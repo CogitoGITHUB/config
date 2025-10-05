@@ -1,21 +1,11 @@
 let keybindings = [
     # Clear terminal
-    {
-      name: clear
-      modifier: control
-      keycode: char_c
-      mode: emacs
-      event: {
-        send: executehostcommand
-        cmd: "clear"
-      }
-    },
 
     # Launch Hyprland from TTY
     {
       name: hyprland
       modifier: control
-      keycode: char_h
+      keycode: char_e
       mode: emacs
       event: {
         send: executehostcommand

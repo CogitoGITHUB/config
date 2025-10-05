@@ -1,7 +1,7 @@
 { config, pkgs, inputs, ... }:
 
 { imports = [ ./hardware-configuration.nix ];
-
+  nixpkgs.config.allowUnfree = true;
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -71,6 +71,9 @@
 
   # System Packages (Consolidated and Caelestia Shell added)
   environment.systemPackages = with pkgs; [
+    tmux
+    zathura
+    nb
     ffmpeg
     python3
     python3Packages.mutagen
@@ -88,7 +91,6 @@
     gh
     starship
     kitty
-    zellij
     firefox
     pyprland
     waybar
@@ -105,11 +107,12 @@
     zoxide
     obs-studio
     obs-cli
-    texliveTeTeX
     blender
     mpv
     mpvpaper
     yt-dlp
+    texlive.combined.scheme-full       # full LaTeX distribution
+  texlivePackages.latexmk             # latexmk from Texlive
   ];
 
   # Kanata
