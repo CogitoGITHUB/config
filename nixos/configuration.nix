@@ -71,6 +71,7 @@
 
   # System Packages (Consolidated and Caelestia Shell added)
   environment.systemPackages = with pkgs; [
+    bat
     tmux
     zathura
     nb

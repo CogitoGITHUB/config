@@ -2113,3 +2113,71 @@ git add .
 # List of plugins<\n>set -g @plugin 'tmux-plugins/tpm'<\n>set -g @plugin 'tmux-plugins/tmux-sensible'<\n># Session save & auto-restore<\n>set -g @plugin 'tmux-plugins/tmux-resurrect'<\n>set -g @plugin 'tmux-plugins/tmux-continuum'<\n><\n># Optional: auto-save every 15 minutes<\n>set -g @continuum-save-interval '15'<\n><\n># Optional: auto-restore tmux on start<\n>set -g @continuum-restore 'on'<\n><\n><\n><\n><\n>set -g @plugin 'mrjones2014/smart-splits.nvim'<\n><\n># Optional configurations with their default values if omitted:<\n><\n>set -g @smart-splits_no_wrap '' # to disable wrapping. (any value disables wrapping)<\n><\n>set -g @smart-splits_move_left_key  'C-h' # key-mapping for navigation.<\n>set -g @smart-splits_move_down_key  'C-j' #  --"--<\n>set -g @smart-splits_move_up_key    'C-k' #  --"--<\n>set -g @smart-splits_move_right_key 'C-l' #  --"--<\n><\n>set -g @smart-splits_resize_left_key  'M-h' # key-mapping for resizing.<\n>set -g @smart-splits_resize_down_key  'M-j' #  --"--<\n>set -g @smart-splits_resize_up_key    'M-k' #  --"--<\n>set -g @smart-splits_resize_right_key 'M-l' #  --"--<\n><\n>set -g @smart-splits_resize_step_size '3' # change the step-size for resizing.<\n><\n># Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)<\n>run '~/.tmux/plugins/tpm/tpm'<\n><\n>unbind C-b<\n>set -g prefix C-a<\n>bind C-a send-prefix<\n><\n><\n># --- Unbind the ugly defaults ---<\n>unbind '"'<\n>unbind %<\n><\n># --- Clean, mnemonic splits ---<\n>bind v split-window -h   # v = vertical split (side-by-side)<\n>bind s split-window -v   # s = stack split (horizontal)<\n>bind z resize-pane -Z<\n><\n><\n><\n>bind f display-popup -w 80% -h 80% -E "tmux new-session -A -s scratch"<\n><\n><\n>set-option -g set-clipboard on<\n><\n># 🖤 Monochrome TMUX Theme<\n><\n># --- Basics ---<\n>set -g default-terminal "tmux-256color"<\n>set -as terminal-overrides ',xterm*:Tc' # True color support<\n><\n># --- Pane Borders ---<\n>set -g pane-border-style fg=brightblack<\n>set -g pane-active-border-style fg=white<\n><\n># --- Status Bar ---<\n>set -g status on<\n>set -g status-interval 5<\n>set -g status-justify centre<\n>set -g status-bg black<\n>set -g status-fg white<\n><\n># --- Left Side ---<\n>set -g status-left-length 50<\n>set -g status-left "#[fg=white,bg=black,bold] #S #[fg=brightblack]"<\n><\n># --- Right Side ---<\n>set -g status-right-length 100<\n>set -g status-right "#[fg=brightblack] #[fg=white,bg=black] %Y-%m-%d #[fg=brightblack] #[fg=white] %H:%M "<\n><\n># --- Window Tabs ---<\n>setw -g window-status-format "#[fg=brightblack] #I #[fg=white] #W "<\n>setw -g window-status-current-format "#[fg=black,bg=white,bold] #I  #W #[default]"<\n>setw -g window-status-separator ""<\n><\n># --- Message Styles ---<\n>set -g message-style fg=white,bg=black,bold<\n>set -g message-command-style fg=white,bg=black,bold<\n><\n># --- Mode (Copy Mode, etc) ---<\n>set -g mode-style bg=brightblack,fg=white<\n><\n># --- Optional: No bells ---<\n>set -g bell-action none<\n><\n># --- Optional: No mouse distractions ---<\n>set -g mouse off<\n><\n>set -g clock-mode-colour white<\n>set -g mode-style "fg=white,bg=black"<\n><\n>
 git add .
 git commit 
+git add .
+git commit 
+git push
+fs
+nb
+clear
+nb settings edit<\n>
+mkdir Files-tex
+clear
+nb 
+nb add tex.tex
+nb show tex.tex<\n>
+clear
+fs Files-tex/
+ls
+ls -all
+fs
+ls -all
+celr
+clear
+fs
+f
+afa
+fa
+celr
+clear
+fs home/
+ls
+nb show tex.tex<\n>
+nb show tex
+nb edit tex
+nb show tex
+nb
+nb settings<\n>
+clear
+nb settings<\n>
+nb settings
+fastfetch12
+nb settings
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+clear
+fs
+fa
+nb settings
+clear
+nb show tex
+clear
+nb edit tex
+nb 
+nb show tex
+nb edit tex
+nb 
+nb 2
+nb open 
+nb open tex.tex
+nb 
+nb add low.tex
+nb
+fs
+ls -all
+clear
+ls -all
+fa
+mkdir nb
+fs nb/
+fa
+clear

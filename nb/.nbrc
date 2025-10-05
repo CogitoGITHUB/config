@@ -1,0 +1,13 @@
+export NB_EDITOR="nvim"       # Or "emacs" if you want
+export NB_DIR="$HOME/Files-tex"
+export NB_NOTEBOOK_PATH="$NB_DIR/"
+export NB_PDF_TOOL="pdftotext"
+export NB_GIT_AUTO_COMMIT="true"   # automatically commit on changes
+export NB_GIT_AUTO_PUSH="true"     # push changes to remote automatically
+export BAT_THEME="Monokai Extended"
+
+export NB_DEFAULT_EXTENSION="${NB_DEFAULT_EXTENSION:-tex}" # Set by `nb` • duminică 5 octombrie 2025, 21:27:06 +0300
+
+export NB_COLOR_THEME="${NB_COLOR_THEME:-smoke}" # Set by `nb` • duminică 5 octombrie 2025, 21:28:46 +0300
+
+export NB_SYNTAX_THEME="${NB_SYNTAX_THEME:-ansi}" # Set by `nb` • duminică 5 octombrie 2025, 21:33:15 +0300
