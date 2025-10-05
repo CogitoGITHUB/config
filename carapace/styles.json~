@@ -1,0 +1,9 @@
+{
+  "carapace": {
+    "Argument": "fg-white,bg-default,no-bold,no-dim,no-italic,no-underlined,no-blink,no-inverse",
+    "Command": "fg-white,bg-default,no-bold,no-dim,no-italic,no-underlined,no-blink,no-inverse",
+    "File": "fg-white,bg-default,no-bold,no-dim,no-italic,no-underlined,no-blink,no-inverse",
+    "Flag": "fg-white,bg-default,no-bold,no-dim,no-italic,no-underlined,no-blink,no-inverse",
+    "Option": "fg-white,bg-default,no-bold,no-dim,no-italic,no-underlined,no-blink,no-inverse"
+  }
+}

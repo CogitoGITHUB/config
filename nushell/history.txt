@@ -1,0 +1,2062 @@
+rm -rf nushell/
+nushell
+cd .config/
+ls
+cd nushell/
+ls
+nano config.nu
+nano env.nu
+# Nushell Environment Config File<\n>#<\n># version = "0.100.0"<\n><\n>def create_left_prompt [] {<\n>    let dir = match (do --ignore-shell-errors { $env.PWD | path relative-to $nu.home-path }) {<\n>        null => $env.PWD<\n>        '' => '~'<\n>        $relative_pwd => ([~ $relative_pwd] | path join)<\n>    }<\n><\n>    let path_color = (if (is-admin) { ansi red_bold } else { ansi green_bold })<\n>    let separator_color = (if (is-admin) { ansi light_red_bold } else { ansi light_green_bold })<\n>    let path_segment = $"($path_color)($dir)(ansi reset)"<\n><\n>    $path_segment | str replace --all (char path_sep) $"($separator_color)(char path_sep)($path_color)"<\n>}<\n><\n>def create_right_prompt [] {<\n>    # create a right prompt in magenta with green separators and am/pm underlined<\n>    let time_segment = ([<\n>        (ansi reset)<\n>        (ansi magenta)<\n>        (date now | format date '%x %X') # try to respect user's locale<\n>    ] | str join | str replace --regex --all "([/:])" $"(ansi green)${1}(ansi magenta)" |<\n>        str replace --regex --all "([AP]M)" $"(ansi magenta_underline)${1}")<\n><\n>    let last_exit_code = if ($env.LAST_EXIT_CODE != 0) {([<\n>        (ansi rb)<\n>        ($env.LAST_EXIT_CODE)<\n>    ] | str join)<\n>    } else { "" }<\n><\n>    ([$last_exit_code, (char space), $time_segment] | str join)<\n>}<\n><\n># Use nushell functions to define your right and left prompt<\n>$env.PROMPT_COMMAND = {|| create_left_prompt }<\n># FIXME: This default is not implemented in rust code as of 2023-09-08.<\n>$env.PROMPT_COMMAND_RIGHT = {|| create_right_prompt }<\n><\n># The prompt indicators are environmental variables that represent<\n># the state of the prompt<\n>$env.PROMPT_INDICATOR = {|| "> " }<\n>$env.PROMPT_INDICATOR_VI_INSERT = {|| ": " }<\n>$env.PROMPT_INDICATOR_VI_NORMAL = {|| "> " }<\n>$env.PROMPT_MULTILINE_INDICATOR = {|| "::: " }<\n><\n># If you want previously entered commands to have a different prompt from the usual one,<\n># you can uncomment one or more of the following lines.<\n># This can be useful if you have a 2-line prompt and it's taking up a lot of space<\n># because every command entered takes up 2 lines instead of 1. You can then uncomment<\n># the line below so that previously entered commands show with a single `🚀`.<\n># $env.TRANSIENT_PROMPT_COMMAND = {|| "🚀 " }<\n># $env.TRANSIENT_PROMPT_INDICATOR = {|| "" }<\n># $env.TRANSIENT_PROMPT_INDICATOR_VI_INSERT = {|| "" }<\n># $env.TRANSIENT_PROMPT_INDICATOR_VI_NORMAL = {|| "" }<\n># $env.TRANSIENT_PROMPT_MULTILINE_INDICATOR = {|| "" }<\n># $env.TRANSIENT_PROMPT_COMMAND_RIGHT = {|| "" }<\n><\n># Specifies how environment variables are:<\n># - converted from a string to a value on Nushell startup (from_string)<\n># - converted from a value back to a string when running external commands (to_string)<\n># Note: The conversions happen *after* config.nu is loaded<\n>$env.ENV_CONVERSIONS = {<\n>    "PATH": {<\n>        from_string: { |s| $s | split row (char esep) | path expand --no-symlink }<\n>        to_string: { |v| $v | path expand --no-symlink | str join (char esep) }<\n>    }<\n>    "Path": {<\n>        from_string: { |s| $s | split row (char esep) | path expand --no-symlink }<\n>        to_string: { |v| $v | path expand --no-symlink | str join (char esep) }<\n>    }<\n>}<\n><\n># Directories to search for scripts when calling source or use<\n># The default for this is $nu.default-config-dir/scripts<\n>$env.NU_LIB_DIRS = [<\n>    ($nu.default-config-dir | path join 'scripts') # add <nushell-config-dir>/scripts<\n>    ($nu.data-dir | path join 'completions') # default home for nushell completions<\n>]<\n><\n># Directories to search for plugin binaries when calling register<\n># The default for this is $nu.default-config-dir/plugins<\n>$env.NU_PLUGIN_DIRS = [<\n>    ($nu.default-config-dir | path join 'plugins') # add <nushell-config-dir>/plugins<\n>]<\n><\n># To add entries to PATH (on Windows you might use Path), you can use the following pattern:<\n># $env.PATH = ($env.PATH | split row (char esep) | prepend '/some/path')<\n># An alternate way to add entries to $env.PATH is to use the custom command `path add`<\n># which is built into the nushell stdlib:<\n># use std "path add"<\n># $env.PATH = ($env.PATH | split row (char esep))<\n># path add /some/path<\n># path add ($env.CARGO_HOME | path join "bin")<\n># path add ($env.HOME | path join ".local" "bin")<\n># $env.PATH = ($env.PATH | uniq)<\n><\n># To load from a custom file you can use:<\n># source ($nu.default-config-dir | path join 'custom.nu')
+source ~/.config/nushell/config.nu
+clear
+source ~/.config/nushell/config.nu
+nano config.nu
+source ~/.config/nushell/config.nu
+nano config.nu
+celar
+clear
+nano env.nu
+rn env.nu
+rm env.nu
+nano env.nu
+clear
+ls
+cd
+cd .config/nushell/
+nano config.nu
+cd ..
+cd zellij/
+ls
+nano config.kdl
+cd .config/zellij/
+nano config.kdl
+ls
+hyprsunset 
+t?
+zellij 
+clear
+fastfech
+ls
+ld
+ls
+nvim
+fd
+ls
+ffssd
+ls
+gf
+cd ..
+cd etc/nixos/
+sudo nano configuration.nix
+hyprctl clients
+cle
+cler
+clear
+hyprctl rules
+curl https://raw.githubusercontent.com/hyprland-community/pyprland/main/scripts/get-pypr | sh
+ls
+ls -all
+curl https://raw.githubusercontent.com/hyprland-community/pyprland/main/scripts/get-pypr | sh
+pip install pyprland
+cd ..
+cd etc/nixos/
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+which pypr 
+cd
+pgrep -af pyprland
+pyprland daemon
+which pypr 
+pyprland daemon
+pyprdaemon
+pypr daemon
+cd ..
+cd nixo\\\
+cd ..
+cd etc/nixos/
+clear
+pyprland daemon
+echo $env.PATH
+ls -l /home/asdf/.nix-profile/bin/pypr*
+ip a
+nmtui
+nmcli device list
+nmcli device wifi list
+nmcli device wifi connect "TP-Link_5E9C" paswword "44875817"
+nmcli device wifi connect "TP-Link_5E9C" password "44875817"
+ls -l /run/current-system/sw/bin/pypr*
+pypr daemon
+pgrep -af pyprland
+rm -f /tmp/pyprland-socket*
+pypr daemon
+pypr --debug --log-file /tmp/pyprland-debug.log daemon
+whoami
+ls -ld /tmp
+sudo nano configuration.nix
+pypr daemon
+pypr --debug --log-file /tmp/pyprland-debug.log daemon
+strace -f -o /tmp/pyprland-strace.log pypr daemon
+cat /tmp/pyprland-strace.log
+2125  read(3, "", 1)                    = 0
+rm -f ~/.local/share/pyprland/socket
+strace -f -o /tmp/pyprland-strace.log pypr daemon
+clar
+zellij 
+htop
+cd ..
+cd etc/nixos/
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+DEBUG=1 pypr
+hyprctl reload
+fastfech
+fastfetch
+htop
+ava
+cava
+ip a
+nmcli device wifi connect "RedAeon" password "asdfasdf"
+hotp
+htop
+gf
+a
+fastfetch
+fastfetch
+ip a
+nmcli device wifi connect "RedAeon" password "asdfasdf"
+cd ..
+cd //
+cd 
+cd //
+cd 
+cd..
+cd ..
+cd etc/nixos/
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+cd
+ls
+path
+path basename
+path -basename
+clear
+ip a
+a
+emacs -d
+emacs --debug-init
+cd ..
+cd etc/nixos/
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+obs 
+Hyprland 
+p a 
+ip a 
+emacs --debug-init
+Hyprland 
+swww init
+swww img .config/swww/swww.gifs/room.gif
+Hyprland 
+swww img .config/swww/swww.gifs/room.gif
+swww img .config/swww/swww.gifs/error.gif
+swww img .config/swww/swww.gifs/lucy-red.gif
+swww img .config/swww/swww.gifs/dark-entity.gif
+swww img .config/swww/swww.gifs/room.gif
+swww img .config/swww/swww.gifs/tv-glitch.gif
+swww img --next
+cd .config/hypr/
+mkdir scripts
+cs scripts/
+cd scripts/
+cd .config/swww/swww.gifs/
+ls
+nano wallpaper_selector_fzf.sh
+#!/bin/bash<\n><\n># --- CONFIGURATION ---<\n># IMPORTANT: Set this to the directory where your wallpapers are stored<\n>WALLPAPER_DIR="$HOME/Pictures/Wallpapers" # <--- CUSTOMIZE THIS PATH!<\n><\n># swww transition settings<\n>TRANSITION_TYPE="grow"<\n>TRANSITION_DURATION=1.5<\n>TRANSITION_FPS=60<\n># --- END CONFIGURATION ---<\n><\n># Check if swww-daemon is running, if not, initialize it<\n>if ! pgrep -x swww-daemon > /dev/null; then<\n>    swww init<\n>fi<\n><\n># Find all image files (jpg, png, jpeg, webp, gif) in the wallpaper directory<\n># Pipe the list of files to fzf for selection<\n># You can type to fuzzy-search, navigate with arrow keys, and press Enter to select.<\n>selected_wallpaper=$(find "$WALLPAPER_DIR" -type f \( -name "*.jpg" -o -name "*.png" -o -name "*.jpeg" -o -name "*.webp" -o -name "*.gif" \) | fzf)<\n><\n># Check if a wallpaper was actually selected (user didn't press Esc or close fzf)<\n>if [ -n "$selected_wallpaper" ]; then<\n>    # Set the selected wallpaper using swww with transitions<\n>    swww img "$selected_wallpaper" \<\n>        --transition-type "$TRANSITION_TYPE" \<\n>        --transition-duration "$TRANSITION_DURATION" \<\n>        --transition-fps "$TRANSITION_FPS"<\n>fi
+chmod +x ~/.config/hypr/scripts/wallpaper_selector_fzf.sh
+rm wallpaper_selector_fzf.sh
+ls
+cd 
+cd ..
+cd etc/nixos/
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+cd
+clear
+cd ..
+cd etc/nixos/
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+cd
+yt-dlp 'https://www.youtube.com/watch?v=F3wJzNQUivw'
+ls
+mpv 'Yuji Itadori [AMV] ｜ Skyfall (Jujutsu Kaisen) [F3wJzNQUivw].mp4'
+cd .config/
+ls
+Hyprland 
+nix search DaVinci Resolve
+cd ..
+cd etc/nixos/
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+date humanize 
+cd
+cd .config/
+ls
+cd
+mkdir -p ~/.config/fastfetch<\n>touch ~/.config/fastfetch/config.jsonc
+mkdir  ~/.config/fastfetch<\n>touch ~/.config/fastfetch/config.jsonc
+cd .config/fastfetch/
+nano config.jsonc
+fastfetch
+nano config.jsonc
+fastfetch
+nano config.jsonc
+rm config.jsonc
+nano config.jsonc
+fastfetch
+r
+afr
+fastfetch
+cd
+cd .config/swww/swww.gifs/
+ls
+fastfetch
+cd
+cd .config/fastfetch/
+nano config.jsonc
+fastfetch
+kitty +kitten icat ~/.config/swww/swww.gifs/red-moon.gif
+nano config.jsonc
+fastfetch
+nano config.jsonc
+fastfetch
+nano config.jsonc
+fastfetch
+fastfetch -v
+kitty +kitten icat /home/asdf/.config/swww/swww.gifs/red-moon.gif
+nano config.jsonc
+fastfetch 
+rm config.jsonc
+nano config.jsonc
+fastfetch 
+rm config.jsonc
+fastfetch 
+nano config.jsonc
+fastfetch 
+nano config.jsonc
+fastfetch 
+rm config.jsonc
+fastfetch 
+cd `Root for Aeon/`
+ls
+cd AeoncoreOS/
+ls
+rm README.org
+nano README.org
+fastfetch
+htop
+fastfetch
+gh repo clone AeoncoreOS
+time
+clock
+cd ..
+cd etc/nixos/
+sudo nvim configuration.nix
+fate
+date
+date now
+sudo nano configuration.nix
+a
+nvim
+swww img ~/.config/swww/swww.gifs/red-moon.gif
+swww img ~/.config/swww/swww.gifs/purple/i-tried.gif
+swww img ~/.config/swww/swww.gifs/dark-entity.gif
+swww img ~/.config/swww/swww.gifs/error.gif
+sudo nixos-rebuild switch
+nvim
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+cd .config/
+ls
+sudo nixos-rebuild switch
+mkdir nvim
+cd nvim/
+nvim init.lua
+mkdir lua
+cd lua/
+mkdir config
+cd config/
+nvim lazy.lua
+cd ..
+mkdir plugins
+cd plugins/
+nvim hardtime.nvim
+nvim hardtime.lua
+nvim
+nvim hardtime.lua
+nvim oil.lua
+rm hardtime.lua
+rm hardtime.nvim
+nvim
+nvim snacks.lua
+nvim
+cd ..
+ls
+cd config/
+ls
+cd ..
+cd nvim/
+ls
+nvim init.lua
+tree
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+cd lua/config/
+ls
+nvim keymaps.lua
+cd ..
+nvim init.lua
+nvim
+ls
+cd lua/plugins/
+cd .config/nvim/
+tree
+nvim
+rm hardtime.lua
+nvim
+swww img ~/.config/swww/swww.gifs/lucy-red.gif
+swww img ~/.config/swww/swww.gifs/dark-entity.gif
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+zellij 
+tmux
+cd ..
+cd etc/nixos/
+cd .config/
+ls
+rm zellij/
+rm -rf zellij/
+ls
+cd
+{<\n>  "nvim-neotest/neotest",<\n>  dependencies = {<\n>    "nvim-neotest/nvim-nio",<\n>    "nvim-lua/plenary.nvim",<\n>    "antoinemadec/FixCursorHold.nvim",<\n>    "nvim-treesitter/nvim-treesitter"<\n>  }<\n>}
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+ls -all
+cd .tmux/
+ls
+cd
+cd .config/
+ls
+mkdir tmux
+cd tmux/
+nvim tmux.conf
+nvim
+cle
+clear
+tmux source-file ~/.tmux.conf
+tmux source-file ~/.config/tmux/tmux.conf
+nvim
+rm neotest.lua
+nvim
+swww img ~/.config/swww/swww.gifs/error.gif
+swww img ~/.config/swww/swww.gifs/room.gif
+cava
+nvim
+tmux
+nvim
+tmux
+KK
+cd
+ls
+nvim
+cd
+cd ..
+cd etc/nixos/
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+gcc
+cd
+clear
+nvim
+cd
+cd .config/tmux/
+ls
+cat tmux.conf
+nvim tmux.conf
+cd
+cd ..
+cd etc/nixos/
+sudo nvim configuration.nix
+swww img ~/.config/swww/swww.gifs/error.gif
+sudo nixos-rebuild switch
+cd
+fastfetch
+steam 
+cd .config/hypr/
+which steam 
+nvim
+tmux
+cd
+fastfetch
+cd cd /
+cd .config/
+ls
+git clone https://github.com/Filip-Sutkowy/blurclean-firefox-theme chrome
+ls
+cd chrome/
+ls
+cd .config/hypr/modules/
+nvim keybindings.conf
+cd .config/hypr/modules/
+nvim look-and-feel.conf
+ds
+Hyprland 
+cd .config/
+ls
+nvim hypr/modules/keybindings.conf
+cd hypr/modules/
+nvim keybindings.conf
+fastfetch
+cd .config/hypr/modules/
+nvim keybindings.conf
+pypr reload
+hyprctl reload
+pypr reload
+hyprctl reload
+pypr reload
+hyprctl reload
+Hyprland 
+pypr reload
+hyprctl reload
+pypr reload
+hyprctl reload
+pypr reload
+hyprctl reload
+pypr reload
+hyprctl reload
+cd .config/hypr/modules/
+nvim keybindings.conf
+pypr reload
+hyprctl reload
+pypr reload
+fastfetch
+cd ..
+cd etc/nixos/
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+termius
+sudo nvim configuration.nix
+davinci-resolve-studio 
+sudo nvim configuration.nix
+cd .config/hypr/modules/
+nvim keybindings.conf
+sudo nixos-rebuild switch
+ip a 
+shh
+ssh
+ip a 
+hostname
+ls
+fastfetch 
+reboot
+sudo reboot
+ls
+fastfetch 
+nvim
+Hyprland
+fastfetch 
+cd .config/
+ls
+cd qutebrowser/
+ls
+cd ..
+cd .config/
+ls
+mkdir nyxt
+cd nyxt/
+nvim init.lisp
+cd .config/nyxt/
+nvim init.lisp
+emacs
+cd .config/qutebrowser/
+ls
+mkdir themes
+cd themes/
+cd ..
+fastfetch 
+cd .config/nyxt/
+git clone https://github.com/dracula/nyxt.git<\n>cp nyxt/*.lisp ~/.config/nyxt
+ls
+nvim config.lisp
+cd
+ls 
+git clone https://github.com/dracula/nyxt.git<\n>cp nyxt/*.lisp ~/.config/nyxt
+ls
+cd nyxt/
+ls
+cd
+fastfetch 
+gh repo clone AeoncoreOS
+cd AeoncoreOS/
+emacs 
+ls
+git add .
+cd
+rm AeoncoreOS/
+ls
+gh repo clone AeoncoreOS
+cd AeoncoreOS/
+ls
+emacs
+cd ..
+ls
+cd
+cd ..
+ls
+cd usr/etc/
+ls
+rm motd
+cd
+tmux
+pkg install tmux
+nvim
+pkg install gcc
+nvim
+tmux
+cd 
+emacs
+mkdir aeon-tome
+ls
+emacs
+cd .config/nushell/
+ls
+nvim config.nu
+cd .config/nushell/
+v
+nvim config.nu
+cd .config/nushell/
+nvim config.nu
+tmux
+cd .config/nushell/
+nvim config.nu
+ls
+nvim config.nu
+emacs
+ls -all
+nvim .termux/
+t
+nvim .termux/
+emacs
+nvim .termux/
+emacs
+nu
+swww img ~/.config/swww/swww.gifs/tv-glitch.gif
+pypr reload
+cd ..
+cd etc/nixos/
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+pypr reload
+ip a
+nmcli device wifi list
+nmcli device wifi connect "TP-Link_5E9C" password "44875817"
+cd
+pypr reload
+pyprland daemon
+pypr daemon
+pyprland daemon
+cd ..
+cd etc/nixos/
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+pyprland daemon
+pypr daemon
+pypr reload
+pkill -f pypr
+pypr reload
+pypr daemon
+reboot
+t
+cd ..
+cd
+cd ..
+cd etc/nixos/
+swww -kill
+swww kill
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+cd
+nu.env-path
+nu path
+zoxide init
+zoxide init nu
+zoxide init nushell
+z 
+z .config/
+use zoxide.nu
+zoxide --version
+zoxide init nushell | save --force ~/.config/nushell/zoxide.nu
+source ~/.config/nushell/config.nu
+z .config/
+z
+source ~/.config/nushell/config.nu
+z
+z .config/
+cd
+fzf
+zoxide query --interactive
+zi
+fs
+fa
+source ~/.config/nushell/config.nu
+fa
+source ~/.config/nushell/zoxide.nu
+fa
+source ~/.config/nushell/zoxide.nu
+cd
+fastfetch 
+z ..
+z etc/nixos/
+ls
+z etc/nixos/
+fa
+ls
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+ranger
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+z
+fa
+ls
+z asdf/
+fa asdf/
+cd asdf/
+fs
+fd
+fa
+fd
+ds
+fs
+fa
+fs
+fastfetch 
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+fa
+ls
+cd asdf/
+ls
+fs
+cd Music/
+ls
+yt-dlp 'https://youtu.be/gH_nHVvfJiI?si=SOP4C0geX8VXIxyK'
+ls
+mv 'SUNG JIN-WOO ｜ SOLO LEVELING ASMV [gH_nHVvfJiI].webm' ~/
+ls
+yt-dlp 'https://youtu.be/ME_eL7wkI84?si=s-Cd3aghv1M1v2YP'
+mpvpaper 
+mpvpaper "*" 'MMV – 4ЯR - Hide [ME_eL7wkI84].webm'
+mpvpaper -f "*" 'MMV – 4ЯR - Hide [ME_eL7wkI84].webm'
+fastfetch 
+fs
+fa
+ls -la
+ls -l
+ls -al
+ls -all
+fastfetch 
+cava
+htop
+mpvpaper -k
+mpvpaper -s
+Hyprland
+swww kill
+fa .config/hypr/modules/
+cd .config/hypr/modules/
+nvim keybindings.conf
+fa
+fs
+fa
+mkdir ~/.emacs.d/backups
+ls -all
+ls
+gh init
+gh init repo
+gh repo
+gh repo create
+ls
+cd cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+ls
+fastfetch 
+cd Downloads/
+ls
+rm `-45gBXbR.html`
+ls
+cd
+git clone https://github.com/protesilaos/denote.git
+cd denote/
+ls
+mv README.org ~/cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+cd
+rm -rf denote/
+cd Working-Docs/
+ls
+cd
+rm -rf Working-Docs/
+ls
+cd aeon-tome/
+ls
+cd
+rm -rf aeon-tome/
+ls
+cd `Root for Aeon/`
+ls
+cd
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+tree
+fs
+tree cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+git clone https://github.com/protesilaos/denote.git
+cat cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+tree cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+ls
+sudo ufw status
+sudo iptables -L
+sudo iptables -A nixos-fw-accept -p tcp --dport 35901 -j ACCEPT
+sudo iptables -F
+telnet localhost 35901
+curl http://localhost:35901
+fastfetch 
+swww img ~/.config/swww/swww.gifs/dark-entity.gif
+swww kill
+tree cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+swww kill
+path cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+path
+path dirname cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+path dirname cartographer.reality.403-shapeshifter-to-aeonsmth.0
+H
+swww kill
+H
+emacs -k
+emacs
+swww kill
+swww img ~/.config/swww/swww.gifs/room.gif
+swww-daemon 
+exec-once swww-daemon
+swww img ~/.config/swww/swww.gifs/room.gif
+Hyprland
+swww img ~/.config/swww/swww.gifs/room.gif
+cd .config/hypr/modules/
+nvim 
+gh clone Working
+gh repo clone Working
+emacs
+clear
+reboot
+Hyprland
+z
+fa
+which zoxide 
+fa
+fa ..
+cd ..
+cd etc/nixos/
+sudo neovim configuration.nix
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+cd
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+fa
+fa .config/hypr/modules/
+fa
+fs
+fa
+fs .config/hypr/modules/
+ls
+nvim 
+firefox
+nvim .
+reboot
+fa
+sudo nano configuration.nix
+sudo nixos-rebuild switch
+reboot
+h
+fa
+fs .config/nushell/
+ls
+cd aeon-modules/aliases.nu
+ls
+cd aeon-modules/
+ls
+nvim .
+cd
+h
+reboot
+fa .config/hypr/modules/
+fa
+swww img ~/.config/swww/swww.gifs/room.gif
+swww-daemon 
+cd .config/
+ls
+cd 
+cd backup/
+ls
+ls -all
+`AeoncoreOS-working dir/`
+ls
+cd 
+cd .config/
+ls
+mkdir swww
+cd swww/
+mkdir swww-gifs
+cd swww-gifs/
+mkdir monochrome
+cd monochrome/
+swww img rain.gif
+swww img ~/.config/swww/swww-gifs/
+swww img ~/.config/swww/swww-gifs/monochrome/rain.gif
+swww kill
+swww-daemon 
+r
+swww-daemon 
+swww img ~/.config/swww/swww-gifs/monochrome/rain.gif
+ls .config/swww/swww-gifs/monochrome/
+swww img ~/.config/swww/swww-gifs/monochrome/rain.gif
+c
+clear
+swww img ~/.config/swww/swww-gifs/monochrome/rain.gif
+swww img ~/.config/swww/swww-gifs/monochrome/rain.gif
+r
+fa
+sudo nvim configuration.nix
+sr
+sudo sr
+sudo nixos-rebuild switch
+mpvpaper -s
+fa
+ls
+mkdir mpvpaper
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+which yt-dlp 
+yt-dlp 'https://www.youtube.com/watch?v=VlOfYFixlKs'
+fa
+ls
+ls mpvpaper/
+yt-dlp "~/.config/mpvpaper/" "https://www.youtube.com/watch?v=VlOfYFixlKs"
+ls
+mv 'Monochrome Countdown Animation Motion Background Stock Video Footage Free For Editing [VlOfYFixlKs].mp4' mpvpaper/
+cd mpvpaper/
+ls
+mpvpaper 'Monochrome Countdown Animation Motion Background Stock Video Footage Free For Editing [VlOfYFixlKs].mp4'
+swww kill
+mpvpaper-daemon
+mpvpaper daemon
+mpvpaper -o "no-audio --loop" eDP-1 '/home/asdf/.config/mpvpaper/Monochrome Countdown Animation Motion Background Stock Video Footage Free For Editing [VlOfYFixlKs].mp4'
+fa
+nvim .
+r
+mpvpaper -o "no-audio --loop" eDP-1 "$(yt-dlp -f best -g 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')"
+mpvpaper -o "no-audio --loop" eDP-1 "$(yt-dlp -f best -g 'https://www.youtube.com/watch?v=VlOfYFixlKs')"
+mpvpaper -o "no-audio --loop" eDP-1 $(yt-dlp -f best -g "https://www.youtube.com/watch?v=VlOfYFixlKs")
+mpvpaper -o "no-audio --loop" eDP-1 (yt-dlp -f best -g "https://www.youtube.com/watch?v=VlOfYFixlKs")
+fa
+nvim .
+sh -c 'mpvpaper -o "no-audio --loop" eDP-1 $(yt-dlp -f best -g "https://www.youtube.com/watch?v=VlOfYFixlKs")'
+r
+fa
+htop
+cava
+clear
+fastfetch 
+echo time.
+clear ; echo time.
+celar
+clear
+hyprctl reload
+r
+fa
+nvim .
+r
+fa
+fs hypr/
+ls
+nvim .
+r
+hotp
+htop
+ls
+t
+time
+fastfetch 
+fs .config/
+ls
+fs zellij/
+ls
+nvim config.kdl
+zellij 
+fa
+nvim config.kdl
+zellij 
+nvim config.kdl
+fa
+nvim config.kdl
+zellij kill
+zellij kill-all-sessions
+zellij 
+ls
+cd ..
+cd nushell/
+ls
+nvim config.nu
+fa
+nvim configuration.nix
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+fs
+fa
+nvim .
+fs
+fs .config/
+ls
+nvim starship.toml
+exec $SHELL -l
+source ~/.config/nushell/config.nu
+starship
+starship module
+starship prompt
+source ~/.config/nushell/config.nu
+fs nushell/
+nvim .
+clear
+time
+nvim .
+nvim
+cd zellij/
+fs zellij/
+fa
+htop
+ls
+ll
+all
+lll
+ls
+clear
+ls -all
+ls
+clear
+fa
+clear
+fa
+atuin
+clear
+atuin
+a
+fa
+ls
+this looks so clean 
+mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
+fa
+nvim .
+clear
+fa
+fs
+clear
+fa
+sudo nvim configuration.nix
+fs
+clear
+sudo nixos-rebuild switch
+clear
+fs
+clear
+qemu-system-x86_64 \<\n>   -nic user,model=virtio-net-pci \<\n>   -enable-kvm -m 2048 \<\n>   -device virtio-blk,drive=myhd \<\n>   -drive if=none,file=guix-system-vm-image-1.4.0.x86_64-linux.qcow2,id=myhd<\n>
+clear
+qemu
+clear
+fs
+fa
+ansi 
+fa
+nvim .
+hyprctl reload
+cat
+clear
+cat .config/hypr/modules/keybindings.conf
+clear
+cd .config/
+ls
+gh repo
+cd
+gh repo create
+ls
+ls -all
+cd .config/
+ls
+git status
+git add .
+git commit
+git config --global user.email "vlasceanupaulinoionut@gmail.com"
+git config --global user.name "CogitoGITHUB"
+git commit
+git config --global core.editor nvim
+git commit
+git push
+git push master
+git push --set-upstream origin master
+h
+fa
+ls
+rm keybindings.conf
+rm keybindings.conf~
+ls
+fs
+clear
+zellij 
+nvim .
+zellij 
+nvim .
+swww img ~/.config/swww/swww-gifs/monochrome/rain.gif
+nvim .
+exec-once = mpvpaper -o "no-audio --loop" eDP-1 (yt-dlp -f best -g "https://www.youtube.com/watch?v=VlOfYFixlKs")
+mpvpaper -o "no-audio --loop" eDP-1 (yt-dlp -f best -g "https://www.youtube.com/watch?v=VlOfYFixlKs")
+cd .config/
+git add .
+git commit
+git push
+fa
+nvim .
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+fs
+nix-env -iA nixos.gemini-cli
+fa
+mpvpaper -o "no-audio --loop" eDP-1 (yt-dlp -f best -g "https://www.youtube.com/watch?v=VlOfYFixlKs")<\n>
+nvim .
+hyprctl reload
+systemctl --user enable --now mpvpaper.service
+mpvpaper -o "no-audio --loop" eDP-1 (yt-dlp -f best -g "https://www.youtube.com/watch?v=gH_nHVvfJiI&list=LL&index=12")<\n>
+mpvpaper -o " --loop" eDP-1 (yt-dlp -f best -g "https://www.youtube.com/watch?v=gH_nHVvfJiI&list=LL&index=12")
+nvim .
+mpvpaper -o "--loop" eDP-1 (yt-dlp  best -g "https://www.youtube.com/watch?v=gH_nHVvfJiI&list=LL&index=12")<\n>
+mpvpaper -o "--loop" eDP-1 (yt-dlp -g "https://www.youtube.com/watch?v=gH_nHVvfJiI&list=LL&index=12")
+mpvpaper -o "--loop" eDP-1 (yt-dlp "https://www.youtube.com/watch?v=gH_nHVvfJiI&list=LL&index=12")
+mpvpaper "--loop" eDP-1 (yt-dlp "https://www.youtube.com/watch?v=gH_nHVvfJiI&list=LL&index=12")
+yt-dlp -f best -g "https://www.youtube.com/watch?v=gH_nHVvfJiI&list=LL&index=12"
+yt-dlp -f best -g "https://www.youtube.com/watch?v=gH_nHVvfJiI&list=LL&index=13"
+mpvpaper -o "--loop" eDP-1 "https://direct_video_url_from_yt-dlp"
+mpvpaper -o "--loop" eDP-1 'https://youtu.be/0Mf2nkd0JUU?si=c_KZoKTfHZJnDJmw'
+nvim .config/hypr/modules/autostart.conf
+fastfetch 
+stat .emacs.d/Emacs.org
+ls -all
+path dirname cartographer.reality.403-shapeshifter-to-aeonsmth.0
+path dirname cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+path cartographer.reality.403-shapeshifter-to-aeonsmth.0/
+fastfetch 
+ip
+ip a
+sudo ip link set wlan0 up
+sudo ip link 
+ip a
+sudo ip link set wlp2s0 up
+sudo iw dev wlp2s0 scan | grep SSID<\n>
+nmcli dev wifi
+nmcli dev wifi connect "TP-Link_5E9C" password "44875817"
+ip a
+fastfetch 
+nvvim .
+nvim .
+nvim
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+fastfetch 
+fs
+clear
+fastfetch 
+nvim
+fastfetch 
+pypr reload
+hyprctl clients | grep class
+pypr reload
+hyprctl clients
+clear
+hyprctl clients
+pypr reload
+hyprctl clients
+pypr reload
+nvim .
+zellij 
+nvim .
+nvim .config/nushell/env.nu
+nvim .config/nushell/config.nu
+echo $nu.env.SHELL
+clear
+nvim .config/nushell/config.nu
+which zellij
+cd .config/
+mkdir kitty
+cd kitty/
+nvim kitty.conf
+fastfetch 
+nvim .config/nushell/startup.nu
+fastfetch --gen-config
+nvim .config/fastfetch/config.jsonc
+fastfetch 
+nvim .config/fastfetch/config.jsonc
+fastfetch 
+nvim .config/fastfetch/config.jsonc
+fastfetch
+nvim .config/fastfetch/config.jsonc
+fastfetch
+nvim .config/fastfetch/config.jsonc
+fastfetch
+nvim .config/fastfetch/config.jsonc
+fastfetch
+nvim .config/fastfetch/config.jsonc
+fastfetch
+clear
+nvim .config/fastfetch/config.jsonc
+fastfetch
+nvim .config/fastfetch/config.jsonc
+fastfetch
+nvim .config/fastfetch/config.jsonc
+fastfetch
+nvim .config/nushell/
+nvim .config/zellij/
+asdf
+ls
+nvim .config/
+clear
+nvim .config/nushell/aeon-modules/aliases.nu
+n
+n .
+n
+ls .config/nushell/
+n .config/nushell/aeon-modules/
+n
+n .config/nushell/config.nu
+cd .config/nushell/aeon-modules/keybindings/
+ls
+nvim .config/nushell/config.nu
+n .config/kitty/kitty.conf
+keybindings default
+c
+n .config/nushell/
+nvim .config/nushell/config.nu
+> keybindings list
+keybindings list --modifiers --keycodes --modes --events --edits
+nvim .config/nushell/aeon-modules/keybindings/basic.nu
+l
+c
+nvim .config/nushell/config.nu
+nvim .config/nushell/aeon-modules/keybindings/basic.nu
+c
+{<\n>    name: launch_hyprland_floating_term<\n>    modifier: control<\n>    keycode: char_f<\n>    mode: [emacs vi_normal vi_insert]<\n>    event: { send: executehostcommand, cmd: "hyprctl dispatch -- exec [workspace special:term, float; alacritty]" }<\n>}<\n>{<\n>    name: launch_neovim<\n>    modifier: control<\n>    keycode: char_n<\n>    mode: [emacs vi_normal vi_insert]<\n>    event: { send: executehostcommand, cmd: "nvim" }<\n>}<\n>{<\n>    name: launch_zexide_alias<\n>    modifier: control<\n>    keycode: char_e<\n>    mode: [emacs vi_normal vi_insert]<\n>    event: { send: executehostcommand, cmd: "fa" }<\n>}<\n>{<\n>    name: clear_screen<\n>    modifier: control<\n>    keycode: char_l<\n>    mode: [emacs vi_normal vi_insert]<\n>    event: { send: clearscreen }<\n>}<\n>
+nvim .config/nushell/aeon-modules/keybindings/basic.nu
+fastfetch
+swww kill
+nvim .config/nushell/
+fa
+fs
+zoxide 
+z 
+fa
+clear
+fastfetch
+ks
+ls
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+fa
+fs
+clear
+ls -l ~/.config/nushell/core-modules/theme.nu
+source ($nu.config-path + "/core-modules/theme.nu")
+echo $nu.config-path
+ls -b ~/.config/nushell/core-modules/
+echo $nu.config-path<\n>echo ($nu.config-path + "/core-modules/theme.nu")<\n>
+source "/home/asdf/.config/nushell/core-modules/theme.nu"
+echo $dark_theme
+echo $color_config
+fa
+cd ..
+cd etc/nixos/
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+cd
+celar
+clear
+which carapace 
+mkdir -p ~/.cache/carapace
+mkdir ~/.cache/carapace
+carapace _carapace nushell | save --force ~/.cache/carapace/init.nu
+fastfetch
+mkdir ~/.config/carapace
+carapace _carapace nushell | tee ~/.config/carapace/init.nu
+carapace _carapace nushell | save ~/.config/carapace/init.nu --force
+clear
+source ~/.config/carapace/init.nu
+vincent
+fa
+fs
+fastfetch
+fastfetch 
+ls
+ls -all
+cd .config/
+ls
+clear
+ls
+ls all
+ls -all
+ls
+ls -all
+ls
+ls -all
+clear
+ls
+nvim
+clear
+git add .
+git commit
+git push
+gh push
+gh auth 
+gh auth status
+git push
+fastfetch 
+h
+clear
+keybindings default
+clear
+cle
+clear
+swww kill
+clear
+keybindings list | where type == events
+clear
+exec un
+celar
+fa
+git add .
+git commit
+git push
+ls
+ls -all
+git rm -r --cached gh/
+nvim .gitignore
+git add .gitignore<\n>git commit -m "Ignore GitHub CLI config files"<\n>
+git push
+git add .
+git commit
+ls -all
+git rm -r --cached gh/
+fit push
+git push
+# Remove the gh/hosts.yml file from all commits<\n>git filter-branch --force --index-filter \<\n>  "git rm --cached --ignore-unmatch gh/hosts.yml" \<\n>  --prune-empty --tag-name-filter cat -- --all<\n><\n># Push the cleaned history<\n>git push origin master --force
+https://github.com/CogitoGITHUB/.config/security/secret-scanning/unblock-secret/32SAlH6REGM6AXOtnAdGQXxlIx3
+git push
+fa .config
+git restore nushell/
+ls
+lear
+c;ear
+clear
+fs
+cd
+clear
+cd .config/nushell/
+la
+ls
+clear
+ls
+cd aeon-modules/
+ls
+hyprctl dispatch exit
+clear
+kill zellij
+zellij kill
+jelliz
+zellij kill
+zellij kill-ERR
+zellij kill-all-session
+h
+swww kill
+fas
+fastfetch 
+keybindings listen
+clear
+config show keybindings
+keybindings list
+keybindings listen
+keybindings emacs
+keybindings default
+keybindings list
+source ~/.config/nushell/config.nu
+config reload
+config
+config flatten 
+clear
+nvim
+$env.config.keybindings | where name == "nvim"
+clear
+fa
+git add .
+git commit
+git push
+clear
+fs
+waybar
+clear
+waybar 
+waybar
+git clone https://github.com/sejjy/mechabar.git ~/.config/waybar<\n>cd ~/.config/waybar
+./install.sh
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+reboot
+waybar 
+cd .config/nushell/
+ncim .
+nvim .
+fs
+swww kill
+fs
+fa
+hyprctl plugin list
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+fs
+rm -rf ~/.config/waybar<\n>git clone https://github.com/Prateek7071/dotfiles.git ~/.config/waybar<\n>
+waybar
+killall waybar<\n>waybar &<\n>disown
+pkill waybar<\n>waybar &<\n>disown
+waybar
+chmod +x ~/.config/waybar/scripts/pomodoro.sh
+fa
+fa waybar/
+cd waybar/
+chmod +x ~/.config/waybar/scripts/pomodoro.sh
+waybar 
+waybar
+chmod +x ~/.config/waybar/scripts/pipewire-audio.sh
+waybar
+chmod +x ~/.config/waybar/scripts/pipewire-audio.sh
+waybar
+fs
+cd .config/
+gh repo clone config-bak/
+rm -rf config-bak/
+gh repo clone config-bak/
+gh repo clone config-bak
+cd
+cd config-bak/
+mv .git/ ~/.config/
+cd
+rm -rf config-bak/
+l
+ls
+reboot
+starship 
+clear
+nvim .
+mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
+exec un
+cd ..
+cd etc/nixos/
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+## ${UserConfigDir}/nushell/env.nu<\n>$env.CARAPACE_BRIDGES = 'zsh,fish,bash,inshellisense' # optional<\n>mkdir $"($nu.cache-dir)"<\n>carapace _carapace nushell | save --force $"($nu.cache-dir)/carapace.nu"<\n><\n># ${UserConfigDir}/nushell/config.nu<\n>source $"($nu.cache-dir)/carapace.nu"<\n>
+cd
+## ${UserConfigDir}/nushell/env.nu<\n>$env.CARAPACE_BRIDGES = 'zsh,fish,bash,inshellisense' # optional<\n>mkdir $"($nu.cache-dir)"<\n>carapace _carapace nushell | save --force $"($nu.cache-dir)/carapace.nu"<\n><\n># ${UserConfigDir}/nushell/config.nu<\n>source $"($nu.cache-dir)/carapace.nu"<\n>
+cd etc/nixos/
+cd ..
+cd etc/nixos/
+sudo nvim configuration.nix
+sudo nixos-
+sudo nixos-rebuild switch
+sudo nixos-
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+reboot
+cd ..
+cd etc/nixos/
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+cd
+$env.CARAPACE_BRIDGES = 'zsh,fish,bash,inshellisense' # optional<\n>mkdir $"($nu.cache-dir)"<\n>carapace _carapace nushell | save --force $"($nu.cache-dir)/carapace.nu"
+source $"($nu.cache-dir)/carapace.nu"
+nvim .
+mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
+mkdir ~/.local/share/atuin/
+atuin init nu | save ~/.local/share/atuin/init.nu
+source ~/.local/share/atuin/init.nu
+clear
+fa
+fs
+zoxide init nushell | save -f ~/.zoxide.nu
+source ~/.zoxide.nu
+fa
+fs
+nvim .
+fs
+zoxide
+nvim .
+fa
+fs
+fs ..
+fs etc/nixos/
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+fs
+fa
+fs .config/
+ls
+obs
+clear
+ls
+mkdir wofi
+cd wofi/
+ls
+nvim config
+nvim style.css
+wofi
+cd
+nvim .
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+fa
+cd
+cler
+cleae
+clear
+nvim ~/.config/tofi/config
+fs .config/
+mkdir tofi
+nvim .
+tofi -m drun<\n>
+tofi -m drun
+tofi drun
+nvim .
+hyprsysteminfo 
+nvim .
+clear
+cd
+clear
+reboot
+fs
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+fa
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+sudo nvim configuration.nix
+sudo nixos-rebuild switch
+ls
+cd
+fs
+fa
+fs .config/
+fa
+mkdir nixos
+fs nixos/
+nix flake init
+ls
+cat flake.nix
+sudo nixos-rebuild switch --flake .#my-machine
+fs
+fa
+git add .
+git commit
+clear
+git config --global user.name "CogitoGITHUB"<\n>git config --global user.email "vlasceanupaulinoionut@gmail.com"<\n>
+git commit
+git config --global core.editor "nvim"<\n>
+git commit
+git commit -m "Add nixos flake"<\n>
+git push
+sudo nixos-rebuild switch --flake .#my-machine<\n>
+fa
+sudo nixos-rebuild switch --flake .#my-machine
+fa
+cat configuration.nix
+fa
+nvim 
+nvim .
+fa
+cp configuration.nix ~/.config/nixos/
+fa
+ls
+fa
+nvim .
+git add .
+git commit -m "Add nixos flakes"
+git push
+sudo nixos-rebuild switch --flake .#nixos<\n>
+clear
+fa
+ls
+cp hardware-configuration.nix ~/.config/nixos/
+fa
+ls
+nvim .
+git add
+git add .
+git commit -m "Add hardware"
+git push
+sudo nixos-rebuild switch --flake .#nixos<\n>
+ls
+cd ~/.config<\n>git add nixos<\n>git commit -m "Fully migrate NixOS configuration to flakes"<\n>
+ls
+git add .
+git commit -m "fresh nix"
+git push
+fs nixos/
+nvim .
+exec xremap -c /home/asdf/.config/nixos/xremap.yml<\n>
+clear
+cat flake.nix
+nvim flake.nix
+sudo nixos-rebuild switch --flake .#nixos<\n>
+nvim flake.nix
+sudo nixos-rebuild switch --flake .#nixos<\n>
+nvim flake.nix
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+clear
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+cd ..
+git add .
+git commit 
+git push
+cd nixos/
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nix flake lock --update-input xremap-flake
+nix flake update
+rm flake.lock
+sudo nixos-rebuild switch --flake .#nixos
+cat flake.nix
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+c;ear
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+clear
+nvim .
+clear
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+fa
+nix search nixpkgs services.xremap # This searches nixpkgs, not your flake, but may give hints
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+systemctl status xremap
+journalctl -u xremap.service
+systemctl --user status xremap.service
+nvim .
+systemctl --user status xremap.service
+journalctl --user -u xremap.service -e
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+systemctl --user status xremap.service
+journalctl --user -u xremap.service -e
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+systemctl --user status xremap.service
+journalctl --user -u xremap.service -e
+systemctl --user start xremap.service<\n>journalctl --user -u xremap.service -e
+clear
+systemctl --user status xremap.service
+ls /dev/input/by-id/
+systemctl --user stop xremap.service
+sudo /nix/store/.../xremap-0.14.1/bin/xremap
+clear
+sudo xremap
+xremap
+clear
+sudo xremap --list-devices
+sudo xremap -devices
+sudo xremap --list-devices
+xremap --devices
+xremap --device
+sudo evtest
+clear
+systemctl --user stop xremap.service
+sudo evtest
+which evtest
+localectl list-keymaps
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+evtest
+sudo evtest
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+sudo reboot
+systemctl --user status xremap.service
+journalctl --user -u xremap.service -e
+clear
+nvim .
+systemctl --user status xremap.service
+systemctl --user start xremap.service<\n>journalctl --user -u xremap.service -e
+systemctl --user status xremap.service
+clear
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+cd ~/.config/nixos
+sudo nixos-rebuild switch --flake .#nixos
+systemctl --user status xremap.service
+systemctl --user stop xremap.service
+systemctl --user start xremap.service
+systemctl --user status xremap.service
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+systemctl --user start xremap.service<\n>systemctl --user status xremap.service
+systemctl --user stop xremap.service
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+systemctl --user stop xremap.service<\n>systemctl --user start xremap.service<\n>systemctl --user status xremap.service
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+systemctl --user stop xremap.service<\n>systemctl --user start xremap.service
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+systemctl --user stop xremap.service<\n>systemctl --user start xremap.service
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+systemctl --user stop xremap.service<\n>systemctl --user start xremap.service
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+clear
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+reboot
+clear
+hyprctl version<\n>
+fs
+fa .config/hypr/
+fs .config/hypr/
+ls
+mkdir plugins
+cd plugins/
+hyprpm add https://github.com/hyprwm/hyprland-plugins
+nix search nixpkgs#hyprlandPlugins<\n>
+clear
+fa
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+reboot
+fa
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nix flake show git+https://git.outfoxxed.me/outfoxxed/quickshell<\n>
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+which quickshell<\n>
+quickshell<\n>
+cd ..
+mkdir quickshell
+quickshell
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+fa
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+clear
+fs ..
+waybar
+fa
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+fs ..
+fs waybar/
+tree
+chmod +x scripts/*.sh<\n>
+waybar
+nvim .
+cd modules/
+chmod +x quote.sh<\n>chmod +x volume.sh   # if you created the PipeWire volume script<\n>
+ls -l<\n>
+waybar
+nvim .
+waybar
+killall waybar<\n>waybar<\n>
+nvim .
+waybar
+nvim .
+waybar
+cd ..
+nvim .
+wayber
+waybar
+clear
+nvim .
+chmod +x ~/.config/waybar/waybar_status.nu<\n>3.  **Update Path:** In `waybar/config.json`, **you must update the path** for the four `custom/` modules on the right to point to where you saved `waybar_status.nu`.<\n>* *Example:* Change `"exec": "nu /path/to/waybar_status.nu network",` to `"exec": "nu ~/.config/waybar/waybar_status.nu network",` if saved in your config folder.
+waybar
+nvim .
+waybar
+waybar
+nvim .
+waybar
+reboot
+fa
+waybar
+nvim .
+waybar
+fs .config/
+ls
+fs mpvpaper/
+ls
+mpv 'Monochrome Countdown Animation Motion Background Stock Video Footage Free For Editing [VlOfYFixlKs].mp4'
+mpvpaper -o "--loop" eDP-1 'https://youtu.be/0Mf2nkd0JUU?si=c_KZoKTfHZJnDJmw'
+mpvpaper -o "--loop" eDP-1 https://youtu.be/sAkVnhthpMI?si=DipdKRe9I9tR-i8T
+pkill swww-daemon<\n>
+fa
+nvim .
+chmod +x ~/.config/hypr/scripts/wallpaper-picker.sh<\n>
+~/.config/hypr/scripts/wallpaper-picker.sh<\n>
+yt-dlp -U<\n>
+~/.config/hypr/scripts/wallpaper-picker.sh
+clear
+nvim .
+~/.config/hypr/scripts/wallpaper-picker.sh
+nvim .
+~/.config/hypr/scripts/wallpaper-picker.sh
+nvim .
+~/.config/hypr/scripts/wallpaper-picker.sh
+nvim .
+~/.config/hypr/scripts/wallpaper-picker.sh
+nvim .
+hyprctl reload<\n>
+hyprctl monitors<\n>
+nvim .
+~/.config/hypr/scripts/wallpaper-picker.sh
+nvim .
+clear
+kill mpvpaper
+mpvpaper kill
+pkill mpvpaper<\n>
+fs ..
+f
+clear
+nvim /home/asdf/.local/share/atuin/init.nu:9:19
+nvim /home/asdf/.local/share/atuin/init.nu
+clear
+af
+nvim /home/asdf/.local/share/atuin/init.nu
+clear
+nvim /home/asdf/.local/share/atuin/init.nu
+clear
+nvim .
+clear
+f
+pkill mpvpaper<\n>
+nvim .
+fa
+sudo nixos-rebuild switch --flake .#nixos
+fs ..
+rmpc config > ~/.config/rmpc/config.ron
+ls
+mkdir rmpc
+fs rmpc/
+rmpc config
+ls
+ls -all
+ll
+tree
+rmpc
+cava
+fa
+systemctl status mpd<\n>
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+mpd
+a
+crar
+clear
+rmpc
+clear
+fs ..
+mkdir mpd
+fs mpd/
+nvim .
+mpd ~/.config/mpd/mpd.conf<\n>
+touch ~/.config/mpd/tag_cache
+chmod 600 ~/.config/mpd/tag_cache
+nvim .
+mpd ~/.config/mpd/mpd.conf<\n>
+sudo lsof -i :6600<\n>
+nix-shell -p lsof<\n>
+kill 22334<\n>mpd ~/.config/mpd/mpd.conf<\n>
+rmpc status<\n>rmpc play<\n>
+fs
+f
+fa
+nvim config.ron
+rmpc
+nvim config.ron
+fa
+nvim .
+mkdir /tmp/rmpc/cache<\n>
+ls
+nvim .
+fa
+fs
+clear
+rmpc searchyt --interactive "lofi hip hop"
+rmpc addyt
+rmpc addyt https://youtu.be/WAp2ItNm7fg<\n>
+fa
+nvim .
+rmpc addyt https://youtu.be/WAp2ItNm7fg
+mkdir -p /tmp/rmpc/cache<\n>
+ls /tmp/rmpc/cache
+tree /tmp/rmpc/cache
+rmpc addyt https://youtu.be/WAp2ItNm7fg
+nvim .
+rmpc addyt https://youtu.be/WAp2ItNm7fg
+which yt-dlp<\n>which ffmpeg<\n>which ffprobe<\n>python3 --version<\n>python3 -c "import mutagen"<\n>
+fa
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+rmpc addyt https://youtu.be/WAp2ItNm7fg
+which yt-dlp<\n>which ffmpeg<\n>which ffprobe<\n>python3 --version<\n>python3 -c "import mutagen"<\n>
+python3 -m pip install --user mutagen<\n>
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+fa
+nvim .
+mkdir  /tmp/rmpc/cache<\n>
+rmpc addyt https://youtu.be/WAp2ItNm7fg<\n>
+clear
+rmpc addyt https://youtu.be/WAp2ItNm7fg
+nix-shell -p yt-dlp ffmpeg python3 python3Packages.mutagen<\n>
+fs
+cd ..
+ls
+cd ..
+ls
+cd tmp/
+ls
+mkdir rmpc/cache<\n>
+ls
+mkdir mpd
+ls
+fs
+clear
+rmpc addyt https://youtu.be/WAp2ItNm7fg<\n>
+rmpc
+fs .config/
+nvim .
+mpd ~/.config/mpd/mpd.conf<\n>
+ls -l /tmp/mpd_socket
+rmpc status
+rmpc addyt https://youtu.be/WAp2ItNm7fg<\n>
+rmpc addyt https://youtu.be/WAp2ItNm7fg
+rmpc addyt https://youtu.be/WAp2ItNm7fg<\n>
+nvim .
+mpd ~/.config/mpd/mpd.conf<\n>rmpc addyt https://youtu.be/WAp2ItNm7fg<\n>
+rmpc addyt https://youtu.be/WAp2ItNm7fg?si=lPykIa-AUpN0up-N
+python3 -c "import mutagen"<\n>
+fa
+sudo nixos-rebuild switch --flake .#nixos
+rmpc addyt https://youtu.be/WAp2ItNm7fg?si=lPykIa-AUpN0up-N
+ca
+fa
+cd
+cd ..
+cd tmp/
+cd mpd/
+ls
+mkdir cache
+fa
+fs
+rmpc addyt https://youtu.be/WAp2ItNm7fg?si=lPykIa-AUpN0up-N
+python3 -c "import mutagen"
+nix-shell -p python3 python3Packages.mutagen yt-dlp ffmpeg<\n>
+clear
+fa .config/nushell/
+fs
+fs .config/nushell/
+nvim .
+rmpc
+nvim .
+clear
+waybar
+clear
+fa
+nvim .
+nix flake update<\n>sudo nixos-rebuild switch --flake .<\n>
+nvim .
+nix flake update<\n>sudo nixos-rebuild switch --flake .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nix develop<\n>
+pkill mpvpaper<\n>
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+nvim .
+sudo nixos-rebuild switch --flake .#nixos
+fs ..
+git add .
+git commit -m "fresh"
+git push
+git clone https://github.com/sejjy/mechabar.git ~/.config/waybar<\n><\n># Version 0.14.0 fix:<\n># git clone -b fix/v0.14.0 https://github.com/sejjy/mechabar.git ~/.config/waybar
+~/.config/waybar/install.sh
+waybar
+clear
+cd waybar/
+fa
+sudo nixos-rebuild switch --flake .#nixos
+waybar
+reboot
+f
+fa
+waybar-msg restart<\n>
+waybar restart
+waybar
+nvim .
+waybar 
+waybar
+sudo nixos-rebuild switch --flake .#nixos
+caelestia shell -d<\n>
+ls /run/current-system/sw/bin/caelestia<\n>
+sudo nixos-rebuild switch --flake .#nixos
+clear
+cd
+fa
+fs .config/
+git add .
+git commit 
+git push
+gh repo create
+ls
+cd
+ls
+ls -all
+fs
+fs .config/
+echo "# config" >> README.md<\n>git init<\n>git add README.md<\n>git commit -m "first commit"<\n>git branch -M master<\n>git remote add origin https://github.com/CogitoGITHUB/config.git<\n>git push -u origin master
+git add .
+clear
+ls
+ls -all
+git add .
+git remote add origin https://github.com/CogitoGITHUB/config.git<\n>git branch -M master<\n>git push -u origin master
+git add .

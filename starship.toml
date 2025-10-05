@@ -1,0 +1,44 @@
+# ~/.config/starship.toml
+format = "$all"
+add_newline = true
+
+# global style override
+palette = "monochrome"
+
+[palettes.monochrome]
+text = "white"
+muted = "bright-black"
+highlight = "bright-white"
+success = "white"
+error = "bright-black"
+
+# prompt character
+[character]
+success_symbol = "[>](white)"
+error_symbol = "[x](bright-black)"
+vicmd_symbol = "[<](white)"
+
+# directory
+[directory]
+style = "white"
+truncation_length = 3
+truncation_symbol = "…/"
+
+# git status
+[git_branch]
+style = "white"
+
+[git_status]
+style = "bright-black"
+
+# command duration
+[cmd_duration]
+style = "bright-black"
+
+# time
+[time]
+disabled = true
+format = "[$time]($style) "
+time_format = "%H:%M"
+style = "bright-black"
+

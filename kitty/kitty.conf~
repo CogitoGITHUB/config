@@ -1,0 +1,7 @@
+# ~/.config/kitty/kitty.conf
+shell zellij
+
+
+map ctrl+e nu -c 'launch-hyperland'
+map ctrl+k nu -c 'clear-screen'
+map ctrl+v nu -c 'launch-nvim'
