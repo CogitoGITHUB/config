@@ -9,3 +9,6 @@ source "/home/asdf/.config/nushell/zoxide.nu"
 source "/home/asdf/.local/share/atuin/init.nu"
 source "/home/asdf/.config/nushell/core-modules/completion.nu"
 source ~/.zoxide.nu
+
+
+

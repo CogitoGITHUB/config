@@ -2181,3 +2181,43 @@ mkdir nb
 fs nb/
 fa
 clear
+git add .
+git commit 
+git push
+fs
+nvim .
+tmux
+nvim .config/nushell/env.nu
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+spf
+superfile
+sudo nixos-rebuild switch --flake .#mySystem
+superfile
+clear
+clar
+clear
+tmux
+clear
+fastfetch
+fs
+clear
+celar
+clear
+fastfetch -c all
+fastfetch -c all --no-logo --color off<\n>
+fastfetch --logo none --color white --color-keys white
+fastfetch --logo none --color white --color-keys white --gen-config-full
+fastfetch -c all --logo none --color white --color-keys white --gen-config-full
+fastfetch -c all --logo none --color white --color-keys white --gen-config-full-force
+fastfetch -c all
+fastfetch -c all --logo none --color white --color-keys white --gen-config-full-force
+fastfetch
+fastfetch --list-modules
+cat ~/.config/fastfetch/config.jsonc
+fastfetch
+fa
+clear
+celar
+xdg-mime default nvim.desktop text/plain
+echo $EDITOR

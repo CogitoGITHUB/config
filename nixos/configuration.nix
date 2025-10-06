@@ -71,6 +71,8 @@
 
   # System Packages (Consolidated and Caelestia Shell added)
   environment.systemPackages = with pkgs; [
+    exiftool
+    superfile
     bat
     tmux
     zathura

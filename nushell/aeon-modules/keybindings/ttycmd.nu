@@ -1,5 +1,16 @@
 let keybindings = [
-    # Clear terminal
+   
+    # Launch Superfile
+    {
+      name: superfile_launch
+      modifier: control
+      keycode: char_s
+      mode: emacs
+      event: {
+        send: executehostcommand
+        cmd: "superfile"
+      }
+    },
 
     # Launch Hyprland from TTY
     {
@@ -36,5 +47,6 @@ let keybindings = [
         cmd: "systemctl reboot"
       }
     }
-  ];
+];
+
 $env.config.keybindings ++= $keybindings
