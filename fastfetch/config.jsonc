@@ -129,7 +129,6 @@
     "localip",
     "bluetooth",
     "bluetoothradio",
-    "battery",
     "poweradapter",
     "media",
     "player",
@@ -151,5 +150,6 @@
     "editor",
     "break",
     "custom",
+    "battery",
   ]
 }

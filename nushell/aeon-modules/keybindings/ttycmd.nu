@@ -1,5 +1,17 @@
 let keybindings = [
    
+    # Clear
+    {
+      name: superfile_launch
+      modifier: control
+      keycode: char_v
+      mode: emacs
+      event: {
+        send: executehostcommand
+        cmd: "clear"
+      }
+    },
+
     # Launch Superfile
     {
       name: superfile_launch
@@ -9,6 +21,18 @@ let keybindings = [
       event: {
         send: executehostcommand
         cmd: "superfile"
+      }
+    },
+     
+    # Tmux
+    {
+      name: tmux
+      modifier: control
+      keycode: char_t
+      mode: emacs
+      event: {
+        send: executehostcommand
+        cmd: "tmux"
       }
     },
 
@@ -40,7 +64,7 @@ let keybindings = [
     {
       name: reboot
       modifier: control
-      keycode: char_r
+      keycode: char_q
       mode: emacs
       event: {
         send: executehostcommand

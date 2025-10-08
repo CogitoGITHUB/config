@@ -18,9 +18,9 @@ return {
   -- If true, highlights the {sign,fold} column the same as cursorline
   cursorline_gutter = true,
   -- If true, highlights the gutter darker than the bg
-  dark_gutter = false,
+  dark_gutter = true,
   -- if true favor treesitter highlights over semantic highlights
-  favor_treesitter_hl = false,
+  favor_treesitter_hl = true,
   -- Don't set background of floating windows. Recommended for when using floating
   -- windows with borders.
   plain_float = false,
@@ -31,7 +31,7 @@ return {
   -- Keymap (in normal mode) to toggle between light and dark variants.
   toggle_variant_key = nil,
   -- Don't set background
-  transparent = false,
+  transparent = true,
 
   -----DIAGNOSTICS and CODE STYLE-----
   --

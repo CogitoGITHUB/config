@@ -1,6 +1,9 @@
-{ config, pkgs, inputs, ... }:
+{ config, pkgs,  ... }:
 
-{ imports = [ ./hardware-configuration.nix ];
+{
+  imports = [
+    ./hardware-configuration.nix
+  ];
   nixpkgs.config.allowUnfree = true;
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
@@ -27,29 +30,52 @@
     LC_TELEPHONE = "ro_RO.UTF-8";
     LC_TIME = "ro_RO.UTF-8";
   };
+ #
+  # Audio
+  #
+  services.pulseaudio.enable = false; # Use Pipewire, the modern sound subsystem
 
-  # Fonts
-  fonts.packages = with pkgs; [
-    noto-fonts
-    noto-fonts-cjk-sans
-    noto-fonts-emoji
-    liberation_ttf
-    fira-code
-    fira-code-symbols
-    mplus-outline-fonts.githubRelease
-    dina-font
-    proggyfonts
-  ];
+  security.rtkit.enable = true; # Enable RealtimeKit for audio purposes
 
-  # Nix Settings
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-
-  # X11 Keymap
-  services.xserver.xkb = {
-    layout = "us";
-    variant = "";
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+    # Uncomment the following line if you want to use JACK applications
+    # jack.enable = true;
   };
 
+
+hardware.bluetooth = {
+  enable = true;
+  powerOnBoot = true;
+  settings = {
+    General = {
+      # Shows battery charge of connected devices on supported
+      # Bluetooth adapters. Defaults to 'false'.
+      Experimental = true;
+      # When enabled other devices can connect faster to us, however
+      # the tradeoff is increased power consumption. Defaults to
+      # 'false'.
+      FastConnectable = true;
+    };
+    Policy = {
+      # Enable all controllers when they are found. This includes
+      # adapters present on start as well as adapters that are plugged
+      # in later on. Defaults to 'true'.
+      AutoEnable = true;
+    };
+  };
+};
+
+
+ 
+# Enable Power Management services
+services.upower.enable = true;
+services.power-profiles-daemon.enable = true;
+ # Nix Settings
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
   # Users
   users.users.asdf = {
     isNormalUser = true;
@@ -59,18 +85,22 @@
     packages = with pkgs; [];
   };
 
-  # Automatic Login
-  services.getty.autologinUser = "asdf";
 
   # Hyprland Configuration (Used for both enabling and setting up exec-once)
   programs.hyprland = {
     enable = true;
   };
-  
-  programs.steam.enable = true;
 
-  # System Packages (Consolidated and Caelestia Shell added)
-  environment.systemPackages = with pkgs; [
+
+
+  # Automatic Login
+  services.getty.autologinUser = "asdf";
+
+  programs.steam.enable = true;
+environment.systemPackages = with pkgs; [
+    qutebrowser
+    htop
+    bluetui
     exiftool
     superfile
     bat

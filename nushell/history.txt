@@ -2221,3 +2221,327 @@ clear
 celar
 xdg-mime default nvim.desktop text/plain
 echo $EDITOR
+git add .
+git commit 
+git push
+clear
+clear
+g
+flear
+clear
+htop
+btop
+clear
+fa
+clear
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+btop
+htop
+clear
+q
+cava
+ckear
+clear
+fa
+which superfile<\n>
+fa
+fs lua/plugins/
+clear
+nvim .
+fg
+clear
+job list<\n>
+job unfreeze 1<\n>
+fs
+clear
+fa
+clear
+cava
+htop
+nb
+fa
+nb
+nb edit tex
+ls
+nb low.tex
+nb edit low.tex
+nvim low.tex
+cava 
+ls
+fa
+fs .
+ls
+fs asdf/
+celar
+clear
+ls -all
+cd .mozilla/
+ls
+mv ~/.mozilla ~/.config/mozilla<\n>
+ls -all
+ln -s ~/.config/mozilla ~/.mozilla<\n>
+ls
+ls -all
+fs .config/
+ls -all
+cd mozilla/
+ls
+mv `nightTab backup - 2025.10.06 - 19 59 44.json` ~/.config/firefox/nighttab/
+clear
+cd
+dlear
+clear
+fa
+reboot
+ls
+ls -all
+rm -rf .mozilla
+mv mozilla/ ~/.mozila
+cear
+clear
+cava
+htop
+clear
+fa
+clear
+sudo nixos-rebuild switch --flake .#mySystem
+clear
+tmux
+tmux
+fa
+tmux -vv new<\n>
+tmux ls
+tmux ls  # lists sessions<\n>tmux kill-server  # kills all tmux servers<\n>
+tmux
+tmux ls
+tmux
+clear
+fa
+ls -l ~/.tmux/plugins/tmux-fzf/bin/tmux-fzf<\n>
+tmux
+ls
+ls -all
+rm -rf .tmux/
+tmux
+tmux -n
+tmux new-session -s mysession<\n>
+tmux ls
+clear
+fa
+tmux
+fa
+tmux 
+~/.tmux/plugins/tpm/bin/install_plugins<\n>
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+ls -l ~/.tmux/plugins/tmux-fzf/bin/tmux-fzf<\n>
+which fzf<\n>
+clear
+git clone https://github.com/sainnhe/tmux-fzf ~/.tmux/plugins/tmux-fzf<\n>
+chmod +x ~/.tmux/plugins/tmux-fzf/bin/tmux-fzf<\n>
+fa
+tmux
+a
+aa
+a
+celar
+clear
+tmux
+clear
+tmux ls
+clear
+fa 
+sudo nixos-rebuild switch --flake .#mySystem
+ls -l ~/.config/nixos/modules<\n>
+pwd
+sudo nixos-rebuild switch --flake .#mySystem
+sudo nixos-rebuild switch --flake /home/asdf/.config/nixos#mySystem<\n>
+sudo nixos-rebuild switch --flake .#mySystem
+sudo nixos-rebuild switch --flake /home/asdf/.config/nixos#mySystem
+clear
+sudo -E nixos-rebuild switch --flake /home/asdf/.config/nixos#mySystem<\n>
+sudo nixos-rebuild switch --flake .#mySystem
+sudo -E nixos-rebuild switch --flake /home/asdf/.config/nixos#mySystem<\n>
+sudo nixos-rebuild switch --flake .#mySystem
+nix flake show git+https://git.outfoxxed.me/outfoxxed/quickshell<\n>
+nix flake show .<\n>
+nix flake show git+https://git.outfoxxed.me/outfoxxed/quickshell<\n>
+sudo nixos-rebuild switch --flake .#mySystem
+nvim .
+sudo nixos-rebuild switch --flake .#mySystem
+nvim .
+sudo nixos-rebuild switch --flake .#mySystem
+nvim .
+sudo nixos-rebuild switch --flake .#mySystem
+nix-env -q quickshell
+which quickshell
+sudo nixos-rebuild switch --flake .#mySystem
+which quickshell
+quickshell
+f
+fs
+fs .config/
+mkdir quickshell
+ls
+sudo nixos-rebuild switch --flake .#mySystem
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+quickshell
+fa
+fs ..
+fs quickshell/
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+a
+quickshell
+sudo nixos-rebuild switch --flake .#mySystem
+q
+quickshell
+sudo nixos-rebuild switch --flake .#mySystem
+quickshell
+quickshell run ~/.config/quickshell/panels/status-bar.qml<\n>
+quickshell run status-bar<\n>
+quickshell ~/.config/quickshell/panels/status-bar.qml<\n>
+cd ..
+fa
+quickshell 
+quickshell
+fs
+git clone https://github.com/Rexcrazy804/Zaphkiel.git
+fa
+fs ..
+rm -rf quickshell/
+cd Zaphkiel/users/dots/quickshell/
+cd ..
+ls
+mv quickshell/ ~/.config/
+cd
+rm -rf Zaphkiel/
+fa
+quickshell
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+quickshell
+fa
+quickshell
+tree
+quickshell
+nvim .
+tree
+quickshell
+clear
+:w
+nvim
+git clone https://github.com/MJBgood/quickshell.git
+# Clone or copy to your quickshell config directory<\n>cp -r . ~/.config/quickshell/<\n><\n># Test the configuration<\n>quickshell ~/.config/quickshell/shell.qml
+fa .config/
+fs .config/
+mkdir quickshell
+cd
+# Clone or copy to your quickshell config directory<\n>cp -r . ~/.config/quickshell/<\n><\n># Test the configuration<\n>quickshell ~/.config/quickshell/shell.qml
+quickshell
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+quickshell
+which qmlscene<\n>which qml<\n>
+nix-env -q | grep -E "qtbase|qtdeclarative|qtmultimedia|qtgraphicaleffects|upower"<\n>
+nix-store -q --references /run/current-system | grep -E "qtbase|qtdeclarative|qtmultimedia|qtgraphicaleffects|upower"<\n>
+ls /run/current-system/sw/lib/qt5/qml/Qt5Compat/GraphicalEffects<\n>
+which upower<\n>upower --version<\n>
+systemctl --user enable --now upower.service<\n>systemctl --user status upower.service<\n>
+quickshell
+dVdv
+qmlscene /home/asdf/.config/quickshell/shell.qml<\n>
+systemctl --user enable --now upower.service<\n>systemctl --user status upower.service<\n>
+VV
+celar
+sudo nixos-rebuild switch --flake .#mySystem
+waybar
+clear
+waybar
+f
+clear
+tmux
+f
+fs .config/waybar/
+tree
+waybar kill
+waybar
+nvim .
+waybar
+cd
+clear
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+which quickshell
+quickshell 
+fs
+fa
+quickshell 
+fs
+nix run github:caelestia-dots/shell
+clear
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+quickshell 
+caelestia-shell 
+caelestia shell -d
+caelestia-shell
+sudo nixos-rebuild switch --flake .#mySystem
+caelestia-shell
+fa
+ls
+caelestia-shell
+fa
+fs caelestia/
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+caelestia-shell
+caelestia scheme
+caelestia
+~/.config/hypr/scripts/wallpaper-picker.sh
+swww kill
+mpvpaper kill
+kill mpvpaper
+caelestia-shell
+spotify 
+fa
+caelestia-shell
+fs
+fa
+clear
+spotify 
+sudo nixos-rebuild switch --flake .#mySystem
+rm flake.lock
+sudo nixos-rebuild switch --flake .#mySystem
+caelestia-shell
+caelestia
+sudo nixos-rebuild switch --flake .#mySystem
+fs
+{<\n>  description = "A NixOS configuration flake.";<\n><\n>  inputs = {<\n>    # Only the primary nixpkgs source remains.<\n>    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";<\n>  };<\n><\n>  # The 'caelestiaShell' variable is removed from the outputs destructuring.<\n>  outputs = { self, nixpkgs, ... }@inputs: {<\n>    nixosConfigurations.mySystem = nixpkgs.lib.nixosSystem {<\n>      system = "x86_64-linux";<\n>      <\n>      # The 'specialArgs' line is removed.<\n>      <\n>      modules = [<\n>        ./configuration.nix<\n>        ./hardware-configuration.nix<\n>      ];<\n>    };<\n>  };<\n>}
+yolk init
+which eww
+yolk
+yolk init
+which eww
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+which quickshell
+quickshell 
+fs ..
+quickshell 
+fa
+quickshell 
+cd
+celar
+clear
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+fs
+fa
+nvim .
+fs
+fa
+git add .

@@ -47,6 +47,6 @@ return {
     })
 
     -- Keymap to start moving a window
-    vim.api.nvim_set_keymap('n', '<leader>wm', '<cmd>WinShift<CR>', { noremap = true, silent = true })
+    vim.api.nvim_set_keymap('n', '<leader>w', '<cmd>WinShift<CR>', { noremap = true, silent = true })
   end,
 }
