@@ -137,7 +137,7 @@ environment.systemPackages = with pkgs; [
     firefox
     pyprland
     waybar
-    wofi
+    rofi
     hyprpaper
     hypridle
     hyprlock
