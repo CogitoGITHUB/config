@@ -105,6 +105,7 @@ services.power-profiles-daemon.enable = true;
 
 environment.systemPackages = with pkgs; [
     qutebrowser
+    lsd
     htop
     bluetui
     exiftool
