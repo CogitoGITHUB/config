@@ -2545,3 +2545,23 @@ nvim .
 fs
 fa
 git add .
+git commit 
+git push
+fa
+s
+sudo nixos-rebuild switch --flake .#mySystem
+fa
+sudo nixos-rebuild switch --flake .#mySystem
+fff
+sudo nixos-rebuild switch --flake .#mySystem
+ok 
+ls
+jfa
+sudo nixos-rebuild switch --flake .#mySystem
+ls 
+ls
+tree
+su
+clear
+sudo nixos-rebuild switch --flake .#mySystem
+nvim .

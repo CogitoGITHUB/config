@@ -97,6 +97,12 @@ services.power-profiles-daemon.enable = true;
   services.getty.autologinUser = "asdf";
 
   programs.steam.enable = true;
+
+
+
+
+
+
 environment.systemPackages = with pkgs; [
     qutebrowser
     htop
@@ -122,12 +128,15 @@ environment.systemPackages = with pkgs; [
     evtest
     git
     gh
+    jujutsu
+    lazyjj
+    jj-fzf
     starship
     kitty
     firefox
     pyprland
     waybar
-    tofi
+    wofi
     hyprpaper
     hypridle
     hyprlock
@@ -158,19 +167,23 @@ environment.systemPackages = with pkgs; [
         ];
         extraDefCfg = "process-unmapped-keys yes";
         config = ''
-          (defsrc
-            caps a s d f j k l ;
+         (defsrc
+            caps a s d f g h j k l ;
           )
+
           (defvar
             tap-time 150
             hold-time 200
           )
           (defalias
-            caps (tap-hold 100 100 esc lctl)
+            caps (tap-hold 100 100 esc bspc)
             a (tap-hold $tap-time $hold-time a lmet)
             s (tap-hold $tap-time $hold-time s lalt)
             d (tap-hold $tap-time $hold-time d lsft)
             f (tap-hold $tap-time $hold-time f lctl)
+	    g (tap-hold $tap-time $hold-time g ret)
+
+	    h (tap-hold $tap-time $hold-time h spc)
             j (tap-hold $tap-time $hold-time j rctl)
             k (tap-hold $tap-time $hold-time k rsft)
             l (tap-hold $tap-time $hold-time l ralt)
@@ -178,8 +191,10 @@ environment.systemPackages = with pkgs; [
           )
 
           (deflayer base
-            @caps @a @s @d @f @j @k @l @;
+            @caps @a @s @d @f @g @h @j @k @l @;
           )
+
+
         '';
       };
     };

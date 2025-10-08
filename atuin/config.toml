@@ -38,7 +38,7 @@
 
 ## which search mode to use
 ## possible values: prefix, fulltext, fuzzy, skim
- search_mode = "prefix"
+ search_mode = "skim"
 
 ## which filter mode to use
 ## possible values: global, host, session, directory
@@ -60,14 +60,14 @@
 
 ## which style to use
 ## possible values: auto, full, compact
- style = "compact"
+ style = "auto"
 
 ## the maximum number of lines the interface should take up
 ## set it to 0 to always go full screen
 # inline_height = 0
 
 ## Invert the UI - put the search bar at the top , Default to `false`
-# invert = false
+ invert = true
 
 ## enable or disable showing a preview of the selected command
 ## useful when the command is longer than the terminal width and is cut off
@@ -75,10 +75,10 @@
 
 ## what to do when the escape key is pressed when searching
 ## possible values: return-original, return-query
-# exit_mode = "return-original"
+ exit_mode = "return-original"
 
 ## possible values: emacs, subl
-# word_jump_mode = "emacs"
+ word_jump_mode = "emacs"
 
 ## characters that count as a part of a word
 # word_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -88,10 +88,10 @@
 
 ## use ctrl instead of alt as the shortcut modifier key for numerical UI shortcuts
 ## alt-0 .. alt-9
- ctrl_n_shortcuts = false
+ ctrl_n_shortcuts = true
 
 ## default history list format - can also be specified with the --format arg
-# history_format = "{time}\t{command}\t{duration}"
+ history_format = "{time}\t{command}\t{duration}"
 
 ## prevent commands matching any of these regexes from being written to history.
 ## Note that these regular expressions are unanchored, i.e. if they don't start
@@ -120,7 +120,7 @@
 ## Configure whether or not to show the help row, which includes the current Atuin
 ## version (and whether an update is available), a keymap hint, and the total
 ## amount of commands in your history.
-# show_help = true
+ show_help = true
 
 ## Configure whether or not to show tabs for search and inspect
  show_tabs = true
@@ -164,23 +164,23 @@ enter_accept = true
 ## Set commands where we should consider the subcommand for statistics. Eg, kubectl get vs just kubectl
  common_subcommands = [
 #   "apt",
-#   "cargo",
-#   "composer",
-#   "dnf",
-#   "docker",
+   "cargo",
+   "composer",
+   "dnf",
+   "docker",
    "git",
 #   "go",
    "ip",
-#   "kubectl",
+   "kubectl",
    "nix",
    "nmcli",
    "npm",
 #   "pecl",
 #   "pnpm",
-#   "podman",
+   "podman",
 #   "port",
-#   "systemctl",
-#   "tmux",
+   "systemctl",
+   "tmux",
 #   "yarn",
  ]
 
@@ -196,7 +196,7 @@ enter_accept = true
 
 [keys]
 # Defaults to true. If disabled, using the up/down key won't exit the TUI when scrolled past the first/last entry.
-# scroll_exits = false
+ scroll_exits = false
 
 [sync]
 # Enable sync v2 by default
@@ -209,7 +209,7 @@ records = true
 ## possible values: auto, static
 ## auto: length of the selected command.
 ## static: length of the longest command stored in the history.
-# strategy = "auto"
+ strategy = "auto"
 
 [daemon]
 ## Enables using the daemon to sync. Requires the daemon to be running in the background. Start it with `atuin daemon`
@@ -230,3 +230,7 @@ records = true
 
 ## The port that should be used for TCP on non unix systems
 # tcp_port = 8889
+
+
+[theme]
+name = "all-white" # Tells Atuin to look for all-white.toml

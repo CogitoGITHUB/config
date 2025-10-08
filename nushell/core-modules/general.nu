@@ -13,10 +13,10 @@ $env.config = {
     }
 
     table: {
-        mode: rounded # basic, compact, compact_double, light, thin, with_love, rounded, reinforced, heavy, none, other
+        mode: thin # basic, compact, compact_double, light, thin, with_love, rounded, reinforced, heavy, none, other
         index_mode: auto # "always" show indexes, "never" show indexes, "auto" = show indexes when a table has "index" column
-        show_empty: false  # show 'empty list' and 'empty record' placeholders for command output
-        padding: { left: 1, right: 1 } # a left right padding of each column in a table
+        show_empty: true  # show 'empty list' and 'empty record' placeholders for command output
+        padding: { left: 0, right: 0 } # a left right padding of each column in a table
         trim: {
             methodology: wrapping # wrapping or truncating
             wrapping_try_keep_words: true # A strategy used by the 'wrapping' methodology
@@ -24,7 +24,7 @@ $env.config = {
         }
         header_on_separator: true # show header text on separator/border line
         footer_inheritance: true # render footer in parent table if child is big enough (extended table option)
-        # abbreviated_row_count: 10 # limit data rows from top and bottom after reaching a set point
+        # abbreviated_row_count: 100 # limit data rows from top and bottom after reaching a set point
     }
 
     error_style: "fancy" # "fancy" or "plain" for screen reader-friendly error messages
@@ -60,7 +60,7 @@ $env.config = {
     history: {
         max_size: 100_000 # Session has to be reloaded for this to take effect
         sync_on_enter: true # Enable to share history between multiple sessions, else you have to close the session to write history to file
-        file_format: "plaintext" # "sqlite" or "plaintext"
+        file_format: "sqlite" # "sqlite" or "plaintext"
         isolation: false # only available with sqlite file_format. true enables history isolation, false disables it. true will allow the history to be isolated to the current session using up/down arrows. false will allow the history to be shared across all sessions.
     }
 
@@ -80,18 +80,18 @@ $env.config = {
     footer_mode: 25 # always, never, number_of_rows, auto
     float_precision: 2 # the precision for displaying floats in tables
     buffer_editor: null # command that will be used to edit the current line buffer with ctrl+o, if unset fallback to $env.VISUAL and $env.EDITOR
-    use_ansi_coloring: true
+    use_ansi_coloring: false
     bracketed_paste: true # enable bracketed paste, currently useless on windows
     edit_mode: emacs # emacs, vi
     shell_integration: {
-        # osc2 abbreviates the path if in the home_dir, sets the tab/window title, shows the running command in the tab/window title
+         #osc2 abbreviates the path if in the home_dir, sets the tab/window title, shows the running command in the tab/window title
         osc2: true
         # osc7 is a way to communicate the path to the terminal, this is helpful for spawning new tabs in the same directory
         osc7: true
         # osc8 is also implemented as the deprecated setting ls.show_clickable_links, it shows clickable links in ls output if your terminal supports it. show_clickable_links is deprecated in favor of osc8
         osc8: true
         # osc9_9 is from ConEmu and is starting to get wider support. It's similar to osc7 in that it communicates the path to the terminal
-        osc9_9: false
+        osc9_9: true
         # osc133 is several escapes invented by Final Term which include the supported ones below.
         # 133;A - Mark prompt start
         # 133;B - Mark prompt end
@@ -141,10 +141,10 @@ $env.config = {
             }
             style: {
                 text: white
-                selected_text: { attr: r }
+                selected_text: { fg: white, bg: black }
                 description_text: white
                 match_text: { attr: u }
-                selected_match_text: { attr: ur }
+                selected_match_text: { fg: white, bg: black }
             }
         }
         {
@@ -174,10 +174,10 @@ $env.config = {
             }
             style: {
                 text: white
-                selected_text: { attr: r }
+                selected_text: { fg: white, bg: black }
                 description_text: white
                 match_text: { attr: u }
-                selected_match_text: { attr: ur }
+                selected_match_text: { fg: white, bg: black }
             }
         }
         {
@@ -208,8 +208,8 @@ $env.config = {
             }
             style: {
                 text: white
-                selected_text: green_reverse
-                description_text: yellow
+                selected_text: white
+                description_text: white
             }
         }
     ]

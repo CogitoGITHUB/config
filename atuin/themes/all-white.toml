@@ -1,0 +1,13 @@
+[theme]
+name = "all-white"
+
+[colors]
+
+AlertInfo = "white"
+AlertWarn = "white"
+AlertError = "white"
+Guidance = "white"
+Base = "white"
+Annotation = "white"
+Title = "white"
+Important = "white"
