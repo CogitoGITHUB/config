@@ -3,7 +3,8 @@
 local map = vim.keymap.set
 
 vim.keymap.set("n", "<leader>l", "<cmd>Lazy<CR>", { desc = "Open Lazy Plugin Manager" })
-
+-- Lua code to set the key map:
+vim.keymap.set('n', '<leader>q', '<cmd>quit<CR>', { desc = 'Quit Neovim' })
 -- Keymap to open Oil in the current directory
 map("n", "<leader>e", "<CMD>Oil<CR>", { desc = "Open Oil (file explorer)" })
 

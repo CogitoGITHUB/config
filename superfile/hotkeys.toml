@@ -1,6 +1,9 @@
 # =================================================================================================
 # Global hotkeys (cannot conflict with other hotkeys)
-confirm = ['enter', 'right', 'l']
+#
+# MODIFIED LINE: 'enter' and 'right' are removed from 'confirm' and moved to 'open_file_with_editor'.
+# 'confirm' is now only mapped to 'l' and handles *entering* directories.
+confirm = ['l']
 quit = ['q', 'esc']
 
 # movement
@@ -32,7 +35,9 @@ delete_items = ['ctrl+d', 'delete', '']
 extract_file = ['ctrl+e', '']
 compress_file = ['ctrl+a', '']
 # editor
-open_file_with_editor = ['e', '']
+#
+# MODIFIED LINE: 'enter' and 'right' are now mapped to open the file with the editor.
+open_file_with_editor = ['enter', 'e', 'right']
 open_current_directory_with_editor = ['E', '']
 # other
 pinned_directory = ['P', '']

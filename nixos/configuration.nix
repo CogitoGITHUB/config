@@ -104,6 +104,9 @@ services.power-profiles-daemon.enable = true;
 
 
 environment.systemPackages = with pkgs; [
+    nodejs
+    gcc
+    tree-sitter
     qutebrowser
     lsd
     htop

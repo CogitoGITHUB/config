@@ -1,19 +1,17 @@
 return {
-    "anaypurohit0907/superfile.nvim",
-    main = "superfile",
-    opts = { key = false },
-    keys = {
-        {
-            "<leader>f",
-            function()
-                local cmd = "/run/current-system/sw/bin/superfile "
-                vim.cmd("botright split | terminal " .. cmd)
-                vim.cmd("startinsert")
-            end,
-            mode = { "n" },
-            desc = "Open Superfile",
-            silent = true,
-        },
+  "anaypurohit0907/superfile.nvim",
+  -- Remove 'main = "superfile"' as it's not needed for simple plugins
+  -- Remove 'opts = { key = false }' as you are defining the keymap below
+  
+  keys = {
+    {
+      "<leader>f",
+      -- Execute the plugin's registered command, typically :SuperFile.
+      -- If the plugin uses a different command, substitute it here.
+      "<cmd>SuperFile<CR>",
+      mode = { "n" },
+      desc = "Open Superfile",
+      -- Remove 'silent = true' as it can hide useful output if something goes wrong
     },
+  },
 }
-
