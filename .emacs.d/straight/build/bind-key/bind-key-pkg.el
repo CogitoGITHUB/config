@@ -1,0 +1,1 @@
+/data/data/com.termux/files/home/.emacs.d/straight/repos/bind-key/bind-key-pkg.el
