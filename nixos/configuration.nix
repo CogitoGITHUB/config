@@ -105,6 +105,7 @@ services.power-profiles-daemon.enable = true;
 
 environment.systemPackages = with pkgs; [
     cool-retro-term
+    wofi
     warp-terminal
     nodejs
     gcc
@@ -140,7 +141,6 @@ environment.systemPackages = with pkgs; [
     firefox
     pyprland
     waybar
-    rofi
     hyprpaper
     hypridle
     hyprlock
