@@ -6,7 +6,7 @@ let keybindings = [
     mode: ["emacs"]
     event: {
       send: "executehostcommand"
-      cmd: "nvim ."
+      cmd : 'let file = (fzf); if $file != "" { nvim $file }'
     }
   },
 ]

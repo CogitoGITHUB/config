@@ -1,8 +1,7 @@
 let keybindings = [
    
-    # Clear
     {
-      name: superfile_launch
+      name: clear
       modifier: control
       keycode: char_v
       mode: emacs
@@ -12,18 +11,7 @@ let keybindings = [
       }
     },
 
-    # Launch Superfile
-    {
-      name: superfile_launch
-      modifier: control
-      keycode: char_s
-      mode: emacs
-      event: {
-        send: executehostcommand
-        cmd: "superfile"
-      }
-    },
-     
+        
     # Tmux
     {
       name: tmux

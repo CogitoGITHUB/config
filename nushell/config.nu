@@ -12,3 +12,4 @@ source "/home/asdf/.config/nushell/core-modules/completion.nu"
 source ~/.zoxide.nu
 
 
+

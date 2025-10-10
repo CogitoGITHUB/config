@@ -104,6 +104,8 @@ services.power-profiles-daemon.enable = true;
 
 
 environment.systemPackages = with pkgs; [
+    cool-retro-term
+    warp-terminal
     nodejs
     gcc
     tree-sitter
@@ -112,7 +114,6 @@ environment.systemPackages = with pkgs; [
     htop
     bluetui
     exiftool
-    superfile
     bat
     tmux
     zathura

@@ -2565,3 +2565,6 @@ su
 clear
 sudo nixos-rebuild switch --flake .#mySystem
 nvim .
+nvim zoxide.nu
+nvim config.ron
+nvim config.nu
