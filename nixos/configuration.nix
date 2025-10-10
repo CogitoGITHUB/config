@@ -137,7 +137,6 @@ environment.systemPackages = with pkgs; [
     lazyjj
     jj-fzf
     starship
-    kitty
     firefox
     pyprland
     waybar

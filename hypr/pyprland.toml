@@ -25,15 +25,13 @@ next2 = "movefocus d"
 prev2 = "movefocus u"
 
 
-
 [scratchpads.term]
 animation = ""
-command = "kitty --class kitty-dropterm --override window_decorations=no"
-class = "kitty-dropterm"
-size = "100% 100%"
-max_size = "100% 100%"
-margin = 2
-
+command = "/run/current-system/sw/bin/cool-retro-term"
+class = "cool-retro-term."
+size = "99% 99%"
+max_size = "99% 99%"
+margin = "1"
 
 [shortcuts_menu.entries]
 

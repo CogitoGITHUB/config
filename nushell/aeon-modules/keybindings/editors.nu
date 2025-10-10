@@ -6,9 +6,10 @@ let keybindings = [
     mode: ["emacs"]
     event: {
       send: "executehostcommand"
-      cmd : 'let file = (fzf); if $file != "" { nvim $file }'
+      cmd: 'let file = (try { fzf } | default ""); if $file != "" { nvim $file }'
     }
   },
 ]
 
 $env.config.keybindings ++= $keybindings
+
