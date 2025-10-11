@@ -5,8 +5,8 @@ let
   hyprPluginPkgs = inputs.hyprland-plugins.packages.${pkgs.system};
   
   # --- READ EXTERNAL CONFIG FILE ---
-  # Reads the content of ~/.config/hypr/main.conf and makes it available here.
-  externalHyprConfig = builtins.readFile ../hypr/main.conf;
+  # Reads the content of the file now located directly in the flake root: ~/.config/nixos/hypr-main.conf
+  externalHyprConfig = builtins.readFile ./hypr-main.conf;
 in
 {
   home.username = "asdf";
@@ -24,7 +24,7 @@ in
     ];
 
     # Inject the entire contents of your external main.conf.
-    # All keybinds, monitors, and exec-once commands should be in that file now.
+    # The 'source = modules/...' commands inside this content will still work at runtime.
     extraConfig = externalHyprConfig;
   };
 }
