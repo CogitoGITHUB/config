@@ -3,6 +3,10 @@
 let
   # Access the hyprland-plugins package set via the 'inputs' specialArg
   hyprPluginPkgs = inputs.hyprland-plugins.packages.${pkgs.system};
+  
+  # --- READ EXTERNAL CONFIG FILE ---
+  # Reads the content of ~/.config/hypr/main.conf and makes it available here.
+  externalHyprConfig = builtins.readFile ../hypr/main.conf;
 in
 {
   home.username = "asdf";
@@ -19,14 +23,9 @@ in
       # Add any other desired plugins here
     ];
 
-    extraConfig = ''
-      monitor=,preferred,auto,1
-      exec-once = waybar
-    '';
+    # Inject the entire contents of your external main.conf.
+    # All keybinds, monitors, and exec-once commands should be in that file now.
+    extraConfig = externalHyprConfig;
   };
-  
-  home.packages = with pkgs; [
-    waybar
-    alacritty
-  ];
 }
+
