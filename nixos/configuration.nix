@@ -1,5 +1,4 @@
-{ config, pkgs,  ... }:
-
+{ config, pkgs, inputs, ... }:
 {
   imports = [
     ./hardware-configuration.nix
@@ -84,15 +83,6 @@ services.power-profiles-daemon.enable = true;
     shell = pkgs.nushell;
     packages = with pkgs; [];
   };
-
-
-  # Hyprland Configuration (Used for both enabling and setting up exec-once)
-  programs.hyprland = {
-    enable = true;
-  };
-
-
-
   # Automatic Login
   services.getty.autologinUser = "asdf";
 
@@ -101,9 +91,8 @@ services.power-profiles-daemon.enable = true;
 
 
 
-
-
 environment.systemPackages = with pkgs; [
+    emacs
     cool-retro-term
     wofi
     warp-terminal

@@ -1,1 +1,0 @@
-/data/data/com.termux/files/home/.emacs.d/straight/repos/bind-key/.github/PULL_REQUEST_TEMPLATE.md
