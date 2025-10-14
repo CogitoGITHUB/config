@@ -1,53 +1,67 @@
 {
-  description = "NixOS flake with Home Manager, Hyprland, and plugins";
+  description = "NixOS flake with Hyprland and several community plugins.";
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
     hyprland.url = "github:hyprwm/Hyprland";
-    
+
+    # Official Plugins
     hyprland-plugins = {
       url = "github:hyprwm/hyprland-plugins";
       inputs.hyprland.follows = "hyprland";
     };
 
-    home-manager = {
-      url = "github:nix-community/home-manager";
-      inputs.nixpkgs.follows = "nixpkgs";
+    # Custom Plugin: hyprland-easymotion
+    hyprland-easymotion = {
+      url = "github:zakk4223/hyprland-easymotion";
+      inputs.hyprland.follows = "hyprland";
+    };
+
+    # Custom Plugin: hypr-dynamic-cursors
+    hypr-dynamic-cursors = {
+      url = "github:VirtCode/hypr-dynamic-cursors";
+      inputs.hyprland.follows = "hyprland";
     };
   };
 
-  outputs = { self, nixpkgs, home-manager, ... }@inputs:
+  # The 'outputs' function now correctly consumes all input flakes.
+  outputs = { self, nixpkgs, hyprland, hyprland-plugins, hyprland-easymotion, hypr-dynamic-cursors, ... }@inputs:
     let
       system = "x86_64-linux";
-      # Define a minimal pkgs for the system to reference lib
       pkgs = import nixpkgs { inherit system; };
-
+      lib = pkgs.lib;
     in {
       nixosConfigurations.mySystem = nixpkgs.lib.nixosSystem {
         inherit system;
-
-        # Pass ALL inputs to modules via specialArgs
-        specialArgs = { inherit inputs; }; 
+        specialArgs = { inherit inputs; };
 
         modules = [
           ./configuration.nix
           ./hardware-configuration.nix
 
-          # Integrate Home Manager as a module
-          home-manager.nixosModules.home-manager {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            
-            home-manager.users.asdf = {
-              # Use the simplest relative path import:
-              imports = [ ./home.nix ];
-              
-              # Ensure the home-manager module has the correct lib and pkgs
-              # for its internal evaluations, matching our top-level pkgs.
-              _module.args = {
-                inherit (nixpkgs) lib;
-                inherit pkgs;
-                inherit inputs;
+          {
+            programs.hyprland = {
+              enable = true;
+              package = inputs.hyprland.packages.${system}.hyprland;
+            };
+
+            # 🧩 Set up HYPR_PLUGIN_DIR by symlinking all plugins from all inputs
+            environment.sessionVariables = {
+              HYPR_PLUGIN_DIR = pkgs.symlinkJoin {
+                name = "hyprland-plugins-all";
+                paths = [
+                  # Official Plugins
+                  inputs.hyprland-plugins.packages.${system}.hyprscrolling
+                  inputs.hyprland-plugins.packages.${system}.hyprfocus
+                  inputs.hyprland-plugins.packages.${system}.hyprexpo
+                  inputs.hyprland-plugins.packages.${system}.hyprwinwrap
+                  
+                  # EasyMotion Plugin
+                  inputs.hyprland-easymotion.packages.${system}.hyprland-easymotion
+
+                  # Dynamic Cursors Plugin
+                  inputs.hypr-dynamic-cursors.packages.${system}.hypr-dynamic-cursors
+                ];
               };
             };
           }
@@ -55,3 +69,4 @@
       };
     };
 }
+

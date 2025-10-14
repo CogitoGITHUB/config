@@ -1,0 +1,25 @@
+Hyprland Org-roam-ui Wallpaper TemplateThis template assumes:org-roam-ui is running inside Emacs, serving the graph on http://127.0.0.1:8080/.You are using Chromium (or a similar browser that supports --app and --class).1. Hyprland Startup Command (hyprland.conf)Use exec-once to launch the browser instance immediately after Hyprland starts. We assign a custom class name, ORUI-Background, which we target in the rules below.# Launch Org-roam-ui in a dedicated browser app instance
+# Add a short delay (sleep 1) if Emacs/ORUI takes time to initialize
+exec-once = sleep 1 && chromium --app=[http://127.0.0.1:8080/](http://127.0.0.1:8080/) --class="ORUI-Background"
+2. Hyprland Plugin and Window Rules (hyprland.conf)These rules are essential to make the browser window act like a non-interactive, background layer.A. Hyprwinwrap Plugin ConfigurationThis section tells hyprwinwrap to capture the specific window class and stretch it to cover the entire screen.plugin {
+    hyprwinwrap {
+        # IMPORTANT: Match the class name used in the exec-once command
+        class = ORUI-Background
+        
+        # Position and size to cover the entire monitor
+        pos_x = 0
+        pos_y = 0
+        size_x = 100%
+        size_y = 100%
+    }
+}
+B. Essential Window RulesThese rules ensure the wallpaper is passive and pinned across workspaces.# 1. Prevent the wallpaper from stealing focus or receiving clicks
+windowrulev2 = nofocus, class:^(ORUI-Background)$
+
+# 2. Pin the window to all workspaces so it persists
+windowrulev2 = pinned, class:^(ORUI-Background)$
+
+# 3. Remove window decorations (border, shadow)
+windowrulev2 = noborder, class:^(ORUI-Background)$
+windowrulev2 = noshadow, class:^(ORUI-Background)$
+With this configuration, your Org-roam graph will be running full-screen, passively underneath all your tiled windows, ready to be a beautiful, interactive reference dashboard! Let me know if you want any more configuration ideas once your Emacs setup is ready to go!

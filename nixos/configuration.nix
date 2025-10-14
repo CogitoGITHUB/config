@@ -89,9 +89,9 @@ services.power-profiles-daemon.enable = true;
   programs.steam.enable = true;
 
 
-
-
 environment.systemPackages = with pkgs; [
+    hyprcursor
+    rose-pine-hyprcursor
     emacs
     cool-retro-term
     wofi
