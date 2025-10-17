@@ -51,7 +51,6 @@
                 name = "hyprland-plugins-all";
                 paths = [
                   # Official Plugins
-                  inputs.hyprland-plugins.packages.${system}.hyprscrolling
                   inputs.hyprland-plugins.packages.${system}.hyprfocus
                   inputs.hyprland-plugins.packages.${system}.hyprexpo
                   inputs.hyprland-plugins.packages.${system}.hyprwinwrap

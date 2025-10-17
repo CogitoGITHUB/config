@@ -1,4 +1,15 @@
-let keybindings = [
+let keybindings = [ 
+{
+    name: "emacs"
+    modifier: "control"
+    keycode: "char_e"
+    mode: ["emacs"]
+    event: {
+      send: "executehostcommand"
+      cmd: 'emacs -nw'
+    }
+  },
+
   {
     name: "nvim"
     modifier: "control"

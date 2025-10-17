@@ -1,0 +1,1 @@
+/home/asdf/.config/emacs/straight/repos/magit/docs/magit-section.texi

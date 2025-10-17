@@ -3,21 +3,6 @@
 
 
 
-;; Increase garbage collection threshold during startup for speed
-(setq gc-cons-threshold 100000000) ;; 100MB
-
-;; UI clean-up: disable GUI elements early
-;;(set-fringe-mode 0)        ;; no fringes left/right
-(menu-bar-mode -1)         ;; no menu bar
-;;(scroll-bar-mode -1)       ;; no scroll bar
-(tool-bar-mode -1)         ;; no tool bar
-(setq-default mode-line-format nil) ;; hide mode line early
-(setq inhibit-startup-screen t) ;; no startup screen
-
-;; Line numbers — relative everywhere
-(global-display-line-numbers-mode 1)
-(setq display-line-numbers-type 'relative)
-
 
 
 (use-package modus-themes
@@ -127,3 +112,125 @@
 
   (global-set-key (kbd "<f5>") #'shapeshifter/toggle-modus-theme)) 
 
+
+
+
+
+
+
+
+
+
+
+
+;; --- DENOTE ---
+(use-package denote
+  :straight (denote :type git :host github :repo "protesilaos/denote")
+  :init
+  (setq denote-directory "~/The grand index of T.O.E/"
+        denote-file-type 'org
+        denote-date-format "%Y-%m-%d"
+        denote-known-keywords '("emacs" "philosophy" "ai" "cosmos" "blackhole"))
+
+  :config
+  ;; Auto-create org-id when creating a new Denote file
+  (add-hook 'denote-after-new-note-hook #'org-id-get-create)
+
+  ;; Keybindings
+  (define-key global-map (kbd "C-c n n") #'denote)
+  (define-key global-map (kbd "C-c n l") #'denote-link)
+  (define-key global-map (kbd "C-c n b") #'denote-backlinks)
+  (define-key global-map (kbd "C-c n r") #'denote-rename-file)
+  (define-key global-map (kbd "C-c n s") #'my/denote-in-subdirectory)
+
+
+(defun my/denote-in-subdirectory ()
+  "Prompt for a subdirectory under `denote-directory`, create it if missing, and create a note there."
+  (interactive)
+  (let* ((root (expand-file-name denote-directory))
+         (subdirs (seq-filter
+                   (lambda (f)
+                     (and (file-directory-p f)
+                          (not (string-match-p "/\\.$\\|/\\.\\.$" f))))
+                   (directory-files root t "^[^.]")))
+         (choices (mapcar (lambda (f)
+                            (string-remove-prefix root f))
+                          subdirs))
+         (chosen (completing-read
+                  "Choose (or type new) subfolder (blank = root): "
+                  choices nil nil))) ;; nil for require-match lets you type new
+    (let ((target-dir (if (string-empty-p chosen)
+                          root
+                        (expand-file-name chosen root))))
+      ;; Create subdirectory if it doesn’t exist
+      (unless (file-directory-p target-dir)
+        (make-directory target-dir t))
+      ;; Temporarily bind denote-directory to target
+      (let ((denote-directory target-dir))
+        (call-interactively #'denote)))))
+
+(defun my/denote-get-title (file)
+  "Return the title of a Denote note FILE, or derive from filename if none."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (goto-char (point-min))
+    (if (re-search-forward "^#\\+title:[ \t]*\\(.*\\)$" nil t)
+        (string-trim (match-string 1))
+      ;; fallback to filename base
+      (file-name-base file))))
+
+  )
+
+;; --- ORG-ID ---
+(use-package org-id
+  :after org
+  :config
+  (setq org-id-link-to-org-use-id 'create-from-current)
+  ;; ensure IDs are persistent between sessions
+  (setq org-id-locations-file (expand-file-name "org-id-locations" user-emacs-directory))
+  (org-id-update-id-locations))
+
+
+;; --- ORG-ROAM ---
+(use-package org-roam
+  :straight (org-roam :type git :host github :repo "org-roam/org-roam")
+  :after org
+  :defer t
+  :commands (org-roam-node-find org-roam-node-insert org-roam-graph)
+  :init
+  (setq org-roam-directory (expand-file-name "~/The grand index of T.O.E/")
+        org-roam-db-location (expand-file-name "org-roam.db" user-emacs-directory)
+        org-roam-file-extensions '("org"))
+  :config
+  (require 'org-roam-protocol)
+  (org-roam-db-autosync-mode)
+  ;; Sync database when new Denote notes are created
+  (add-hook 'denote-after-new-note-hook #'org-roam-db-sync)
+  (add-hook 'denote-rename-file-hook #'org-roam-db-sync)
+  ;; Ensure all symbols are defined before native comp
+  (eval-when-compile
+    (declare-function org-roam-node-create "org-roam-node")
+    (declare-function org-roam-node-file "org-roam-node")
+    (declare-function org-roam-node-point "org-roam-node")
+    (declare-function org-roam-db-node-p "org-roam-db"))
+  ;; Keybindings
+  (define-key global-map (kbd "C-c r f") #'org-roam-node-find)
+  (define-key global-map (kbd "C-c r i") #'org-roam-node-insert)
+  (define-key global-map (kbd "C-c r g") #'org-roam-graph))
+
+;; --- ORG-ROAM-UI ---
+(use-package org-roam-ui
+  :straight (org-roam-ui :type git :host github :repo "org-roam/org-roam-ui")
+  :after org-roam
+  :defer t
+  :config
+  ;; Silences warnings for undefined UI functions
+  (eval-when-compile
+    (declare-function orui-sync-theme "org-roam-ui")
+    (declare-function orui-node-local "org-roam-ui")
+    (declare-function orui-node-zoom "org-roam-ui")
+    (declare-function orui-open "org-roam-ui"))
+  (setq org-roam-ui-sync-theme t
+        org-roam-ui-follow t
+        org-roam-ui-update-on-save t
+        org-roam-ui-open-on-start t))

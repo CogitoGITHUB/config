@@ -48,3 +48,20 @@
   save-place-file            (expand-file-name "places" user-emacs-directory)
   native-comp-eln-load-path  (list (expand-file-name "eln-cache/" user-emacs-directory))
 )
+
+
+
+;; Increase garbage collection threshold during startup for speed
+(setq gc-cons-threshold 100000000) ;; 100MB
+
+;; UI clean-up: disable GUI elements early
+(set-fringe-mode 0)        ;; no fringes left/right
+(menu-bar-mode -1)         ;; no menu bar
+(scroll-bar-mode -1)       ;; no scroll bar
+(tool-bar-mode -1)         ;; no tool bar
+;;(setq-default mode-line-format nil) ;; hide mode line early
+(setq inhibit-startup-screen t) ;; no startup screen
+
+;; Line numbers — relative everywhere
+(global-display-line-numbers-mode 1)
+(setq display-line-numbers-type 'relative)

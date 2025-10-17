@@ -14,6 +14,14 @@ plugins = [
  "shortcuts_menu",
 ]
 
+[scratchpads.term]
+animation = "fromTop"
+command = "kitty --class kitty-dropterm"
+class = "kitty-dropterm"
+size = "100% 100%"
+max_size = "1920px 100%"
+margin = 0
+
 
 
 [layout_center]
@@ -23,15 +31,6 @@ next = "movefocus r"
 prev = "movefocus l"
 next2 = "movefocus d"
 prev2 = "movefocus u"
-
-
-[scratchpads.term]
-animation = ""
-command = "/run/current-system/sw/bin/cool-retro-term"
-class = "cool-retro-term."
-size = "99% 99%"
-max_size = "99% 99%"
-margin = "1"
 
 [shortcuts_menu.entries]
 

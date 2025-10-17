@@ -90,9 +90,13 @@ services.power-profiles-daemon.enable = true;
 
 
 environment.systemPackages = with pkgs; [
+    gimp
+    krita
+    inkscape
     hyprcursor
     rose-pine-hyprcursor
     emacs
+    kitty
     cool-retro-term
     wofi
     warp-terminal
