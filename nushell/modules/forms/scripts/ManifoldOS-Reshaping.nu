@@ -1,221 +1,57 @@
 # =============================================================================
-# ManifoldOS Reshape Script
+# ManifoldOS — Reshaping
 # =============================================================================
-# Handles system reconfiguration via `guix system reconfigure`, with git-based
-# version control for all config changes. Git only commits & pushes AFTER a
-# successful reconfigure — so the remote always reflects a working system.
+# Handles system reconfiguration via `guix system reconfigure`.
+# Git commits & pushes AFTER a successful reconfigure only.
 #
-# ⚠️  DEPENDENCY WARNING
-# =============================================================================
-# This script sources ManifoldOS-Reshaping-History.nu directly.
-# The following functions are available after sourcing:
-#
-#   - reshaping-history-rows [n: int = 10, left: string, right: string]
-#
-# =============================================================================
-#
-# Flow:
-#   1. Capture last-good git commit (current local state)
-#   2. Clear Guile cache
-#   3. Reconfigure system (guix)
-#      ├─ Failure → show build log → show REPL output → offer revert
-#      └─ Success → commit & push (git) → GC → unified summary table
+# Depends on ManifoldOS-Reshaping-History.nu being sourced first.
+# Public API used from that script:
+#   - print-git-sections [repo, changed, push_results]
+#   - print-section [label, subtitle, rows]
+#   - fetch-repo-stats-from [repo]
+#   - fetch-status-from [repo]
+#   - fetch-commits-from [repo, n]
 # =============================================================================
 
 source ~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping-History.nu
 
 
 # =============================================================================
-# SECTION 1 — TIME UTILITIES
+# SECTION 1 — FLOW ENGINE
 # =============================================================================
 
-def reshape-step-time [t: datetime] {
-    let secs = (((date now) - $t) | into int) / 1_000_000_000
-    let secs_rounded = ($secs | math round)
-    $"($secs_rounded)s"
-}
-
-
-# =============================================================================
-# SECTION 2 — DISPLAY / RENDERING
-# =============================================================================
-
-def render-progress [results: list, current: string] {
+def rs-flow [steps: list, current: string, timings: record] {
     print -n "\e[2J\e[H"
     print ""
-    print $"(ansi red_bold)  ManifoldOS Reshaping ...(ansi reset)"
+    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
+    print $"(ansi grey)  A staged collapse of system state into new configuration.(ansi reset)"
     print ""
-    for row in $results {
-        print $"(ansi red_bold)  ✓ ($row.description) 🌹(ansi reset)"
+
+    for step in $steps {
+        let name      = $step.name
+        let elapsed   = ($timings | get -i $name | default "")
+        let is_done   = ($elapsed | is-not-empty)
+        let is_active = ($name == $current)
+        let symbol    = if $is_done and not $is_active { "🌹" } else if $is_active { "►" } else { "○" }
+        let suffix    = if $is_active { "───► running" } else if $is_done { $"✓  ($elapsed)" } else { "" }
+        print $"  ($symbol)  ($name)  ($suffix)"
     }
+
     print ""
-    print $"  >>> ($current) ❗"
-    print ""
-}
-
-def render-summary [results: list, changed: list] {
-    $env.config.color_config = ($env.config.color_config | upsert header "red_bold")
-
-    mut rows = []
-
-    # --- Reshape steps ---
-    for row in $results {
-        $rows = ($rows | append {
-            "ManifoldOS": $"(ansi red_bold)($row.description)(ansi reset)"
-            "": "🌹"
-        })
-    }
-
-    # --- Divider ---
-    $rows = ($rows | append {
-        "ManifoldOS": $"(ansi red_bold)─────────────────────────────(ansi reset)"
-        "": ""
-    })
-
-    # --- Emacs ---
-    let emacs_status = (try { herd status emacs-daemon | str trim } catch { "" })
-    let emacs_icon = if ($emacs_status =~ "running") {
-        $"(ansi red_bold)🌹 running(ansi reset)"
-    } else {
-        $"(ansi red)🥀 stopped(ansi reset)"
-    }
-    $rows = ($rows | append {
-        "ManifoldOS": $"(ansi red_bold)🌹 Emacs — Control Center(ansi reset)"
-        "": $emacs_icon
-    })
-
-    # --- Divider ---
-    $rows = ($rows | append {
-        "ManifoldOS": $"(ansi red_bold)─────────────────────────────(ansi reset)"
-        "": ""
-    })
-
-    # --- System info ---
-    let kernel = (^uname -r | str trim)
-    let disk_cols = (^df -h / | lines | last | split row " " | where { |it| $it | is-not-empty })
-    let disk = $"($disk_cols | get 2) / ($disk_cols | get 1)"
-    let store = (du --max-depth 0 /gnu/store | get apparent | first | into string)
-    let mem_cols = (^free -h | lines | where { |l| $l =~ "^Mem:" } | first | split row " " | where { |it| $it | is-not-empty })
-    let ram = $"($mem_cols | get 2) / ($mem_cols | get 1)"
-    let uptime = (^uptime | str trim | str replace -r `.*up\s+` "" | str replace -r `,\s+\d+ user.*` "" | str trim)
-    let cpu = (try {
-        let load = (^cat /proc/loadavg | split row " ")
-        $"($load | get 0) ($load | get 1) ($load | get 2)"
-    } catch { "unavailable" })
-    let temp = (try {
-        let t = (^cat /sys/class/thermal/thermal_zone0/temp | str trim | into int)
-        $"($t / 1000)°C"
-    } catch { "unavailable" })
-    let generations = (try {
-        guix system list-generations | lines | where { |l| $l =~ "^Generation" } | length | into string
-    } catch { "unavailable" })
-
-    $rows = ($rows | append { "ManifoldOS": $"(ansi red_bold)Kernel(ansi reset)"      "": $"(ansi red)($kernel)(ansi reset)" })
-    $rows = ($rows | append { "ManifoldOS": $"(ansi red_bold)Disk /(ansi reset)"      "": $"(ansi red)($disk)(ansi reset)" })
-    $rows = ($rows | append { "ManifoldOS": $"(ansi red_bold)Store(ansi reset)"       "": $"(ansi red)($store)(ansi reset)" })
-    $rows = ($rows | append { "ManifoldOS": $"(ansi red_bold)RAM(ansi reset)"         "": $"(ansi red)($ram)(ansi reset)" })
-    $rows = ($rows | append { "ManifoldOS": $"(ansi red_bold)CPU Load(ansi reset)"    "": $"(ansi red)($cpu)(ansi reset)" })
-    $rows = ($rows | append { "ManifoldOS": $"(ansi red_bold)Temp(ansi reset)"        "": $"(ansi red)($temp)(ansi reset)" })
-    $rows = ($rows | append { "ManifoldOS": $"(ansi red_bold)Uptime(ansi reset)"      "": $"(ansi red)($uptime)(ansi reset)" })
-    $rows = ($rows | append { "ManifoldOS": $"(ansi red_bold)Generations(ansi reset)" "": $"(ansi red)($generations)(ansi reset)" })
-
-    # --- Divider ---
-    $rows = ($rows | append {
-        "ManifoldOS": $"(ansi red_bold)─────────────────────────────(ansi reset)"
-        "": ""
-    })
-
-    # --- Shepherd services ---
-    let skip_patterns = [
-        "file-system-"
-        "term-"
-        "console-font-"
-        "root"
-        "transient"
-        "timer"
-        "loopback"
-        "urandom-seed"
-        "user-file-systems"
-        "user-processes"
-        "virtual-terminal"
-        "pam"
-        "system-log"
-    ]
-
-    let lines = (^/run/setuid-programs/sudo herd status | lines)
-    mut current_status = ""
-
-    for line in $lines {
-        if ($line =~ "^Started:") {
-            $current_status = "running"
-        } else if ($line =~ "^Stopped:") {
-            $current_status = "stopped"
-        } else if ($line =~ "^One-shot:") {
-            $current_status = ""
-        } else if ($line =~ "^Running timers:") {
-            $current_status = ""
-        } else if ($line =~ "^\\s*[+\\-]\\s+\\S" and $current_status != "") {
-            let name = ($line | str replace -r "^\\s*[+\\-]\\s+" "" | str trim)
-            let should_skip = ($skip_patterns | any { |p| $name | str starts-with $p })
-            if (not $should_skip) and ($name | is-not-empty) {
-                let icon = if $current_status == "running" {
-                    $"(ansi red)🌹 running(ansi reset)"
-                } else {
-                    $"(ansi red)🥀 stopped(ansi reset)"
-                }
-                $rows = ($rows | append {
-                    "ManifoldOS": $"(ansi red_bold)($name)(ansi reset)"
-                    "": $icon
-                })
-            }
-        }
-    }
-
-    # --- Divider ---
-    $rows = ($rows | append {
-        "ManifoldOS": $"(ansi red_bold)─────────────────────────────(ansi reset)"
-        "": ""
-    })
-
-    # --- Changed files ---
-    if ($changed | is-not-empty) {
-        for row in $changed {
-            let status_label = if $row.status == "added" {
-                $"(ansi green)added(ansi reset)"
-            } else if $row.status == "deleted" {
-                $"(ansi red)deleted(ansi reset)"
-            } else {
-                $"(ansi yellow)modified(ansi reset)"
-            }
-            let detail = if $row.status == "modified" {
-                $"(ansi yellow)($row.file)  (ansi green)+($row.added)(ansi reset) (ansi red)-($row.removed)(ansi reset)"
-            } else {
-                $"($row.file)"
-            }
-            $rows = ($rows | append {
-                "ManifoldOS": $status_label
-                "": $detail
-            })
-        }
-        $rows = ($rows | append {
-            "ManifoldOS": $"(ansi red_bold)─────────────────────────────(ansi reset)"
-            "": ""
-        })
-    }
-
-    # --- Git history — always from /ManifoldOS ---
-    let git_rows = (reshaping-history-rows 10 "ManifoldOS" "" "/ManifoldOS")
-    $rows = ($rows | append $git_rows)
-
-    print ($rows | table --index false)
 }
 
 
 # =============================================================================
-# SECTION 3 — ERROR DISPLAY
+# SECTION 2 — ERROR DISPLAY
 # =============================================================================
 
 def render-errors [all_output: string] {
+    print -n "\e[2J\e[H"
+    print ""
+    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPE FAILED 🌹(ansi reset)"
+    print $"(ansi grey)  System reconfiguration did not complete.(ansi reset)"
+    print ""
+
     let drv_log_lines = ($all_output | lines | where { |l| $l =~ "View build log at" })
     let drv_log = if ($drv_log_lines | is-empty) {
         ""
@@ -224,43 +60,33 @@ def render-errors [all_output: string] {
     }
 
     if ($drv_log | is-not-empty) {
-        print $"(ansi red_bold)  Build Log:(ansi reset)"
-        print ""
+        print-section "BUILD LOG" "derivation build output" []
         ^/run/setuid-programs/sudo zcat $drv_log | bat --language=log --paging=never
-        print ""
     } else {
-        let error_lines = ($all_output | lines | where { |l| $l =~ "error:" })
-        print $"(ansi red_bold)  Reshaping failed because:(ansi reset)"
-        print ""
-        for line in $error_lines {
-            print $"  (ansi red)($line)(ansi reset)"
-        }
-        print ""
+        let error_lines = (
+            $all_output
+            | lines
+            | where { |l| $l =~ "error:" }
+            | each { |l| { error: $l } }
+        )
+        print-section "ERRORS" "reconfiguration failed because" $error_lines
     }
 
-    print $"(ansi red_bold)  REPL Output:(ansi reset)"
-    print ""
     let repl_out = (
         ^/run/setuid-programs/sudo guix repl /ManifoldOS/system.scm e>| str trim
         | lines
         | where { |l|
-            not ($l =~ "^;;;" or
-                 $l =~ "scheme@" or
-                 $l =~ "wrong-type-arg" or
-                 $l =~ "open-input-string" or
-                 $l =~ "WARNING:" or
-                 $l =~ "^$")
+            not ($l =~ "^;;;" or $l =~ "scheme@" or $l =~ "wrong-type-arg" or
+                 $l =~ "open-input-string" or $l =~ "WARNING:" or $l =~ "^$")
         }
+        | each { |l| { output: $l } }
     )
-    for line in $repl_out {
-        print $"  ($line)"
-    }
-    print ""
+    print-section "REPL OUTPUT" "scheme evaluation trace" $repl_out
 }
 
 
 # =============================================================================
-# SECTION 4 — GIT OPERATIONS
+# SECTION 3 — GIT OPERATIONS
 # =============================================================================
 
 def capture-last-good [] {
@@ -269,24 +95,21 @@ def capture-last-good [] {
 
 def git-sync [] {
     git -C /ManifoldOS add --all
-
-    # Capture changes before committing
-    let added = (git -C /ManifoldOS diff --cached --name-only --diff-filter=A | lines | where { |l| $l | is-not-empty } | each { |f| { status: "added" file: $f added: "" removed: "" } })
-    let deleted = (git -C /ManifoldOS diff --cached --name-only --diff-filter=D | lines | where { |l| $l | is-not-empty } | each { |f| { status: "deleted" file: $f added: "" removed: "" } })
-    let modified = (git -C /ManifoldOS diff --cached --numstat --diff-filter=M | lines | where { |l| $l | is-not-empty } | each { |line|
-        let parts = ($line | split row "\t")
-        { status: "modified" file: ($parts | get 2) added: ($parts | get 0) removed: ($parts | get 1) }
+    let added    = (git -C /ManifoldOS diff --cached --name-only --diff-filter=A | lines | where { |l| $l | is-not-empty } | each { |f| { status: "added"    file: $f  "+": ""  "-": "" } })
+    let deleted  = (git -C /ManifoldOS diff --cached --name-only --diff-filter=D | lines | where { |l| $l | is-not-empty } | each { |f| { status: "deleted"  file: $f  "+": ""  "-": "" } })
+    let modified = (git -C /ManifoldOS diff --cached --numstat --diff-filter=M   | lines | where { |l| $l | is-not-empty } | each { |line|
+        let p = ($line | split row "\t")
+        { status: "modified"  file: ($p | get 2)  "+": ($p | get 0)  "-": ($p | get 1) }
     })
     let changed = ($added | append $deleted | append $modified)
-
-    # Delegates commit/push to ManifoldOS-Reshaping-History.nu
     ManifoldOS-Reshaping-History "update"
-
     $changed
 }
 
 def revert-to-last-good [last_good: string] {
-    print $"(ansi yellow_bold)  Last good commit: (ansi reset)(ansi yellow)($last_good | str substring 0..7)(ansi reset)"
+    print-section "REVERT" "last known working commit" [
+        { key: "Commit"  value: ($last_good | str substring 0..7) }
+    ]
     print ""
 
     let choice = (
@@ -297,14 +120,16 @@ def revert-to-last-good [last_good: string] {
     if ($choice | str starts-with "yes") {
         git -C /ManifoldOS reset --hard $last_good
         print ""
-        print $"(ansi green_bold)  ✓ Local files reverted to ($last_good | str substring 0..7)(ansi reset)"
+        print-section "REVERTED" "local files restored to last working state" [
+            { key: "Commit"  value: ($last_good | str substring 0..7) }
+        ]
         print ""
     }
 }
 
 
 # =============================================================================
-# SECTION 5 — SYSTEM OPERATIONS
+# SECTION 4 — SYSTEM OPERATIONS
 # =============================================================================
 
 def clear-guile-cache [log: string] {
@@ -325,68 +150,150 @@ def run-gc [log: string] {
 
 
 # =============================================================================
-# SECTION 6 — MAIN RESHAPE ENTRYPOINT
+# SECTION 5 — SUMMARY
+# =============================================================================
+
+def render-summary [results: list, changed: list] {
+    print -n "\e[2J\e[H"
+    print ""
+    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
+    print $"(ansi grey)  System reconfiguration complete.(ansi reset)"
+    print ""
+
+    # --- Steps ---
+    print-section "STEPS" "operations performed during this reshape" (
+        $results | each { |r| { step: $r.description } }
+    )
+
+    # --- Emacs ---
+    let emacs_status = (try { herd status emacs-daemon | str trim } catch { "" })
+    let emacs_state  = if ($emacs_status =~ "running") { "🌹 running" } else { "🥀 stopped" }
+    print-section "EMACS" "control center status" [{ state: $emacs_state }]
+
+    # --- System info ---
+    let kernel      = (^uname -r | str trim)
+    let disk_cols   = (^df -h / | lines | last | split row " " | where { |it| $it | is-not-empty })
+    let disk        = $"($disk_cols | get 2) / ($disk_cols | get 1)"
+    let store       = (du --max-depth 0 /gnu/store | get apparent | first | into string)
+    let mem_cols    = (try { ^free -h | lines | where { |l| $l =~ "^Mem:" } | first | split row " " | where { |it| $it | is-not-empty } } catch { [] })
+    let ram         = $"($mem_cols | get 2) / ($mem_cols | get 1)"
+    let uptime      = (^uptime | str trim | str replace -r `.*up\s+` "" | str replace -r `,\s+\d+ user.*` "" | str trim)
+    let cpu         = (try { let l = (^cat /proc/loadavg | split row " "); $"($l | get 0) ($l | get 1) ($l | get 2)" } catch { "unavailable" })
+    let temp        = (try { let t = (^cat /sys/class/thermal/thermal_zone0/temp | str trim | into int); $"($t / 1000)°C" } catch { "unavailable" })
+    let generations = (try { guix system list-generations | lines | where { |l| $l =~ "^Generation" } | length | into string } catch { "unavailable" })
+
+    print-section "SYSTEM" "hardware and runtime state" [
+        { key: "Kernel"      value: $kernel }
+        { key: "Disk /"      value: $disk }
+        { key: "Store"       value: $store }
+        { key: "RAM"         value: $ram }
+        { key: "CPU Load"    value: $cpu }
+        { key: "Temp"        value: $temp }
+        { key: "Uptime"      value: $uptime }
+        { key: "Generations" value: $generations }
+    ]
+
+    # --- Shepherd services ---
+    let skip_patterns = [
+        "file-system-" "term-" "console-font-" "root" "transient" "timer"
+        "loopback" "urandom-seed" "user-file-systems" "user-processes"
+        "virtual-terminal" "pam" "system-log"
+    ]
+
+    let herd_lines = (^/run/setuid-programs/sudo herd status | lines)
+    mut svc_status = ""
+    mut svc_rows   = []
+
+    for line in $herd_lines {
+        if ($line =~ "^Started:") {
+            $svc_status = "running"
+        } else if ($line =~ "^Stopped:") {
+            $svc_status = "stopped"
+        } else if ($line =~ "^One-shot:") {
+            $svc_status = ""
+        } else if ($line =~ "^Running timers:") {
+            $svc_status = ""
+        } else {
+            let trimmed = ($line | str trim)
+            let is_service = ($trimmed | str starts-with "+") or ($trimmed | str starts-with "-")
+            if $is_service and $svc_status != "" {
+                let name = ($trimmed | str substring 2..)
+                let skip = ($skip_patterns | any { |p| $name | str starts-with $p })
+                if (not $skip) and ($name | is-not-empty) {
+                    let icon = if $svc_status == "running" { "🌹 running" } else { "🥀 stopped" }
+                    $svc_rows = ($svc_rows | append { service: $name  state: $icon })
+                }
+            }
+        }
+    }
+
+    print-section "SERVICES" "shepherd daemon states" $svc_rows
+
+    # --- Git sections ---
+    print-git-sections "/ManifoldOS" $changed $results
+}
+
+
+# =============================================================================
+# SECTION 6 — MAIN
 # =============================================================================
 
 def ManifoldOS-Reshaping [] {
-    let manifest = "/ManifoldOS/system.scm"
-    let log = $"/tmp/reshape_(date now | format date '%Y%m%d_%H%M%S').log"
-    let origin_dir = ($env.PWD)
+    let manifest    = "/ManifoldOS/system.scm"
+    let log         = $"/tmp/reshape_(date now | format date '%Y%m%d_%H%M%S').log"
+    let origin_dir  = ($env.PWD)
+    let last_good   = (capture-last-good)
 
-    mut results = []
+    let steps = [
+        { name: "Cache" }
+        { name: "Reconfigure" }
+        { name: "Commit" }
+        { name: "GC" }
+    ]
+    mut timings = {}
 
-    let last_good = (capture-last-good)
-
-    # --- cd into ManifoldOS ---
     cd /ManifoldOS
 
     # --- Step 1: Clear Guile cache ---
-    render-progress $results "Clearing Guile cache"
+    rs-flow $steps "Cache" $timings
     let t = (date now)
     clear-guile-cache $log
-    let elapsed = (reshape-step-time $t)
-    $results = ($results | append { description: "Guile cache cleared" })
+    $timings = ($timings | insert Cache $"(((date now) - $t) / 1sec | math round)s")
 
     # --- Step 2: Reconfigure ---
-    render-progress $results "Reconfiguring system"
+    rs-flow $steps "Reconfigure" $timings
     let t = (date now)
     let r = (run-reconfigure $manifest $log)
-    let elapsed = (reshape-step-time $t)
+    $timings = ($timings | insert Reconfigure $"(((date now) - $t) / 1sec | math round)s")
 
     if $r.exit_code != 0 {
-        print -n "\e[2J\e[H"
-        print ""
-        let all_output = ($r.stdout + "\n" + $r.stderr)
-        render-errors $all_output
-        # Stay in /ManifoldOS on failure so user can work on it
+        render-errors ($r.stdout + "\n" + $r.stderr)
         revert-to-last-good $last_good
         return
     }
 
-    $results = ($results | append { description: "System reconfigured" })
-
     # --- Step 3: Git commit & push ---
-    render-progress $results "Committing working state"
+    rs-flow $steps "Commit" $timings
     let t = (date now)
     let changed = (git-sync)
-    let elapsed = (reshape-step-time $t)
-    $results = ($results | append { description: "Working state committed & pushed" })
+    $timings = ($timings | insert Commit $"(((date now) - $t) / 1sec | math round)s")
 
-    # --- Step 4: Garbage collection ---
-    render-progress $results "Reshaping reality"
+    # --- Step 4: GC ---
+    rs-flow $steps "GC" $timings
     let t = (date now)
     run-gc $log
-    let elapsed = (reshape-step-time $t)
-    $results = ($results | append { description: "Reality reshaped" })
+    $timings = ($timings | insert GC $"(((date now) - $t) / 1sec | math round)s")
 
-    # --- Return to original dir ---
     cd $origin_dir
 
-    # --- Done: Print unified summary table ---
-    print -n "\e[2J\e[H"
-    print ""
+    let results = [
+        { description: "Guile cache cleared" }
+        { description: "System reconfigured" }
+        { description: "Working state committed & pushed" }
+        { description: "Reality reshaped" }
+    ]
+
     render-summary $results $changed
-    print ""
 }
 
 
