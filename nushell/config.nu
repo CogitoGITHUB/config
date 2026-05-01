@@ -4,12 +4,10 @@ source "~/.config/nushell/modules/substrate/theme.nu"
 source "~/.config/nushell/modules/substrate/plugins.nu"
 source "~/.config/nushell/modules/substrate/completion.nu"
 
-# workspace — must be before zoxide and aliases
-source ~/.config/nushell/dir-info.nu
-
 # session / tools
 source "~/.config/nushell/zellij.nu"
-source "~/.config/nushell/zoxide.nu"
+source "~/.config/nushell/modules/forms/scripts/zoxide.nu"
+source "~/.config/nushell/modules/forms/scripts/dir-info.nu"
 
 # forms (interaction layer)
 source "~/.config/nushell/modules/forms/keybindings/editors.nu"
