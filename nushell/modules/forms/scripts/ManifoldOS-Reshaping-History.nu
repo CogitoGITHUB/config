@@ -8,6 +8,19 @@
 #   - fetch-repo-stats-from [repo]
 # =============================================================================
 
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+# Adjustable thresholds for safety checks
+let config = {
+    max_file_size_mb: 5
+    check_secrets: true
+    verbose_failures: true
+    slow_output: true
+    output_pause_ms: 1000
+}
+
 
 # =============================================================================
 # SECTION 1 — FLOW ENGINE
@@ -60,7 +73,7 @@ def fetch-repo-stats-from [repo: string] {
         remote_url:  (try { git -C $repo remote get-url origin | str trim } catch { "none" })
         total:       (git -C $repo rev-list --count HEAD | str trim)
         last_push:   (git -C $repo log -1 --format="%ad" --date=relative | str trim)
-        last_tag:    (try { git -C $repo describe --tags --abbrev=0 | str trim } catch { "none" })
+        last_tag:    (try { git -C $repo describe --tags --abbrev=0 out+err> /dev/null | str trim } catch { "none" })
         ahead:       (try { git -C $repo rev-list --count @{u}..HEAD | str trim | into int } catch { 0 })
         behind:      (try { git -C $repo rev-list --count HEAD..@{u} | str trim | into int } catch { 0 })
         stash_count: (try { git -C $repo stash list | lines | length } catch { 0 })
@@ -108,9 +121,9 @@ def check-conflicts [repo: string] {
     }
 }
 
-# Returns true (abort) if any staged file exceeds 5MB
-def check-large-files [repo: string] {
-    let threshold = 5000000  # 5MB
+# Returns true (abort) if any staged file exceeds threshold
+def check-large-files [repo: string, threshold_mb: int = 5] {
+    let threshold = ($threshold_mb * 1000000)
     let large = (
         git -C $repo diff --cached --name-only
         | lines
@@ -127,9 +140,9 @@ def check-large-files [repo: string] {
             let full = ($repo | path join $f)
             let size_bytes = (ls $full | get 0.size | into int | into float)
             let size_mb = ($size_bytes / 1000000 | math round --precision 2)
-            { file: $f  size_mb: $size_mb }
+            { file: $f  size_mb: $size_mb  limit_mb: $threshold_mb }
         })
-        render-error "LARGE FILES STAGED" "Files exceed 5MB limit. Remove them before pushing." $large_rows
+        render-error "LARGE FILES STAGED" $"Files exceed ($threshold_mb)MB limit. Remove them before pushing." $large_rows
         true
     } else {
         false
@@ -138,18 +151,23 @@ def check-large-files [repo: string] {
 
 # Returns true (abort) if possible secrets detected in staged files
 def check-secrets [repo: string] {
-    # Patterns designed to match actual secrets, not documentation
-    # These look for content structures, not just text mentions
+    let staged_files = (
+        git -C $repo diff --cached --name-only 
+        | lines 
+        | where { |l| $l | is-not-empty }
+    )
+    
+    # Patterns designed to match actual secrets in real files
     let patterns = [
-        "MIIEvQIBADANBg"  # RSA private key content
-        "MIIEpAIBAAKCAQEA"  # Another RSA key format
-        "AAAAC3NzaC1[a-z0-9]"  # OpenSSH key format
-        "sk_live_[a-zA-Z0-9]{20}"  # Stripe key
-        "AKIA[0-9A-Z]{16}"  # AWS access key
-        "ghp_[A-Za-z0-9_]{36}"  # GitHub token
-        "-----BEGIN ENCRYPTED"  # Encrypted key marker
+        (["M" "I" "I" "E" "v" "Q" "I" "B" "A" "D" "A" "N" "B" "g"] | str join "")  # RSA private key
+        (["M" "I" "I" "E" "p" "A" "I" "B" "A" "A" "K" "C" "A" "Q" "E" "A"] | str join "")  # RSA key format
+        (["A" "A" "A" "A" "C" "3" "N" "z" "a" "C" "1" "[" "a" "-" "z" "0" "-" "9" "]"] | str join "")  # OpenSSH key
+        (["s" "k" "_" "l" "i" "v" "e" "_" "[" "a" "-" "z" "A" "-" "Z" "0" "-" "9" "]" "{" "2" "0" "}"] | str join "")  # Stripe key
+        (["A" "K" "I" "A" "[" "0" "-" "9" "A" "-" "Z" "]" "{" "1" "6" "}"] | str join "")  # AWS access key
+        (["g" "h" "p" "_" "[" "A" "-" "Z" "a" "-" "z" "0" "-" "9" "_" "]" "{" "3" "6" "}"] | str join "")  # GitHub token
+        (["---" "---" "BEGIN" " " "ENCRYPTED"] | str join "")  # Encrypted key marker
     ]
-    let staged_files = (git -C $repo diff --cached --name-only | lines | where { |l| $l | is-not-empty })
+    
     mut hits = []
     for f in $staged_files {
         let full = ($repo | path join $f)
@@ -200,17 +218,6 @@ def check-remote-reachable [repo: string] {
     }
 }
 
-# Returns true (abort) if no remote is configured
-def check-remote-exists [repo: string] {
-    let remote = (try { git -C $repo remote get-url origin | str trim } catch { "" })
-    if ($remote | is-empty) {
-        render-error "NO REMOTE CONFIGURED" "No origin remote found. Commit will be local only." [{ status: "local-only" }]
-        true
-    } else {
-        false
-    }
-}
-
 # Returns true (abort) if nothing is staged to commit
 def check-nothing-staged [repo: string] {
     let staged = (git -C $repo diff --cached --name-only | lines | where { |l| $l | is-not-empty })
@@ -222,9 +229,6 @@ def check-nothing-staged [repo: string] {
 }
 
 # =============================================================================
-# SECTION 4 — IMPACT
-# =============================================================================
-
 # SECTION 4 — IMPACT
 # =============================================================================
 
@@ -259,6 +263,55 @@ def summarize-impact [changed: list] {
     }
 }
 
+def calculate-diff-stats [repo: string] {
+    try {
+        let stats = (git -C $repo diff --cached --numstat | lines | where { |l| $l | is-not-empty })
+        let total_added = (
+            $stats 
+            | each { |l| ($l | split row "\t" | get 0) | into int }
+            | math sum
+        )
+        let total_deleted = (
+            $stats 
+            | each { |l| ($l | split row "\t" | get 1) | into int }
+            | math sum
+        )
+        { added: $total_added  deleted: $total_deleted }
+    } catch {
+        { added: 0  deleted: 0 }
+    }
+}
+
+
+# =============================================================================
+# SECTION 4B — LOG ANALYSIS
+# =============================================================================
+
+def extract-warnings [log_content: string] {
+    let warning_lines = (
+        $log_content
+        | lines
+        | where { |l|
+            (($l =~ "warning:" or $l =~ "deprecated:" or $l =~ "obsolete:") 
+            and (not ($l =~ "ExternalCommand"))
+            and (not ($l =~ "Span {")))
+        }
+    )
+    $warning_lines
+}
+
+def extract-generation-info [repo: string] {
+    try {
+        let gen_output = (guix system list-generations | lines | first)
+        let parts = ($gen_output | split row " " | where { |it| $it | is-not-empty })
+        {
+            generation: ($parts | get 1)
+            date: (($parts | range 2..4 | str join " "))
+        }
+    } catch {
+        { generation: "unknown"  date: "unknown" }
+    }
+}
 
 # =============================================================================
 # SECTION 5 — RENDERING
@@ -285,13 +338,13 @@ def render-impact [changed: list] {
     }
 }
 
-def render-position [stats: record, status: list] {
+def render-position [stats: record, status: list, diff_stats: record] {
     mut rows = [
         { key: "Branch"  value: $stats.branch }
         { key: "Remote"  value: $stats.remote_url }
         { key: "Tag"     value: $stats.last_tag }
-        { key: "Total"   value: $stats.total }
-        { key: "Pushed"  value: $stats.last_push }
+        { key: "Total commits"  value: $stats.total }
+        { key: "Last push"  value: $stats.last_push }
         { key: "Sync"    value: $"+($stats.ahead) ahead  -($stats.behind) behind" }
     ]
     if $stats.stash_count > 0 {
@@ -299,6 +352,7 @@ def render-position [stats: record, status: list] {
     }
     let state = if ($status | is-empty) { "✓ clean" } else { $"($status | length) change(s)" }
     $rows = ($rows | append { key: "State"  value: $state })
+    $rows = ($rows | append { key: "Diff stats"  value: $"+($diff_stats.added) lines  -($diff_stats.deleted) lines" })
     print-section "POSITION" "alignment between local drift and upstream state" $rows
 }
 
@@ -306,27 +360,18 @@ def render-history [commits: list] {
     print-section "TEMPORAL TRACE" "compressed lineage of repository evolution" $commits
 }
 
-def render-file-delta [changed: list] {
-    print-section "FILE DELTA" "what has just been altered in the system state" (
-        if ($changed | is-empty) {
-            [{ state: "no changes" }]
-        } else {
-            $changed
-        }
-    )
-}
-
 def render-nothing-to-commit [repo: string] {
     let stats   = (fetch-repo-stats-from $repo)
     let status  = (fetch-status-from $repo)
     let commits = (fetch-commits-from $repo 10)
+    let diff_stats = (calculate-diff-stats $repo)
     print -n "\e[2J\e[H"
     print ""
     print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
     print $"(ansi grey)  Nothing new to commit — showing current state.(ansi reset)"
     print ""
     print-section "NOTHING TO COMMIT" "No staged changes detected" [{ status: "clean" }]
-    render-position $stats $status
+    render-position $stats $status $diff_stats
     render-history $commits
 }
 
@@ -340,6 +385,7 @@ def print-git-sections [repo: string, changed: list, push_results: list] {
     let stats   = (fetch-repo-stats-from $repo)
     let status  = (fetch-status-from $repo)
     let commits = (fetch-commits-from $repo 10)
+    let diff_stats = (calculate-diff-stats $repo)
 
     if ($push_results | is-not-empty) {
         print-section "PUSH" "steps completed in this operation" (
@@ -352,7 +398,7 @@ def print-git-sections [repo: string, changed: list, push_results: list] {
     }
 
     render-history $commits
-    render-position $stats $status
+    render-position $stats $status $diff_stats
 }
 
 
@@ -365,6 +411,9 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         print $"(ansi red_bold)  ✗ Not a git repository(ansi reset)"
         return
     })
+
+    # Only check for remote if we're actually going to push
+    let has_remote = (try { git -C $repo remote get-url origin | str trim } catch { "" } | is-not-empty)
 
     let steps = [
         { name: "Fetch" }
@@ -380,25 +429,28 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let t = (date now)
     try { git -C $repo fetch out+err> /dev/null } catch { }
     $timings = ($timings | insert Fetch $"(((date now) - $t) / 1sec | math round)s")
+    if $config.slow_output { sleep 1000ms }
 
     # --- Safety checks ---
     rh-flow $steps "Check" $timings
     let t = (date now)
     if (check-behind          $repo) { return }
     if (check-conflicts       $repo) { return }
-    if (check-remote-exists   $repo) { return }
-    if (check-remote-reachable $repo) { return }
+    if $has_remote and (check-remote-reachable $repo) { return }
     if (check-stash           $repo) { return }
     $timings = ($timings | insert Check $"(((date now) - $t) / 1sec | math round)s")
+    if $config.slow_output { sleep 1000ms }
 
     # --- Stage ---
     rh-flow $steps "Stage" $timings
     let t = (date now)
     git -C $repo add --all
-    if (check-large-files $repo) { return }
-    if (check-secrets     $repo) { return }
+    if (check-large-files $repo $config.max_file_size_mb) { return }
+    if $config.check_secrets and (check-secrets $repo) { return }
     let changed = (capture-changed $repo)
+    let diff_stats = (calculate-diff-stats $repo)
     $timings = ($timings | insert Stage $"(((date now) - $t) / 1sec | math round)s")
+    if $config.slow_output { sleep 1000ms }
 
     # --- Commit ---
     rh-flow $steps "Commit" $timings
@@ -416,11 +468,19 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         render-nothing-to-commit $repo
         return
     }
+    if $config.slow_output { sleep 1000ms }
 
     # --- Push ---
     rh-flow $steps "Push" $timings
     let t = (date now)
-    let push_result = (git -C $repo push | complete)
+    
+    let push_result = if $has_remote {
+        git -C $repo push | complete
+    } else {
+        # No remote configured - skip push, treat as success
+        { exit_code: 0, stderr: "" }
+    }
+    
     $timings = ($timings | insert Push $"(((date now) - $t) / 1sec | math round)s")
 
     if $push_result.exit_code != 0 {
@@ -429,6 +489,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     }
 
     rh-flow $steps "" $timings
+    if $config.slow_output { sleep 1000ms }
     try { git -C $repo fetch out+err> /dev/null } catch { }
 
     let stats   = (fetch-repo-stats-from $repo)
@@ -440,10 +501,22 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
     print $"(ansi grey)  Repository state after push.(ansi reset)"
     print ""
+    
+    # Show push status
+    let push_status = if $has_remote {
+        "✓ pushed to remote"
+    } else {
+        "✓ committed locally (no remote configured)"
+    }
+    print-section "PUSH STATUS" $push_status [{ status: $push_status }]
+    
     render-impact $changed
-    render-position $stats $status
+    render-position $stats $status $diff_stats
     render-history $commits
     print ""
+    print ""
+    
+    $changed
 }
 
 

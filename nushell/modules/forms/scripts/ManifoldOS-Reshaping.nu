@@ -45,67 +45,101 @@ def rs-flow [steps: list, current: string, timings: record] {
 # SECTION 2 — ERROR DISPLAY
 # =============================================================================
 
-def render-errors [all_output: string] {
+def extract-core-error [all_output: string] {
+    let error_lines = (
+        $all_output
+        | lines
+        | where { |l| $l =~ "error:" }
+    )
+    
+    if ($error_lines | is-empty) {
+        "Unknown error — check log for details"
+    } else {
+        $error_lines | first | str trim
+    }
+}
+
+def render-errors [all_output: string, log_file: string] {
     print -n "\e[2J\e[H"
     print ""
     print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
     print $"(ansi grey)  Error encountered during workflow.(ansi reset)"
     print ""
 
-    # --- Extract derivation log path ---
-    let drv_log_lines = ($all_output | lines | where { |l| $l =~ "View build log at" })
-    let drv_log = if ($drv_log_lines | is-empty) {
-        ""
-    } else {
-        $drv_log_lines | first | str replace -r `.*'([^']+)'.*` "$1" | str trim
+    # --- Extract and show core error ---
+    let core_error = (extract-core-error $all_output)
+    print-section "❌ ERROR" "reconfiguration failed" [
+        { error: $core_error }
+    ]
+    print ""
+
+    # --- Show log file path ---
+    print-section "📋 LOG FILE" "full output saved at" [
+        { path: $log_file }
+    ]
+    print ""
+
+    # --- Ask if user wants to revert to last push ---
+    print $"(ansi yellow)🔄 REVERT TO LAST PUSH(ansi reset)"
+    print $"(ansi grey)  Go back to last known good commit?(ansi reset)"
+    print ""
+    let revert_choice = (
+        ["no — keep trying to fix" "yes — revert to last push"]
+        | input list --fuzzy "Revert working directory?"
+    )
+    print ""
+
+    let should_revert = ($revert_choice | str starts-with "yes")
+    
+    if $should_revert {
+        return $should_revert
     }
 
-    # --- Show BUILD LOG from .drv if available ---
-    if ($drv_log | is-not-empty) {
-        print-section "BUILD LOG" "derivation build output from failed compilation" []
+    # --- If not reverting, ask if they want to see full log or diagnostics ---
+    print $"(ansi yellow)📖 VIEW OPTIONS(ansi reset)"
+    print $"(ansi grey)  How would you like to review the error?(ansi reset)"
+    print ""
+    let view_choice = (
+        ["diagnostics — show error + repl output" "full-log — open log file in pager"]
+        | input list --fuzzy "View:"
+    )
+    print ""
+
+    if ($view_choice | str starts-with "full-log") {
+        # Open log in less
         try {
-            ^/run/setuid-programs/sudo zcat $drv_log | bat --language=log --paging=never
+            less $log_file
         } catch {
+            print $"(ansi grey)Unable to open log with less, showing raw content:(ansi reset)"
             print ""
             try {
-                ^/run/setuid-programs/sudo zcat $drv_log
+                open --raw $log_file | print
             } catch {
-                print $"(ansi grey)  Unable to read log file: ($drv_log)(ansi reset)"
+                print $"(ansi red)Failed to read log file(ansi reset)"
             }
-            print ""
         }
-    }
-
-    # --- Show error lines from output ---
-    let error_lines = (
-        $all_output
-        | lines
-        | where { |l| $l =~ "error:" }
-        | each { |l| { error: $l } }
-    )
-    if ($error_lines | is-not-empty) {
-        print-section "ERRORS" "reconfiguration failed because" $error_lines
-    }
-
-    # --- Run REPL evaluation to get scheme trace ---
-    print-section "SCHEME EVALUATION" "running guix repl to diagnose configuration" []
-    let repl_out = (
-        try {
-            (^/run/setuid-programs/sudo guix repl /ManifoldOS/system.scm out+err>| str trim)
+    } else {
+        # Show diagnostic info: error + warnings
+        print-section "⚠ WARNINGS" "non-fatal issues in build log" (
+            ($all_output
             | lines
-            | where { |l|
-                not ($l =~ "^;;;" or $l =~ "^scheme@" or $l =~ "^$")
+            | where { |l| 
+                ($l =~ "warning:" or $l =~ "deprecated:") 
+                and (not ($l =~ "ExternalCommand"))
+                and (not ($l =~ "Span {"))
             }
-        } catch {
-            ["Failed to run guix repl — check permissions and system state"]
-        }
-    )
-    
-    if ($repl_out | is-not-empty) {
-        $repl_out | each { |l| print $"  ($l)" }
+            | each { |w| { warning: $w } })
+        )
+        print ""
+
+        # Show the raw output for inspection
+        print-section "📄 RAW OUTPUT" "full error output from guix system reconfigure" []
+        print ""
+        $all_output | lines | each { |l| print $"  ($l)" }
+        print ""
     }
-    
-    print ""
+
+    $should_revert
 }
 
 
@@ -126,29 +160,22 @@ def git-sync [] {
         { status: "modified"  file: ($p | get 2)  "+": ($p | get 0)  "-": ($p | get 1) }
     })
     let changed = ($added | append $deleted | append $modified)
-    ManifoldOS-Reshaping-History "update"
+    let returned = (ManifoldOS-Reshaping-History "update")
     $changed
 }
 
-def revert-to-last-good [last_good: string] {
-    print-section "REVERT" "last known working commit" [
-        { key: "Commit"  value: ($last_good | str substring 0..7) }
+def revert-to-last-push [last_good: string] {
+    print-section "⏮ REVERTING" "resetting to last pushed commit" [
+        { commit: ($last_good | str substring 0..7) }
     ]
     print ""
-
-    let choice = (
-        ["no" "yes — revert local files"]
-        | input list --fuzzy "Revert local files to last working commit?"
-    )
-
-    if ($choice | str starts-with "yes") {
-        git -C /ManifoldOS reset --hard $last_good
-        print ""
-        print-section "REVERTED" "local files restored to last working state" [
-            { key: "Commit"  value: ($last_good | str substring 0..7) }
-        ]
-        print ""
-    }
+    
+    git -C /ManifoldOS reset --hard $last_good
+    
+    print-section "✓ REVERTED" "working directory reset to last push" [
+        { commit: ($last_good | str substring 0..7) }
+    ]
+    print ""
 }
 
 
@@ -177,11 +204,46 @@ def run-gc [log: string] {
 # SECTION 5 — SUMMARY
 # =============================================================================
 
-def render-summary [results: list, changed: list] {
+def render-summary [results: list, changed: list, timings: record, log_file: string] {
     print -n "\e[2J\e[H"
     print ""
-    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
-    print $"(ansi grey)  System reconfiguration complete.(ansi reset)"
+    
+    # --- Read log for warnings ---
+    let log_content = (try { open --raw $log_file } catch { "" })
+    let warnings = (extract-warnings $log_content)
+    
+    # --- Success banner ---
+    print $"(ansi green_bold)✓ RECONFIGURATION SUCCESSFUL(ansi reset)"
+    print ""
+    
+    # --- Warnings block (if any) ---
+    if ($warnings | is-not-empty) {
+        print-section "⚠ WARNINGS" "issues detected in build log" (
+            $warnings | each { |w| { warning: $w } }
+        )
+    } else {
+        print ""
+    }
+    
+    # --- Summary metrics ---
+    let gen_info = (extract-generation-info "/ManifoldOS")
+    let total_time = (
+        ($timings | values)
+        | each { |v| 
+            $v | str replace -r 's$' '' | into float 
+        }
+        | math sum
+    )
+    let file_count = ($changed | length)
+    let disk_cols = (^df -h / | lines | last | split row " " | where { |it| $it | is-not-empty })
+    let disk_usage = ($disk_cols | get 4)
+    
+    print-section "SUMMARY" "reconfiguration metrics" [
+        { metric: "Generation"     value: $gen_info.generation }
+        { metric: "Files changed"  value: $file_count }
+        { metric: "Total time"     value: $"($total_time | math round --precision 1)s" }
+        { metric: "Disk usage /"   value: $disk_usage }
+    ]
     print ""
 
     # --- Steps ---
@@ -189,10 +251,12 @@ def render-summary [results: list, changed: list] {
         $results | each { |r| { step: $r.description } }
     )
 
-    # --- Emacs ---
-    let emacs_status = (try { herd status emacs-daemon | str trim } catch { "" })
-    let emacs_state  = if ($emacs_status =~ "running") { "🌹 running" } else { "🥀 stopped" }
-    print-section "EMACS" "control center status" [{ state: $emacs_state }]
+    # --- Build Timing ---
+    print-section "BUILD TIMING" "duration of each step" (
+        $timings | transpose key value | each { |e| 
+            { step: $e.key  duration: $e.value }
+        }
+    )
 
     # --- System info ---
     let kernel      = (^uname -r | str trim)
@@ -255,6 +319,15 @@ def render-summary [results: list, changed: list] {
 
     # --- Git sections ---
     print-git-sections "/ManifoldOS" $changed $results
+
+    # --- Emacs ---
+    let emacs_status = (try { herd status emacs-daemon | str trim } catch { "" })
+    let emacs_state  = if ($emacs_status =~ "running") { "🌹 running" } else { "🥀 stopped" }
+    print-section "EMACS" "control center status" [{ state: $emacs_state }]
+    
+    print ""
+    print $"(ansi green_bold)✓ System reconfiguration and git history updated(ansi reset)"
+    print ""
 }
 
 
@@ -291,8 +364,12 @@ def ManifoldOS-Reshaping [] {
     $timings = ($timings | insert Reconfigure $"(((date now) - $t) / 1sec | math round)s")
 
     if $r.exit_code != 0 {
-        render-errors ($r.stdout + "\n" + $r.stderr)
-        revert-to-last-good $last_good
+        let should_revert = (render-errors ($r.stdout + "\n" + $r.stderr) $log)
+        
+        if $should_revert {
+            revert-to-last-push $last_good
+        }
+        
         return
     }
 
@@ -317,7 +394,7 @@ def ManifoldOS-Reshaping [] {
         { description: "Reality reshaped" }
     ]
 
-    render-summary $results $changed
+    render-summary $results $changed $timings $log
 }
 
 
