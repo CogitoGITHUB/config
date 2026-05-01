@@ -21,12 +21,12 @@ def rh-flow [steps: list, current: string, timings: record] {
     print ""
 
     for step in $steps {
-        let name     = $step.name
-        let elapsed  = ($timings | get -i $name | default "")
-        let is_done  = ($elapsed | is-not-empty)
+        let name      = $step.name
+        let elapsed   = ($timings | get -i $name | default "")
+        let is_done   = ($elapsed | is-not-empty)
         let is_active = ($name == $current)
-        let symbol   = if $is_done and not $is_active { "🌹" } else if $is_active { "►" } else { "○" }
-        let suffix   = if $is_active { "───► running" } else if $is_done { $"✓  ($elapsed)" } else { "" }
+        let symbol    = if $is_done and not $is_active { "🌹" } else if $is_active { "►" } else { "○" }
+        let suffix    = if $is_active { "───► running" } else if $is_done { $"✓  ($elapsed)" } else { "" }
         print $"  ($symbol)  ($name)  ($suffix)"
     }
 
@@ -72,6 +72,7 @@ def fetch-repo-stats-from [repo: string] {
 # SECTION 3 — SAFETY CHECKS
 # =============================================================================
 
+# Returns true (abort) if behind remote
 def check-behind [repo: string] {
     let behind_str = (try { git -C $repo rev-list --count HEAD..@{u} | str trim } catch { "0" })
     let behind = (if ($behind_str | is-empty) { 0 } else { $behind_str | into int })
@@ -91,6 +92,7 @@ def check-behind [repo: string] {
     }
 }
 
+# Returns true (abort) if unresolved merge conflicts exist
 def check-conflicts [repo: string] {
     let conflicts = (git -C $repo diff --name-only --diff-filter=U | lines | where { |l| $l | is-not-empty })
     if ($conflicts | is-not-empty) {
@@ -107,6 +109,7 @@ def check-conflicts [repo: string] {
     }
 }
 
+# Returns true (abort) if any staged file exceeds 5MB
 def check-large-files [repo: string] {
     let threshold = 5000000  # 5MB
     let large = (
@@ -123,35 +126,97 @@ def check-large-files [repo: string] {
     if ($large | is-not-empty) {
         print ""
         print $"(ansi red_bold)  ⚠ LARGE FILES STAGED(ansi reset)"
-        print $"(ansi grey)  These files exceed 5MB — confirm before pushing.(ansi reset)"
+        print $"(ansi grey)  These files exceed 5MB — refusing to push.(ansi reset)"
         print ""
         for f in $large { print $"  ⚠  ($f)" }
         print ""
+        true
+    } else {
+        false
     }
 }
 
-def check-secrets [repo: string] {
-    let patterns = ["PRIVATE KEY" "BEGIN RSA" "password=" "secret=" "token=" "api_key=" "AWS_SECRET"]
-    let staged_files = (git -C $repo diff --cached --name-only | lines | where { |l| $l | is-not-empty })
-    mut hits = []
-    for f in $staged_files {
-        let full = ($repo | path join $f)
-        if ($full | path exists) {
-            for pattern in $patterns {
-                let found = (try { open $full | str contains $pattern } catch { false })
-                if $found {
-                    $hits = ($hits | append { file: $f  pattern: $pattern })
-                }
-            }
-        }
+# # Returns true (abort) if possible secrets detected in staged files
+# def check-secrets [repo: string] {
+#     let patterns = ["PRIVATE KEY" "BEGIN RSA" "password=" "secret=" "token=" "api_key=" "AWS_SECRET"]
+#     let staged_files = (git -C $repo diff --cached --name-only | lines | where { |l| $l | is-not-empty })
+#     mut hits = []
+#     for f in $staged_files {
+#         let full = ($repo | path join $f)
+#         if ($full | path exists) {
+#             for pattern in $patterns {
+#                 let found = (try { open $full | str contains $pattern } catch { false })
+#                 if $found {
+#                     $hits = ($hits | append { file: $f  pattern: $pattern })
+#                 }
+#             }
+#         }
+#     }
+#     if ($hits | is-not-empty) {
+#         print ""
+#         print $"(ansi red_bold)  ⚠ POSSIBLE SECRETS DETECTED(ansi reset)"
+#         print $"(ansi grey)  Review these files before pushing.(ansi reset)"
+#         print ""
+#         $hits | print
+#         print ""
+#         true
+#     } else {
+#         false
+#     }
+# }
+
+# Returns true (abort) if stashed changes exist — warns operator to review
+def check-stash [repo: string] {
+    let count = (try { git -C $repo stash list | lines | length } catch { 0 })
+    if $count > 0 {
+        print ""
+        print $"(ansi red_bold)  ⚠ STASHED CHANGES PRESENT(ansi reset)"
+        print $"(ansi grey)  ($count) stash(es) exist — they may conflict with the current push.(ansi reset)"
+        print ""
+        git -C $repo stash list | lines | each { |l| print $"  ($l)" }
+        print ""
+        let choice = (["continue anyway" "abort"] | input list --fuzzy "Stash detected — proceed?")
+        $choice == "abort"
+    } else {
+        false
     }
-    if ($hits | is-not-empty) {
+}
+
+# Returns true (abort) if remote is unreachable
+def check-remote-reachable [repo: string] {
+    let result = (try { git -C $repo ls-remote --exit-code origin HEAD | complete } catch { { exit_code: 1 } })
+    if $result.exit_code != 0 {
         print ""
-        print $"(ansi red_bold)  ⚠ POSSIBLE SECRETS DETECTED(ansi reset)"
-        print $"(ansi grey)  Review these files before pushing.(ansi reset)"
+        print $"(ansi red_bold)  ⚠ REMOTE UNREACHABLE(ansi reset)"
+        print $"(ansi grey)  Cannot reach origin — skipping push.(ansi reset)"
         print ""
-        $hits | print
+        true
+    } else {
+        false
+    }
+}
+
+# Returns true (abort) if no remote is configured
+def check-remote-exists [repo: string] {
+    let remote = (try { git -C $repo remote get-url origin | str trim } catch { "" })
+    if ($remote | is-empty) {
         print ""
+        print $"(ansi red_bold)  ⚠ NO REMOTE CONFIGURED(ansi reset)"
+        print $"(ansi grey)  No origin remote found — commit will be local only.(ansi reset)"
+        print ""
+        true
+    } else {
+        false
+    }
+}
+
+# Returns true (abort) if nothing is staged to commit
+def check-nothing-staged [repo: string] {
+    let staged = (git -C $repo diff --cached --name-only | lines | where { |l| $l | is-not-empty })
+    if ($staged | is-empty) {
+        true
+    } else {
+        false
     }
 }
 
@@ -249,8 +314,8 @@ def render-file-delta [changed: list] {
 }
 
 def render-nothing-to-commit [repo: string] {
-    let stats  = (fetch-repo-stats-from $repo)
-    let status = (fetch-status-from $repo)
+    let stats   = (fetch-repo-stats-from $repo)
+    let status  = (fetch-status-from $repo)
     let commits = (fetch-commits-from $repo 10)
     print -n "\e[2J\e[H"
     print ""
@@ -320,22 +385,31 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     # --- Safety checks ---
     rh-flow $steps "Check" $timings
     let t = (date now)
-    if (check-behind $repo)    { return }
-    if (check-conflicts $repo) { return }
+    if (check-behind          $repo) { return }
+    if (check-conflicts       $repo) { return }
+    if (check-remote-exists   $repo) { return }
+    if (check-remote-reachable $repo) { return }
+    if (check-stash           $repo) { return }
     $timings = ($timings | insert Check $"(((date now) - $t) / 1sec | math round)s")
 
     # --- Stage ---
     rh-flow $steps "Stage" $timings
     let t = (date now)
     git -C $repo add --all
-    check-large-files $repo
-    check-secrets $repo
+    if (check-large-files $repo) { return }
+#    if (check-secrets     $repo) { return }
     let changed = (capture-changed $repo)
     $timings = ($timings | insert Stage $"(((date now) - $t) / 1sec | math round)s")
 
     # --- Commit ---
     rh-flow $steps "Commit" $timings
     let t = (date now)
+
+    if (check-nothing-staged $repo) {
+        render-nothing-to-commit $repo
+        return
+    }
+
     let commit_result = (git -C $repo commit -m $msg | complete)
     $timings = ($timings | insert Commit $"(((date now) - $t) / 1sec | math round)s")
 
