@@ -6,8 +6,9 @@ source "~/.config/nushell/modules/substrate/completion.nu"
 
 # session / tools
 source "~/.config/nushell/zellij.nu"
-source "~/.config/nushell/modules/forms/scripts/zoxide.nu"
 source "~/.config/nushell/modules/forms/scripts/dir-info.nu"
+source "~/.config/nushell/modules/forms/scripts/zoxide.nu"
+
 
 # forms (interaction layer)
 source "~/.config/nushell/modules/forms/keybindings/editors.nu"

@@ -122,3 +122,14 @@ cd .config/nushell/modules/forms/scripts/
 emacs .
 d
 emacs .
+nu
+nu
+nu
+nu
+nu
+nu
+nu
+nu
+nu
+nu
+nu

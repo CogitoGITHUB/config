@@ -72,20 +72,24 @@ def fetch-repo-stats-from [repo: string] {
 # SECTION 3 — SAFETY CHECKS
 # =============================================================================
 
+# Helper function to render errors consistently
+def render-error [title: string, subtitle: string, details: any] {
+    print -n "\e[2J\e[H"
+    print ""
+    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
+    print $"(ansi grey)  Error encountered during workflow.(ansi reset)"
+    print ""
+    print-section $title $subtitle $details
+    print ""
+}
+
 # Returns true (abort) if behind remote
 def check-behind [repo: string] {
     let behind_str = (try { git -C $repo rev-list --count HEAD..@{u} | str trim } catch { "0" })
     let behind = (if ($behind_str | is-empty) { 0 } else { $behind_str | into int })
     if $behind > 0 {
-        print -n "\e[2J\e[H"
-        print ""
-        print $"(ansi red_bold)  ⚠ BEHIND REMOTE(ansi reset)"
-        print $"(ansi grey)  This machine is ($behind) commit(s) behind. Pull before pushing.(ansi reset)"
-        print ""
-        git -C $repo log HEAD..@{u} --format="%h  %ad  %an  %s" --date=short
-        | lines
-        | each { |l| print $"  ($l)" }
-        print ""
+        let commits = (git -C $repo log HEAD..@{u} --format="%h  %ad  %an  %s" --date=short | lines)
+        render-error "BEHIND REMOTE" $"Your branch is ($behind) commit(s) behind. Pull before pushing." $commits
         true
     } else {
         false
@@ -96,13 +100,8 @@ def check-behind [repo: string] {
 def check-conflicts [repo: string] {
     let conflicts = (git -C $repo diff --name-only --diff-filter=U | lines | where { |l| $l | is-not-empty })
     if ($conflicts | is-not-empty) {
-        print -n "\e[2J\e[H"
-        print ""
-        print $"(ansi red_bold)  ⚠ UNRESOLVED CONFLICTS(ansi reset)"
-        print $"(ansi grey)  Resolve these before pushing.(ansi reset)"
-        print ""
-        for f in $conflicts { print $"  ✗  ($f)" }
-        print ""
+        let conflict_rows = ($conflicts | each { |f| { file: $f } })
+        render-error "UNRESOLVED CONFLICTS" "Merge conflicts detected. Resolve them before pushing." $conflict_rows
         true
     } else {
         false
@@ -124,57 +123,65 @@ def check-large-files [repo: string] {
         }
     )
     if ($large | is-not-empty) {
-        print ""
-        print $"(ansi red_bold)  ⚠ LARGE FILES STAGED(ansi reset)"
-        print $"(ansi grey)  These files exceed 5MB — refusing to push.(ansi reset)"
-        print ""
-        for f in $large { print $"  ⚠  ($f)" }
-        print ""
+        let large_rows = ($large | each { |f| 
+            let full = ($repo | path join $f)
+            let size_bytes = (ls $full | get 0.size | into int | into float)
+            let size_mb = ($size_bytes / 1000000 | math round --precision 2)
+            { file: $f  size_mb: $size_mb }
+        })
+        render-error "LARGE FILES STAGED" "Files exceed 5MB limit. Remove them before pushing." $large_rows
         true
     } else {
         false
     }
 }
 
-# # Returns true (abort) if possible secrets detected in staged files
-# def check-secrets [repo: string] {
-#     let patterns = ["PRIVATE KEY" "BEGIN RSA" "password=" "secret=" "token=" "api_key=" "AWS_SECRET"]
-#     let staged_files = (git -C $repo diff --cached --name-only | lines | where { |l| $l | is-not-empty })
-#     mut hits = []
-#     for f in $staged_files {
-#         let full = ($repo | path join $f)
-#         if ($full | path exists) {
-#             for pattern in $patterns {
-#                 let found = (try { open $full | str contains $pattern } catch { false })
-#                 if $found {
-#                     $hits = ($hits | append { file: $f  pattern: $pattern })
-#                 }
-#             }
-#         }
-#     }
-#     if ($hits | is-not-empty) {
-#         print ""
-#         print $"(ansi red_bold)  ⚠ POSSIBLE SECRETS DETECTED(ansi reset)"
-#         print $"(ansi grey)  Review these files before pushing.(ansi reset)"
-#         print ""
-#         $hits | print
-#         print ""
-#         true
-#     } else {
-#         false
-#     }
-# }
+# Returns true (abort) if possible secrets detected in staged files
+def check-secrets [repo: string] {
+    # Patterns designed to match actual secrets, not documentation
+    # These look for content structures, not just text mentions
+    let patterns = [
+        "MIIEvQIBADANBg"  # RSA private key content
+        "MIIEpAIBAAKCAQEA"  # Another RSA key format
+        "AAAAC3NzaC1[a-z0-9]"  # OpenSSH key format
+        "sk_live_[a-zA-Z0-9]{20}"  # Stripe key
+        "AKIA[0-9A-Z]{16}"  # AWS access key
+        "ghp_[A-Za-z0-9_]{36}"  # GitHub token
+        "-----BEGIN ENCRYPTED"  # Encrypted key marker
+    ]
+    let staged_files = (git -C $repo diff --cached --name-only | lines | where { |l| $l | is-not-empty })
+    mut hits = []
+    for f in $staged_files {
+        let full = ($repo | path join $f)
+        if ($full | path exists) {
+            for pattern in $patterns {
+                let found = (try { 
+                    open --raw $full | str contains $pattern 
+                } catch { 
+                    false 
+                })
+                if $found {
+                    $hits = ($hits | append { file: $f  pattern: $pattern })
+                }
+            }
+        }
+    }
+    if ($hits | is-not-empty) {
+        render-error "POSSIBLE SECRETS DETECTED" "Credential patterns found. Review before pushing." $hits
+        let choice = (["abort" "continue anyway — skip secrets check"] | input list --fuzzy "Secrets detected — proceed?")
+        $choice == "abort"
+    } else {
+        false
+    }
+}
 
 # Returns true (abort) if stashed changes exist — warns operator to review
 def check-stash [repo: string] {
     let count = (try { git -C $repo stash list | lines | length } catch { 0 })
     if $count > 0 {
-        print ""
-        print $"(ansi red_bold)  ⚠ STASHED CHANGES PRESENT(ansi reset)"
-        print $"(ansi grey)  ($count) stash(es) exist — they may conflict with the current push.(ansi reset)"
-        print ""
-        git -C $repo stash list | lines | each { |l| print $"  ($l)" }
-        print ""
+        let stashes = (git -C $repo stash list | lines)
+        let subtitle = $"($count) stash\(es\) exist — they may conflict with the current push."
+        render-error "STASHED CHANGES PRESENT" $subtitle $stashes
         let choice = (["continue anyway" "abort"] | input list --fuzzy "Stash detected — proceed?")
         $choice == "abort"
     } else {
@@ -184,12 +191,9 @@ def check-stash [repo: string] {
 
 # Returns true (abort) if remote is unreachable
 def check-remote-reachable [repo: string] {
-    let result = (try { git -C $repo ls-remote --exit-code origin HEAD | complete } catch { { exit_code: 1 } })
+    let result = (try { git -C $repo ls-remote --exit-code origin HEAD 2>@1 | complete } catch { { exit_code: 1, stderr: "unknown error" } })
     if $result.exit_code != 0 {
-        print ""
-        print $"(ansi red_bold)  ⚠ REMOTE UNREACHABLE(ansi reset)"
-        print $"(ansi grey)  Cannot reach origin — skipping push.(ansi reset)"
-        print ""
+        render-error "REMOTE UNREACHABLE" "Cannot reach origin. Check your network connection." [{ status: "offline" }]
         true
     } else {
         false
@@ -200,10 +204,7 @@ def check-remote-reachable [repo: string] {
 def check-remote-exists [repo: string] {
     let remote = (try { git -C $repo remote get-url origin | str trim } catch { "" })
     if ($remote | is-empty) {
-        print ""
-        print $"(ansi red_bold)  ⚠ NO REMOTE CONFIGURED(ansi reset)"
-        print $"(ansi grey)  No origin remote found — commit will be local only.(ansi reset)"
-        print ""
+        render-error "NO REMOTE CONFIGURED" "No origin remote found. Commit will be local only." [{ status: "local-only" }]
         true
     } else {
         false
@@ -220,8 +221,10 @@ def check-nothing-staged [repo: string] {
     }
 }
 
-
 # =============================================================================
+# SECTION 4 — IMPACT
+# =============================================================================
+
 # SECTION 4 — IMPACT
 # =============================================================================
 
@@ -322,18 +325,14 @@ def render-nothing-to-commit [repo: string] {
     print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
     print $"(ansi grey)  Nothing new to commit — showing current state.(ansi reset)"
     print ""
+    print-section "NOTHING TO COMMIT" "No staged changes detected" [{ status: "clean" }]
     render-position $stats $status
     render-history $commits
 }
 
 def render-push-failure [stderr: string] {
-    print -n "\e[2J\e[H"
-    print ""
-    print $"(ansi red_bold)  ✗ PUSH FAILED(ansi reset)"
-    print $"(ansi grey)  Remote rejected the push. Resolve and retry.(ansi reset)"
-    print ""
-    print $stderr
-    print ""
+    let error_lines = ($stderr | lines | filter { |l| $l | is-not-empty })
+    render-error "PUSH FAILED" "Remote rejected the push. Review errors and retry." $error_lines
 }
 
 # Public API — called by ManifoldOS-Reshaping.nu
@@ -397,7 +396,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let t = (date now)
     git -C $repo add --all
     if (check-large-files $repo) { return }
-#    if (check-secrets     $repo) { return }
+    if (check-secrets     $repo) { return }
     let changed = (capture-changed $repo)
     $timings = ($timings | insert Stage $"(((date now) - $t) / 1sec | math round)s")
 

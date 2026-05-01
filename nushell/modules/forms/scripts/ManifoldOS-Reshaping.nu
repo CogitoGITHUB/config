@@ -48,10 +48,11 @@ def rs-flow [steps: list, current: string, timings: record] {
 def render-errors [all_output: string] {
     print -n "\e[2J\e[H"
     print ""
-    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPE FAILED 🌹(ansi reset)"
-    print $"(ansi grey)  System reconfiguration did not complete.(ansi reset)"
+    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
+    print $"(ansi grey)  Error encountered during workflow.(ansi reset)"
     print ""
 
+    # --- Extract derivation log path ---
     let drv_log_lines = ($all_output | lines | where { |l| $l =~ "View build log at" })
     let drv_log = if ($drv_log_lines | is-empty) {
         ""
@@ -59,29 +60,52 @@ def render-errors [all_output: string] {
         $drv_log_lines | first | str replace -r `.*'([^']+)'.*` "$1" | str trim
     }
 
+    # --- Show BUILD LOG from .drv if available ---
     if ($drv_log | is-not-empty) {
-        print-section "BUILD LOG" "derivation build output" []
-        ^/run/setuid-programs/sudo zcat $drv_log | bat --language=log --paging=never
-    } else {
-        let error_lines = (
-            $all_output
-            | lines
-            | where { |l| $l =~ "error:" }
-            | each { |l| { error: $l } }
-        )
+        print-section "BUILD LOG" "derivation build output from failed compilation" []
+        try {
+            ^/run/setuid-programs/sudo zcat $drv_log | bat --language=log --paging=never
+        } catch {
+            print ""
+            try {
+                ^/run/setuid-programs/sudo zcat $drv_log
+            } catch {
+                print $"(ansi grey)  Unable to read log file: ($drv_log)(ansi reset)"
+            }
+            print ""
+        }
+    }
+
+    # --- Show error lines from output ---
+    let error_lines = (
+        $all_output
+        | lines
+        | where { |l| $l =~ "error:" }
+        | each { |l| { error: $l } }
+    )
+    if ($error_lines | is-not-empty) {
         print-section "ERRORS" "reconfiguration failed because" $error_lines
     }
 
+    # --- Run REPL evaluation to get scheme trace ---
+    print-section "SCHEME EVALUATION" "running guix repl to diagnose configuration" []
     let repl_out = (
-        ^/run/setuid-programs/sudo guix repl /ManifoldOS/system.scm e>| str trim
-        | lines
-        | where { |l|
-            not ($l =~ "^;;;" or $l =~ "scheme@" or $l =~ "wrong-type-arg" or
-                 $l =~ "open-input-string" or $l =~ "WARNING:" or $l =~ "^$")
+        try {
+            (^/run/setuid-programs/sudo guix repl /ManifoldOS/system.scm out+err>| str trim)
+            | lines
+            | where { |l|
+                not ($l =~ "^;;;" or $l =~ "^scheme@" or $l =~ "^$")
+            }
+        } catch {
+            ["Failed to run guix repl — check permissions and system state"]
         }
-        | each { |l| { output: $l } }
     )
-    print-section "REPL OUTPUT" "scheme evaluation trace" $repl_out
+    
+    if ($repl_out | is-not-empty) {
+        $repl_out | each { |l| print $"  ($l)" }
+    }
+    
+    print ""
 }
 
 
