@@ -1,33 +1,7 @@
+monitor=eDP-1,1920x1080@60,0x0,1
 
-# See https://wiki.hypr.land/Configuring/Monitors/
-monitor=,preferred,auto,auto
-
-
-###################
-### MY PROGRAMS ###
-###################
-
-# See https://wiki.hypr.land/Configuring/Keywords/
-
-
-
-#################
-### AUTOSTART ###
-#################
-
-# Autostart necessary processes (like notifications daemons, status bars, etc.)
-# Or execute your favorite apps at launch like this:
-
- exec-once = $wezterm
- exec-once = qutebrowser
-# exec-once = waybar & hyprpaper & firefox
-
-
-#############################
-### ENVIRONMENT VARIABLES ###
-#############################
-
-# See https://wiki.hypr.land/Configuring/Environment-variables/
+exec-once = wezterm
+exec-once = qutebrowser
 
 env = XCURSOR_SIZE,24
 env = HYPRCURSOR_SIZE,24
@@ -58,17 +32,17 @@ env = HYPRCURSOR_SIZE,24
 
 # https://wiki.hypr.land/Configuring/Variables/#general
 general {
-    gaps_in = 5
-    gaps_out = 20
+    gaps_in = 3
+    gaps_out = 10
 
-    border_size = 2
+    border_size = 1
 
     # https://wiki.hypr.land/Configuring/Variables/#variable-types for info about colors
     col.active_border = rgba(33ccffee) rgba(00ff99ee) 45deg
     col.inactive_border = rgba(595959aa)
 
     # Set to true enable resizing windows by clicking and dragging on borders and gaps
-    resize_on_border = false
+    resize_on_border = true
 
     # Please see https://wiki.hypr.land/Configuring/Tearing/ before you turn this on
     allow_tearing = false
@@ -183,7 +157,7 @@ misc {
 # https://wiki.hypr.land/Configuring/Variables/#input
 input {
     kb_layout = us
-    kb_variant =
+    kb_variant = dvorak
     kb_model =
     kb_options =
     kb_rules =
@@ -193,7 +167,7 @@ input {
     sensitivity = 0 # -1.0 - 1.0, 0 means no modification.
 
     touchpad {
-        natural_scroll = false
+        natural_scroll = true
     }
 }
 
@@ -216,14 +190,13 @@ device {
 $mainMod = SUPER # Sets "Windows" key as main modifier
 
 # Example binds, see https://wiki.hypr.land/Configuring/Binds/ for more
-bind = $mainMod, Q, exec, $terminal
-bind = $mainMod, C, killactive,
+bind = $mainMod, RETURN, exec, wezterm
+bind = $mainMod, Backspace, killactive,
 bind = $mainMod, M, exec, command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch exit
-bind = $mainMod, E, exec, $fileManager
 bind = $mainMod, V, togglefloating,
-bind = $mainMod, R, exec, $menu
 bind = $mainMod, P, pseudo, # dwindle
 bind = $mainMod, J, layoutmsg, togglesplit # dwindle
+bind = $mainMod, E, exec, emacs
 
 # Move focus with mainMod + arrow keys
 bind = $mainMod, left, movefocus, l
