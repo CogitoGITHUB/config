@@ -133,3 +133,75 @@ nu
 nu
 nu
 nu
+emacs 
+Hyprland -v
+sudo tailscale up
+e .config/hypr/hyprland.conf
+emacs .config/hypr/hyprland.conf
+start-hyprland 
+emacs .config/hypr/hyprland.conf
+start-hyprland 
+wezterm
+cd ..
+cd etc/
+sudo emacs config.scm
+sudo guix system reconfigure config.scm
+sudo /root/.config/guix/current/bin/guix system reconfigure config.scm -allow-downgrades --no-grafts
+sudo /root/.config/guix/current/bin/guix system reconfigure config.scm --allow-downgrades --no-grafts
+start-hyprland 
+wezterm
+start-hyprland 
+emacs .config/hypr/hyprland.conf
+sudo tailscale up
+sudo tailscale status
+sudo tailscale up
+sudo tailscale status
+cd vv
+cd ..
+cd etc/
+cd ..
+cd etc/
+sudo emacs config.scm
+sudo /root/.config/guix/current/bin/guix system reconfigure config.scm --allow-downgrades --no-grafts
+sudo tailscale up
+sudo tailscale status
+sudo reboot
+e .config/nushell/
+emacs .config/nushell/
+emacs .config/nushell/env.nu
+emacs .config/nushell/config.nu
+cd ..
+sudo emacs config.scm
+ls
+cd etc/
+sudo emacs config.scm
+cat config.scm
+fzf
+guix search starsship
+guix search starship
+guix search zoxide
+guix search carapace
+sudo emacs config.scm
+sudo /root/.config/guix/current/bin/guix system reconfigure config.scm --allow-downgrades --no-grafts
+sudo emacs config.scm
+sudo /root/.config/guix/current/bin/guix system reconfigure config.scm --allow-downgrades --no-grafts
+zoxide 
+cd
+emacs .config/nushell/config.nu
+oeu
+mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
+ni
+source ~/.local/share/atuin/init.nu
+nu
+nu
+mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
+atuin init nu | save -f ~/.local/share/atuin/init.nu
+emacs .config/nushell/config.nu
+starship
+cd ..
+ls
+cd etc/
+ls
+sudo emacs config.scm
+sudo /root/.config/guix/current/bin/guix system reconfigure config.scm --allow-downgrades --no-grafts
+emacs ManifoldOS-Reshaping.nu

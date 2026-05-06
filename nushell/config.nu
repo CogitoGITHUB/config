@@ -31,11 +31,11 @@ source "~/.config/nushell/modules/forms/scripts/fzf-tools.nu"
 source "~/.config/nushell/modules/forms/aliases/cli.nu"
 
 # external integrations
-source ~/.local/share/nushell/vendor/autoload/atuin.nu
-source ($nu.data-dir | path join "carapace-init.nu")
+source ~/.local/share/atuin/init.nu
+# source ($nu.data-dir | path join "carapace-init.nu")
 
-mkdir ($nu.data-dir | path join "vendor/autoload")
-tv init nu | save -f ($nu.data-dir | path join "vendor/autoload/tv.nu")
+#mkdir ($nu.data-dir | path join "vendor/autoload")
+#tv init nu | save -f ($nu.data-dir | path join "vendor/autoload/tv.nu")
 
 $env.config.color_config = $light_theme
 

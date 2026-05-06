@@ -1,7 +1,7 @@
-$env.COLORTERM = "truecolor"
 # /home/aoeu/.config/nushell/env.nu
-carapace _carapace nushell | save -f ($nu.data-dir | path join "carapace-init.nu")
+
 $env.EDITOR = "emacs"
+$env.VISUAL = "emacs"
 
 # --- Guix Configuration ---
 $env.GUIX_PROFILE = "/root/.config/guix/current"
