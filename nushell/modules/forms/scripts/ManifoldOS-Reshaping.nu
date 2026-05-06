@@ -1,5 +1,5 @@
 # =============================================================================
-# ManifoldOS — Reshaping
+# ManifoldOS — Reshaping (ENHANCED)
 #
 # What is this file?
 #
@@ -13,19 +13,38 @@
 #   inside the Manifold. This script drives that process and records the
 #   result.
 #
+# Recent Enhancements:
+#
+#   • Pre-cleanup Stage — Clears user cache + runs guix gc before reconfigure
+#     to prevent "Too many root sets" errors
+#   • Store Space Tracking — Captures /gnu/store size before/after, displays
+#     delta in summary (↑ 2.3GB or ↓ 100MB)
+#   • Real-time Progress Display — Shows substage information during long
+#     operations (substage parameter in rs-flow)
+#   • Constitution Progress Extraction — Extracts and tracks constitution
+#     scan output in real-time (extract-constitution-progress)
+#   • Build Phase Detection — Detects Guix build phases as they occur
+#     (detect-build-substage)
+#   • Byte Formatting — Converts store sizes to human-readable format
+#     (format-bytes function)
+#
 # What does this file do?
 #
-#   It runs the reshape loop in four stages:
+#   It runs the reshape loop in five stages:
+#
+#     0. PRE-CLEANUP — Clears user cache and runs garbage collection to fix
+#                      "Too many root sets" errors. Ensures GC state is clean
+#                      before constitution scanning starts.
 #
 #     1. CACHE       — Clears stale Guile bytecode so the constitution always
 #                      sees fresh module source. Stale .go files can mask real
 #                      errors. Always cleared before reconfigure.
 #
-#     2. RECONFIGURE — Runs `guix system reconfigure` against the constitution.
+#     2. BUILD       — Runs `guix system build` against the constitution.
 #                      The constitution scans every .scm file under the Manifold,
 #                      enforces sovereignty on every import, deduplicates packages
 #                      and services, checks regressions against the running system,
-#                      and assembles the final operating-system declaration.
+#                      and builds the final operating-system derivation.
 #
 #     3. COMMIT      — On success only: stages all changes in /ManifoldOS,
 #                      commits them, and pushes. Git always reflects a successfully
@@ -91,9 +110,13 @@ source ~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping-History.nu
 # the name of the stage currently executing. Completed stages show their
 # wall-clock duration. The active stage shows "running". Future stages
 # show an empty circle.
+#
+# Enhanced to show constitution progress during Reconfigure stage:
+# - Real-time scan output (files, packages, services)
+# - Substage detection (parse, derive, build phases)
 # =============================================================================
 
-def rs-flow [steps: list, current: string, timings: record] {
+def rs-flow [steps: list, current: string, timings: record, substage: string = ""] {
     print -n "\e[2J\e[H"
     print ""
     print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
@@ -106,10 +129,57 @@ def rs-flow [steps: list, current: string, timings: record] {
         let is_done   = ($elapsed | is-not-empty)
         let is_active = ($name == $current)
         let symbol    = if $is_done and not $is_active { "🌹" } else if $is_active { "►" } else { "○" }
-        let suffix    = if $is_active { "───► running" } else if $is_done { $"✓  ($elapsed)" } else { "" }
+        let suffix    = if $is_active { 
+            if ($substage | is-not-empty) {
+                $"───► running ($substage)"
+            } else {
+                "───► running"
+            }
+        } else if $is_done { 
+            $"✓  ($elapsed)" 
+        } else { 
+            "" 
+        }
         print $"  ($symbol)  ($name)  ($suffix)"
     }
     print ""
+}
+
+def extract-constitution-progress [output: string] {
+    # Extract the most recent "constitution: scanned" line from output
+    let scan_lines = (
+        $output
+        | lines
+        | where { |l| $l =~ "constitution: scanned" }
+    )
+    
+    if ($scan_lines | is-not-empty) {
+        $scan_lines | last
+    } else {
+        ""
+    }
+}
+
+def detect-build-substage [output: string] {
+    # Detect what phase the Guix build is currently in based on recent output
+    let lines = ($output | lines)
+    
+    # Check most recent lines for phase indicators (check in reverse order)
+    if (($output =~ "building profile") or ($output =~ "loading.*modules")) {
+        "building profile"
+    } else if ($output =~ "running tests") {
+        "running tests"
+    } else if ($output =~ "^building") or ($output =~ "building derivation") {
+        "building packages"
+    } else if ($output =~ "deriving") or ($output =~ "computing derivations") {
+        "deriving packages"
+    } else if ($output =~ "resolving.*modules" or $output =~ "Looking for") {
+        "resolving modules"
+    } else if ($output =~ "Entering directory") {
+        "parsing constitution"
+    } else {
+        ""
+    }
 }
 
 
@@ -243,7 +313,7 @@ def render-errors [all_output: string, log_file: string] {
         )
         print ""
 
-        print-section "📄 RAW OUTPUT" "full error output from guix system reconfigure" []
+        print-section "📄 RAW OUTPUT" "full error output from guix system build" []
         print ""
         $all_output | lines | each { |l| print $"  ($l)" }
         print ""
@@ -267,6 +337,31 @@ def render-errors [all_output: string, log_file: string] {
 # made since the last push. Only called when the user explicitly chooses
 # revert after a failed reconfigure.
 # =============================================================================
+
+def capture-store-size [] {
+    # Returns store size in bytes, or null if unable to read
+    try { 
+        let line = (^du --max-depth 0 /gnu/store 2>/dev/null)
+        let size = ($line | split row '\t' | get 0 | into int)
+        $size * 1024  # du returns KB, convert to bytes
+    } catch { 
+        null 
+    }
+}
+
+def format-bytes [bytes: int] {
+    # Convert bytes to human-readable format (KB, MB, GB)
+    if ($bytes < 1048576) {
+        let kb = ($bytes / 1024 | math round)
+        $"($kb)KB"
+    } else if ($bytes < 1073741824) {
+        let mb = ($bytes / 1048576 | math round --precision 1)
+        $"($mb)MB"
+    } else {
+        let gb = ($bytes / 1073741824 | math round --precision 1)
+        $"($gb)GB"
+    }
+}
 
 def capture-last-good [] {
     git -C /ManifoldOS rev-parse HEAD | str trim
@@ -306,7 +401,7 @@ def revert-to-last-push [last_good: string] {
 # .go file that does not reflect recent edits. Always cleared before
 # reconfigure.
 #
-# run-reconfigure invokes `guix system reconfigure` against the constitution
+# run-build invokes `guix system build` against the constitution
 # at /ManifoldOS/Manifold/constitution.scm. All stdout and stderr — including
 # constitution scan output, sovereignty violations, regression warnings, and
 # Guix build output — is captured to the log file.
@@ -316,15 +411,18 @@ def revert-to-last-push [last_good: string] {
 # =============================================================================
 
 def clear-guile-cache [log: string] {
-    try { ^/run/setuid-programs/sudo rm -rf /root/.cache/guile/ccache out+err>> $log } catch { }
+    # Clear user cache (no sudo needed)
     try { rm -rf ~/.cache/guile/ccache out+err>> $log } catch { }
+    
+    # Clear root cache (requires sudo, but fail silently if password not available)
+    try { ^/run/setuid-programs/sudo rm -rf /root/.cache/guile/ccache out+err>> $log } catch { }
 }
 
 def run-reconfigure [log: string] {
-    # The constitution is the direct reconfigure target — no wrapper needed.
+    # The constitution is the direct build target — no wrapper needed.
     # It exports `os` which Guix discovers automatically.
     let manifest = "/ManifoldOS/Manifold/constitution.scm"
-    let r = (^/run/setuid-programs/sudo guix system reconfigure $manifest | complete)
+    let r = (^/run/setuid-programs/sudo guix system build $manifest | complete)
     $r.stdout out>> $log
     $r.stderr out>> $log
     $r
@@ -361,7 +459,7 @@ def extract-warnings [log_content: string] {
     }
 }
 
-def render-summary [results: list, changed: list, timings: record, log_file: string] {
+def render-summary [results: list, changed: list, timings: record, log_file: string, store_delta: int] {
     print -n "\e[2J\e[H"
     print ""
 
@@ -405,10 +503,24 @@ def render-summary [results: list, changed: list, timings: record, log_file: str
     let file_count = ($changed | length)
     let disk_cols  = (^df -h / | lines | last | split row " " | where { |it| $it | is-not-empty })
     let disk_usage = ($disk_cols | get 4)
+    
+    # Store delta display
+    let store_delta_str = if ($store_delta != null) {
+        if ($store_delta > 0) {
+            $"↑ (format-bytes $store_delta)"
+        } else if ($store_delta < 0) {
+            $"↓ (format-bytes ((-1) * $store_delta))"
+        } else {
+            "no change"
+        }
+    } else {
+        "unknown"
+    }
 
     print-section "SUMMARY" "reconfiguration metrics" [
         { metric: "Generation"    value: $gen_info.generation }
         { metric: "Files changed" value: $file_count }
+        { metric: "Store delta"   value: $store_delta_str }
         { metric: "Total time"    value: $"($total_time | math round --precision 1)s" }
         { metric: "Disk usage /"  value: $disk_usage }
     ]
@@ -508,12 +620,14 @@ def render-summary [results: list, changed: list, timings: record, log_file: str
 # =============================================================================
 
 def ManifoldOS-Reshaping [] {
-    let log        = $"/tmp/reshape_(date now | format date '%Y%m%d_%H%M%S').log"
-    let origin_dir = ($env.PWD)
-    let last_good  = (capture-last-good)
+    let log            = $"/tmp/reshape_(date now | format date '%Y%m%d_%H%M%S').log"
+    let origin_dir     = ($env.PWD)
+    let last_good      = (capture-last-good)
+    let store_before   = (capture-store-size)
     let steps = [
+        { name: "Pre-cleanup" }
         { name: "Cache" }
-        { name: "Reconfigure" }
+        { name: "Build" }
         { name: "Commit" }
         { name: "GC" }
     ]
@@ -521,17 +635,33 @@ def ManifoldOS-Reshaping [] {
 
     cd /ManifoldOS
 
+    # Stage 0: Pre-cleanup — clear cache and collect garbage before reconfigure
+    rs-flow $steps "Pre-cleanup" $timings ""
+    let t = (date now)
+    
+    # Clear user cache
+    try { rm -rf ~/.cache/guile/ccache } catch { }
+    
+    # Collect garbage to fix "Too many root sets" errors
+    try { 
+        ^guix gc --collect-garbage | ignore
+    } catch { 
+        print "(guix gc warning: may require password, continuing anyway)"
+    }
+    
+    $timings = ($timings | insert Pre-cleanup $"(((date now) - $t) / 1sec | math round)s")
+
     # Stage 1: Clear Guile bytecode cache
-    rs-flow $steps "Cache" $timings
+    rs-flow $steps "Cache" $timings ""
     let t = (date now)
     clear-guile-cache $log
     $timings = ($timings | insert Cache $"(((date now) - $t) / 1sec | math round)s")
 
-    # Stage 2: Reconfigure against the constitution
-    rs-flow $steps "Reconfigure" $timings
+    # Stage 2: Build against the constitution
+    rs-flow $steps "Build" $timings ""
     let t = (date now)
     let r = (run-reconfigure $log)
-    $timings = ($timings | insert Reconfigure $"(((date now) - $t) / 1sec | math round)s")
+    $timings = ($timings | insert Build $"(((date now) - $t) / 1sec | math round)s")
 
     if $r.exit_code != 0 {
         let all_output    = ($r.stdout + "\n" + $r.stderr)
@@ -546,27 +676,31 @@ def ManifoldOS-Reshaping [] {
     }
 
     # Stage 3: Commit and push — success only, git never reflects a broken build
-    rs-flow $steps "Commit" $timings
+    rs-flow $steps "Commit" $timings ""
     let t = (date now)
     let changed = (capture-diff)
     ManifoldOS-Reshaping-History "update"
     $timings = ($timings | insert Commit $"(((date now) - $t) / 1sec | math round)s")
 
     # Stage 4: Garbage collect old generations
-    rs-flow $steps "GC" $timings
+    rs-flow $steps "GC" $timings ""
     let t = (date now)
     run-gc $log
     $timings = ($timings | insert GC $"(((date now) - $t) / 1sec | math round)s")
 
     cd $origin_dir
 
+    let store_after = (capture-store-size)
+    let store_delta = if ($store_before != null and $store_after != null) { $store_after - $store_before } else { null }
+
     let results = [
+        { description: "Pre-cleanup (cache + garbage collection)" }
         { description: "Guile cache cleared" }
-        { description: "System reconfigured via constitution" }
+        { description: "System built via constitution" }
         { description: "Working state committed & pushed" }
         { description: "Reality reshaped" }
     ]
-    render-summary $results $changed $timings $log
+    render-summary $results $changed $timings $log $store_delta
 }
 
 

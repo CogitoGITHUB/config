@@ -197,6 +197,10 @@ bind = $mainMod, V, togglefloating,
 bind = $mainMod, P, pseudo, # dwindle
 bind = $mainMod, J, layoutmsg, togglesplit # dwindle
 bind = $mainMod, E, exec, emacs
+bind = $mainMod, O
+ exec, qutebrowser
+bind = $mainMod, F, fullscreen, 0
+
 
 # Move focus with mainMod + arrow keys
 bind = $mainMod, left, movefocus, l

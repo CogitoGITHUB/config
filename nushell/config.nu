@@ -21,7 +21,7 @@ source "~/.config/nushell/modules/forms/keybindings/ttycmd.nu"
 # which is defined in ManifoldOS-Reshaping-History.nu.
 # Do NOT reorder these two lines.
 source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping-History.nu"
-source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping.nu"
+#source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping.nu"
 
 
 
