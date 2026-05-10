@@ -1,0 +1,65 @@
+def ManifoldOS-Sources [] {
+    let root = "/ManifoldOS/Manifold"
+
+    let submodules = (
+        open $"($root)/.gitmodules"
+        | lines
+        | reduce -f {current: "", acc: []} { |line, state|
+            if ($line =~ '^\[submodule') {
+                $state
+            } else if ($line =~ 'path\s*=') {
+                {current: ($line | str replace -r '.*=\s*' '' | str trim), acc: $state.acc}
+            } else if ($line =~ 'url\s*=') {
+                let url = ($line | str replace -r '.*=\s*' '' | str trim)
+                {current: "", acc: ($state.acc | append {path: $state.current, url: $url})}
+            } else {
+                $state
+            }
+        }
+        | get acc
+    )
+
+    mut updates = []
+
+    for sub in $submodules {
+        let full_path = $"($root)/($sub.path)"
+        let current = (
+            try { git -C $full_path rev-parse HEAD | str trim } catch { "unknown" }
+        )
+        let latest = (
+            try {
+                git -C $full_path fetch origin --quiet
+                git -C $full_path rev-parse origin/HEAD | str trim
+            } catch { "unknown" }
+        )
+        let behind = if ($current == "unknown" or $latest == "unknown") {
+            "?"
+        } else if ($current == $latest) {
+            "0"
+        } else {
+            try {
+                git -C $full_path rev-list --count $"($current)..($latest)" | str trim
+            } catch { "?" }
+        }
+
+        if $behind != "0" {
+            $updates = ($updates | append {
+                package: ($sub.path | split row "/" | last)
+                path:    $sub.path
+                current: ($current | str substring 0..7)
+                latest:  ($latest  | str substring 0..7)
+                behind:  $behind
+            })
+        }
+    }
+
+    if ($updates | is-empty) {
+        return
+    }
+
+    print ""
+    print $"(ansi yellow)⚠  MANIFOLD SOURCES — UPDATES AVAILABLE(ansi reset)"
+    print ""
+    $updates | select package current latest behind | print
+    print ""
+}

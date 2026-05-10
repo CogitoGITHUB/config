@@ -22,7 +22,7 @@ source "~/.config/nushell/modules/forms/keybindings/ttycmd.nu"
 # Do NOT reorder these two lines.
 source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping-History.nu"
 #source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping.nu"
-
+source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Build.nu"
 
 
 source "~/.config/nushell/modules/forms/scripts/fzf-tools.nu"
@@ -41,3 +41,7 @@ $env.config.color_config = $light_theme
 
 # starship
 starship init nu | save -f ($nu.data-dir | path join "vendor/autoload/starship.nu")
+
+def hypr [] {
+    dbus-run-session Hyprland
+}

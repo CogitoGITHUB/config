@@ -1,7 +1,9 @@
 # /home/aoeu/.config/nushell/env.nu
 
 $env.EDITOR = "emacs"
-$env.VISUAL = "emacs"
+
+
+$env.XDG_RUNTIME_DIR = $"/run/user/(id -u | str trim)"
 
 # --- Guix Configuration ---
 $env.GUIX_PROFILE = "/root/.config/guix/current"
@@ -12,7 +14,7 @@ if not ($"($env.HOME)/.guile" | path exists) {
     ^ln -sf /ManifoldOS/guile-init/init.scm $"($env.HOME)/.guile"
 }
 if not ("/root/.guile" | path exists) {
-    ^/run/setuid-programs/su -c "ln -sf /ManifoldOS/guile-init/init.scm /root/.guile"
+    ^/run/setuid-programs/sudo ln -sf /ManifoldOS/guile-init/init.scm /root/.guile
 }
 
 # --- PATH Setup ---
