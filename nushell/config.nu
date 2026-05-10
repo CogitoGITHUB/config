@@ -41,7 +41,3 @@ $env.config.color_config = $light_theme
 
 # starship
 starship init nu | save -f ($nu.data-dir | path join "vendor/autoload/starship.nu")
-
-def hypr [] {
-    dbus-run-session Hyprland
-}

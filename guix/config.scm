@@ -80,6 +80,8 @@
     (description "Kanata is a keyboard remapper for Linux.")
     (license (@ (guix licenses) lgpl3))))
 
+(define seatd (@ (gnu packages admin) seatd))
+
 (define kanata-service
   (simple-service 'kanata
                   shepherd-root-service-type
@@ -520,13 +522,23 @@ its looks.")
                           fzf
                           qutebrowser
                           hyprland
-                          opencode
-
-			  )
+                          opencode)
                     %base-packages))
   (services
    (append (list (service tailscaled-service-type)
                  kanata-service
+                 (simple-service 'seatd
+                                 shepherd-root-service-type
+                                 (list (shepherd-service
+                                        (provision '(seatd))
+                                        (requirement '(user-processes))
+                                        (documentation "Minimal seat management daemon")
+                                        (start #~(make-forkexec-constructor
+                                                  (list #$(file-append seatd "/bin/seatd")
+                                                        "-g" "seat")
+                                                  #:log-file "/var/log/seatd.log"))
+                                        (stop #~(make-kill-destructor))
+                                        (respawn? #t))))
                  (service openssh-service-type
                           (openssh-configuration
                            (permit-root-login #f)

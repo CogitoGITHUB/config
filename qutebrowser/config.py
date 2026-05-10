@@ -1,5 +1,3 @@
-from contextlib import redirect_stderr
-
 config.load_autoconfig(False)
 
 # -------------------------------------------------
@@ -10,9 +8,6 @@ c.statusbar.show = "always"
 c.window.hide_decoration = True
 c.statusbar.padding = {"top": 0, "bottom": 0, "left": 4, "right": 4}
 c.statusbar.widgets = ["keypress"]
-
-# Toggle statusbar visibility
-config.bind('<Ctrl-Shift-b>', 'config-cycle statusbar.show always never')
 
 # -------------------------------------------------
 # Colors: pure monochrome
@@ -103,19 +98,8 @@ config.bind('d', 'move-to-prev-word', mode='caret')
 config.bind('0', 'move-to-start-of-line', mode='caret')
 config.bind('$', 'move-to-end-of-line', mode='caret')
 
-# Yank text via hints (NOT links-only)
-config.bind('yt', 'hint all yank')          # yank text of any element
-config.bind('yT', 'hint all yank --rapid')  # chain yanks without exiting
-
-# Optional: yank just the visible text node
-config.bind('yy', 'hint all yank-primary')
-
-
 # -------------------------------------------------
-# Clipboard: system only
+# Clipboard
 # -------------------------------------------------
-c.content.clipboard = "clipboard"
 
-# Paste clipboard into command line
-config.bind('<Ctrl-Shift-v>', 'cmd-set-text :open {clipboard}')
-
+c.content.javascript.clipboard = "access"

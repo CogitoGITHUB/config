@@ -1,6 +1,3 @@
-hl.exec_once("$terminal")
-hl.exec_once("qutebrowser")
-hl.exec_once("hypridle")
-hl.exec_once("swww-daemon")
-hl.exec_once("pypr")
-hl.exec_once("LOCK-SCREEN_MODE=lockd quickshell --path /home/aoeu/.config/lock-screen/greeter.qml")
+-- modules/autostart.lua
+os.execute("kitty &")
+os.execute("qutebrowser &")
