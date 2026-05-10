@@ -88,16 +88,11 @@
 #
 #   max_file_size_mb  — staged files larger than this trigger a hard abort
 #   verbose_failures  — reserved for future per-check verbosity control
-#   slow_output       — inserts 1s pauses between stages so the flow display
-#                       is readable rather than flashing past instantly
-#   output_pause_ms   — pause duration in milliseconds (slow_output must be true)
 # =============================================================================
 
 let config = {
     max_file_size_mb: 5
     verbose_failures: true
-    slow_output: true
-    output_pause_ms: 1000
 }
 
 
@@ -572,7 +567,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let t = (date now)
     try { git -C $repo fetch out+err> /dev/null } catch { }
     $timings = ($timings | insert Fetch $"(((date now) - $t) / 1sec | math round)s")
-    if $config.slow_output { sleep 1000ms }
 
     # --- Safety checks — abort pipeline on first failure ---
     rh-flow $steps "Check" $timings
@@ -582,9 +576,8 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     if $has_remote and (check-remote-reachable $repo) { return }
     if (check-stash $repo)                            { return }
     $timings = ($timings | insert Check $"(((date now) - $t) / 1sec | math round)s")
-    if $config.slow_output { sleep 1000ms }
 
-    # --- Stage --- capture diff before index advances
+    # --- Stage — capture diff before index advances ---
     rh-flow $steps "Stage" $timings
     let t = (date now)
     git -C $repo add --all
@@ -592,7 +585,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let changed    = (capture-changed $repo)
     let diff_stats = (calculate-diff-stats $repo)
     $timings = ($timings | insert Stage $"(((date now) - $t) / 1sec | math round)s")
-    if $config.slow_output { sleep 1000ms }
 
     # --- Commit ---
     rh-flow $steps "Commit" $timings
@@ -607,7 +599,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         render-nothing-to-commit $repo
         return
     }
-    if $config.slow_output { sleep 1000ms }
 
     # --- Push ---
     rh-flow $steps "Push" $timings
@@ -626,7 +617,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
 
     # --- Post-push summary ---
     rh-flow $steps "" $timings
-    if $config.slow_output { sleep 1000ms }
     try { git -C $repo fetch out+err> /dev/null } catch { }
 
     let stats   = (fetch-repo-stats-from $repo)
