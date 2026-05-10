@@ -7,6 +7,7 @@
              (guix build-system trivial)
              (guix build-system gnu)
              (guix build-system cmake)
+             (guix build-system emacs)
              (guix gexp)
              (gnu packages base)
              (gnu packages compression)
@@ -37,7 +38,9 @@
              (gnu packages ghostscript)
              (gnu packages readline)
              (gnu packages python)
-             (gnu packages gnome))
+             (gnu packages gnome)
+             (gnu packages emacs-xyz)
+             (gnu packages emacs-build))
 
 (use-service-modules networking ssh desktop xorg)
 
@@ -477,6 +480,24 @@ its looks.")
     (properties '((upstream-name . "source")))
     (license (@ (guix licenses) bsd-3))))
 
+(define emacs-org-tidy
+  (package
+    (name "emacs-org-tidy")
+    (version "0.1")
+    (source
+     (origin
+       (method url-fetch)
+       (uri "https://github.com/jxq0/org-tidy/archive/refs/heads/main.tar.gz")
+       (sha256
+        (base32 "0jm4anl64xqv43zq8hh9q14ka040az7hbwvg2qcp5ics3sdjknfx"))))
+    (build-system emacs-build-system)
+    (arguments '(#:tests? #f))
+    (propagated-inputs (list emacs-dash))
+    (home-page "https://github.com/jxq0/org-tidy")
+    (synopsis "Automatically tidy Org mode property drawers")
+    (description "Org-tidy is an Emacs minor mode to automatically tidy org-mode property drawers.")
+    (license (@ (guix licenses) gpl3))))
+
 (operating-system
   (locale "en_US.utf8")
   (timezone "Europe/Bucharest")
@@ -518,6 +539,37 @@ its looks.")
                           kanata
                           nushell
                           (@ (gnu packages emacs) emacs-no-x)
+                          (@ (gnu packages emacs-xyz) emacs-auctex)
+                          (@ (gnu packages emacs-xyz) emacs-avy)
+                          (@ (gnu packages emacs-xyz) emacs-cape)
+                          (@ (gnu packages emacs-xyz) emacs-cdlatex)
+                          (@ (gnu packages emacs-xyz) emacs-vertico)
+                          (@ (gnu packages emacs-xyz) emacs-orderless)
+                          (@ (gnu packages emacs-xyz) emacs-marginalia)
+                          (@ (gnu packages emacs-xyz) emacs-consult)
+                          (@ (gnu packages emacs-xyz) emacs-embark)
+                          (@ (gnu packages emacs-xyz) emacs-corfu)
+                          (@ (gnu packages emacs-xyz) emacs-denote)
+                          (@ (gnu packages emacs-xyz) emacs-denote-explore)
+                          (@ (gnu packages emacs-xyz) emacs-dashboard)
+                          (@ (gnu packages emacs-xyz) emacs-dash-docs)
+                          (@ (gnu packages emacs-xyz) emacs-god-mode)
+                          (@ (gnu packages emacs-xyz) emacs-magit)
+                          (@ (gnu packages emacs-xyz) emacs-meow)
+                          (@ (gnu packages emacs-xyz) emacs-modus-themes)
+                          (@ (gnu packages emacs-xyz) emacs-nano-modeline)
+                          (@ (gnu packages emacs-xyz) emacs-nerd-icons)
+                          (@ (gnu packages emacs-xyz) emacs-org-appear)
+                          (@ (gnu packages emacs-xyz) emacs-org-auto-tangle)
+                          (@ (gnu packages emacs-xyz) emacs-org-modern)
+                          (@ (gnu packages emacs-xyz) emacs-org-modern-indent)
+                          emacs-org-tidy
+                          (@ (gnu packages emacs-xyz) emacs-fzf)
+                          (@ (gnu packages emacs-xyz) emacs-general)
+                          (@ (gnu packages emacs-xyz) emacs-svg-lib)
+                          (@ (gnu packages emacs-xyz) emacs-tempel)
+                          (@ (gnu packages emacs-xyz) emacs-wgrep)
+                          (@ (gnu packages emacs-xyz) emacs-yasnippet)
                           git
                           fzf
                           qutebrowser
