@@ -522,6 +522,7 @@ its looks.")
                           fzf
                           qutebrowser
                           hyprland
+                          hypridle
                           opencode)
                     %base-packages))
   (services
@@ -544,4 +545,10 @@ its looks.")
                            (permit-root-login #f)
                            (password-authentication? #t))))
            (modify-services %desktop-services
-             (delete gdm-service-type)))))
+             (delete gdm-service-type)
+             (elogind-service-type config =>
+               (elogind-configuration
+                 (inherit config)
+                 (handle-lid-switch 'ignore)
+                 (handle-lid-switch-docked 'ignore)
+                 (handle-lid-switch-external-power 'ignore)))))))

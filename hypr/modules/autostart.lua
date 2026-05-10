@@ -1,3 +1,6 @@
 -- modules/autostart.lua
-os.execute("kitty &")
-os.execute("qutebrowser &")
+hl.on("hyprland.start", function()
+    hl.exec_cmd("wezterm")
+    hl.exec_cmd("qutebrowser")
+    hl.exec_cmd("hypridle")
+end)
