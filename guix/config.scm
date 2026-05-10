@@ -520,7 +520,9 @@ its looks.")
                           fzf
                           qutebrowser
                           hyprland
-                          opencode)
+                          opencode
+
+			  )
                     %base-packages))
   (services
    (append (list (service tailscaled-service-type)
