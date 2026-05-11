@@ -114,6 +114,16 @@ def ensure-jj-initialized [repo: string] {
         }
         print $"(ansi green)  ✓ jj initialized \(colocated\)(ansi reset)"
     }
+
+    # Sync identity from git config if jj has none
+    let jj_email = (try { jj config get user.email | str trim } catch { "" })
+    if ($jj_email | is-empty) {
+        let git_email = (try { git -C $repo config user.email | str trim } catch { "" })
+        let git_name  = (try { git -C $repo config user.name  | str trim } catch { "" })
+        if ($git_email | is-not-empty) { jj config set --user user.email $git_email }
+        if ($git_name  | is-not-empty) { jj config set --user user.name  $git_name  }
+    }
+
     true
 }
 
@@ -267,16 +277,6 @@ def snapshot-op-id [repo: string] {
     }
 }
 
-# Preview what would be pushed (dry run)
-def preview-push [repo: string] {
-    try {
-        jj --repository $repo log --no-graph -r 'remote_bookmarks()..@'
-    } catch {
-        "(nothing to push or remote not reachable)"
-    }
-}
-
-
 # =============================================================================
 # SECTION 4 — RENDER
 # =============================================================================
@@ -398,8 +398,8 @@ def ManifoldOS-Reshaping-History [msg: string = ""] {
 
     let commit_msg = if ($msg | is-empty) {
         let branch = (git -C $repo branch --show-current | str trim)
-        let ts     = (date now | format date "%Y-%m-%d %H:%M")
-        $"[$branch] ($ts)"
+        let ts = (date now | format date "%Y-%m-%d %H:%M")
+        $"[($branch)] ($ts)"
     } else {
         $msg
     }
@@ -420,21 +420,6 @@ def ManifoldOS-Reshaping-History [msg: string = ""] {
     # ── PUSH ────────────────────────────────────────────────
     rh-flow $steps "PUSH" $timings
     let t0 = (date now)
-
-    # Dry-run preview
-    let preview = (preview-push $repo)
-    print ""
-    print $"(ansi cyan_bold)  Push preview:(ansi reset)"
-    print $"($preview)"
-    print ""
-    print -n "  Proceed? [y/N] "
-    let answer = (input)
-    if ($answer | str downcase) != "y" {
-        print $"(ansi yellow)  Push cancelled.(ansi reset)"
-        $timings = ($timings | insert "PUSH" "cancelled")
-        print-git-sections $repo $changed null $pre_op_id
-        return
-    }
 
     let push_result = (do { jj --repository $repo git push } | complete)
     let push_output = if $push_result.exit_code != 0 {
