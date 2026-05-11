@@ -507,6 +507,37 @@ its looks.")
     (synopsis "Automatically tidy Org mode property drawers")
     (description "Org-tidy is an Emacs minor mode to automatically tidy org-mode property drawers.")
     (license (@ (guix licenses) gpl3))))
+
+
+(define-public emacs-book-mode
+  (package
+    (name "emacs-book-mode")
+    (version "0.1.0")
+    (source
+     (origin
+       (method git-fetch)
+       (uri
+        (git-reference
+         (url "https://github.com/rougier/book-mode.git")
+         (commit "master")))
+       (file-name (git-file-name name version))
+       (sha256
+        (base32
+         "1bzc9v7hck6i975z1581mb3qpgzsv5i9sdvi2373ljx6c6v97h5a"))))
+    (build-system emacs-build-system)
+    (arguments
+     '(#:tests? #f))
+    (propagated-inputs
+     (list emacs-nano-theme))
+    (home-page "https://github.com/rougier/book-mode")
+    (synopsis "Clean reading interface for Org files")
+    (description
+     "Book Mode is an Emacs minor mode offering a clean reading
+interface for Org files. It uses large margins, styled headlines,
+and a custom mode-line layout. Invoke with M-x book-mode.")
+    (license (@ (guix licenses) gpl3+))))
+
+
 (operating-system
   (locale "en_US.utf8")
   (timezone "Europe/Bucharest")
@@ -580,6 +611,8 @@ its looks.")
                           (@ (gnu packages emacs-xyz) emacs-tempel)
                           (@ (gnu packages emacs-xyz) emacs-wgrep)
                           (@ (gnu packages emacs-xyz) emacs-yasnippet)
+                          emacs-nano-theme
+                          emacs-book-mode
                           git
                           fzf
                           qutebrowser
