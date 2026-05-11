@@ -41,12 +41,9 @@
              (gnu packages gnome)
              (gnu packages emacs-xyz)
              (gnu packages emacs-build))
-
 (use-service-modules networking ssh desktop xorg)
-
 (define unzip (@ (gnu packages compression) unzip))
 (define patchelf (@ (gnu packages elf) patchelf))
-
 (define kanata
   (package
     (name "kanata")
@@ -82,9 +79,7 @@
     (synopsis "Keyboard remapper")
     (description "Kanata is a keyboard remapper for Linux.")
     (license (@ (guix licenses) lgpl3))))
-
 (define seatd (@ (gnu packages admin) seatd))
-
 (define kanata-service
   (simple-service 'kanata
                   shepherd-root-service-type
@@ -97,7 +92,6 @@
                                    #:log-file "/var/log/kanata.log"))
                          (stop #~(make-kill-destructor))
                          (respawn? #t)))))
-
 (define atuin
   (package
     (name "atuin")
@@ -130,7 +124,35 @@
     (synopsis "Shell history manager")
     (description "Atuin replaces your shell history with a SQLite database.")
     (license (@ (guix licenses) asl2.0))))
-
+(define zellij
+  (package
+    (name "zellij")
+    (version "0.44.0")
+    (source
+      (origin
+        (method url-fetch)
+        (uri (string-append
+              "https://github.com/zellij-org/zellij/releases/download/v" version
+              "/zellij-x86_64-unknown-linux-musl.tar.gz"))
+        (sha256 (base32 "1cxd8xw5kssknyrd3l4znvb4sm1jvaj8qbl8rkb3mhcfr581v63y"))))
+    (build-system trivial-build-system)
+    (inputs (list tar gzip))
+    (arguments
+      (list #:modules (quote ((guix build utils)))
+            #:builder
+        (quasiquote (begin
+          (use-modules (guix build utils))
+          (let* ((out (assoc-ref %outputs "out"))
+                 (src (assoc-ref %build-inputs "source"))
+                 (tar (string-append (assoc-ref %build-inputs "tar") "/bin/tar"))
+                 (gzip (string-append (assoc-ref %build-inputs "gzip") "/bin")))
+            (setenv "PATH" gzip)
+            (mkdir-p (string-append out "/bin"))
+            (invoke tar "-xzf" src "-C" (string-append out "/bin")))))))
+    (home-page "https://zellij.dev")
+    (synopsis "Terminal workspace")
+    (description "Zellij is a terminal workspace with multiplexed terminals.")
+    (license (@ (guix licenses) asl2.0))))
 (define tailscale
   (package
     (name "tailscale")
@@ -162,11 +184,9 @@
     (synopsis "Tailscale VPN")
     (description "Tailscale is a zero-config VPN.")
     (license (@ (guix licenses) bsd-3))))
-
 (define tailscale-state-dir "/var/lib/tailscale")
 (define tailscale-run-dir   "/var/run/tailscale")
 (define tailscale-socket    "/var/run/tailscale/tailscaled.sock")
-
 (define tailscale-activation
   (with-imported-modules '((guix build utils))
     #~(begin
@@ -175,7 +195,6 @@
         (mkdir-p #$tailscale-run-dir)
         (chmod #$tailscale-state-dir #o700)
         (chmod #$tailscale-run-dir   #o755))))
-
 (define (tailscale-shepherd-service config)
   (let ((tailscaled (file-append tailscale "/bin/tailscaled")))
     (list
@@ -192,7 +211,6 @@
                 #:log-file "/var/log/tailscaled.log"))
       (stop  #~(make-kill-destructor))
       (respawn? #t)))))
-
 (define tailscaled-service-type
   (service-type
    (name 'tailscaled)
@@ -204,7 +222,6 @@
                         (const tailscale-activation))))
    (default-value #f)
    (description "Run the Tailscale daemon.")))
-
 (define github-cli
   (package
     (name "github-cli")
@@ -237,7 +254,6 @@
     (synopsis "GitHub CLI tool")
     (description "gh is the official GitHub command line tool.")
     (license (@ (guix licenses) asl2.0))))
-
 (define opencode
   (package
     (name "opencode")
@@ -286,7 +302,6 @@
     (synopsis "AI coding agent for the terminal")
     (description "OpenCode is an open source AI coding agent built for the terminal.")
     (license (@ (guix licenses) expat))))
-
 (define lua-5.5
   (package
     (name "lua")
@@ -321,7 +336,6 @@ prefix=~a
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include
-
 Name: Lua
 Description: Lua scripting language
 Version: ~a
@@ -338,7 +352,6 @@ Cflags: -I${includedir}
     (synopsis "Embeddable scripting language")
     (description "Lua 5.5 scripting language.")
     (license (@ (guix licenses) x11))))
-
 (define hyprutils
   (package
     (name "hyprutils")
@@ -358,7 +371,6 @@ Cflags: -I${includedir}
     (synopsis "C++ library for utilities used across Hyprland ecosystem")
     (description "Hyprutils is a C++ library for utilities used across the Hyprland ecosystem.")
     (license (@ (guix licenses) bsd-3))))
-
 (define hyprgraphics
   (package
     (name "hyprgraphics")
@@ -386,7 +398,6 @@ Cflags: -I${includedir}
     (synopsis "Hyprland graphics/resource utilities")
     (description "Hyprgraphics is a small C++ library with graphics/resource related utilities.")
     (license (@ (guix licenses) bsd-3))))
-
 (define hyprland
   (package
     (name "hyprland")
@@ -479,7 +490,6 @@ Cflags: -I${includedir}
 its looks.")
     (properties '((upstream-name . "source")))
     (license (@ (guix licenses) bsd-3))))
-
 (define emacs-org-tidy
   (package
     (name "emacs-org-tidy")
@@ -497,7 +507,6 @@ its looks.")
     (synopsis "Automatically tidy Org mode property drawers")
     (description "Org-tidy is an Emacs minor mode to automatically tidy org-mode property drawers.")
     (license (@ (guix licenses) gpl3))))
-
 (operating-system
   (locale "en_US.utf8")
   (timezone "Europe/Bucharest")
@@ -536,6 +545,7 @@ its looks.")
                           github-cli
                           zoxide
                           atuin
+                          zellij
                           kanata
                           nushell
                           (@ (gnu packages emacs) emacs-no-x)

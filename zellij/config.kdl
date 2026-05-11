@@ -203,7 +203,7 @@ default_cwd "/"
 default_layout "default"
 layout_dir "/home/aoeu/.config/zellij/layouts"
 theme_dir "/home/aoeu/.config/zellij/themes"
-mouse_mode true
+mouse_mode false
 pane_frame true
 mirror_session true
 on_force_close "detach"

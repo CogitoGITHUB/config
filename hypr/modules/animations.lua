@@ -1,48 +1,27 @@
-hl.config({
-    animations = {
-        enabled = true,
+hl.curve("snap",        { type = "bezier", points = { {0.05, 0.9},  {0.1,  1.0}  } })
+hl.curve("snapLight",   { type = "bezier", points = { {0.1,  0.9},  {0.2,  1.0}  } })
+hl.curve("eject",       { type = "bezier", points = { {0.8,  0.0},  {1.0,  0.15} } })
+hl.curve("swell",       { type = "bezier", points = { {0.1,  1.8},  {0.25, 1.0}  } })
+hl.curve("pulseSharp",  { type = "bezier", points = { {0.5,  0.0},  {0.2,  1.0}  } })
+hl.curve("pulseBig",    { type = "bezier", points = { {0.25, 0.0},  {0.1,  1.0}  } })
+hl.curve("springSnap",  { type = "spring", mass = 1, stiffness = 300, dampening = 25 })
+hl.curve("springHard",  { type = "spring", mass = 1, stiffness = 500, dampening = 30 })
 
-        -- ── Bézier curves ──────────────────────────────────────────────
-        beziers = {
-            cinema   = { 0.25, 0.46, 0.45, 0.94 },
-            weight   = { 0.34, 1.26, 0.64, 1     },
-            snappy   = { 0.23, 1,    0.32, 1      },
-            exit     = { 0.55, 0,    1,    0.45   },
-            momentum = { 0.16, 1,    0.3,  1      },
-        },
-
-        animations = {
-            -- ── Global fallback ────────────────────────────────────────────
-            { name = "global",        enable = true, speed = 4,   curve = "cinema"                        },
-
-            -- ── Border ─────────────────────────────────────────────────────
-            { name = "border",        enable = true, speed = 8,   curve = "cinema"                        },
-
-            -- ── Windows ────────────────────────────────────────────────────
-            { name = "windows",       enable = true, speed = 3.5, curve = "weight",   style = "slide"     },
-            { name = "windowsIn",     enable = true, speed = 3.5, curve = "weight",   style = "slide"     },
-            { name = "windowsOut",    enable = true, speed = 2,   curve = "exit",     style = "slide"     },
-            { name = "windowsMove",   enable = true, speed = 3,   curve = "cinema",   style = "slide"     },
-
-            -- ── Fade ───────────────────────────────────────────────────────
-            { name = "fade",          enable = true, speed = 3.5, curve = "cinema"                        },
-            { name = "fadeIn",        enable = true, speed = 4,   curve = "cinema"                        },
-            { name = "fadeOut",       enable = true, speed = 2,   curve = "exit"                          },
-
-            -- ── Layers ─────────────────────────────────────────────────────
-            { name = "layers",        enable = true, speed = 3,   curve = "cinema",   style = "slide"     },
-            { name = "layersIn",      enable = true, speed = 3,   curve = "weight",   style = "slide"     },
-            { name = "layersOut",     enable = true, speed = 1.8, curve = "exit",     style = "slide"     },
-            { name = "fadeLayersIn",  enable = true, speed = 3.5, curve = "cinema"                        },
-            { name = "fadeLayersOut", enable = true, speed = 1.8, curve = "exit"                          },
-
-            -- ── Workspaces ─────────────────────────────────────────────────
-            { name = "workspaces",    enable = true, speed = 4,   curve = "momentum", style = "slidefade 20%" },
-            { name = "workspacesIn",  enable = true, speed = 4,   curve = "momentum", style = "slidefade 20%" },
-            { name = "workspacesOut", enable = true, speed = 2.5, curve = "exit",     style = "slidefade 20%" },
-
-            -- ── Zoom (scrolling layout) ────────────────────────────────────
-            { name = "zoomFactor",    enable = true, speed = 4,   curve = "cinema"                        },
-        },
-    },
-})
+hl.animation({ leaf = "global",        enabled = true, speed = 20, bezier = "snap"                              })
+hl.animation({ leaf = "border",        enabled = true, speed = 20, bezier = "pulseSharp"                        })
+hl.animation({ leaf = "windows",       enabled = true, speed = 20, spring = "springHard", style = "popin 40%"   })
+hl.animation({ leaf = "windowsIn",     enabled = true, speed = 20, spring = "springHard", style = "popin 40%"   })
+hl.animation({ leaf = "windowsOut",    enabled = true, speed = 20, bezier = "eject",      style = "popin 95%"   })
+hl.animation({ leaf = "windowsMove",   enabled = true, speed = 20, spring = "springSnap", style = "slide"       })
+hl.animation({ leaf = "fade",          enabled = false })
+hl.animation({ leaf = "fadeIn",        enabled = false })
+hl.animation({ leaf = "fadeOut",       enabled = false })
+hl.animation({ leaf = "layers",        enabled = true, speed = 20, spring = "springSnap", style = "slide"       })
+hl.animation({ leaf = "layersIn",      enabled = true, speed = 20, spring = "springHard", style = "popin 45%"   })
+hl.animation({ leaf = "layersOut",     enabled = true, speed = 20, bezier = "eject",      style = "slide"       })
+hl.animation({ leaf = "fadeLayersIn",  enabled = true, speed = 20, bezier = "pulseBig"                          })
+hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 20, bezier = "eject"                             })
+hl.animation({ leaf = "workspaces",    enabled = true, speed = 20, bezier = "swell",      style = "slidefade 15%" })
+hl.animation({ leaf = "workspacesIn",  enabled = true, speed = 20, bezier = "swell",      style = "slidefade 15%" })
+hl.animation({ leaf = "workspacesOut", enabled = true, speed = 20, bezier = "eject",      style = "slidefade 15%" })
+hl.animation({ leaf = "zoomFactor",    enabled = true, speed = 20, spring = "springHard"                        })

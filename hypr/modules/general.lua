@@ -1,8 +1,8 @@
 hl.config({
     general = {
-        gaps_in     = 2,
-        gaps_out    = 2,
-        border_size = 1,
+        gaps_in     = 20,
+        gaps_out    = 200,
+        border_size = 5,
 
         col = {
             active_border   = "0xff8B0000",
