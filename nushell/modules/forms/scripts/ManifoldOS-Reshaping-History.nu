@@ -3,91 +3,56 @@
 #
 # What is this file?
 #
-#   This is the git layer of the ManifoldOS reshape loop. It owns everything
+#   This is the git/jj layer of the ManifoldOS reshape loop. It owns everything
 #   that happens to the repository after a successful reconfigure: safety
-#   checks, staging, committing, pushing, and rendering the post-push state.
+#   checks, committing, pushing, and rendering the post-push state.
 #
-#   It is intentionally decoupled from the reconfigure layer. This file never
-#   knows whether a reconfigure succeeded or failed — it is simply called by
-#   ManifoldOS-Reshaping.nu when the system is clean and ready to persist.
-#   That separation is the guarantee that git never reflects a broken build.
+#   jj is used for working copy management, commit description, and operation
+#   log. git (via colocated mode) remains intact so Magit and other git tools
+#   continue to work without modification.
 #
-# What does this file do?
+#   On first run in a repo, jj is initialized automatically with --colocate
+#   so the repo is never left in a broken state.
 #
-#   It runs the git pipeline in five stages:
+# Pipeline stages:
 #
-#     1. FETCH  — Pulls remote refs so safety checks have current data.
-#                 Does not merge. Failures are silently swallowed — a fetch
-#                 failure is not a reason to abort a commit.
+#   1. INIT    — Ensures jj is initialized in the repo (colocated). No-op if
+#                already set up.
 #
-#     2. CHECK  — Runs all safety checks before touching the index:
-#                   - Behind remote  — abort if upstream has commits we lack
-#                   - Conflicts      — abort if unresolved merge markers exist
-#                   - Remote reachable — abort if origin is offline
-#                   - Stash          — warn and let the operator decide
-#                 Any check returning true aborts the entire pipeline.
-#                 Nothing is staged until all checks pass.
+#   2. FETCH   — jj git fetch (reflected in git immediately)
 #
-#     3. STAGE  — Runs `git add --all` and checks for oversized files.
-#                 Captures the structured diff (added/deleted/modified) and
-#                 line-level stats before committing so the summary display
-#                 has accurate data even after the index advances.
+#   3. CHECK   — Safety checks against upstream state using jj revsets
 #
-#     4. COMMIT — Commits with the message passed by the caller. If nothing
-#                 is staged (clean working tree after a reconfigure that
-#                 touched no files), renders the current repo state and exits
-#                 cleanly — this is not an error.
+#   4. COMMIT  — jj describe + jj new (no staging — jj tracks working copy)
 #
-#     5. PUSH   — Pushes to origin if a remote is configured. If no remote
-#                 exists, skips silently and reports local-only commit.
-#                 Push failures render the full remote error and abort.
+#   5. PUSH    — jj git push
 #
-# What is the public API?
+# Public API:
 #
 #   ManifoldOS-Reshaping-History [msg]
-#     Runs the full five-stage pipeline. Called by ManifoldOS-Reshaping.nu
-#     after a successful reconfigure. Can also be invoked standalone via
-#     Ctrl+G for committing config-only or file-only changes without
-#     triggering a full system reconfigure.
+#     Full pipeline. Called by ManifoldOS-Reshaping.nu after reconfigure,
+#     or standalone via Ctrl+G.
 #
 #   print-git-sections [repo, changed, push_results]
-#     Read-only. Called by ManifoldOS-Reshaping.nu to render the git
-#     sections inside the main reshape summary. Does not stage, commit,
-#     or push — only reads and displays.
+#     Read-only render of git/jj state. Called by ManifoldOS-Reshaping.nu.
 #
 #   fetch-commits-from [repo, n]
-#     Returns the last N commits as a structured table with hash, date,
-#     subject, author, and a one-line change summary from git show --stat.
+#     Last N commits as structured table.
 #
 #   fetch-status-from [repo]
-#     Returns raw short-format git status lines for the working tree.
+#     Raw jj status lines for working copy.
 #
 #   fetch-repo-stats-from [repo]
-#     Returns a record with branch, remote URL, total commit count, last
-#     push time, last tag, ahead/behind counts, and stash count.
-#
-# What happens on failure?
-#
-#   Every failure path clears the screen, renders a labelled error block
-#   with the specific reason, and returns without touching git further.
-#   The operator is never left with a partially committed or partially
-#   pushed repository.
+#     Single-glance repo metrics record.
 #
 # Keybinding:
 #
-#   Ctrl+G in Nushell emacs mode runs the history pipeline standalone
-#   from any prompt without triggering a reconfigure.
+#   Ctrl+G runs the history pipeline standalone from any prompt.
 # =============================================================================
 
 
 # =============================================================================
 # CONFIGURATION
-#
-# Top-level record read by safety checks at runtime. Adjust thresholds here
-# rather than hunting through individual check functions.
-#
-#   max_file_size_mb  — staged files larger than this trigger a hard abort
-#   verbose_failures  — reserved for future per-check verbosity control
 # =============================================================================
 
 let config = {
@@ -97,16 +62,30 @@ let config = {
 
 
 # =============================================================================
+# SECTION 0 — JJ INIT
+#
+# Ensures jj is colocated in the repo before any operation runs.
+# If .jj already exists, this is a no-op. If not, runs jj git init --colocate
+# so jj and git share the same object store going forward.
+# =============================================================================
+
+def ensure-jj-initialized [repo: string] {
+    let jj_dir = ($repo | path join ".jj")
+    if not ($jj_dir | path exists) {
+        print $"(ansi yellow)  jj not initialized in this repo — running jj git init --colocate(ansi reset)"
+        let result = (do { cd $repo; jj git init --colocate } | complete)
+        if $result.exit_code != 0 {
+            print $"(ansi red_bold)  ✗ jj init failed:(ansi reset) ($result.stderr)"
+            return false
+        }
+        print $"(ansi green)  ✓ jj initialized \(colocated\)(ansi reset)"
+    }
+    true
+}
+
+
+# =============================================================================
 # SECTION 1 — FLOW ENGINE
-#
-# Renders the live pipeline progress display. Called at the start of each
-# stage with the name of the currently executing stage. Completed stages
-# show their wall-clock duration. The active stage shows "running". Future
-# stages show an empty circle.
-#
-# Clears the screen on every call so the display updates in place rather
-# than scrolling. This is intentional — the flow is a status display, not
-# a log. The log file is the record of what happened.
 # =============================================================================
 
 def rh-flow [steps: list, current: string, timings: record] {
@@ -132,23 +111,11 @@ def rh-flow [steps: list, current: string, timings: record] {
 # =============================================================================
 # SECTION 2 — DATA COLLECTION (public API)
 #
-# These three functions are the read layer — they query the repository and
-# return structured data. They never modify the index or working tree.
-# Called both from the pipeline stages and from print-git-sections.
-#
-# fetch-commits-from
-#   Parses `git log` with a pipe-delimited format so fields never collide
-#   with commit message content. Adds a stat summary from `git show --stat`
-#   so the history table shows what each commit actually touched.
-#
-# fetch-status-from
-#   Returns raw short-format lines. Callers decide how to display them.
-#   An empty list means a clean working tree.
-#
-# fetch-repo-stats-from
-#   Aggregates the most useful single-glance metrics into one record.
-#   ahead/behind use @{u} (the upstream tracking branch) — if no upstream
-#   is configured, both default to 0 via the catch clause.
+# fetch-commits-from   — last N commits via git log (git stays source of truth
+#                        for history so Magit sees the same data)
+# fetch-status-from    — jj status for working copy awareness
+# fetch-repo-stats-from — combined jj + git metrics
+# fetch-op-log-from    — jj operation log (jj-native, no git equivalent)
 # =============================================================================
 
 def fetch-commits-from [repo: string, n: int] {
@@ -164,19 +131,47 @@ def fetch-commits-from [repo: string, n: int] {
 }
 
 def fetch-status-from [repo: string] {
-    git -C $repo status --short | lines | where { |l| $l | is-not-empty }
+    # Use jj status for working copy — richer than git status in colocated mode
+    try {
+        jj --repository $repo status
+        | lines
+        | where { |l| $l | is-not-empty }
+    } catch {
+        git -C $repo status --short | lines | where { |l| $l | is-not-empty }
+    }
 }
 
 def fetch-repo-stats-from [repo: string] {
+    let ahead  = (try {
+        jj --repository $repo log --no-graph -r 'remote_bookmarks()..@' --limit 100
+        | lines | where { |l| $l | is-not-empty } | length
+    } catch { 0 })
+
+    let behind = (try {
+        jj --repository $repo log --no-graph -r '@..remote_bookmarks()' --limit 100
+        | lines | where { |l| $l | is-not-empty } | length
+    } catch { 0 })
+
     {
         branch:      (git -C $repo branch --show-current | str trim)
         remote_url:  (try { git -C $repo remote get-url origin | str trim } catch { "none" })
         total:       (git -C $repo rev-list --count HEAD | str trim)
         last_push:   (git -C $repo log -1 --format="%ad" --date=relative | str trim)
         last_tag:    (try { git -C $repo describe --tags --abbrev=0 out+err> /dev/null | str trim } catch { "none" })
-        ahead:       (try { git -C $repo rev-list --count @{u}..HEAD | str trim | into int } catch { 0 })
-        behind:      (try { git -C $repo rev-list --count HEAD..@{u} | str trim | into int } catch { 0 })
+        ahead:       $ahead
+        behind:      $behind
         stash_count: (try { git -C $repo stash list | lines | length } catch { 0 })
+    }
+}
+
+def fetch-op-log-from [repo: string, n: int] {
+    try {
+        jj --repository $repo op log --no-graph --limit $n
+        | lines
+        | where { |l| $l | is-not-empty }
+        | each { |line| { operation: $line } }
+    } catch {
+        []
     }
 }
 
@@ -184,43 +179,12 @@ def fetch-repo-stats-from [repo: string] {
 # =============================================================================
 # SECTION 3 — SAFETY CHECKS
 #
-# Each check is a pure predicate: returns true to abort, false to continue.
-# The main pipeline calls them in sequence and returns immediately on the
-# first true — no check runs after an abort is decided.
-#
-# render-error
-#   Shared display primitive for all check failures. Clears the screen and
-#   renders a labelled error block so every failure looks consistent.
-#
-# check-behind
-#   Compares local HEAD against the upstream tracking ref. If the remote
-#   has commits we don't have, pushing would either be rejected or create
-#   a diverged history. Abort and show the missing commits so the operator
-#   knows exactly what to pull.
-#
-# check-conflicts
-#   Looks for files in the U (unmerged) diff-filter state. Any unresolved
-#   conflict marker in a staged file would corrupt the commit. Hard abort.
-#
-# check-remote-reachable
-#   Uses `git ls-remote` as a lightweight connectivity probe. Only runs if
-#   a remote is configured. A failed probe aborts before staging so the
-#   operator doesn't end up with staged changes and nowhere to push them.
-#
-# check-stash
-#   Stashed changes are not a hard abort — they don't affect the index.
-#   But they are a signal that the operator may have forgotten something.
-#   Surfaces them with a prompt so the decision is explicit, not silent.
-#
-# check-large-files
-#   Runs after `git add --all` so it sees exactly what is staged. Files
-#   over the threshold are listed with their actual sizes. Hard abort —
-#   large files in git history are permanent and expensive to remove.
-#
-# check-nothing-staged
-#   Silent predicate. Returns true if the index is empty after staging.
-#   Not an error — a reconfigure that touched no tracked files produces
-#   a clean index. The caller renders the current state and exits cleanly.
+# check-behind      — uses jj revsets instead of git rev-list
+# check-conflicts   — uses jj revsets: conflict() function
+# check-remote-reachable — git ls-remote (network probe, unchanged)
+# check-stash       — git stash (unchanged, Magit users may use this)
+# check-large-files — git diff --cached (unchanged)
+# check-nothing-to-commit — jj status check
 # =============================================================================
 
 def render-error [title: string, subtitle: string, details: any] {
@@ -234,10 +198,17 @@ def render-error [title: string, subtitle: string, details: any] {
 }
 
 def check-behind [repo: string] {
-    let behind_str = (try { git -C $repo rev-list --count HEAD..@{u} | str trim } catch { "0" })
-    let behind     = (if ($behind_str | is-empty) { 0 } else { $behind_str | into int })
+    let behind = (try {
+        jj --repository $repo log --no-graph -r '@..remote_bookmarks()' --limit 100
+        | lines | where { |l| $l | is-not-empty } | length
+    } catch { 0 })
+
     if $behind > 0 {
-        let commits = (git -C $repo log HEAD..@{u} --format="%h  %ad  %an  %s" --date=short | lines)
+        let commits = (try {
+            jj --repository $repo log --no-graph -r '@..remote_bookmarks()'
+            | lines | where { |l| $l | is-not-empty }
+            | each { |l| { commit: $l } }
+        } catch { [] })
         render-error "BEHIND REMOTE" $"Your branch is ($behind) commit(s) behind. Pull before pushing." $commits
         true
     } else {
@@ -246,12 +217,39 @@ def check-behind [repo: string] {
 }
 
 def check-conflicts [repo: string] {
-    let conflicts = (git -C $repo diff --name-only --diff-filter=U | lines | where { |l| $l | is-not-empty })
+    let conflicts = (try {
+        jj --repository $repo log --no-graph -r 'conflict()'
+        | lines | where { |l| $l | is-not-empty }
+    } catch { [] })
+
     if ($conflicts | is-not-empty) {
-        render-error "UNRESOLVED CONFLICTS" "Merge conflicts detected. Resolve them before pushing." (
-            $conflicts | each { |f| { file: $f } }
+        render-error "UNRESOLVED CONFLICTS" "Conflicted commits detected. Resolve them before pushing." (
+            $conflicts | each { |l| { commit: $l } }
         )
         true
+    } else {
+        false
+    }
+}
+
+def check-remote-reachable [repo: string] {
+    let result = (try { git -C $repo ls-remote --exit-code origin HEAD | complete } catch { { exit_code: 1 } })
+    if $result.exit_code != 0 {
+        render-error "REMOTE UNREACHABLE" "Cannot reach origin. Check your network connection." [{ status: "offline" }]
+        true
+    } else {
+        false
+    }
+}
+
+def check-stash [repo: string] {
+    let count = (try { git -C $repo stash list | lines | length } catch { 0 })
+    if $count > 0 {
+        let stashes  = (git -C $repo stash list | lines)
+        let subtitle = $"($count) stash\(es\) exist — they may conflict with the current push."
+        render-error "STASHED CHANGES PRESENT" $subtitle $stashes
+        let choice = (["continue anyway" "abort"] | input list --fuzzy "Stash detected — proceed?")
+        $choice == "abort"
     } else {
         false
     }
@@ -284,55 +282,18 @@ def check-large-files [repo: string, threshold_mb: int = 5] {
     }
 }
 
-def check-remote-reachable [repo: string] {
-    let result = (try { git -C $repo ls-remote --exit-code origin HEAD | complete } catch { { exit_code: 1 } })
-    if $result.exit_code != 0 {
-        render-error "REMOTE UNREACHABLE" "Cannot reach origin. Check your network connection." [{ status: "offline" }]
-        true
-    } else {
-        false
-    }
-}
-
-def check-stash [repo: string] {
-    let count = (try { git -C $repo stash list | lines | length } catch { 0 })
-    if $count > 0 {
-        let stashes  = (git -C $repo stash list | lines)
-        let subtitle = $"($count) stash\(es\) exist — they may conflict with the current push."
-        render-error "STASHED CHANGES PRESENT" $subtitle $stashes
-        let choice = (["continue anyway" "abort"] | input list --fuzzy "Stash detected — proceed?")
-        $choice == "abort"
-    } else {
-        false
-    }
-}
-
-def check-nothing-staged [repo: string] {
-    let staged = (git -C $repo diff --cached --name-only | lines | where { |l| $l | is-not-empty })
-    $staged | is-empty
+def check-nothing-to-commit [repo: string] {
+    # jj working copy is always a commit — check if it has any changes
+    let status = (try {
+        jj --repository $repo diff --stat
+        | lines | where { |l| $l | is-not-empty }
+    } catch { [] })
+    $status | is-empty
 }
 
 
 # =============================================================================
 # SECTION 4 — IMPACT
-#
-# Captures what the commit contains as structured data so the summary
-# display can show exactly what changed without re-querying after the
-# index has advanced.
-#
-# capture-changed
-#   Runs three separate diff-filter queries (A/D/M) rather than one combined
-#   query because numstat only covers modified files — added and deleted files
-#   have no line counts to report, so they need their own pass.
-#
-# summarize-impact
-#   Aggregates the changed list into counts by status. Used in the impact
-#   header row before the per-file table.
-#
-# calculate-diff-stats
-#   Totals lines added and deleted across all staged files from numstat.
-#   Binary files and renames report "-" in numstat — into int will fail on
-#   those, so the entire calculation is wrapped in try/catch.
 # =============================================================================
 
 def capture-changed [repo: string] {
@@ -380,16 +341,6 @@ def calculate-diff-stats [repo: string] {
 
 # =============================================================================
 # SECTION 4B — SYSTEM INFO
-#
-# extract-generation-info
-#   Reads the current Guix system generation number and creation date from
-#   `guix system list-generations`. The first line of that command's output
-#   describes the currently running generation. Used in the reshape summary
-#   to confirm which generation the reconfigure produced.
-#
-#   Wrapped in try/catch because this is called in contexts where the running
-#   system may not yet have a generation (fresh install) or the guix binary
-#   may not be on PATH for the current user.
 # =============================================================================
 
 def extract-generation-info [repo: string] {
@@ -405,42 +356,6 @@ def extract-generation-info [repo: string] {
 
 # =============================================================================
 # SECTION 5 — RENDERING
-#
-# All display logic lives here. The pipeline stages call these functions
-# rather than printing directly so the display layer is fully separated
-# from the operation layer.
-#
-# print-section
-#   The universal display primitive. Every block of output in this file
-#   and in ManifoldOS-Reshaping.nu goes through print-section. Consistent
-#   label style, subtitle in grey, table body or a dash if empty.
-#
-# render-impact
-#   Shows the commit's mutation signature: file counts by status in a
-#   header row, then the full per-file diff table below it.
-#
-# render-position
-#   Shows the repository's sync state relative to upstream: branch, remote,
-#   tag, total commits, last push time, ahead/behind counts, stash warning
-#   if stashes exist, working tree cleanliness, and line-level diff totals.
-#
-# render-history
-#   Shows the last N commits as a table. Column widths are determined by
-#   Nushell's table renderer automatically.
-#
-# render-nothing-to-commit
-#   Called when the index is empty after staging. Not an error display —
-#   renders the current repo position and history as a clean state summary.
-#
-# render-push-failure
-#   Called when `git push` exits non-zero. Shows the raw stderr lines from
-#   git so the operator sees the actual remote rejection message.
-#
-# print-git-sections
-#   Public API called by ManifoldOS-Reshaping.nu to render git sections
-#   inside the main reshape summary. Read-only — does not stage, commit,
-#   or push. Takes the already-captured changed list so it reflects the
-#   state at the time of the commit, not the current working tree.
 # =============================================================================
 
 def print-section [label: string, subtitle: string, rows: any] {
@@ -486,19 +401,26 @@ def render-history [commits: list] {
     print-section "TEMPORAL TRACE" "compressed lineage of repository evolution" $commits
 }
 
+def render-op-log [ops: list] {
+    print-section "OPERATION LOG" "jj operations that reshaped this repository" $ops
+}
+
 def render-nothing-to-commit [repo: string] {
     let stats      = (fetch-repo-stats-from $repo)
     let status     = (fetch-status-from $repo)
     let commits    = (fetch-commits-from $repo 10)
     let diff_stats = (calculate-diff-stats $repo)
+    let ops        = (fetch-op-log-from $repo 5)
+
     print -n "\e[2J\e[H"
     print ""
     print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
     print $"(ansi grey)  Nothing new to commit — showing current state.(ansi reset)"
     print ""
-    print-section "NOTHING TO COMMIT" "No staged changes detected" [{ status: "clean" }]
+    print-section "NOTHING TO COMMIT" "No changes detected in working copy" [{ status: "clean" }]
     render-position $stats $status $diff_stats
     render-history $commits
+    render-op-log $ops
 }
 
 def render-push-failure [stderr: string] {
@@ -511,6 +433,7 @@ def print-git-sections [repo: string, changed: list, push_results: list] {
     let status     = (fetch-status-from $repo)
     let commits    = (fetch-commits-from $repo 10)
     let diff_stats = (calculate-diff-stats $repo)
+    let ops        = (fetch-op-log-from $repo 5)
 
     if ($push_results | is-not-empty) {
         print-section "PUSH" "steps completed in this operation" (
@@ -521,6 +444,7 @@ def print-git-sections [repo: string, changed: list, push_results: list] {
         render-impact $changed
     }
     render-history $commits
+    render-op-log $ops
     render-position $stats $status $diff_stats
 }
 
@@ -528,21 +452,15 @@ def print-git-sections [repo: string, changed: list, push_results: list] {
 # =============================================================================
 # SECTION 6 — MAIN
 #
-# ManifoldOS-Reshaping-History runs the full five-stage git pipeline.
+# Five-stage pipeline using jj for working copy + push, git for history
+# display so Magit continues to work without any changes.
 #
-# Entry points:
-#   - Called by ManifoldOS-Reshaping.nu after a successful reconfigure,
-#     with msg defaulting to "update"
-#   - Called standalone via Ctrl+G for committing without reconfiguring
+# jj commit flow:
+#   - jj describe -m $msg   — sets message on current working copy commit
+#   - jj new                — advances @ to a fresh empty commit
+#   - jj git push           — pushes to remote
 #
-# The repo root is resolved dynamically from the current working directory
-# via `git rev-parse --show-toplevel` rather than hardcoded so this function
-# works correctly whether invoked from /ManifoldOS, a subdirectory, or via
-# the keybinding from any prompt location.
-#
-# has_remote is resolved once at the top and threaded through all stages
-# that need it. This avoids repeated subprocess calls and ensures consistent
-# behaviour if the remote configuration changes mid-run (unlikely but safe).
+# git remains intact underneath for Magit and any other git tooling.
 # =============================================================================
 
 def ManifoldOS-Reshaping-History [msg: string = "update"] {
@@ -554,21 +472,27 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let has_remote = (try { git -C $repo remote get-url origin | str trim } catch { "" } | is-not-empty)
 
     let steps = [
+        { name: "Init" }
         { name: "Fetch" }
         { name: "Check" }
-        { name: "Stage" }
         { name: "Commit" }
         { name: "Push" }
     ]
     mut timings = {}
 
+    # --- Init --- ensure jj is colocated
+    rh-flow $steps "Init" $timings
+    let t = (date now)
+    if not (ensure-jj-initialized $repo) { return }
+    $timings = ($timings | insert Init $"(((date now) - $t) / 1sec | math round)s")
+
     # --- Fetch ---
     rh-flow $steps "Fetch" $timings
     let t = (date now)
-    try { git -C $repo fetch out+err> /dev/null } catch { }
+    try { jj --repository $repo git fetch out+err> /dev/null } catch { }
     $timings = ($timings | insert Fetch $"(((date now) - $t) / 1sec | math round)s")
 
-    # --- Safety checks — abort pipeline on first failure ---
+    # --- Safety checks ---
     rh-flow $steps "Check" $timings
     let t = (date now)
     if (check-behind $repo)                           { return }
@@ -577,34 +501,39 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     if (check-stash $repo)                            { return }
     $timings = ($timings | insert Check $"(((date now) - $t) / 1sec | math round)s")
 
-    # --- Stage — capture diff before index advances ---
-    rh-flow $steps "Stage" $timings
+    # --- Commit ---
+    rh-flow $steps "Commit" $timings
     let t = (date now)
+
+    if (check-nothing-to-commit $repo) {
+        render-nothing-to-commit $repo
+        return
+    }
+
+    # Capture diff before jj advances the working copy commit
+    # We stage via git add so git index reflects reality for Magit
     git -C $repo add --all
     if (check-large-files $repo $config.max_file_size_mb) { return }
     let changed    = (capture-changed $repo)
     let diff_stats = (calculate-diff-stats $repo)
-    $timings = ($timings | insert Stage $"(((date now) - $t) / 1sec | math round)s")
 
-    # --- Commit ---
-    rh-flow $steps "Commit" $timings
-    let t = (date now)
-    if (check-nothing-staged $repo) {
+    # jj describe sets the commit message on the working copy commit
+    let desc_result = (jj --repository $repo describe -m $msg | complete)
+    if $desc_result.exit_code != 0 {
         render-nothing-to-commit $repo
         return
     }
-    let commit_result = (git -C $repo commit -m $msg | complete)
+
+    # jj new advances @ to a fresh empty commit, finalizing the previous one
+    jj --repository $repo new out+err> /dev/null
+
     $timings = ($timings | insert Commit $"(((date now) - $t) / 1sec | math round)s")
-    if $commit_result.exit_code != 0 {
-        render-nothing-to-commit $repo
-        return
-    }
 
     # --- Push ---
     rh-flow $steps "Push" $timings
     let t = (date now)
     let push_result = if $has_remote {
-        git -C $repo push | complete
+        jj --repository $repo git push | complete
     } else {
         { exit_code: 0, stderr: "" }
     }
@@ -617,11 +546,12 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
 
     # --- Post-push summary ---
     rh-flow $steps "" $timings
-    try { git -C $repo fetch out+err> /dev/null } catch { }
+    try { jj --repository $repo git fetch out+err> /dev/null } catch { }
 
     let stats   = (fetch-repo-stats-from $repo)
     let status  = (fetch-status-from $repo)
     let commits = (fetch-commits-from $repo 10)
+    let ops     = (fetch-op-log-from $repo 5)
 
     print -n "\e[2J\e[H"
     print ""
@@ -635,6 +565,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     render-impact $changed
     render-position $stats $status $diff_stats
     render-history $commits
+    render-op-log $ops
     print ""
 
     $changed
@@ -643,10 +574,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
 
 # =============================================================================
 # SECTION 7 — KEYBINDING
-#
-# Ctrl+G in Nushell emacs mode runs the history pipeline standalone from
-# any prompt. Useful for committing documentation, config, or module changes
-# without triggering a full system reconfigure.
 # =============================================================================
 
 $env.config.keybindings = ($env.config.keybindings | append {

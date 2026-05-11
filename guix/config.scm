@@ -7,6 +7,7 @@
              (guix build-system trivial)
              (guix build-system gnu)
              (guix build-system cmake)
+             (gnu packages ssh)
              (guix build-system emacs)
              (guix gexp)
              (gnu packages base)
@@ -38,12 +39,16 @@
              (gnu packages ghostscript)
              (gnu packages readline)
              (gnu packages python)
+             (guix build-system cargo)
              (gnu packages gnome)
+             (guix licenses)
              (gnu packages emacs-xyz)
              (gnu packages emacs-build))
 (use-service-modules networking ssh desktop xorg)
 (define unzip (@ (gnu packages compression) unzip))
 (define patchelf (@ (gnu packages elf) patchelf))
+
+
 (define kanata
   (package
     (name "kanata")
@@ -92,6 +97,7 @@
                                    #:log-file "/var/log/kanata.log"))
                          (stop #~(make-kill-destructor))
                          (respawn? #t)))))
+
 (define atuin
   (package
     (name "atuin")
@@ -614,6 +620,7 @@ and a custom mode-line layout. Invoke with M-x book-mode.")
                           emacs-nano-theme
                           emacs-book-mode
                           git
+			  jujutsu
                           fzf
                           qutebrowser
                           hyprland
