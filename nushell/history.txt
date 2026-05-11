@@ -205,3 +205,6 @@ ls
 sudo emacs config.scm
 sudo /root/.config/guix/current/bin/guix system reconfigure config.scm --allow-downgrades --no-grafts
 emacs ManifoldOS-Reshaping.nu
+cat ManifoldOS-Reshaping-History.nu
+emacs ManifoldOS-Reshaping.nu
+emacs ManifoldOS-Reshaping-History.nu
