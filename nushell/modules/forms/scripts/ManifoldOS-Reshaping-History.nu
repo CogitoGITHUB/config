@@ -391,7 +391,7 @@ def render-position [stats: record, status: list, diff_stats: record] {
     if $stats.stash_count > 0 {
         $rows = ($rows | append { key: "Stash"  value: $"($stats.stash_count) stashed change(s)" })
     }
-    let state = if ($status | is-empty) { "✓ clean" } else { $"($status | length) change(s)" }
+    let state = if ($status | is-empty) { "✓ clean" } else { $"($status | length) changes" }
     $rows = ($rows | append { key: "State"      value: $state })
     $rows = ($rows | append { key: "Diff stats" value: $"+($diff_stats.added) lines  -($diff_stats.deleted) lines" })
     print-section "POSITION" "alignment between local drift and upstream state" $rows
