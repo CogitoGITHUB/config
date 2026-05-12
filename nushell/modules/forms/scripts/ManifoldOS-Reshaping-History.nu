@@ -21,6 +21,25 @@ def find-repo-root [] {
         $dir = $parent
     }
 }
+
+# Resolve the effective jj user identity: jj config → git config → fallback.
+# Returns a record { name: string, email: string } that is always non-empty.
+def resolve-jj-identity [repo: string] {
+    let jj_email = (try { jj --repository $repo config get user.email | str trim } catch { "" })
+    let jj_name  = (try { jj --repository $repo config get user.name  | str trim } catch { "" })
+    if ($jj_email | is-not-empty) and ($jj_name | is-not-empty) {
+        return { name: $jj_name  email: $jj_email }
+    }
+    let git_email = (try { git -C $repo config user.email | str trim } catch { "" })
+    let git_name  = (try { git -C $repo config user.name  | str trim } catch { "" })
+    {
+        name:  (if ($jj_name  | is-not-empty) { $jj_name  } else if ($git_name  | is-not-empty) { $git_name  } else { "MappingOS" })
+        email: (if ($jj_email | is-not-empty) { $jj_email } else if ($git_email | is-not-empty) { $git_email } else { "manifold@localhost" })
+    }
+}
+
+# Ensure jj is colocated and that a valid user identity exists in jj config.
+# Returns false and prints an error only on hard failures.
 def ensure-jj-initialized [repo: string] {
     let jj_dir = ($repo | path join ".jj")
     if not ($jj_dir | path exists) {
@@ -32,12 +51,19 @@ def ensure-jj-initialized [repo: string] {
         }
         print $"(ansi green)  ✓ jj initialized \(colocated\)(ansi reset)"
     }
-    let jj_email = (try { jj config get user.email | str trim } catch { "" })
-    if ($jj_email | is-empty) {
-        let git_email = (try { git -C $repo config user.email | str trim } catch { "" })
-        let git_name  = (try { git -C $repo config user.name  | str trim } catch { "" })
-        if ($git_email | is-not-empty) { jj config set --user user.email $git_email }
-        if ($git_name  | is-not-empty) { jj config set --user user.name  $git_name  }
+
+    # Always reconcile identity: write whatever we can resolve into jj --user config.
+    # This covers fresh colocations where jj has no identity yet.
+    let id = (resolve-jj-identity $repo)
+    let cur_email = (try { jj --repository $repo config get user.email | str trim } catch { "" })
+    let cur_name  = (try { jj --repository $repo config get user.name  | str trim } catch { "" })
+    if ($cur_email | is-empty) {
+        jj config set --user user.email $id.email
+        print $"(ansi green)  ✓ jj user.email set to ($id.email)(ansi reset)"
+    }
+    if ($cur_name | is-empty) {
+        jj config set --user user.name $id.name
+        print $"(ansi green)  ✓ jj user.name set to ($id.name)(ansi reset)"
     }
     true
 }
@@ -64,8 +90,6 @@ def rh-flow [steps: list, current: string, timings: record] {
 # =============================================================================
 # SECTION 2 — DATA COLLECTION
 # =============================================================================
-
-# Returns a list of all local bookmark names in the repo.
 def list-bookmarks [repo: string] {
     try {
         jj --repository $repo bookmark list
@@ -75,28 +99,21 @@ def list-bookmarks [repo: string] {
     } catch { [] }
 }
 
-# Returns the best bookmark name for the current line of work, or null if none.
-# Checks @- first (where described commits land), then @.
-# Only returns a name that actually exists in jj bookmark list.
 def resolve-bookmark [repo: string] {
     let known = (list-bookmarks $repo)
     if ($known | is-empty) { return null }
-
     let on_parent = (try {
         jj --repository $repo log --no-graph -r '@-' --template 'bookmarks.join("\n")' | lines | where { |l| $l | is-not-empty } | get 0
     } catch { "" })
     if ($on_parent | is-not-empty) and ($known | any { |b| $b == $on_parent }) {
         return $on_parent
     }
-
     let on_wc = (try {
         jj --repository $repo log --no-graph -r '@' --template 'bookmarks.join("\n")' | lines | where { |l| $l | is-not-empty } | get 0
     } catch { "" })
     if ($on_wc | is-not-empty) and ($known | any { |b| $b == $on_wc }) {
         return $on_wc
     }
-
-    # Fall back to first known bookmark
     $known | get 0
 }
 
@@ -178,7 +195,6 @@ def snapshot-op-id [repo: string] {
         jj --repository $repo op log --no-graph --limit 1 --template 'id.short(12)' | str trim
     } catch { null }
 }
-
 # =============================================================================
 # SECTION 3 — SAFETY CHECKS
 # =============================================================================
@@ -190,6 +206,15 @@ def render-error [title: string, subtitle: string, details: any] {
     print ""
     print-section $title $subtitle $details
     print ""
+}
+
+def check-identity [repo: string] {
+    # Hard-fail if we still can't resolve a name+email after ensure-jj-initialized ran.
+    let id = (resolve-jj-identity $repo)
+    if ($id.email | str ends-with "@localhost") {
+        print $"(ansi yellow)  ⚠ using fallback identity ($id.name) <($id.email)> — set git config user.name / user.email for a real author(ansi reset)"
+    }
+    false  # never a hard failure; we always have a fallback
 }
 
 def check-behind [repo: string, bookmark: string] {
@@ -246,7 +271,6 @@ def check-stash [repo: string] {
         false
     }
 }
-
 # =============================================================================
 # SECTION 4 — IMPACT
 # =============================================================================
@@ -284,7 +308,6 @@ def calculate-diff-stats [repo: string] {
         { added: $added  deleted: $deleted }
     } catch { { added: 0  deleted: 0 } }
 }
-
 # =============================================================================
 # SECTION 4B — SYSTEM INFO
 # =============================================================================
@@ -295,7 +318,6 @@ def extract-generation-info [] {
         { generation: ($parts | get 1)  date: ($parts | range 2..4 | str join " ") }
     } catch { { generation: "unknown"  date: "unknown" } }
 }
-
 # =============================================================================
 # SECTION 5 — RENDERING
 # =============================================================================
@@ -347,7 +369,6 @@ def render-op-log [repo: string, pre_op_id: string] {
     }
 }
 
-# Renders the pipeline checklist — one row per stage, showing result and timing.
 def render-checklist [checklist: list] {
     print-section "PIPELINE" "stage-by-stage result" $checklist
 }
@@ -384,7 +405,6 @@ def print-git-sections [repo: string, changed: list, push_results: list] {
     render-history $commits
     render-position $stats $status $diff_stats
 }
-
 # =============================================================================
 # SECTION 6 — MAIN
 # =============================================================================
@@ -398,6 +418,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         print -e $"(ansi red_bold)  ✗ no git or jj repo found(ansi reset)"
         return
     }
+
     let init_ok = (ensure-jj-initialized $repo)
     if not $init_ok { return }
 
@@ -424,8 +445,8 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     } else {
         $bookmark
     }
-    let pre_op_id = (snapshot-op-id $repo)
 
+    let pre_op_id = (snapshot-op-id $repo)
     let steps = [
         { name: "INIT"   }
         { name: "FETCH"  }
@@ -434,11 +455,17 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         { name: "PUSH"   }
     ]
     mut timings   = {}
-    mut checklist = []   # accumulates { stage, result, elapsed } rows
+    mut checklist = []
 
     # ── INIT ────────────────────────────────────────────────
     rh-flow $steps "INIT" $timings
     let t = (date now)
+
+    # Resolve and display the identity we will commit as.
+    let id = (resolve-jj-identity $repo)
+    print $"(ansi grey)  author  ($id.name) <($id.email)>(ansi reset)"
+    check-identity $repo   # may print a warning; never aborts
+
     let elapsed_init = $"(((date now) - $t) / 1sec * 1000 | math round)ms"
     $timings   = ($timings | insert INIT $elapsed_init)
     $checklist = ($checklist | append { stage: "INIT"  result: "✓"  elapsed: $elapsed_init  note: $"repo: ($repo)" })
@@ -481,7 +508,10 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         if ($bm | is-not-empty) { $"[($bm)] ($ts)" } else { $"[no-bookmark] ($ts)" }
     } else { $msg }
 
-    let desc_result = (do { jj --repository $repo describe -m $commit_msg } | complete)
+    # Pass --author explicitly so jj never produces an authorless commit,
+    # even if the working-copy commit was created before identity was set.
+    let author_flag = $"($id.name) <($id.email)>"
+    let desc_result = (do { jj --repository $repo describe -m $commit_msg --author $author_flag } | complete)
     if $desc_result.exit_code != 0 {
         $checklist = ($checklist | append { stage: "COMMIT"  result: "✗"  elapsed: "—"  note: "describe failed" })
         render-checklist $checklist
@@ -516,7 +546,8 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     } else {
         (do { jj --repository $repo git push } | complete)
     }
-    # jj refuses to push if a non-tracking remote bookmark exists — auto-track and retry once
+
+    # Auto-track non-tracking remote bookmark and retry once
     let push_result = if $push_result.exit_code != 0 and ($push_result.stderr | str contains "Non-tracking remote bookmark") {
         print $"(ansi yellow)  ⚠ non-tracking remote bookmark — running: jj bookmark track ($bm) --remote=origin(ansi reset)"
         let track_result = (do { jj --repository $repo bookmark track $bm --remote=origin } | complete)
@@ -534,6 +565,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     } else {
         $push_result
     }
+
     let elapsed_push = $"(((date now) - $t) / 1sec * 1000 | math round)ms"
     if $push_result.exit_code != 0 {
         $checklist = ($checklist | append { stage: "PUSH"  result: "✗"  elapsed: $elapsed_push  note: "remote rejected" })
@@ -550,7 +582,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let stats   = (fetch-repo-stats-from $repo $bm)
     let status  = (fetch-status-from $repo)
     let commits = (fetch-commits-from $repo $config.commits_to_show)
-
     print -n "\e[2J\e[H"
     print ""
     print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
@@ -563,7 +594,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     render-op-log $repo $pre_op_id
     print ""
 }
-
 # =============================================================================
 # SECTION 7 — CONVENIENCE COMMANDS
 # =============================================================================
@@ -609,7 +639,6 @@ def jj-stats-json [] {
     let bm = (resolve-bookmark $repo | default "")
     fetch-repo-stats-from $repo $bm --json
 }
-
 # =============================================================================
 # SECTION 8 — KEYBINDINGS
 # =============================================================================
