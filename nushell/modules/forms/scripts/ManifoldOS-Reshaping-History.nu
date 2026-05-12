@@ -181,8 +181,7 @@ def fetch-commits-from [repo: string, n: int] {
 }
 
 def fetch-status-from [repo: string] {
-    try { jj --repository $repo status | lines | where { |l| $l | is-not-empty } }
-    catch { git -C $repo status --short | lines | where { |l| $l | is-not-empty } }
+    try { jj --repository $repo status | lines | where { |l| $l | is-not-empty } } catch { [] }
 }
 
 def fetch-repo-stats-from [repo: string, bookmark: string, --json] {
@@ -515,7 +514,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
 
     # ── SUMMARY ──────────────────────────────────────────────────────────────
     rh-flow $steps "" $timings
-    try { jj --repository $repo git fetch out+err>/dev/null } catch { }
+    try { jj --repository $repo git fetch } catch { }
     let stats   = (fetch-repo-stats-from $repo $bm)
     let status  = (fetch-status-from $repo)
     let commits = (fetch-commits-from $repo $config.commits_to_show)
