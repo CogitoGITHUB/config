@@ -525,7 +525,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         )
         if ($track_bm | is-not-empty) {
             let bm_name  = ($track_bm | get capture0)
-            let remote   = ($track_bm | get capture1 | str trim ")")
+            let remote   = ($track_bm | get capture1 | str replace --all ")" "" | str trim)
             print $"(ansi yellow)  ⚠ tracking ($bm_name) on ($remote) and retrying push(ansi reset)"
             let _ = (do { jj --repository $repo bookmark track $bm_name $"--remote=($remote)" } | complete)
             if ($bm | is-not-empty) {
