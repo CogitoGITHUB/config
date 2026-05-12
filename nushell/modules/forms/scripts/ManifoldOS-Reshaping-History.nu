@@ -251,7 +251,14 @@ def rh-flow [steps: list, current: string, timings: record] {
 
 # =============================================================================
 # SECTION 2 — DATA COLLECTION
+# Delimiter \u{001E} (ASCII Record Separator) is used throughout to split
+# jj template output. It cannot appear in commit messages, author names, or
+# timestamps, so field parsing is safe regardless of message content.
 # =============================================================================
+
+# Safe delimiter — ASCII Record Separator, never in user-visible text
+const SEP = "\u{001E}"
+
 def list-bookmarks [repo: string] {
     try {
         jj --repository $repo bookmark list
@@ -264,13 +271,13 @@ def resolve-bookmark [repo: string] {
     let known = (list-bookmarks $repo)
     if ($known | is-empty) { return null }
     let on_parent = (try {
-        jj --repository $repo log --no-graph -r '@-' --template 'bookmarks.join("\n")'
-        | lines | where { |l| $l | is-not-empty } | get 0
+        jj --repository $repo log --no-graph -r '@-' --template $"bookmarks.join\(\"($SEP)\"\)"
+        | str trim | split row $SEP | where { |l| $l | is-not-empty } | get 0
     } catch { "" })
     if ($on_parent | is-not-empty) and ($known | any { |b| $b == $on_parent }) { return $on_parent }
     let on_wc = (try {
-        jj --repository $repo log --no-graph -r '@' --template 'bookmarks.join("\n")'
-        | lines | where { |l| $l | is-not-empty } | get 0
+        jj --repository $repo log --no-graph -r '@' --template $"bookmarks.join\(\"($SEP)\"\)"
+        | str trim | split row $SEP | where { |l| $l | is-not-empty } | get 0
     } catch { "" })
     if ($on_wc | is-not-empty) and ($known | any { |b| $b == $on_wc }) { return $on_wc }
     $known | get 0
@@ -278,31 +285,35 @@ def resolve-bookmark [repo: string] {
 
 def resolve-ahead-behind [repo: string, bookmark: string] {
     let ahead = (try {
-        jj --repository $repo log --no-graph -r $"remote_bookmarks\(exact:\"($bookmark)\"\)..($bookmark)" --limit 100
+        let rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)..($bookmark)"
+        jj --repository $repo log --no-graph -r $rev --limit 100
         | lines | where { |l| $l | is-not-empty } | length | into string
     } catch { "?" })
     let behind = (try {
-        jj --repository $repo log --no-graph -r $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)" --limit 100
+        let rev = $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)"
+        jj --repository $repo log --no-graph -r $rev --limit 100
         | lines | where { |l| $l | is-not-empty } | length | into string
     } catch { "?" })
     { ahead: $ahead  behind: $behind }
 }
 
+# Returns a list of records: { change commit age subject author }
+# Uses SEP as field delimiter — safe against | in commit messages.
 def fetch-commits-from [repo: string, n: int] {
-    let tmpl = 'change_id.short(8) ++ "|" ++ commit_id.short(8) ++ "|" ++ author.timestamp().ago() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "\n"'
+    let tmpl = $"change_id.short\(8\)++\"($SEP)\"++commit_id.short\(8\)++\"($SEP)\"++author.timestamp\(\).ago\(\)++\"($SEP)\"++description.first_line\(\)++\"($SEP)\"++author.name\(\)++\"\\n\""
     try {
         jj --repository $repo log --no-graph --limit $n --template $tmpl
         | lines | where { |l| $l | is-not-empty }
         | each { |line|
-            let p = ($line | split row "|")
+            let p = ($line | split row $SEP)
             { change: ($p | get 0)  commit: ($p | get 1)  age: ($p | get 2)  subject: ($p | get 3)  author: ($p | get 4) }
         }
         | where { |row| ($row.subject | is-not-empty) }
     } catch {
-        git -C $repo log --format="%h|%ad|%s|%an" --date=relative $"-($n)"
+        git -C $repo log --format="%h%x1e%ad%x1e%s%x1e%an" --date=relative $"-($n)"
         | lines | where { |l| $l | is-not-empty }
         | each { |line|
-            let p = ($line | split row "|")
+            let p = ($line | split row $SEP)
             { change: "—"  commit: ($p | get 0)  age: ($p | get 1)  subject: ($p | get 2)  author: ($p | get 3) }
         }
     }
@@ -331,12 +342,12 @@ def fetch-repo-stats-from [repo: string, bookmark: string, --json] {
 }
 
 def fetch-op-log-from [repo: string, n: int] {
+    let tmpl = $"id.short\(12\)++\"($SEP)\"++description++\"($SEP)\"++user++\"($SEP)\"++time.start\(\).ago\(\)++\"\\n\""
     try {
-        let tmpl = 'id.short(12) ++ "|" ++ description ++ "|" ++ user ++ "|" ++ time.start().ago() ++ "\n"'
         jj --repository $repo op log --no-graph --limit $n --template $tmpl
         | lines | where { |l| $l | is-not-empty }
         | each { |line|
-            let p = ($line | split row "|")
+            let p = ($line | split row $SEP)
             { op: ($p | get 0)  description: ($p | get 1)  user: ($p | get 2)  when: ($p | get 3) }
         }
     } catch { [{ op: "—"  description: "(op log unavailable)"  user: ""  when: "" }] }
@@ -359,34 +370,127 @@ def render-error [title: string, subtitle: string, details: any] {
     print ""
 }
 
+# Returns true if the workflow should abort.
+# Offers three resolution options: fast-forward rebase, pull+rebase, or abort.
 def check-behind [repo: string, bookmark: string] {
     if ($bookmark | is-empty) { return false }
     let behind = (try {
-        jj --repository $repo log --no-graph -r $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)" --limit 100
+        let rev = $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)"
+        jj --repository $repo log --no-graph -r $rev --limit 100
         | lines | where { |l| $l | is-not-empty } | length
     } catch { 0 })
-    if $behind > 0 {
-        let commits = (try {
-            jj --repository $repo log --no-graph -r $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)" --limit 20
+    if $behind == 0 { return false }
+
+    let tmpl = $"commit_id.short\(8\)++\"($SEP)\"++author.timestamp\(\).ago\(\)++\"($SEP)\"++description.first_line\(\)++\"\\n\""
+    let remote_commits = (try {
+        let rev = $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)"
+        jj --repository $repo log --no-graph -r $rev --template $tmpl
+        | lines | where { |l| $l | is-not-empty }
+        | each { |line|
+            let p = ($line | split row $SEP)
+            { commit: ($p | get 0)  age: ($p | get 1)  subject: ($p | get 2) }
+        }
+    } catch { [] })
+
+    render-error "BEHIND REMOTE" $"Bookmark ($bookmark) is ($behind) commit\(s\) behind remote." $remote_commits
+
+    let choice = (
+        [
+            "fast-forward  — rebase local commits on top of remote (recommended)"
+            "pull only     — fetch and move bookmark to remote tip, discard local"
+            "abort         — exit and handle manually"
+        ] | input list --fuzzy "Behind remote — how to proceed?"
+    )
+
+    if ($choice | str starts-with "abort") { return true }
+
+    let author_flag = $"($config.author_name) <($config.author_email)>"
+
+    if ($choice | str starts-with "fast-forward") {
+        let local_rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)..($bookmark)"
+        let local_only_count = (try {
+            jj --repository $repo log --no-graph -r $local_rev --limit 100
+            | lines | where { |l| $l | is-not-empty } | length
+        } catch { 0 })
+
+        if $local_only_count == 0 {
+            let remote_rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)"
+            let r = (do {
+                jj --repository $repo bookmark set $bookmark -r $remote_rev
+            } | complete)
+            if $r.exit_code != 0 {
+                print -e $"(ansi red_bold)  ✗ bookmark fast-forward failed:(ansi reset) ($r.stderr)"
+                return true
+            }
+            print $"(ansi green)  ✓ bookmark fast-forwarded to remote tip(ansi reset)"
+        } else {
+            let remote_rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)"
+            let r = (do {
+                jj --repository $repo rebase -s $"($bookmark)~($local_only_count)" -d $remote_rev
+            } | complete)
+            if $r.exit_code != 0 {
+                let r2 = (do {
+                    jj --repository $repo rebase -b $bookmark -d $remote_rev
+                } | complete)
+                if $r2.exit_code != 0 {
+                    print -e $"(ansi red_bold)  ✗ rebase failed:(ansi reset) ($r2.stderr)"
+                    return true
+                }
+            }
+            jj --repository $repo bookmark set $bookmark -r '@-' | ignore
+            print $"(ansi green)  ✓ local commits rebased onto remote tip(ansi reset)"
+        }
+        return false
+    }
+
+    if ($choice | str starts-with "pull only") {
+        let local_rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)..($bookmark)"
+        let tmpl2 = $"change_id.short\(8\)++\"\\n\""
+        let local_only = (try {
+            jj --repository $repo log --no-graph -r $local_rev --template $tmpl2
             | lines | where { |l| $l | is-not-empty }
         } catch { [] })
-        render-error "BEHIND REMOTE" $"Bookmark ($bookmark) is ($behind) commit\(s\) behind. Pull before pushing." $commits
-        true
-    } else { false }
+
+        if not ($local_only | is-empty) {
+            print $"(ansi yellow)  ⚠ abandoning ($local_only | length) local-only commit\(s\):(ansi reset)"
+            $local_only | each { |id| print $"    ($id)" } | ignore
+            let confirm = (["yes — discard them" "no — abort"] | input list --fuzzy "Discard local commits?")
+            if not ($confirm | str starts-with "yes") { return true }
+            for id in $local_only {
+                jj --repository $repo abandon $id | ignore
+            }
+        }
+
+        let remote_rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)"
+        let r = (do {
+            jj --repository $repo bookmark set $bookmark -r $remote_rev
+        } | complete)
+        if $r.exit_code != 0 {
+            print -e $"(ansi red_bold)  ✗ pull failed:(ansi reset) ($r.stderr)"
+            return true
+        }
+        print $"(ansi green)  ✓ pulled — bookmark now at remote tip(ansi reset)"
+        return false
+    }
+
+    true  # fallback abort
 }
 
 def check-conflicts [repo: string] {
+    let tmpl = $"change_id.short\(8\)++\"($SEP)\"++description.first_line\(\)++\"\\n\""
     let conflicted = (try {
-        jj --repository $repo log --no-graph -r 'conflicts()' --template 'change_id.short(8) ++ "|" ++ description.first_line() ++ "\n"'
+        jj --repository $repo log --no-graph -r 'conflicts()' --template $tmpl
         | lines | where { |l| $l | is-not-empty }
-        | each { |l| let p = ($l | split row "|"); { change: ($p | get 0) subject: ($p | get 1) } }
+        | each { |l|
+            let p = ($l | split row $SEP)
+            { change: ($p | get 0) subject: ($p | get 1) }
+        }
     } catch { [] })
     if not ($conflicted | is-empty) {
         render-error "UNRESOLVED CONFLICTS" "Resolve before committing." $conflicted
         let choice = (["launch jj resolve" "abort"] | input list --fuzzy "Conflicts detected:")
         if $choice == "launch jj resolve" {
             jj --repository $repo resolve
-            # re-check after resolution attempt
             let still = (try { jj --repository $repo log --no-graph -r 'conflicts()' | str trim | is-not-empty } catch { false })
             if $still { print -e $"(ansi red_bold)  ✗ conflicts remain(ansi reset)"; return true }
             print $"(ansi green)  ✓ conflicts resolved(ansi reset)"
@@ -445,13 +549,13 @@ def check-remote-reachable [repo: string] {
     } else { false }
 }
 
-# Detect and offer to fix diverged bookmark (local vs remote have split history)
 def check-divergence [repo: string, bookmark: string] {
     if ($bookmark | is-empty) { return false }
     let diverged = (try {
-        # both ahead AND behind = diverged
-        let a = (jj --repository $repo log --no-graph -r $"remote_bookmarks\(exact:\"($bookmark)\"\)..($bookmark)" --limit 5 | lines | where { |l| $l | is-not-empty } | length)
-        let b = (jj --repository $repo log --no-graph -r $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)" --limit 5 | lines | where { |l| $l | is-not-empty } | length)
+        let rev_a = $"remote_bookmarks\(exact:\"($bookmark)\"\)..($bookmark)"
+        let rev_b = $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)"
+        let a = (jj --repository $repo log --no-graph -r $rev_a --limit 5 | lines | where { |l| $l | is-not-empty } | length)
+        let b = (jj --repository $repo log --no-graph -r $rev_b --limit 5 | lines | where { |l| $l | is-not-empty } | length)
         $a > 0 and $b > 0
     } catch { false })
     if $diverged {
@@ -464,14 +568,16 @@ def check-divergence [repo: string, bookmark: string] {
         if $choice == "abort" { return true }
         let author_flag = $"($config.author_name) <($config.author_email)>"
         if $choice == "rebase onto remote" {
-            let r = (do { jj --repository $repo rebase -d $"remote_bookmarks\(exact:\"($bookmark)\"\)" } | complete)
+            let remote_rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)"
+            let r = (do { jj --repository $repo rebase -d $remote_rev } | complete)
             if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ rebase failed:(ansi reset) ($r.stderr)"; return true }
             jj --repository $repo bookmark set $bookmark -r '@-' | ignore
             print $"(ansi green)  ✓ rebased onto remote ($bookmark)(ansi reset)"
         } else {
-            let r = (do { jj --repository $repo squash --into $"remote_bookmarks\(exact:\"($bookmark)\"\)" } | complete)
+            let remote_rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)"
+            let r = (do { jj --repository $repo squash --into $remote_rev } | complete)
             if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ squash failed:(ansi reset) ($r.stderr)"; return true }
-            jj --repository $repo bookmark set $bookmark -r $"remote_bookmarks\(exact:\"($bookmark)\"\)" | ignore
+            jj --repository $repo bookmark set $bookmark -r $remote_rev | ignore
             print $"(ansi green)  ✓ squashed into remote head(ansi reset)"
         }
         false
@@ -564,7 +670,9 @@ def render-push-failure [stderr: string] {
 def do-push [repo: string, bm: string] {
     let author_flag = $"($config.author_name) <($config.author_email)>"
     try {
-        jj --repository $repo log --no-graph -r $"remote_bookmarks\(exact:\"($bm)\"\)..($bm)" --template 'change_id.short(8) ++ "\n"'
+        let tmpl = $"change_id.short\(8\)++\"\\n\""
+        let rev = $"remote_bookmarks\(exact:\"($bm)\"\)..($bm)"
+        jj --repository $repo log --no-graph -r $rev --template $tmpl
         | lines | where { |l| $l | is-not-empty }
         | each { |id|
             let r = (do { jj --repository $repo metaedit -r $id --author $author_flag } | complete)
@@ -801,16 +909,16 @@ def jj-amend [] {
     if $repo == null { print -e "✗ no repo found"; return }
     let author_flag = $"($config.author_name) <($config.author_email)>"
     jj --repository $repo debug snapshot | ignore
-    # squash @ into @- (moves working copy changes into the last real commit)
     let r = (do { jj --repository $repo squash } | complete)
     if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ squash failed:(ansi reset) ($r.stderr)"; return }
-    # re-stamp author on the amended commit
-    let id = (try { jj --repository $repo log --no-graph -r '@-' --template 'change_id.short(8)' | str trim } catch { "" })
+    let tmpl = $"change_id.short\(8\)++\"\\n\""
+    let id = (try { jj --repository $repo log --no-graph -r '@-' --template $tmpl | str trim } catch { "" })
     if ($id | is-not-empty) {
         jj --repository $repo metaedit -r $id --author $author_flag | ignore
     }
     print $"(ansi green)  ✓ amended @-(ansi reset)"
-    jj --repository $repo log --no-graph --limit 3 --template 'change_id.short(8) ++ " " ++ description.first_line() ++ "\n"' | print
+    let log_tmpl = $"change_id.short\(8\)++\" \"++description.first_line\(\)++\"\\n\""
+    jj --repository $repo log --no-graph --limit 3 --template $log_tmpl | print
 }
 
 # Create a new feature branch workspace, switch to it
@@ -818,11 +926,9 @@ def jj-branch [name: string] {
     let repo = (find-repo-root)
     if $repo == null { print -e "✗ no repo found"; return }
     let author_flag = $"($config.author_name) <($config.author_email)>"
-    # create bookmark at current @-
     let bmc = (do { jj --repository $repo bookmark create $name -r '@-' } | complete)
     if $bmc.exit_code != 0 { print -e $"(ansi red_bold)  ✗ bookmark create failed:(ansi reset) ($bmc.stderr)"; return }
     print $"(ansi green)  ✓ bookmark ($name) created at @-(ansi reset)"
-    # new empty commit on this branch
     let nr = (do { jj --repository $repo new $name --no-edit } | complete)
     if $nr.exit_code != 0 { print $"(ansi yellow)  ⚠ jj new: ($nr.stderr)(ansi reset)" }
     print $"(ansi green)  ✓ working on ($name) — commit and run ManifoldOS-Reshaping-History to push(ansi reset)"
@@ -834,16 +940,13 @@ def jj-merge [branch: string] {
     if $repo == null { print -e "✗ no repo found"; return }
     let bm = (resolve-bookmark $repo | default $config.default_branch)
     let author_flag = $"($config.author_name) <($config.author_email)>"
-    # rebase branch onto current bookmark tip
     let r = (do { jj --repository $repo rebase -b $branch -d $bm } | complete)
     if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ rebase failed:(ansi reset) ($r.stderr)"; return }
-    # fast-forward bookmark to branch tip
     jj --repository $repo bookmark set $bm -r $branch | ignore
-    # stamp author
-    let id = (try { jj --repository $repo log --no-graph -r $bm --template 'change_id.short(8)' | str trim } catch { "" })
+    let tmpl = $"change_id.short\(8\)++\"\\n\""
+    let id = (try { jj --repository $repo log --no-graph -r $bm --template $tmpl | str trim } catch { "" })
     if ($id | is-not-empty) { jj --repository $repo metaedit -r $id --author $author_flag | ignore }
     print $"(ansi green)  ✓ ($branch) merged into ($bm)(ansi reset)"
-    # push
     let pr = (do-push $repo $bm)
     if $pr.exit_code != 0 { print -e $"(ansi red_bold)  ✗ push failed:(ansi reset) ($pr.stderr)"; return }
     print $"(ansi green)  ✓ pushed ($bm)(ansi reset)"
@@ -857,7 +960,6 @@ def jj-log [] {
     print $"(ansi red_bold)🌹 MANIFOLD // LOG 🌹(ansi reset)"
     print $"(ansi grey)  mutable commits — local history(ansi reset)"
     print ""
-    # full colour graph via jj's built-in renderer
     jj --repository $repo log -r 'mutable()'
     print ""
 }
@@ -867,7 +969,8 @@ def jj-tag [name: string] {
     let repo = (find-repo-root)
     if $repo == null { print -e "✗ no repo found"; return }
     let bm = (resolve-bookmark $repo | default $config.default_branch)
-    let commit = (try { jj --repository $repo log --no-graph -r $bm --template 'commit_id.short(8)' | str trim } catch { "" })
+    let tmpl = $"commit_id.short\(8\)++\"\\n\""
+    let commit = (try { jj --repository $repo log --no-graph -r $bm --template $tmpl | str trim } catch { "" })
     if ($commit | is-empty) { print -e "  ✗ could not resolve bookmark tip"; return }
     let r = (do { git -C $repo tag $name $commit } | complete)
     if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ tag failed:(ansi reset) ($r.stderr)"; return }
@@ -890,7 +993,8 @@ def jj-fix-authors [] {
     let repo = (find-repo-root)
     if $repo == null { print -e "✗ no repo found"; return }
     let author_flag = $"($config.author_name) <($config.author_email)>"
-    jj --repository $repo log --no-graph -r 'mutable()' --template 'change_id.short(8) ++ "\n"'
+    let tmpl = $"change_id.short\(8\)++\"\\n\""
+    jj --repository $repo log --no-graph -r 'mutable()' --template $tmpl
     | lines | where { |l| $l | is-not-empty }
     | each { |id|
         let r = (do { jj --repository $repo metaedit -r $id --author $author_flag } | complete)
