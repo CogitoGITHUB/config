@@ -191,7 +191,7 @@ def fetch-repo-stats-from [repo: string, bookmark: string, --json] {
         remote_url:  (try { git -C $repo remote get-url origin | str trim } catch { "none" })
         total:       (try { git -C $repo rev-list --count HEAD | str trim } catch { "?" })
         last_push:   (try { git -C $repo log -1 --format="%ad" --date=relative | str trim } catch { "?" })
-        last_tag:    (try { git -C $repo describe --tags --abbrev=0 out+err>/dev/null | str trim } catch { "" })
+        last_tag:    (try { do { git -C $repo describe --tags --abbrev=0 } | complete | if $in.exit_code == 0 { $in.stdout | str trim } else { "" } } catch { "" })
         ahead:       $sync.ahead
         behind:      $sync.behind
         stash_count: (try { git -C $repo stash list | lines | length } catch { 0 })
