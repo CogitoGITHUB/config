@@ -6,6 +6,8 @@ let config = {
     verbose_failures: true
     commits_to_show:  10
     op_log_to_show:   5
+    author_name:      "CogitoGITHUB"
+    author_email:     "vlasceanupaulinoionut@gmail.com"
 }
 # =============================================================================
 # SECTION 0 — REPO DETECTION + JJ INIT
@@ -25,17 +27,7 @@ def find-repo-root [] {
 # Resolve the effective jj user identity: jj config → git config → fallback.
 # Returns a record { name: string, email: string } that is always non-empty.
 def resolve-jj-identity [repo: string] {
-    let jj_email = (try { jj --repository $repo config get user.email | str trim } catch { "" })
-    let jj_name  = (try { jj --repository $repo config get user.name  | str trim } catch { "" })
-    if ($jj_email | is-not-empty) and ($jj_name | is-not-empty) {
-        return { name: $jj_name  email: $jj_email }
-    }
-    let git_email = (try { git -C $repo config user.email | str trim } catch { "" })
-    let git_name  = (try { git -C $repo config user.name  | str trim } catch { "" })
-    {
-        name:  (if ($jj_name  | is-not-empty) { $jj_name  } else if ($git_name  | is-not-empty) { $git_name  } else { "MappingOS" })
-        email: (if ($jj_email | is-not-empty) { $jj_email } else if ($git_email | is-not-empty) { $git_email } else { "manifold@localhost" })
-    }
+    { name: $config.author_name  email: $config.author_email }
 }
 
 # Ensure jj is colocated and that a valid user identity exists in jj config.
