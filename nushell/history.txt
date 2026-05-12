@@ -208,3 +208,4 @@ emacs ManifoldOS-Reshaping.nu
 cat ManifoldOS-Reshaping-History.nu
 emacs ManifoldOS-Reshaping.nu
 emacs ManifoldOS-Reshaping-History.nu
+emacs -nw ManifoldOS-Reshaping-History.nu

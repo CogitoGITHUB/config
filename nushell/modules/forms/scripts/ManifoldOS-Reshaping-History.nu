@@ -63,9 +63,53 @@ def rh-flow [steps: list, current: string, timings: record] {
 }
 # =============================================================================
 # SECTION 2 — DATA COLLECTION
+#
+# All branch/bookmark resolution uses jj exclusively.
+# git is only called for things jj doesn't expose: remote URL, rev-list
+# count, stash list, describe --tags.
+#
+# resolve-bookmark
+#   Returns the bookmark(s) on @ or @- (the last described commit).
+#   @ is the working-copy change — it usually has no bookmark.
+#   @- is where `jj describe` lands the commit, so that's where bookmarks live.
+#   Falls back to the change ID short form so the field is never blank.
+#
+# resolve-ahead-behind
+#   Uses jj revsets to count commits ahead/behind the remote bookmark.
+#   remote_bookmarks(exact:"<name>") is the jj-native upstream reference.
 # =============================================================================
+def resolve-bookmark [repo: string] {
+    # Try bookmark on the parent of the working copy first (@-)
+    let on_parent = (try {
+        jj --repository $repo log --no-graph -r '@-' --template 'bookmarks.join(", ")' | str trim
+    } catch { "" })
+    if ($on_parent | is-not-empty) { return $on_parent }
+    # Fall back to @ itself
+    let on_wc = (try {
+        jj --repository $repo log --no-graph -r '@' --template 'bookmarks.join(", ")' | str trim
+    } catch { "" })
+    if ($on_wc | is-not-empty) { return $on_wc }
+    # Last resort: short change ID of @-
+    try {
+        jj --repository $repo log --no-graph -r '@-' --template 'change_id.short(8)' | str trim
+    } catch { "—" }
+}
+def resolve-ahead-behind [repo: string, bookmark: string] {
+    if ($bookmark == "—") { return { ahead: "?"  behind: "?" } }
+    # Strip any trailing "@<remote>" annotation jj may append
+    let name = ($bookmark | split row "@" | get 0 | str trim)
+    let ahead = (try {
+        jj --repository $repo log --no-graph -r $"remote_bookmarks\(exact:\"($name)\"\)..($name)" --limit 100
+        | lines | where { |l| $l | is-not-empty } | length | into string
+    } catch { "?" })
+    let behind = (try {
+        jj --repository $repo log --no-graph -r $"($name)..remote_bookmarks\(exact:\"($name)\"\)" --limit 100
+        | lines | where { |l| $l | is-not-empty } | length | into string
+    } catch { "?" })
+    { ahead: $ahead  behind: $behind }
+}
 def fetch-commits-from [repo: string, n: int] {
-    let tmpl = 'change_id.short() ++ "|" ++ commit_id.short() ++ "|" ++ author.timestamp().ago() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "\n"'
+    let tmpl = 'change_id.short(8) ++ "|" ++ commit_id.short(8) ++ "|" ++ author.timestamp().ago() ++ "|" ++ description.first_line() ++ "|" ++ author.name() ++ "\n"'
     try {
         jj --repository $repo log --no-graph --limit $n --template $tmpl
         | lines
@@ -73,20 +117,20 @@ def fetch-commits-from [repo: string, n: int] {
         | each { |line|
             let p = ($line | split row "|")
             {
-                change_id: ($p | get 0)
-                commit_id: ($p | get 1)
-                age:       ($p | get 2)
-                subject:   ($p | get 3)
-                author:    ($p | get 4)
+                change:  ($p | get 0)
+                commit:  ($p | get 1)
+                age:     ($p | get 2)
+                subject: ($p | get 3)
+                author:  ($p | get 4)
             }
         }
     } catch {
-        git -C $repo log --format="%h|%ad|%s|%an" --date=short $"-($n)"
+        git -C $repo log --format="%h|%ad|%s|%an" --date=relative $"-($n)"
         | lines
         | where { |l| $l | is-not-empty }
         | each { |line|
             let p = ($line | split row "|")
-            { change_id: "git"  commit_id: ($p | get 0)  age: ($p | get 1)  subject: ($p | get 2)  author: ($p | get 3) }
+            { change: "—"  commit: ($p | get 0)  age: ($p | get 1)  subject: ($p | get 2)  author: ($p | get 3) }
         }
     }
 }
@@ -97,36 +141,20 @@ def fetch-status-from [repo: string] {
         git -C $repo status --short | lines | where { |l| $l | is-not-empty }
     }
 }
-# Resolve current branch: prefer git branch name, fall back to jj bookmark, then "—"
-def resolve-branch [repo: string] {
-    let git_branch = (try { git -C $repo branch --show-current | str trim } catch { "" })
-    if ($git_branch | is-not-empty) { return $git_branch }
-    let jj_bookmark = (try { jj --repository $repo log --no-graph -r @ --template 'bookmarks' | str trim } catch { "" })
-    if ($jj_bookmark | is-not-empty) { return $jj_bookmark }
-    "—"
-}
-def fetch-repo-stats-from [repo: string, --json] {
-    let branch = (resolve-branch $repo)
-    # ahead/behind against the tracking remote branch for the current git branch
-    let ahead = (try {
-        git -C $repo rev-list --count $"@{u}..HEAD" | str trim | into int
-    } catch { null })
-    let behind = (try {
-        git -C $repo rev-list --count $"HEAD..@{u}" | str trim | into int
-    } catch { null })
+def fetch-repo-stats-from [repo: string, bookmark: string, --json] {
+    let sync      = (resolve-ahead-behind $repo $bookmark)
     let stats = {
-        branch:      $branch
+        bookmark:    $bookmark
         remote_url:  (try { git -C $repo remote get-url origin | str trim } catch { "none" })
         total:       (try { git -C $repo rev-list --count HEAD | str trim } catch { "?" })
         last_push:   (try { git -C $repo log -1 --format="%ad" --date=relative | str trim } catch { "?" })
-        last_tag:    (try { git -C $repo describe --tags --abbrev=0 out+err>/dev/null | str trim } catch { "none" })
-        ahead:       (if $ahead  == null { "?" } else { $ahead  | into string })
-        behind:      (if $behind == null { "?" } else { $behind | into string })
+        last_tag:    (try { git -C $repo describe --tags --abbrev=0 out+err>/dev/null | str trim } catch { "" })
+        ahead:       $sync.ahead
+        behind:      $sync.behind
         stash_count: (try { git -C $repo stash list | lines | length } catch { 0 })
     }
     if $json { $stats | to json } else { $stats }
 }
-# Parse jj op log into a table: one row per operation
 def fetch-op-log-from [repo: string, n: int] {
     try {
         let tmpl = 'id.short(12) ++ "|" ++ description ++ "|" ++ user ++ "|" ++ time.start().ago() ++ "\n"'
@@ -135,23 +163,10 @@ def fetch-op-log-from [repo: string, n: int] {
         | where { |l| $l | is-not-empty }
         | each { |line|
             let p = ($line | split row "|")
-            {
-                op:          ($p | get 0)
-                description: ($p | get 1)
-                user:        ($p | get 2)
-                when:        ($p | get 3)
-            }
+            { op: ($p | get 0)  description: ($p | get 1)  user: ($p | get 2)  when: ($p | get 3) }
         }
     } catch {
-        # fallback: raw lines wrapped in a single-column table
-        try {
-            jj --repository $repo op log --no-graph --limit $n
-            | lines
-            | where { |l| $l | is-not-empty }
-            | each { |line| { op: "—"  description: $line  user: ""  when: "" } }
-        } catch {
-            [{ op: "—"  description: "(op log unavailable)"  user: ""  when: "" }]
-        }
+        [{ op: "—"  description: "(op log unavailable)"  user: ""  when: "" }]
     }
 }
 def snapshot-op-id [repo: string] {
@@ -171,13 +186,19 @@ def render-error [title: string, subtitle: string, details: any] {
     print-section $title $subtitle $details
     print ""
 }
-def check-behind [repo: string] {
+def check-behind [repo: string, bookmark: string] {
+    if ($bookmark == "—") { return false }
+    let name   = ($bookmark | split row "@" | get 0 | str trim)
     let behind = (try {
-        git -C $repo rev-list --count $"HEAD..@{u}" | str trim | into int
+        jj --repository $repo log --no-graph -r $"($name)..remote_bookmarks\(exact:\"($name)\"\)" --limit 100
+        | lines | where { |l| $l | is-not-empty } | length
     } catch { 0 })
     if $behind > 0 {
-        let commits = (git -C $repo log HEAD..@{u} --format="%h  %ad  %an  %s" --date=short | lines)
-        render-error "BEHIND REMOTE" $"Branch is ($behind) commit\(s\) behind. Pull before pushing." $commits
+        let commits = (try {
+            jj --repository $repo log --no-graph -r $"($name)..remote_bookmarks\(exact:\"($name)\"\)" --limit 20
+            | lines | where { |l| $l | is-not-empty }
+        } catch { [] })
+        render-error "BEHIND REMOTE" $"Bookmark ($name) is ($behind) commit\(s\) behind. Pull before pushing." $commits
         true
     } else {
         false
@@ -282,14 +303,14 @@ def render-impact [changed: list] {
 }
 def render-position [stats: record, status: list, diff_stats: record] {
     mut rows = [
-        { key: "branch"  value: $stats.branch }
-        { key: "remote"  value: $stats.remote_url }
-        { key: "commits" value: $stats.total }
-        { key: "pushed"  value: $stats.last_push }
-        { key: "sync"    value: $"↑($stats.ahead) ↓($stats.behind)" }
-        { key: "diff"    value: $"+($diff_stats.added) / -($diff_stats.deleted) lines" }
+        { key: "bookmark" value: $stats.bookmark }
+        { key: "remote"   value: $stats.remote_url }
+        { key: "commits"  value: $stats.total }
+        { key: "pushed"   value: $stats.last_push }
+        { key: "sync"     value: $"↑($stats.ahead) ↓($stats.behind)" }
+        { key: "diff"     value: $"+($diff_stats.added) / -($diff_stats.deleted) lines" }
     ]
-    if ($stats.last_tag != "none") {
+    if ($stats.last_tag | is-not-empty) {
         $rows = ($rows | append { key: "tag"  value: $stats.last_tag })
     }
     if $stats.stash_count > 0 {
@@ -309,8 +330,8 @@ def render-op-log [repo: string, pre_op_id: string] {
         print $"  (ansi grey)undo target  ($pre_op_id)  →  jj op restore ($pre_op_id)(ansi reset)"
     }
 }
-def render-nothing-to-commit [repo: string] {
-    let stats      = (fetch-repo-stats-from $repo)
+def render-nothing-to-commit [repo: string, bookmark: string] {
+    let stats      = (fetch-repo-stats-from $repo $bookmark)
     let status     = (fetch-status-from $repo)
     let commits    = (fetch-commits-from $repo $config.commits_to_show)
     let diff_stats = (calculate-diff-stats $repo)
@@ -326,7 +347,8 @@ def render-push-failure [stderr: string] {
     render-error "PUSH FAILED" "Remote rejected the push." ($stderr | lines | where { |l| $l | is-not-empty })
 }
 def print-git-sections [repo: string, changed: list, push_results: list] {
-    let stats      = (fetch-repo-stats-from $repo)
+    let bookmark   = (resolve-bookmark $repo)
+    let stats      = (fetch-repo-stats-from $repo $bookmark)
     let status     = (fetch-status-from $repo)
     let commits    = (fetch-commits-from $repo $config.commits_to_show)
     let diff_stats = (calculate-diff-stats $repo)
@@ -356,6 +378,8 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         print -e $"(ansi red_bold)  ✗ no remote configured — git remote add origin <url>(ansi reset)"
         return
     }
+    # Resolve bookmark once — used for commit message, ahead/behind, and push target
+    let bookmark  = (resolve-bookmark $repo)
     let pre_op_id = (snapshot-op-id $repo)
     let steps = [
         { name: "INIT"   }
@@ -384,20 +408,19 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     # ── CHECK ───────────────────────────────────────────────
     rh-flow $steps "CHECK" $timings
     let t = (date now)
-    if (check-behind $repo)           { return }
-    if (check-conflicts $repo)        { return }
-    if (check-remote-reachable $repo) { return }
-    if (check-stash $repo)            { return }
+    if (check-behind $repo $bookmark)  { return }
+    if (check-conflicts $repo)         { return }
+    if (check-remote-reachable $repo)  { return }
+    if (check-stash $repo)             { return }
     let changed    = (capture-changed $repo)
     let diff_stats = (calculate-diff-stats $repo)
     $timings = ($timings | insert CHECK $"(((date now) - $t) / 1sec * 1000 | math round)ms")
     # ── COMMIT ──────────────────────────────────────────────
     rh-flow $steps "COMMIT" $timings
     let t = (date now)
-    let branch = (resolve-branch $repo)
     let commit_msg = if ($msg == "update") {
         let ts = (date now | format date "%Y-%m-%d %H:%M")
-        $"[($branch)] ($ts)"
+        $"[($bookmark)] ($ts)"
     } else {
         $msg
     }
@@ -405,6 +428,15 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     if $desc_result.exit_code != 0 {
         print -e $"(ansi red_bold)  ✗ describe failed:(ansi reset) ($desc_result.stderr)"
         return
+    }
+    # Move the bookmark forward to the just-described commit (@)
+    # Only do this if we have a real bookmark name (not a change ID fallback)
+    let is_real_bookmark = (not ($bookmark | str starts-with "—") and ($bookmark | str length) != 8)
+    if $is_real_bookmark {
+        let bm_result = (do { jj --repository $repo bookmark set $bookmark -r '@' } | complete)
+        if $bm_result.exit_code != 0 {
+            print $"(ansi yellow)  ⚠ bookmark set failed \(non-fatal\): ($bm_result.stderr)(ansi reset)"
+        }
     }
     let new_result = (do { jj --repository $repo new } | complete)
     if $new_result.exit_code != 0 {
@@ -415,7 +447,12 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     # ── PUSH ────────────────────────────────────────────────
     rh-flow $steps "PUSH" $timings
     let t = (date now)
-    let push_result = (do { jj --repository $repo git push } | complete)
+    # Push the specific bookmark so jj knows exactly what to send
+    let push_result = if $is_real_bookmark {
+        (do { jj --repository $repo git push --bookmark $bookmark } | complete)
+    } else {
+        (do { jj --repository $repo git push } | complete)
+    }
     if $push_result.exit_code != 0 {
         render-push-failure $push_result.stderr
         return
@@ -424,13 +461,13 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     # ── POST-PUSH SUMMARY ───────────────────────────────────
     rh-flow $steps "" $timings
     try { jj --repository $repo git fetch out+err>/dev/null } catch { }
-    let stats      = (fetch-repo-stats-from $repo)
-    let status     = (fetch-status-from $repo)
-    let commits    = (fetch-commits-from $repo $config.commits_to_show)
+    let stats   = (fetch-repo-stats-from $repo $bookmark)
+    let status  = (fetch-status-from $repo)
+    let commits = (fetch-commits-from $repo $config.commits_to_show)
     print -n "\e[2J\e[H"
     print ""
     print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
-    print $"(ansi grey)  pushed  ($branch)  (date now | format date '%Y-%m-%d %H:%M')(ansi reset)"
+    print $"(ansi grey)  pushed  ($bookmark)  (date now | format date '%Y-%m-%d %H:%M')(ansi reset)"
     print ""
     render-impact $changed
     render-position $stats $status $diff_stats
@@ -462,13 +499,22 @@ def jj-restore-op [op_id: string] {
         print $"(ansi green)  ✓ restored to ($op_id)(ansi reset)"
     }
 }
+def jj-bookmark-here [name: string] {
+    # Set a bookmark on @- and push it — run this once to bootstrap a new repo
+    let repo = (find-repo-root)
+    if $repo == null { print -e "✗ no repo found"; return }
+    jj --repository $repo bookmark set $name -r '@-'
+    jj --repository $repo git push --bookmark $name
+    print $"(ansi green)  ✓ bookmark ($name) set on @- and pushed(ansi reset)"
+}
 def jj-split  [] { let repo = (find-repo-root); if $repo == null { return }; jj --repository $repo split }
 def jj-squash [] { let repo = (find-repo-root); if $repo == null { return }; jj --repository $repo squash }
 def jj-evolog [] { let repo = (find-repo-root); if $repo == null { return }; jj --repository $repo evolog }
 def jj-stats-json [] {
     let repo = (find-repo-root)
     if $repo == null { print -e "✗ no repo found"; return }
-    fetch-repo-stats-from $repo --json
+    let bookmark = (resolve-bookmark $repo)
+    fetch-repo-stats-from $repo $bookmark --json
 }
 # =============================================================================
 # SECTION 8 — KEYBINDINGS
