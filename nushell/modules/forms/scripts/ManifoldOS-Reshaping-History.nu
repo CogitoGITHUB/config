@@ -518,26 +518,18 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     }
     # jj refuses to push if a non-tracking remote bookmark exists — auto-track and retry once
     let push_result = if $push_result.exit_code != 0 and ($push_result.stderr | str contains "Non-tracking remote bookmark") {
-        # hint line looks like: `jj bookmark track master --remote=origin`
-        let hint_line = ($push_result.stderr | lines | where { |l| $l | str contains "bookmark track" } | get 0?)
-        if ($hint_line | is-not-empty) {
-            # extract "master" and "origin" from the hint
-            let parts   = ($hint_line | str replace --all "`" "" | split row " " | where { |p| $p | is-not-empty })
-            let bm_name = (try { $parts | where { |p| $p != "jj" and $p != "bookmark" and $p != "track" and not ($p | str starts-with "--") } | get 0 } catch { "" })
-            let remote  = (try { $parts | where { |p| $p | str starts-with "--remote=" } | get 0 | split row "=" | get 1 | str replace --all ")" "" | str trim } catch { "origin" })
-            if ($bm_name | is-not-empty) {
-                print $"(ansi yellow)  ⚠ tracking ($bm_name) on ($remote) and retrying push(ansi reset)"
-                let _ = (do { jj --repository $repo bookmark track $bm_name $"--remote=($remote)" } | complete)
-                if ($bm | is-not-empty) {
-                    do { jj --repository $repo git push --bookmark $bm } | complete
-                } else {
-                    do { jj --repository $repo git push } | complete
-                }
-            } else {
-                $push_result
-            }
-        } else {
+        print $"(ansi yellow)  ⚠ non-tracking remote bookmark — running: jj bookmark track ($bm) --remote=origin(ansi reset)"
+        let track_result = (do { jj --repository $repo bookmark track $bm --remote=origin } | complete)
+        if $track_result.exit_code != 0 {
+            print $"(ansi yellow)  ⚠ track failed: ($track_result.stderr)(ansi reset)"
             $push_result
+        } else {
+            print $"(ansi green)  ✓ tracked — retrying push(ansi reset)"
+            if ($bm | is-not-empty) {
+                do { jj --repository $repo git push --bookmark $bm } | complete
+            } else {
+                do { jj --repository $repo git push } | complete
+            }
         }
     } else {
         $push_result
