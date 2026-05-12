@@ -155,7 +155,6 @@ def ensure-ssh-key [] {
     true
 }
 
-# Full bootstrap: git init → set identity → jj colocate → add remote → initial commit → push
 def bootstrap-repo [] {
     let repo = (pwd)
     let repo_name = ($repo | path basename)
@@ -175,56 +174,42 @@ def bootstrap-repo [] {
     }
     if $remote_url == null { return false }
     print $"(ansi green)  ✓ repo created → ($remote_url)(ansi reset)"
-    # git init
     let gi = (do { git init $repo } | complete)
     if $gi.exit_code != 0 { print -e $"(ansi red_bold)  ✗ git init failed:(ansi reset) ($gi.stderr)"; return false }
     print $"(ansi green)  ✓ git init(ansi reset)"
-    # set git identity
     git -C $repo config user.name  $config.author_name
     git -C $repo config user.email $config.author_email
-    print $"(ansi green)  ✓ identity set ($config.author_name) <($config.author_email)>(ansi reset)"
-    # add remote
+    print $"(ansi green)  ✓ identity set(ansi reset)"
     let ra = (do { git -C $repo remote add origin $remote_url } | complete)
     if $ra.exit_code != 0 { print -e $"(ansi red_bold)  ✗ remote add failed:(ansi reset) ($ra.stderr)"; return false }
     print $"(ansi green)  ✓ remote → ($remote_url)(ansi reset)"
-    # jj colocate
     let ji = (do { jj git init --colocate $repo } | complete)
     if $ji.exit_code != 0 { print -e $"(ansi red_bold)  ✗ jj init failed:(ansi reset) ($ji.stderr)"; return false }
     print $"(ansi green)  ✓ jj colocated(ansi reset)"
-    # jj identity
     jj config set --user user.name  $config.author_name
     jj config set --user user.email $config.author_email
-    # create bookmark
     let bm = $config.default_branch
     let bmc = (do { jj --repository $repo bookmark create $bm } | complete)
     if $bmc.exit_code != 0 { print $"(ansi yellow)  ⚠ bookmark create: ($bmc.stderr)(ansi reset)" } else { print $"(ansi green)  ✓ bookmark ($bm) created(ansi reset)" }
-    # initial commit — stamp author explicitly
     let ts = (date now | format date "%Y-%m-%d %H:%M")
     let author_flag = $"($config.author_name) <($config.author_email)>"
     let dc = (do { jj --repository $repo metaedit -m $"[($bm)] init ($ts)" --author $author_flag } | complete)
     if $dc.exit_code != 0 { print $"(ansi yellow)  ⚠ metaedit: ($dc.stderr)(ansi reset)" }
-    # advance bookmark to @
     jj --repository $repo bookmark set $bm -r '@' | ignore
-    # ensure SSH ready
     if ($remote_url | str starts-with "git@") or ($remote_url | str starts-with "ssh://") {
         let ssh_ok = (ensure-ssh-key)
         if not $ssh_ok { return false }
     }
-    # track + push with retry
     jj --repository $repo bookmark track $bm --remote=origin | ignore
     let pr = (do { jj --repository $repo git push --bookmark $bm } | complete)
     if $pr.exit_code != 0 {
         let pr2 = (do { jj --repository $repo git push --bookmark $bm } | complete)
-        if $pr2.exit_code != 0 {
-            print -e $"(ansi red_bold)  ✗ push failed:(ansi reset) ($pr2.stderr)"
-            return false
-        }
+        if $pr2.exit_code != 0 { print -e $"(ansi red_bold)  ✗ push failed:(ansi reset) ($pr2.stderr)"; return false }
     }
     print $"(ansi green)  ✓ pushed → ($remote_url) on ($bm)(ansi reset)"
     true
 }
 
-# Ensure jj is colocated and identity is always set.
 def ensure-jj-initialized [repo: string] {
     let jj_dir = ($repo | path join ".jj")
     if not ($jj_dir | path exists) {
@@ -236,7 +221,6 @@ def ensure-jj-initialized [repo: string] {
         }
         print $"(ansi green)  ✓ jj initialized \(colocated\)(ansi reset)"
     }
-    # Always enforce identity
     jj config set --user user.name  $config.author_name
     jj config set --user user.email $config.author_email
     git -C $repo config user.name  $config.author_name
@@ -271,8 +255,7 @@ def rh-flow [steps: list, current: string, timings: record] {
 def list-bookmarks [repo: string] {
     try {
         jj --repository $repo bookmark list
-        | lines
-        | where { |l| $l | is-not-empty }
+        | lines | where { |l| $l | is-not-empty }
         | each { |l| $l | split row ":" | get 0 | str trim }
     } catch { [] }
 }
@@ -393,18 +376,28 @@ def check-behind [repo: string, bookmark: string] {
 }
 
 def check-conflicts [repo: string] {
-    let has_conflicts = (try { jj --repository $repo log --no-graph -r 'conflicts()' | str trim | is-not-empty } catch { false })
-    if $has_conflicts {
-        render-error "UNRESOLVED CONFLICTS" "Resolve before committing." [
-            { hint: "jj resolve — interactive resolver" }
-            { hint: "jj diff    — inspect conflicts"    }
-        ]
-        true
-    } else { false }
+    let conflicted = (try {
+        jj --repository $repo log --no-graph -r 'conflicts()' --template 'change_id.short(8) ++ "|" ++ description.first_line() ++ "\n"'
+        | lines | where { |l| $l | is-not-empty }
+        | each { |l| let p = ($l | split row "|"); { change: ($p | get 0) subject: ($p | get 1) } }
+    } catch { [] })
+    if not ($conflicted | is-empty) {
+        render-error "UNRESOLVED CONFLICTS" "Resolve before committing." $conflicted
+        let choice = (["launch jj resolve" "abort"] | input list --fuzzy "Conflicts detected:")
+        if $choice == "launch jj resolve" {
+            jj --repository $repo resolve
+            # re-check after resolution attempt
+            let still = (try { jj --repository $repo log --no-graph -r 'conflicts()' | str trim | is-not-empty } catch { false })
+            if $still { print -e $"(ansi red_bold)  ✗ conflicts remain(ansi reset)"; return true }
+            print $"(ansi green)  ✓ conflicts resolved(ansi reset)"
+            return false
+        }
+        return true
+    }
+    false
 }
 
 def check-large-files [repo: string] {
-    # Warn if any staged file exceeds max_file_size_mb
     let limit_bytes = ($config.max_file_size_mb * 1024 * 1024)
     let large = (try {
         jj --repository $repo diff --summary
@@ -419,7 +412,7 @@ def check-large-files [repo: string] {
         | where { |x| $x != null }
     } catch { [] })
     if not ($large | is-empty) {
-        render-error "LARGE FILES DETECTED" $"Files exceed ($config.max_file_size_mb)MB limit — consider .gitignore or git-lfs." $large
+        render-error "LARGE FILES DETECTED" $"Files exceed ($config.max_file_size_mb)MB — consider .gitignore or git-lfs." $large
         let choice = (["continue anyway" "abort"] | input list --fuzzy "Large files — proceed?")
         $choice == "abort"
     } else { false }
@@ -438,7 +431,6 @@ def check-stash [repo: string] {
 def check-remote-reachable [repo: string] {
     let url = (try { git -C $repo remote get-url origin | str trim } catch { "" })
     if ($url | is-empty) { return false }
-    # Only test SSH remotes — HTTP(S) checked implicitly by fetch
     if not ($url | str starts-with "git@") { return false }
     let host = (try { $url | split row ":" | get 0 | str replace "git@" "" } catch { "" })
     if ($host | is-empty) { return false }
@@ -450,6 +442,39 @@ def check-remote-reachable [repo: string] {
             { hint: $"ssh -T git@($host)" }
         ]
         true
+    } else { false }
+}
+
+# Detect and offer to fix diverged bookmark (local vs remote have split history)
+def check-divergence [repo: string, bookmark: string] {
+    if ($bookmark | is-empty) { return false }
+    let diverged = (try {
+        # both ahead AND behind = diverged
+        let a = (jj --repository $repo log --no-graph -r $"remote_bookmarks\(exact:\"($bookmark)\"\)..($bookmark)" --limit 5 | lines | where { |l| $l | is-not-empty } | length)
+        let b = (jj --repository $repo log --no-graph -r $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)" --limit 5 | lines | where { |l| $l | is-not-empty } | length)
+        $a > 0 and $b > 0
+    } catch { false })
+    if $diverged {
+        render-error "DIVERGED HISTORY" $"($bookmark) has diverged from remote. Local and remote have different commits." [
+            { option: "rebase local onto remote  →  safe, rewrites local" }
+            { option: "squash into remote head   →  loses local structure" }
+            { option: "abort                     →  fix manually" }
+        ]
+        let choice = (["rebase onto remote" "squash into remote" "abort"] | input list --fuzzy "Divergence strategy:")
+        if $choice == "abort" { return true }
+        let author_flag = $"($config.author_name) <($config.author_email)>"
+        if $choice == "rebase onto remote" {
+            let r = (do { jj --repository $repo rebase -d $"remote_bookmarks\(exact:\"($bookmark)\"\)" } | complete)
+            if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ rebase failed:(ansi reset) ($r.stderr)"; return true }
+            jj --repository $repo bookmark set $bookmark -r '@-' | ignore
+            print $"(ansi green)  ✓ rebased onto remote ($bookmark)(ansi reset)"
+        } else {
+            let r = (do { jj --repository $repo squash --into $"remote_bookmarks\(exact:\"($bookmark)\"\)" } | complete)
+            if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ squash failed:(ansi reset) ($r.stderr)"; return true }
+            jj --repository $repo bookmark set $bookmark -r $"remote_bookmarks\(exact:\"($bookmark)\"\)" | ignore
+            print $"(ansi green)  ✓ squashed into remote head(ansi reset)"
+        }
+        false
     } else { false }
 }
 
@@ -537,7 +562,6 @@ def render-push-failure [stderr: string] {
 # SECTION 6 — PUSH HELPER
 # =============================================================================
 def do-push [repo: string, bm: string] {
-    # Stamp author on every commit ahead of remote before pushing
     let author_flag = $"($config.author_name) <($config.author_email)>"
     try {
         jj --repository $repo log --no-graph -r $"remote_bookmarks\(exact:\"($bm)\"\)..($bm)" --template 'change_id.short(8) ++ "\n"'
@@ -549,7 +573,6 @@ def do-push [repo: string, bm: string] {
             }
         }
     } catch { }
-    # Track if needed
     jj --repository $repo bookmark track $bm --remote=origin | ignore
     let r = (do { jj --repository $repo git push --bookmark $bm } | complete)
     if $r.exit_code != 0 and ($r.stderr | str contains "Non-tracking remote bookmark") {
@@ -565,7 +588,6 @@ def has-dirty-working-copy [repo: string] {
 }
 
 def ManifoldOS-Reshaping-History [msg: string = "update"] {
-    # ── NO REPO ──────────────────────────────────────────────────────────────
     let repo = (find-repo-root)
     if $repo == null {
         print -n "\e[2J\e[H"
@@ -584,7 +606,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let init_ok = (ensure-jj-initialized $repo)
     if not $init_ok { return }
 
-    # ── NO REMOTE ────────────────────────────────────────────────────────────
     let has_remote = (try { git -C $repo remote | str trim | is-not-empty } catch { false })
     if not $has_remote {
         print $"(ansi yellow)  ⚠ no remote configured(ansi reset)"
@@ -606,7 +627,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         print $"(ansi green)  ✓ remote → ($remote_url)(ansi reset)"
     }
 
-    # ── BOOKMARK ─────────────────────────────────────────────────────────────
     let bookmark = (resolve-bookmark $repo)
     let bm = if ($bookmark | is-empty) or $bookmark == null {
         let git_branch = (try { git -C $repo branch --show-current | str trim } catch { "" })
@@ -614,19 +634,12 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         print $"(ansi yellow)  ⚠ no bookmark — creating ($name)(ansi reset)"
         let bmc = (do { jj --repository $repo bookmark create $name --at '@-' } | complete)
         if $bmc.exit_code != 0 {
-            # try without --at flag (older jj)
             let bmc2 = (do { jj --repository $repo bookmark create $name } | complete)
             if $bmc2.exit_code != 0 {
                 print $"(ansi yellow)  ⚠ bookmark create failed \(non-fatal\): ($bmc2.stderr)(ansi reset)"
                 ""
-            } else {
-                print $"(ansi green)  ✓ bookmark ($name) created(ansi reset)"
-                $name
-            }
-        } else {
-            print $"(ansi green)  ✓ bookmark ($name) created(ansi reset)"
-            $name
-        }
+            } else { print $"(ansi green)  ✓ bookmark ($name) created(ansi reset)"; $name }
+        } else { print $"(ansi green)  ✓ bookmark ($name) created(ansi reset)"; $name }
     } else { $bookmark }
 
     let author_flag = $"($config.author_name) <($config.author_email)>"
@@ -669,6 +682,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     # ── CHECK ────────────────────────────────────────────────────────────────
     rh-flow $steps "CHECK" $timings
     let t = (date now)
+    if (check-divergence $repo $bm)       { return }
     if (check-behind $repo $bm)           { return }
     if (check-conflicts $repo)            { return }
     if (check-remote-reachable $repo)     { return }
@@ -703,7 +717,6 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         let ts = (date now | format date "%Y-%m-%d %H:%M")
         if ($bm | is-not-empty) { $"[($bm)] ($ts)" } else { $"[no-bookmark] ($ts)" }
     } else { $msg }
-    # Snapshot working copy first so metaedit sees all changes
     jj --repository $repo debug snapshot | ignore
     let desc_result = (do { jj --repository $repo metaedit -m $commit_msg --author $author_flag } | complete)
     if $desc_result.exit_code != 0 {
@@ -730,8 +743,8 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     # ── PUSH ─────────────────────────────────────────────────────────────────
     rh-flow $steps "PUSH" $timings
     let t = (date now)
-    let push_result   = (do-push $repo $bm)
-    let elapsed_push  = $"(((date now) - $t) / 1sec * 1000 | math round)ms"
+    let push_result  = (do-push $repo $bm)
+    let elapsed_push = $"(((date now) - $t) / 1sec * 1000 | math round)ms"
     if $push_result.exit_code != 0 {
         $checklist = ($checklist | append { stage: "PUSH"  result: "✗"  elapsed: $elapsed_push  note: "remote rejected" })
         render-checklist $checklist
@@ -763,6 +776,8 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
 # =============================================================================
 # SECTION 8 — CONVENIENCE COMMANDS
 # =============================================================================
+
+# Undo last jj operation
 def jj-undo [] {
     let repo = (find-repo-root)
     if $repo == null { print -e "✗ no repo found"; return }
@@ -771,6 +786,7 @@ def jj-undo [] {
     else { print $"(ansi green)  ✓ undone(ansi reset)"; fetch-op-log-from $repo 3 | print }
 }
 
+# Restore to a specific op id
 def jj-restore-op [op_id: string] {
     let repo = (find-repo-root)
     if $repo == null { print -e "✗ no repo found"; return }
@@ -779,6 +795,88 @@ def jj-restore-op [op_id: string] {
     else { print $"(ansi green)  ✓ restored to ($op_id)(ansi reset)" }
 }
 
+# Amend last real commit with current working copy changes (no message change)
+def jj-amend [] {
+    let repo = (find-repo-root)
+    if $repo == null { print -e "✗ no repo found"; return }
+    let author_flag = $"($config.author_name) <($config.author_email)>"
+    jj --repository $repo debug snapshot | ignore
+    # squash @ into @- (moves working copy changes into the last real commit)
+    let r = (do { jj --repository $repo squash } | complete)
+    if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ squash failed:(ansi reset) ($r.stderr)"; return }
+    # re-stamp author on the amended commit
+    let id = (try { jj --repository $repo log --no-graph -r '@-' --template 'change_id.short(8)' | str trim } catch { "" })
+    if ($id | is-not-empty) {
+        jj --repository $repo metaedit -r $id --author $author_flag | ignore
+    }
+    print $"(ansi green)  ✓ amended @-(ansi reset)"
+    jj --repository $repo log --no-graph --limit 3 --template 'change_id.short(8) ++ " " ++ description.first_line() ++ "\n"' | print
+}
+
+# Create a new feature branch workspace, switch to it
+def jj-branch [name: string] {
+    let repo = (find-repo-root)
+    if $repo == null { print -e "✗ no repo found"; return }
+    let author_flag = $"($config.author_name) <($config.author_email)>"
+    # create bookmark at current @-
+    let bmc = (do { jj --repository $repo bookmark create $name -r '@-' } | complete)
+    if $bmc.exit_code != 0 { print -e $"(ansi red_bold)  ✗ bookmark create failed:(ansi reset) ($bmc.stderr)"; return }
+    print $"(ansi green)  ✓ bookmark ($name) created at @-(ansi reset)"
+    # new empty commit on this branch
+    let nr = (do { jj --repository $repo new $name --no-edit } | complete)
+    if $nr.exit_code != 0 { print $"(ansi yellow)  ⚠ jj new: ($nr.stderr)(ansi reset)" }
+    print $"(ansi green)  ✓ working on ($name) — commit and run ManifoldOS-Reshaping-History to push(ansi reset)"
+}
+
+# Merge a named branch back into the current bookmark and push
+def jj-merge [branch: string] {
+    let repo = (find-repo-root)
+    if $repo == null { print -e "✗ no repo found"; return }
+    let bm = (resolve-bookmark $repo | default $config.default_branch)
+    let author_flag = $"($config.author_name) <($config.author_email)>"
+    # rebase branch onto current bookmark tip
+    let r = (do { jj --repository $repo rebase -b $branch -d $bm } | complete)
+    if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ rebase failed:(ansi reset) ($r.stderr)"; return }
+    # fast-forward bookmark to branch tip
+    jj --repository $repo bookmark set $bm -r $branch | ignore
+    # stamp author
+    let id = (try { jj --repository $repo log --no-graph -r $bm --template 'change_id.short(8)' | str trim } catch { "" })
+    if ($id | is-not-empty) { jj --repository $repo metaedit -r $id --author $author_flag | ignore }
+    print $"(ansi green)  ✓ ($branch) merged into ($bm)(ansi reset)"
+    # push
+    let pr = (do-push $repo $bm)
+    if $pr.exit_code != 0 { print -e $"(ansi red_bold)  ✗ push failed:(ansi reset) ($pr.stderr)"; return }
+    print $"(ansi green)  ✓ pushed ($bm)(ansi reset)"
+}
+
+# Pretty graph log of mutable commits only
+def jj-log [] {
+    let repo = (find-repo-root)
+    if $repo == null { print -e "✗ no repo found"; return }
+    print ""
+    print $"(ansi red_bold)🌹 MANIFOLD // LOG 🌹(ansi reset)"
+    print $"(ansi grey)  mutable commits — local history(ansi reset)"
+    print ""
+    # full colour graph via jj's built-in renderer
+    jj --repository $repo log -r 'mutable()'
+    print ""
+}
+
+# Tag the current bookmark tip and push tags
+def jj-tag [name: string] {
+    let repo = (find-repo-root)
+    if $repo == null { print -e "✗ no repo found"; return }
+    let bm = (resolve-bookmark $repo | default $config.default_branch)
+    let commit = (try { jj --repository $repo log --no-graph -r $bm --template 'commit_id.short(8)' | str trim } catch { "" })
+    if ($commit | is-empty) { print -e "  ✗ could not resolve bookmark tip"; return }
+    let r = (do { git -C $repo tag $name $commit } | complete)
+    if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ tag failed:(ansi reset) ($r.stderr)"; return }
+    let pr = (do { git -C $repo push origin $name } | complete)
+    if $pr.exit_code != 0 { print -e $"(ansi red_bold)  ✗ push tag failed:(ansi reset) ($pr.stderr)"; return }
+    print $"(ansi green)  ✓ tag ($name) → ($commit) pushed(ansi reset)"
+}
+
+# Set bookmark at @- and push
 def jj-bookmark-here [name: string] {
     let repo = (find-repo-root)
     if $repo == null { print -e "✗ no repo found"; return }
@@ -787,8 +885,8 @@ def jj-bookmark-here [name: string] {
     print $"(ansi green)  ✓ bookmark ($name) set on @- and pushed(ansi reset)"
 }
 
+# Fix all mutable commit authors
 def jj-fix-authors [] {
-    # Rewrite all mutable commits to have the correct author.
     let repo = (find-repo-root)
     if $repo == null { print -e "✗ no repo found"; return }
     let author_flag = $"($config.author_name) <($config.author_email)>"
@@ -831,5 +929,19 @@ $env.config.keybindings = ($env.config.keybindings | append [
         keycode: char_z
         mode: emacs
         event: { send: executehostcommand cmd: "jj-undo" }
+    }
+    {
+        name: jj_log
+        modifier: control
+        keycode: char_l
+        mode: emacs
+        event: { send: executehostcommand cmd: "jj-log" }
+    }
+    {
+        name: jj_amend
+        modifier: control
+        keycode: char_a
+        mode: emacs
+        event: { send: executehostcommand cmd: "jj-amend" }
     }
 ])
