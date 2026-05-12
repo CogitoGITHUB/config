@@ -10,8 +10,9 @@ let config = {
     author_email:     "vlasceanupaulinoionut@gmail.com"
     default_branch:   "master"
     github_user:      "CogitoGITHUB"
-    github_token_path: null  # token read from $env.GITHUB_TOKEN — set it in env.nu
+    github_token_path: null
 }
+
 # =============================================================================
 # SECTION 0 — REPO DETECTION + BOOTSTRAP
 # =============================================================================
@@ -27,7 +28,6 @@ def find-repo-root [] {
     }
 }
 
-# Read GitHub token from file, or prompt once and save it.
 def get-github-token [] {
     let secrets_dir = ($env.HOME | path join ".secrets")
     let token_path  = ($secrets_dir | path join "github_token")
@@ -42,16 +42,16 @@ def get-github-token [] {
     print $"(ansi red_bold)🌹 MANIFOLD // GITHUB TOKEN SETUP 🌹(ansi reset)"
     print $"(ansi grey)  One-time setup. Saved to ~/.secrets/github_token \(never committed\).(ansi reset)"
     print ""
-    print $"   1. Browser will open → https://github.com/settings/tokens/new"
-    print $"   2. Set note: ManifoldOS"
-    print $"   3. Set expiration"
-    print $"   4. Check 'repo' scope"
-    print $"   5. Click 'Generate token' and copy it \(ghp_...\)"
+    print "   1. Browser will open → https://github.com/settings/tokens/new"
+    print "   2. Set note: ManifoldOS"
+    print "   3. Set expiration"
+    print "   4. Check 'repo' scope"
+    print "   5. Click 'Generate token' and copy it"
     print ""
     try { xdg-open "https://github.com/settings/tokens/new?scopes=repo&description=ManifoldOS" } catch {
-        print $"  https://github.com/settings/tokens/new?scopes=repo&description=ManifoldOS"
+        print "  https://github.com/settings/tokens/new?scopes=repo&description=ManifoldOS"
     }
-    let token = (input "  Paste token \(ghp_...\): " | str trim)
+    let token = (input "  Paste token: " | str trim)
     if ($token | is-empty) { return null }
     $token | save -f $token_path
     chmod 600 $token_path
@@ -73,16 +73,16 @@ def get-gitlab-token [] {
     print $"(ansi red_bold)🌹 MANIFOLD // GITLAB TOKEN SETUP 🌹(ansi reset)"
     print $"(ansi grey)  One-time setup. Saved to ~/.secrets/gitlab_token \(never committed\).(ansi reset)"
     print ""
-    print $"   1. Browser will open → https://gitlab.com/-/profile/personal_access_tokens"
-    print $"   2. Set name: ManifoldOS"
-    print $"   3. Set expiration"
-    print $"   4. Check 'api' scope"
-    print $"   5. Click 'Create personal access token' and copy it \(glpat-...\)"
+    print "   1. Browser will open → https://gitlab.com/-/profile/personal_access_tokens"
+    print "   2. Set name: ManifoldOS"
+    print "   3. Set expiration"
+    print "   4. Check 'api' scope"
+    print "   5. Click 'Create personal access token' and copy it"
     print ""
     try { xdg-open "https://gitlab.com/-/profile/personal_access_tokens?name=ManifoldOS&scopes=api" } catch {
-        print $"  https://gitlab.com/-/profile/personal_access_tokens?name=ManifoldOS&scopes=api"
+        print "  https://gitlab.com/-/profile/personal_access_tokens?name=ManifoldOS&scopes=api"
     }
-    let token = (input "  Paste token \(glpat-...\): " | str trim)
+    let token = (input "  Paste token: " | str trim)
     if ($token | is-empty) { return null }
     $token | save -f $token_path
     chmod 600 $token_path
@@ -92,16 +92,16 @@ def get-gitlab-token [] {
 
 def github-create-repo [name: string, token: string] {
     let body = ({ name: $name, private: false, auto_init: false } | to json)
+    let gh_headers = { Authorization: $"Bearer ($token)", "User-Agent": $config.author_name, Accept: "application/vnd.github+json" }
     let resp = (try {
-        http post --content-type "application/json" --full --allow-errors --headers { Authorization: $"Bearer ($token)", "User-Agent": $config.author_name, Accept: "application/vnd.github+json" } "https://api.github.com/user/repos" $body
+        http post --content-type "application/json" --full --allow-errors --headers $gh_headers "https://api.github.com/user/repos" $body
     } catch { |err| print -e $"(ansi red_bold)  ✗ GitHub API failed:(ansi reset) ($err.msg)"; return null })
     if $resp.status == 201 {
         $resp.body.ssh_url
     } else if $resp.status == 422 {
-        # repo already exists — fetch it
         print $"(ansi yellow)  ⚠ repo already exists — fetching SSH url(ansi reset)"
         try {
-            let get_resp = (http get --full --allow-errors --headers { Authorization: $"Bearer ($token)", "User-Agent": $config.author_name, Accept: "application/vnd.github+json" } $"https://api.github.com/repos/($config.github_user)/($name)")
+            let get_resp = (http get --full --allow-errors --headers $gh_headers $"https://api.github.com/repos/($config.github_user)/($name)")
             $get_resp.body.ssh_url
         } catch { |err| print -e $"(ansi red_bold)  ✗ fetch existing repo failed:(ansi reset) ($err.msg)"; null }
     } else {
@@ -113,8 +113,12 @@ def github-create-repo [name: string, token: string] {
 def gitlab-create-repo [name: string, token: string] {
     let body = ({ name: $name, visibility: "public", initialize_with_readme: false } | to json)
     try {
-        let resp = (http post --content-type "application/json" --headers { "PRIVATE-TOKEN": $token, "User-Agent": $config.author_name } "https://gitlab.com/api/v4/projects" $body)
-        $resp.ssh_url_to_repo
+        let gl_headers = { "PRIVATE-TOKEN": $token, "User-Agent": $config.author_name }
+        let resp = (http post --content-type "application/json" --full --allow-errors --headers $gl_headers "https://gitlab.com/api/v4/projects" $body)
+        if $resp.status == 201 { $resp.body.ssh_url_to_repo } else {
+            print -e $"(ansi red_bold)  ✗ GitLab API ($resp.status):(ansi reset) ($resp.body | to json)"
+            null
+        }
     } catch { |err|
         print -e $"(ansi red_bold)  ✗ GitLab API failed:(ansi reset) ($err.msg)"
         null
@@ -130,11 +134,9 @@ def ensure-ssh-key [] {
         if $r.exit_code != 0 { print -e $"(ansi red_bold)  ✗ ssh-keygen failed:(ansi reset) ($r.stderr)"; return false }
         print $"(ansi green)  ✓ key generated(ansi reset)"
     }
-    # Test if already authorized
     let test = (do { ssh -T git@github.com -o StrictHostKeyChecking=accept-new -o BatchMode=yes } | complete)
     let authed = ($test.stderr | str contains "successfully authenticated") or ($test.stdout | str contains "successfully authenticated")
     if $authed { print $"(ansi green)  ✓ SSH auth ok(ansi reset)"; return true }
-    # Not authorized — show key and wait
     let pub = (open $pub_path | str trim)
     print ""
     print $"(ansi red_bold)  ── SSH PUBLIC KEY ──────────────────────────────────────────(ansi reset)"
@@ -171,9 +173,8 @@ def bootstrap-repo [] {
     } else {
         gitlab-create-repo $repo_name $token
     }
-    if ($remote_url == null) { return false }
+    if $remote_url == null { return false }
     print $"(ansi green)  ✓ repo created → ($remote_url)(ansi reset)"
-    print $"(ansi yellow)  ⚙ bootstrapping ($repo)...(ansi reset)"
     # git init
     let gi = (do { git init $repo } | complete)
     if $gi.exit_code != 0 { print -e $"(ansi red_bold)  ✗ git init failed:(ansi reset) ($gi.stderr)"; return false }
@@ -197,23 +198,22 @@ def bootstrap-repo [] {
     let bm = $config.default_branch
     let bmc = (do { jj --repository $repo bookmark create $bm } | complete)
     if $bmc.exit_code != 0 { print $"(ansi yellow)  ⚠ bookmark create: ($bmc.stderr)(ansi reset)" } else { print $"(ansi green)  ✓ bookmark ($bm) created(ansi reset)" }
-    # initial commit
+    # initial commit — stamp author explicitly
     let ts = (date now | format date "%Y-%m-%d %H:%M")
     let author_flag = $"($config.author_name) <($config.author_email)>"
     let dc = (do { jj --repository $repo metaedit -m $"[($bm)] init ($ts)" --author $author_flag } | complete)
     if $dc.exit_code != 0 { print $"(ansi yellow)  ⚠ metaedit: ($dc.stderr)(ansi reset)" }
     # advance bookmark to @
     jj --repository $repo bookmark set $bm -r '@' | ignore
-    # Ensure SSH is ready before attempting push
+    # ensure SSH ready
     if ($remote_url | str starts-with "git@") or ($remote_url | str starts-with "ssh://") {
         let ssh_ok = (ensure-ssh-key)
         if not $ssh_ok { return false }
     }
-    # try to push
+    # track + push with retry
+    jj --repository $repo bookmark track $bm --remote=origin | ignore
     let pr = (do { jj --repository $repo git push --bookmark $bm } | complete)
     if $pr.exit_code != 0 {
-        # try tracking first
-        jj --repository $repo bookmark track $bm --remote=origin | ignore
         let pr2 = (do { jj --repository $repo git push --bookmark $bm } | complete)
         if $pr2.exit_code != 0 {
             print -e $"(ansi red_bold)  ✗ push failed:(ansi reset) ($pr2.stderr)"
@@ -236,7 +236,7 @@ def ensure-jj-initialized [repo: string] {
         }
         print $"(ansi green)  ✓ jj initialized \(colocated\)(ansi reset)"
     }
-    # Always enforce identity — never rely on ambient config
+    # Always enforce identity
     jj config set --user user.name  $config.author_name
     jj config set --user user.email $config.author_email
     git -C $repo config user.name  $config.author_name
@@ -281,11 +281,13 @@ def resolve-bookmark [repo: string] {
     let known = (list-bookmarks $repo)
     if ($known | is-empty) { return null }
     let on_parent = (try {
-        jj --repository $repo log --no-graph -r '@-' --template 'bookmarks.join("\n")' | lines | where { |l| $l | is-not-empty } | get 0
+        jj --repository $repo log --no-graph -r '@-' --template 'bookmarks.join("\n")'
+        | lines | where { |l| $l | is-not-empty } | get 0
     } catch { "" })
     if ($on_parent | is-not-empty) and ($known | any { |b| $b == $on_parent }) { return $on_parent }
     let on_wc = (try {
-        jj --repository $repo log --no-graph -r '@' --template 'bookmarks.join("\n")' | lines | where { |l| $l | is-not-empty } | get 0
+        jj --repository $repo log --no-graph -r '@' --template 'bookmarks.join("\n")'
+        | lines | where { |l| $l | is-not-empty } | get 0
     } catch { "" })
     if ($on_wc | is-not-empty) and ($known | any { |b| $b == $on_wc }) { return $on_wc }
     $known | get 0
@@ -324,10 +326,9 @@ def fetch-commits-from [repo: string, n: int] {
 }
 
 def fetch-status-from [repo: string] {
-    # Only report dirty if there are actual file changes in the working copy
     try {
-        let diff = (jj --repository $repo diff --summary | lines | where { |l| $l | is-not-empty })
-        $diff
+        jj --repository $repo diff --summary
+        | lines | where { |l| $l | is-not-empty }
     } catch { [] }
 }
 
@@ -402,15 +403,53 @@ def check-conflicts [repo: string] {
     } else { false }
 }
 
-def check-remote-reachable [_repo: string] { false }
+def check-large-files [repo: string] {
+    # Warn if any staged file exceeds max_file_size_mb
+    let limit_bytes = ($config.max_file_size_mb * 1024 * 1024)
+    let large = (try {
+        jj --repository $repo diff --summary
+        | lines | where { |l| $l | is-not-empty }
+        | each { |line|
+            let parts = ($line | str trim | split row " " | where { |p| $p | is-not-empty })
+            let file  = ($parts | get 1)
+            let full  = ($repo | path join $file)
+            let sz    = (try { (ls $full | get 0.size) } catch { 0 })
+            if ($sz | into int) > $limit_bytes { $file } else { null }
+        }
+        | where { |x| $x != null }
+    } catch { [] })
+    if not ($large | is-empty) {
+        render-error "LARGE FILES DETECTED" $"Files exceed ($config.max_file_size_mb)MB limit — consider .gitignore or git-lfs." $large
+        let choice = (["continue anyway" "abort"] | input list --fuzzy "Large files — proceed?")
+        $choice == "abort"
+    } else { false }
+}
 
 def check-stash [repo: string] {
     let count = (try { git -C $repo stash list | lines | length } catch { 0 })
     if $count > 0 {
         let stashes = (git -C $repo stash list | lines)
-        render-error "STASHED CHANGES" $"($count) stash\(es\) may conflict with this push." $stashes
+        render-error "STASHED CHANGES" $"($count) stash\(es\) detected." $stashes
         let choice = (["continue anyway" "abort"] | input list --fuzzy "Stash detected — proceed?")
         $choice == "abort"
+    } else { false }
+}
+
+def check-remote-reachable [repo: string] {
+    let url = (try { git -C $repo remote get-url origin | str trim } catch { "" })
+    if ($url | is-empty) { return false }
+    # Only test SSH remotes — HTTP(S) checked implicitly by fetch
+    if not ($url | str starts-with "git@") { return false }
+    let host = (try { $url | split row ":" | get 0 | str replace "git@" "" } catch { "" })
+    if ($host | is-empty) { return false }
+    let r = (do { ssh -T $"git@($host)" -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=5 } | complete)
+    let ok = ($r.stderr | str contains "successfully authenticated") or ($r.stdout | str contains "successfully authenticated") or ($r.exit_code == 1)
+    if not $ok {
+        render-error "REMOTE UNREACHABLE" $"Cannot reach ($host) via SSH." [
+            { hint: "Check network / VPN" }
+            { hint: $"ssh -T git@($host)" }
+        ]
+        true
     } else { false }
 }
 
@@ -495,21 +534,25 @@ def render-push-failure [stderr: string] {
 }
 
 # =============================================================================
-# SECTION 6 — PUSH HELPER (shared by main + bootstrap)
+# SECTION 6 — PUSH HELPER
 # =============================================================================
 def do-push [repo: string, bm: string] {
-    # Ensure no commit in the push set is missing author
+    # Stamp author on every commit ahead of remote before pushing
     let author_flag = $"($config.author_name) <($config.author_email)>"
     try {
         jj --repository $repo log --no-graph -r $"remote_bookmarks\(exact:\"($bm)\"\)..($bm)" --template 'change_id.short(8) ++ "\n"'
         | lines | where { |l| $l | is-not-empty }
         | each { |id|
-            jj --repository $repo metaedit -r $id --author $author_flag | ignore
+            let r = (do { jj --repository $repo metaedit -r $id --author $author_flag } | complete)
+            if $r.exit_code != 0 and not ($r.stderr | str contains "Nothing changed") {
+                print $"(ansi yellow)  ⚠ author stamp ($id): ($r.stderr)(ansi reset)"
+            }
         }
     } catch { }
+    # Track if needed
+    jj --repository $repo bookmark track $bm --remote=origin | ignore
     let r = (do { jj --repository $repo git push --bookmark $bm } | complete)
     if $r.exit_code != 0 and ($r.stderr | str contains "Non-tracking remote bookmark") {
-        jj --repository $repo bookmark track $bm --remote=origin | ignore
         do { jj --repository $repo git push --bookmark $bm } | complete
     } else { $r }
 }
@@ -522,7 +565,7 @@ def has-dirty-working-copy [repo: string] {
 }
 
 def ManifoldOS-Reshaping-History [msg: string = "update"] {
-    # ── NO REPO: offer to bootstrap ─────────────────────────────────────────
+    # ── NO REPO ──────────────────────────────────────────────────────────────
     let repo = (find-repo-root)
     if $repo == null {
         print -n "\e[2J\e[H"
@@ -534,37 +577,58 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         if $choice == "abort" { return }
         let ok = (bootstrap-repo)
         if not $ok { return }
-        # re-run the full flow now that repo exists
         ManifoldOS-Reshaping-History $msg
         return
     }
+
     let init_ok = (ensure-jj-initialized $repo)
     if not $init_ok { return }
-    # ── NO REMOTE: offer to add one ─────────────────────────────────────────
+
+    # ── NO REMOTE ────────────────────────────────────────────────────────────
     let has_remote = (try { git -C $repo remote | str trim | is-not-empty } catch { false })
     if not $has_remote {
         print $"(ansi yellow)  ⚠ no remote configured(ansi reset)"
-        let remote_url = (input "  Remote URL (e.g. git@github.com:user/repo.git): " | str trim)
-        if ($remote_url | is-empty) { print -e "  ✗ no URL provided"; return }
+        let provider = (["GitHub" "GitLab" "manual URL"] | input list --fuzzy "Add remote:")
+        let remote_url = if $provider == "GitHub" {
+            let token = (get-github-token)
+            if $token == null { print -e "  ✗ no token"; return }
+            github-create-repo ($repo | path basename) $token
+        } else if $provider == "GitLab" {
+            let token = (get-gitlab-token)
+            if $token == null { print -e "  ✗ no token"; return }
+            gitlab-create-repo ($repo | path basename) $token
+        } else {
+            input "  Remote URL: " | str trim
+        }
+        if ($remote_url | is-empty) or $remote_url == null { print -e "  ✗ no URL provided"; return }
         let ra = (do { git -C $repo remote add origin $remote_url } | complete)
         if $ra.exit_code != 0 { print -e $"(ansi red_bold)  ✗ remote add failed:(ansi reset) ($ra.stderr)"; return }
         print $"(ansi green)  ✓ remote → ($remote_url)(ansi reset)"
     }
+
     # ── BOOKMARK ─────────────────────────────────────────────────────────────
     let bookmark = (resolve-bookmark $repo)
-    let bm = if ($bookmark | is-empty) {
+    let bm = if ($bookmark | is-empty) or $bookmark == null {
         let git_branch = (try { git -C $repo branch --show-current | str trim } catch { "" })
         let name = if ($git_branch | is-not-empty) { $git_branch } else { $config.default_branch }
         print $"(ansi yellow)  ⚠ no bookmark — creating ($name)(ansi reset)"
         let bmc = (do { jj --repository $repo bookmark create $name --at '@-' } | complete)
         if $bmc.exit_code != 0 {
-            print $"(ansi yellow)  ⚠ bookmark create failed \(non-fatal\): ($bmc.stderr)(ansi reset)"
-            ""
+            # try without --at flag (older jj)
+            let bmc2 = (do { jj --repository $repo bookmark create $name } | complete)
+            if $bmc2.exit_code != 0 {
+                print $"(ansi yellow)  ⚠ bookmark create failed \(non-fatal\): ($bmc2.stderr)(ansi reset)"
+                ""
+            } else {
+                print $"(ansi green)  ✓ bookmark ($name) created(ansi reset)"
+                $name
+            }
         } else {
             print $"(ansi green)  ✓ bookmark ($name) created(ansi reset)"
             $name
         }
     } else { $bookmark }
+
     let author_flag = $"($config.author_name) <($config.author_email)>"
     let pre_op_id   = (snapshot-op-id $repo)
     let steps = [
@@ -576,6 +640,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     ]
     mut timings   = {}
     mut checklist = []
+
     # ── INIT ─────────────────────────────────────────────────────────────────
     rh-flow $steps "INIT" $timings
     let t = (date now)
@@ -583,6 +648,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let elapsed_init = $"(((date now) - $t) / 1sec * 1000 | math round)ms"
     $timings   = ($timings | insert INIT $elapsed_init)
     $checklist = ($checklist | append { stage: "INIT"  result: "✓"  elapsed: $elapsed_init  note: $"repo: ($repo)" })
+
     # ── FETCH ────────────────────────────────────────────────────────────────
     rh-flow $steps "FETCH" $timings
     let t = (date now)
@@ -599,18 +665,21 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     }
     $timings   = ($timings | insert FETCH $elapsed_fetch)
     $checklist = ($checklist | append { stage: "FETCH"  result: "✓"  elapsed: $elapsed_fetch  note: "ok" })
+
     # ── CHECK ────────────────────────────────────────────────────────────────
     rh-flow $steps "CHECK" $timings
     let t = (date now)
-    if (check-behind $repo $bm)        { return }
-    if (check-conflicts $repo)         { return }
-    if (check-remote-reachable $repo)  { return }
-    if (check-stash $repo)             { return }
+    if (check-behind $repo $bm)           { return }
+    if (check-conflicts $repo)            { return }
+    if (check-remote-reachable $repo)     { return }
+    if (check-stash $repo)                { return }
+    if (check-large-files $repo)          { return }
     let changed       = (capture-changed $repo)
     let diff_stats    = (calculate-diff-stats $repo)
     let elapsed_check = $"(((date now) - $t) / 1sec * 1000 | math round)ms"
     $timings   = ($timings | insert CHECK $elapsed_check)
     $checklist = ($checklist | append { stage: "CHECK"  result: "✓"  elapsed: $elapsed_check  note: "all clear" })
+
     # ── NOTHING TO COMMIT ────────────────────────────────────────────────────
     if ($changed | is-empty) {
         print -n "\e[2J\e[H"
@@ -626,6 +695,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         print ""
         return
     }
+
     # ── COMMIT ───────────────────────────────────────────────────────────────
     rh-flow $steps "COMMIT" $timings
     let t = (date now)
@@ -633,6 +703,8 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
         let ts = (date now | format date "%Y-%m-%d %H:%M")
         if ($bm | is-not-empty) { $"[($bm)] ($ts)" } else { $"[no-bookmark] ($ts)" }
     } else { $msg }
+    # Snapshot working copy first so metaedit sees all changes
+    jj --repository $repo debug snapshot | ignore
     let desc_result = (do { jj --repository $repo metaedit -m $commit_msg --author $author_flag } | complete)
     if $desc_result.exit_code != 0 {
         $checklist = ($checklist | append { stage: "COMMIT"  result: "✗"  elapsed: "—"  note: "metaedit failed" })
@@ -654,6 +726,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let elapsed_commit = $"(((date now) - $t) / 1sec * 1000 | math round)ms"
     $timings   = ($timings | insert COMMIT $elapsed_commit)
     $checklist = ($checklist | append { stage: "COMMIT"  result: "✓"  elapsed: $elapsed_commit  note: $commit_msg })
+
     # ── PUSH ─────────────────────────────────────────────────────────────────
     rh-flow $steps "PUSH" $timings
     let t = (date now)
@@ -667,6 +740,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     }
     $timings   = ($timings | insert PUSH $elapsed_push)
     $checklist = ($checklist | append { stage: "PUSH"  result: "✓"  elapsed: $elapsed_push  note: $"→ ($bm)" })
+
     # ── SUMMARY ──────────────────────────────────────────────────────────────
     rh-flow $steps "" $timings
     try { jj --repository $repo git fetch } catch { }
@@ -714,7 +788,7 @@ def jj-bookmark-here [name: string] {
 }
 
 def jj-fix-authors [] {
-    # Rewrite all mutable commits to have the correct author. Run this once to fix a poisoned history.
+    # Rewrite all mutable commits to have the correct author.
     let repo = (find-repo-root)
     if $repo == null { print -e "✗ no repo found"; return }
     let author_flag = $"($config.author_name) <($config.author_email)>"
