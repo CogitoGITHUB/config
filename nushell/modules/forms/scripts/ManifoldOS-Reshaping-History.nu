@@ -498,6 +498,15 @@ def render-push-failure [stderr: string] {
 # SECTION 6 — PUSH HELPER (shared by main + bootstrap)
 # =============================================================================
 def do-push [repo: string, bm: string] {
+    # Ensure no commit in the push set is missing author
+    let author_flag = $"($config.author_name) <($config.author_email)>"
+    try {
+        jj --repository $repo log --no-graph -r $"remote_bookmarks\(exact:\"($bm)\"\)..($bm)" --template 'change_id.short(8) ++ "\n"'
+        | lines | where { |l| $l | is-not-empty }
+        | each { |id|
+            jj --repository $repo metaedit -r $id --author $author_flag | ignore
+        }
+    } catch { }
     let r = (do { jj --repository $repo git push --bookmark $bm } | complete)
     if $r.exit_code != 0 and ($r.stderr | str contains "Non-tracking remote bookmark") {
         jj --repository $repo bookmark track $bm --remote=origin | ignore
