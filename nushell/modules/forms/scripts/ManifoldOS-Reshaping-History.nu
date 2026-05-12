@@ -40,18 +40,18 @@ def get-github-token [] {
     print -n "\e[2J\e[H"
     print ""
     print $"(ansi red_bold)🌹 MANIFOLD // GITHUB TOKEN SETUP 🌹(ansi reset)"
-    print $"(ansi grey)  One-time setup. Saved to ~/.secrets/github_token (never committed).(ansi reset)"
+    print $"(ansi grey)  One-time setup. Saved to ~/.secrets/github_token \(never committed\).(ansi reset)"
     print ""
     print $"   1. Browser will open → https://github.com/settings/tokens/new"
     print $"   2. Set note: ManifoldOS"
     print $"   3. Set expiration"
     print $"   4. Check 'repo' scope"
-    print $"   5. Click 'Generate token' and copy it (ghp_...)"
+    print $"   5. Click 'Generate token' and copy it \(ghp_...\)"
     print ""
     try { xdg-open "https://github.com/settings/tokens/new?scopes=repo&description=ManifoldOS" } catch {
         print $"  https://github.com/settings/tokens/new?scopes=repo&description=ManifoldOS"
     }
-    let token = (input "  Paste token (ghp_...): " | str trim)
+    let token = (input "  Paste token \(ghp_...\): " | str trim)
     if ($token | is-empty) { return null }
     $token | save -f $token_path
     chmod 600 $token_path
@@ -71,18 +71,18 @@ def get-gitlab-token [] {
     print -n "\e[2J\e[H"
     print ""
     print $"(ansi red_bold)🌹 MANIFOLD // GITLAB TOKEN SETUP 🌹(ansi reset)"
-    print $"(ansi grey)  One-time setup. Saved to ~/.secrets/gitlab_token (never committed).(ansi reset)"
+    print $"(ansi grey)  One-time setup. Saved to ~/.secrets/gitlab_token \(never committed\).(ansi reset)"
     print ""
     print $"   1. Browser will open → https://gitlab.com/-/profile/personal_access_tokens"
     print $"   2. Set name: ManifoldOS"
     print $"   3. Set expiration"
     print $"   4. Check 'api' scope"
-    print $"   5. Click 'Create personal access token' and copy it (glpat-...)"
+    print $"   5. Click 'Create personal access token' and copy it \(glpat-...\)"
     print ""
     try { xdg-open "https://gitlab.com/-/profile/personal_access_tokens?name=ManifoldOS&scopes=api" } catch {
         print $"  https://gitlab.com/-/profile/personal_access_tokens?name=ManifoldOS&scopes=api"
     }
-    let token = (input "  Paste token (glpat-...): " | str trim)
+    let token = (input "  Paste token \(glpat-...\): " | str trim)
     if ($token | is-empty) { return null }
     $token | save -f $token_path
     chmod 600 $token_path
@@ -92,20 +92,33 @@ def get-gitlab-token [] {
 
 def github-create-repo [name: string, token: string] {
     let body = ({ name: $name, private: false, auto_init: false } | to json)
-    let result = (do {
-        http post --content-type "application/json" --headers { Authorization: $"Bearer ($token)", "User-Agent": $config.author_name, Accept: "application/vnd.github+json" } "https://api.github.com/user/repos" $body
-    } | complete)
-    if $result.exit_code != 0 { print -e $"(ansi red_bold)  ✗ GitHub API failed:(ansi reset) ($result.stderr)"; return null }
-    try { ($result.stdout | from json).ssh_url } catch { null }
+    let resp = (try {
+        http post --content-type "application/json" --full --allow-errors --headers { Authorization: $"Bearer ($token)", "User-Agent": $config.author_name, Accept: "application/vnd.github+json" } "https://api.github.com/user/repos" $body
+    } catch { |err| print -e $"(ansi red_bold)  ✗ GitHub API failed:(ansi reset) ($err.msg)"; return null })
+    if $resp.status == 201 {
+        $resp.body.ssh_url
+    } else if $resp.status == 422 {
+        # repo already exists — fetch it
+        print $"(ansi yellow)  ⚠ repo already exists — fetching SSH url(ansi reset)"
+        try {
+            let get_resp = (http get --full --allow-errors --headers { Authorization: $"Bearer ($token)", "User-Agent": $config.author_name, Accept: "application/vnd.github+json" } $"https://api.github.com/repos/($config.github_user)/($name)")
+            $get_resp.body.ssh_url
+        } catch { |err| print -e $"(ansi red_bold)  ✗ fetch existing repo failed:(ansi reset) ($err.msg)"; null }
+    } else {
+        print -e $"(ansi red_bold)  ✗ GitHub API ($resp.status):(ansi reset) ($resp.body | to json)"
+        null
+    }
 }
 
 def gitlab-create-repo [name: string, token: string] {
     let body = ({ name: $name, visibility: "public", initialize_with_readme: false } | to json)
-    let result = (do {
-        http post --content-type "application/json" --headers { "PRIVATE-TOKEN": $token, "User-Agent": $config.author_name } "https://gitlab.com/api/v4/projects" $body
-    } | complete)
-    if $result.exit_code != 0 { print -e $"(ansi red_bold)  ✗ GitLab API failed:(ansi reset) ($result.stderr)"; return null }
-    try { ($result.stdout | from json).ssh_url_to_repo } catch { null }
+    try {
+        let resp = (http post --content-type "application/json" --headers { "PRIVATE-TOKEN": $token, "User-Agent": $config.author_name } "https://gitlab.com/api/v4/projects" $body)
+        $resp.ssh_url_to_repo
+    } catch { |err|
+        print -e $"(ansi red_bold)  ✗ GitLab API failed:(ansi reset) ($err.msg)"
+        null
+    }
 }
 
 def ensure-ssh-key [] {
@@ -151,14 +164,14 @@ def bootstrap-repo [] {
     print ""
     let provider = (["GitHub" "GitLab"] | input list --fuzzy "Push to:")
     let token = if $provider == "GitHub" { get-github-token } else { get-gitlab-token }
-    if ($token | is-null) { print -e "  ✗ no token — aborting"; return false }
+    if $token == null { print -e "  ✗ no token — aborting"; return false }
     print $"(ansi yellow)  ⚙ creating ($provider) repo ($repo_name)...(ansi reset)"
     let remote_url = if $provider == "GitHub" {
         github-create-repo $repo_name $token
     } else {
         gitlab-create-repo $repo_name $token
     }
-    if ($remote_url | is-null) { return false }
+    if ($remote_url == null) { return false }
     print $"(ansi green)  ✓ repo created → ($remote_url)(ansi reset)"
     print $"(ansi yellow)  ⚙ bootstrapping ($repo)...(ansi reset)"
     # git init
@@ -299,6 +312,7 @@ def fetch-commits-from [repo: string, n: int] {
             let p = ($line | split row "|")
             { change: ($p | get 0)  commit: ($p | get 1)  age: ($p | get 2)  subject: ($p | get 3)  author: ($p | get 4) }
         }
+        | where { |row| ($row.subject | is-not-empty) }
     } catch {
         git -C $repo log --format="%h|%ad|%s|%an" --date=relative $"-($n)"
         | lines | where { |l| $l | is-not-empty }
@@ -310,7 +324,11 @@ def fetch-commits-from [repo: string, n: int] {
 }
 
 def fetch-status-from [repo: string] {
-    try { jj --repository $repo status | lines | where { |l| $l | is-not-empty } } catch { [] }
+    # Only report dirty if there are actual file changes in the working copy
+    try {
+        let diff = (jj --repository $repo diff --summary | lines | where { |l| $l | is-not-empty })
+        $diff
+    } catch { [] }
 }
 
 def fetch-repo-stats-from [repo: string, bookmark: string, --json] {
