@@ -214,3 +214,6 @@ emacn dir-info.nu
 emacs dir-info.nu
 emacs .
 nu
+emacs dir-info.nu
+cat dir-info.nu
+emacs dir-info.nu

@@ -1,10 +1,8 @@
 # =============================================================================
 # ManifoldOS — Weather
-# Uses wttr.in — no API key required
-# Default location: Galați, România
 # =============================================================================
 
-const WEATHER_LOCATION = "Galati,Romania"
+const WEATHER_LOCATION = ""  # empty = wttr.in auto-detects from IP
 
 def get-weather-emoji [condition: string] {
     match ($condition | str downcase) {
@@ -47,9 +45,9 @@ def format-day [day: record, label: string] {
     $"($label)  ($date)  ($emoji) ($condition)  ↑($high)°C ↓($low)°C"
 }
 
-# Show current weather and 3-day forecast for Galați, România
+# Show current weather and 3-day forecast 
 export def ManifoldOS-Weather [
-    --location(-l): string  # Override location (default: Galați, România)
+    --location(-l): string  # Override location 
     --celsius(-c)           # Show in Celsius (default)
     --fahrenheit(-f)        # Show in Fahrenheit
 ] {
