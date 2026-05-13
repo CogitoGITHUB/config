@@ -288,12 +288,12 @@ def resolve-ahead-behind [repo: string, bookmark: string] {
         let rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)..($bookmark)"
         jj --repository $repo log --no-graph -r $rev --limit 100
         | lines | where { |l| $l | is-not-empty } | length | into string
-    } catch { "?" })
+    } catch { "0" })
     let behind = (try {
         let rev = $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)"
         jj --repository $repo log --no-graph -r $rev --limit 100
         | lines | where { |l| $l | is-not-empty } | length | into string
-    } catch { "?" })
+    } catch { "0" })
     { ahead: $ahead  behind: $behind }
 }
 
@@ -374,6 +374,12 @@ def render-error [title: string, subtitle: string, details: any] {
 # Offers three resolution options: fast-forward rebase, pull+rebase, or abort.
 def check-behind [repo: string, bookmark: string] {
     if ($bookmark | is-empty) { return false }
+    # Only meaningful if a remote tracking bookmark exists
+    let remote_exists = (try {
+        let rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)"
+        jj --repository $repo log --no-graph -r $rev --limit 1 | str trim | is-not-empty
+    } catch { false })
+    if not $remote_exists { return false }
     let behind = (try {
         let rev = $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)"
         jj --repository $repo log --no-graph -r $rev --limit 100
@@ -551,6 +557,12 @@ def check-remote-reachable [repo: string] {
 
 def check-divergence [repo: string, bookmark: string] {
     if ($bookmark | is-empty) { return false }
+    # Only meaningful if a remote tracking bookmark exists
+    let remote_exists = (try {
+        let rev = $"remote_bookmarks\(exact:\"($bookmark)\"\)"
+        jj --repository $repo log --no-graph -r $rev --limit 1 | str trim | is-not-empty
+    } catch { false })
+    if not $remote_exists { return false }
     let diverged = (try {
         let rev_a = $"remote_bookmarks\(exact:\"($bookmark)\"\)..($bookmark)"
         let rev_b = $"($bookmark)..remote_bookmarks\(exact:\"($bookmark)\"\)"
@@ -696,6 +708,8 @@ def has-dirty-working-copy [repo: string] {
 }
 
 def ManifoldOS-Reshaping-History [msg: string = "update"] {
+    $env.config.table.mode = "rounded"
+    $env.config.table.index_mode = "always"
     let repo = (find-repo-root)
     if $repo == null {
         print -n "\e[2J\e[H"
@@ -853,7 +867,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     let t = (date now)
     let push_result  = (do-push $repo $bm)
     let elapsed_push = $"(((date now) - $t) / 1sec * 1000 | math round)ms"
-    if $push_result.exit_code != 0 {
+    if ($push_result | is-empty) or $push_result.exit_code != 0 {
         $checklist = ($checklist | append { stage: "PUSH"  result: "✗"  elapsed: $elapsed_push  note: "remote rejected" })
         render-checklist $checklist
         render-push-failure $push_result.stderr
@@ -1033,6 +1047,13 @@ $env.config.keybindings = ($env.config.keybindings | append [
         keycode: char_z
         mode: emacs
         event: { send: executehostcommand cmd: "jj-undo" }
+    }
+    {
+        name: jj_log
+        modifier: control
+        keycode: char_l
+        mode: emacs
+        event: { send: executehostcommand cmd: "jj-log" }
     }
     {
         name: jj_amend
