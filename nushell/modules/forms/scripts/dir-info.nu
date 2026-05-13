@@ -14,7 +14,7 @@ def fzf-bat [path?: string] {
 }
 
 # =============================================================================
-# COMMANDS CONFIG
+# 🌹 COMMANDS 🌹
 # =============================================================================
 const COMMANDS = [
     { key: "w",  command: "Weather" }
@@ -22,10 +22,11 @@ const COMMANDS = [
     { key: "p",  command: "In Progress (last TODO)" }
     { key: "s",  command: "Done (last active)" }
     { key: "d",  command: "Delete (last DONE only)" }
-    { key: "u",  command: "fzf → emacs" }
-    { key: "h",  command: "fzf → bat" }
-    { key: "i",  command: "Describe commit (jj)" }
-    { key: "g",  command: "Push (with confirm)" }
+    { key: "u",  command: "fzf > emacs" }
+    { key: "h",  command: "fzf > bat" }
+    { key: "v",  command: "jj diff" }
+    { key: "i",  command: "jj describe" }
+    { key: "g",  command: "jj push" }
     { key: "m",  command: "Commands" }
     { key: "r",  command: "Redraw" }
     { key: "l",  command: "Clear" }
@@ -210,6 +211,10 @@ def show-commands [] {
 # =============================================================================
 # JJ
 # =============================================================================
+def jj-diff [] {
+    ^bash -c "jj diff | bat --style=full --color=always --language=diff"
+}
+
 def jj-describe [] {
     try {
         let current = (do { jj log --no-graph -r '@' --template 'description' } | complete | get stdout | str trim)
@@ -374,6 +379,7 @@ def workspace-loop [] {
                 "d" => { delete-last }
                 "u" => { fzf-open }
                 "h" => { fzf-bat; $needs_draw = false }
+                "v" => { jj-diff; $needs_draw = false }
                 "i" => { jj-describe; $needs_draw = false }
                 "m" => { show-commands; $needs_draw = false }
                 "w" => { ManifoldOS-Weather; $needs_draw = false }
@@ -392,6 +398,8 @@ def workspace-loop [] {
                     print $"(ansi grey)     You are condemned to be free.\" — Jean-Paul Sartre 🌹(ansi reset)"
                     print ""
                     print $"(ansi red_bold)  🌹 Reshaping is only adaptation under pressure 🌹(ansi reset)"
+                    print ""
+                    print-section ($env.PWD | path join "TODO.org") "TODO" "What is unfinished and consuming attention" "A ledger of open, executable items. No speculation, no someday-maybe. If it is on this list, it is active. If it is not executable, it belongs in Hypotheses or Blueprint."
                     print ""
                     $env.__skip_workspace = true
                     $running = false
