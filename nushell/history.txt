@@ -209,3 +209,6 @@ cat ManifoldOS-Reshaping-History.nu
 emacs ManifoldOS-Reshaping.nu
 emacs ManifoldOS-Reshaping-History.nu
 emacs -nw ManifoldOS-Reshaping-History.nu
+e dir-info.nu
+emacn dir-info.nu
+emacs dir-info.nu
