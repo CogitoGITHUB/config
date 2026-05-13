@@ -1041,13 +1041,7 @@ $env.config.keybindings = ($env.config.keybindings | append [
         mode: emacs
         event: { send: executehostcommand cmd: "jj-undo" }
     }
-    {
-        name: jj_log
-        modifier: control
-        keycode: char_l
-        mode: emacs
-        event: { send: executehostcommand cmd: "jj-log" }
-    }
+  
     {
         name: jj_amend
         modifier: control

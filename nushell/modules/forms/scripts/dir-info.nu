@@ -122,6 +122,11 @@ def draw-workspace [] {
     print $"(ansi red_bold)  ($dir_name)(ansi reset)"
     ls -la | reject inode target num_links | print
     repo-status-line
+    # weather inline — fast, non-blocking
+    try {
+        let w = (http get "https://wttr.in/Galati,Romania?format=3" | str trim)
+        print $"(ansi grey)  ($w)(ansi reset)"
+    } catch { }
     for entry in $WORKSPACE {
         print-section ($env.PWD | path join $entry.file) $entry.label $entry.subtitle
     }

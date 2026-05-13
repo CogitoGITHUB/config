@@ -24,6 +24,7 @@ source "~/.config/nushell/zellij.nu"
 source "~/.config/nushell/modules/forms/scripts/dir-info.nu"
 source "~/.config/nushell/modules/forms/scripts/zoxide.nu"
 
+source ~/.config/nushell/modules/forms/scripts/ManifoldOS-Weather.nu
 
 source "~/.config/nushell/modules/forms/scripts/fzf-tools.nu"
 
