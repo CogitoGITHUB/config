@@ -820,14 +820,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
     if ($changed | is-empty) {
         print -n "\e[2J\e[H"
         print ""
-        print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
-        print $"(ansi grey)  Nothing to commit — working copy is clean.(ansi reset)"
-        print ""
-        render-checklist $checklist
-        let stats  = (fetch-repo-stats-from $repo $bm)
-        let status = (fetch-status-from $repo)
-        render-position $stats $status $diff_stats
-        render-history (fetch-commits-from $repo $config.commits_to_show)
+        print $"(ansi red_bold)🌹(ansi reset)"
         print ""
         return
     }
