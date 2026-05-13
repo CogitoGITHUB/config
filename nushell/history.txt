@@ -217,3 +217,10 @@ nu
 emacs dir-info.nu
 cat dir-info.nu
 emacs dir-info.nu
+emacs fzf-tools.nu
+cd ../../..
+e config.nu
+emacs config.nu
+emacs .
+ni
+emacs .
