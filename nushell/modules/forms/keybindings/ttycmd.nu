@@ -1,12 +1,12 @@
 let keybindings = [
   {
-    name: say_script
+    name: Weather
     modifier: control
-    keycode: char_v
+    keycode: char_W
     mode: emacs
     event: {
       send: executehostcommand
-      cmd: "nu -c '~/.config/nushell/aeon-modules/scripts/say.nu'"
+      cmd: "ManifoldOS-Weather"
     }
   }
   

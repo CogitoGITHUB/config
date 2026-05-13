@@ -212,3 +212,4 @@ emacs -nw ManifoldOS-Reshaping-History.nu
 e dir-info.nu
 emacn dir-info.nu
 emacs dir-info.nu
+emacs .

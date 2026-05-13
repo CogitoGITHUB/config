@@ -7,7 +7,6 @@ source "~/.config/nushell/modules/substrate/completion.nu"
 
 # forms (interaction layer)
 source "~/.config/nushell/modules/forms/keybindings/editors.nu"
-source "~/.config/nushell/modules/forms/keybindings/wallpaper.nu"
 source "~/.config/nushell/modules/forms/keybindings/ttycmd.nu"
 
 # --- ManifoldOS Scripts ---
@@ -18,6 +17,7 @@ source "~/.config/nushell/modules/forms/keybindings/ttycmd.nu"
 source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping-History.nu"
 #source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping.nu"
 source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Build.nu"
+source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Weather.nu"
 
 # session / tools
 source "~/.config/nushell/zellij.nu"
