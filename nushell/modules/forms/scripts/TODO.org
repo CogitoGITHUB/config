@@ -1,2 +1,23 @@
-* resahpe :  zellish popup screnn 
+* TODO Workspace
+- Show a `last modified` indicator on each section header — so you can see at a glance which files were touched recently without opening them
+- A `git blame`-style "last entry added" timestamp pulled from jj log per file
+
+* TODO Capture
+- Multi-line capture — right now it's one heading, could support adding a note body under the heading
+- A `DONE` toggle — press a key to mark the last captured item done without opening Emacs
+
+* TODO Navigation
+- Fuzzy jump — press `/` to type part of a label and jump straight to that file via fzf
+- A recent files list — show the last 3-5 org files you opened, ranked by `modified`
+
+* TODO Display
+- Rotate the Sartre quote — keep a small list of quotes and pick one randomly or by day
+- A session timer — show how long the workspace has been open this session
+- Dim/grey out sections that haven't been touched in over N days — visual decay to surface neglected areas
+
+* TODO Integration 
+- A `jj describe` shortcut — press a key to set the commit description for the current working copy without leaving the workspace
+- Auto-push on exit via `g` with a confirmation prompt showing what's dirty first
+
+* TODO resahpe :  zellish popup screnn 
 
