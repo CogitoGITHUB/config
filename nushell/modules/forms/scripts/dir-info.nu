@@ -200,12 +200,7 @@ def workspace-loop [] {
             match $code {
                 "n" => { quick-capture; $needs_draw = false }
                 "g" => {
-                    let rh = ($env.HOME | path join ".config/nushell/modules/forms/scripts/ManifoldOS-Reshaping-History.nu")
-                    if ($rh | path exists) {
-                        nu -c $"source '($rh)'; ManifoldOS-Reshaping-History"
-                    } else {
-                        print $"(ansi red_bold)  ✗ ManifoldOS-Reshaping-History.nu not found at ($rh)(ansi reset)"
-                    }
+                    ManifoldOS-Reshaping-History
                     $running = false
                 }
                 "r" => { }
