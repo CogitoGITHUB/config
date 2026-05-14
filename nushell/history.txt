@@ -224,3 +224,6 @@ emacs config.nu
 emacs .
 ni
 emacs .
+emacs dir-info.nu
+tnu
+emacs dir-info.nu

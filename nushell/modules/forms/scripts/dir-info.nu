@@ -138,9 +138,10 @@ def print-section [path: string, label: string, subtitle: string, description: s
         let rows = (parse-org $path)
         let count = ($rows | length)
         let status = if $count > 0 { $"● ($count)" } else { "○ empty" }
+        let rose = if $count > 0 { "🌹" } else { "🥀" }
         print ""
-        print $"(ansi red_bold)  🌹 ($label) 🌹 ($subtitle) 🌹 ($status)(ansi reset)"
-        print $"  🌹 ($description)"
+        print $"(ansi red_bold)  ($rose) ($label) ($rose) ($subtitle) ($rose) ($status)(ansi reset)"
+        print $"  ($rose) ($description)"
         if $count > 0 {
             print ""
             $rows | select keyword description overdue | table | print
@@ -194,6 +195,31 @@ def draw-workspace [] {
     print ""
     print-section ($env.PWD | path join "TODO.org") "TODO" "What is unfinished and consuming attention" "A ledger of open, executable items. No speculation, no someday-maybe. If it is on this list, it is active. If it is not executable, it belongs in Hypotheses or Blueprint."
     print ""
+    workspace-health
+    print ""
+}
+
+def workspace-health [] {
+    let files = ($WORKSPACE | each {|e| $env.PWD | path join $e.file})
+    let total = ($files | length)
+    let alive = ($files | where {|p|
+        ($p | path exists) and ((open --raw $p | str trim | is-not-empty))
+    } | length)
+    let dead = $total - $alive
+    let roses = (0..$alive | each { "🌹" } | str join "")
+    let wilted = (0..$dead | each { "🥀" } | str join "")
+    let bar = $"($roses)($wilted)"
+    let msg = if $dead == $total {
+        "The garden is barren. Nothing has been planted."
+    } else if $dead >= ($total / 2 | math floor) {
+        "The workspace withers. Feed it."
+    } else if $dead > 0 {
+        "Most shapes hold. Some still hunger."
+    } else {
+        "The garden is tended. Every shape breathes."
+    }
+    print $"  ($bar)"
+    print $"(ansi grey)  ($msg)(ansi reset)"
 }
 
 # =============================================================================
@@ -400,6 +426,8 @@ def workspace-loop [] {
                     print $"(ansi red_bold)  🌹 Reshaping is only adaptation under pressure 🌹(ansi reset)"
                     print ""
                     print-section ($env.PWD | path join "TODO.org") "TODO" "What is unfinished and consuming attention" "A ledger of open, executable items. No speculation, no someday-maybe. If it is on this list, it is active. If it is not executable, it belongs in Hypotheses or Blueprint."
+                    print ""
+                    workspace-health
                     print ""
                     $env.__skip_workspace = true
                     $running = false
