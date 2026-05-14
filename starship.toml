@@ -1,112 +1,55 @@
-# Advanced Dark Red Starship Config
-add_newline = false
+# 🌹 ManifoldOS Starship — Garden Theme
+add_newline = true
 command_timeout = 800
 
-format = """
- $username$hostname$directory$git_branch$git_status
-$jobs$cmd_duration
- • $character"""
+format = """$git_status🌹
+"""
 
-right_format = """$time$battery$memory_usage"""
-
-# ── Directory ──────────────────────────────────────────────
-[directory]
-style = "bold #8B0000"
-format = "[ 󰉋 $path]($style) "
-truncation_length = 4
-truncation_symbol = "…/"
-home_symbol = "~"
-read_only = " 󰌾"
-read_only_style = "#3D0000"
-
-# ── Git Branch ─────────────────────────────────────────────
-[git_branch]
-symbol = " "
-style = "bold #8B0000"
-format = "[│](#3D0000) [$symbol$branch]($style) "
+right_format = ""
 
 # ── Git Status ─────────────────────────────────────────────
 [git_status]
 style = "#6B0000"
-format = '([$ahead_behind]($style) [$all_status](#6B0000) )'
-conflicted  = "⚔ "
+format = '([$all_status$ahead_behind]($style) )'
+conflicted  = "🥀 "
 ahead       = "↑$count "
 behind      = "↓$count "
-diverged    = "↕ "
+diverged    = "🥀🥀 "
 untracked   = "? "
 stashed     = "↪ "
 modified    = "~$count "
 staged      = "+$count "
 renamed     = "» "
-deleted     = "✘ "
+deleted     = "🥀$count "
 
-# ── Jobs ───────────────────────────────────────────────────
-[jobs]
-symbol = "󰒓 "
-style = "#8B0000"
-format = "[$symbol$number]($style) "
-number_threshold = 1
+# ── Disabled ───────────────────────────────────────────────
+[git_branch]
+disabled = true
 
-# ── Command Duration ───────────────────────────────────────
+# ── Disabled ───────────────────────────────────────────────
+[directory]
+disabled = true
+
 [cmd_duration]
-min_time = 200
-style = "#3D0000"
-format = "[│](#3D0000) [⏱ $duration]($style) "
+disabled = true
 
-# ── Character ──────────────────────────────────────────────
 [character]
-success_symbol = "[❯](bold #8B0000)"
-error_symbol   = "[❯](bold red)"
-vimcmd_symbol  = "[❮](bold #8B0000)"
+disabled = true
 
-# ── Username ───────────────────────────────────────────────
-[username]
-disabled = false
-style_user = "#8B0000"
-style_root = "bold red"
-format = "[$user]($style)[](#3D0000) "
-show_always = true
-
-# ── Hostname ───────────────────────────────────────────────
-[hostname]
-disabled = false
-style = "#6B0000"
-format = "[$hostname]($style) [│](#3D0000) "
-ssh_only = false
-
-# ── Time (right prompt) ────────────────────────────────────
 [time]
-disabled = false
-style = "#3D0000"
-format = "[│](#1A0000) [ $time]($style) "
-time_format = "%H:%M"
-use_12hr = false
+disabled = true
 
-# ── Battery (right prompt) ─────────────────────────────────
+[username]
+disabled = true
+
+[hostname]
+disabled = true
+
 [battery]
-full_symbol     = "󰁹 "
-charging_symbol = "󰂄 "
-discharging_symbol = "󰂃 "
-unknown_symbol  = "󰁽 "
-empty_symbol    = "󰂎 "
-format = "[│](#1A0000) [$symbol$percentage]($style) "
+disabled = true
 
-[[battery.display]]
-threshold = 15
-style = "bold red"
-
-[[battery.display]]
-threshold = 50
-style = "#6B0000"
-
-[[battery.display]]
-threshold = 100
-style = "#3D0000"
-
-# ── Memory (right prompt) ──────────────────────────────────
 [memory_usage]
-disabled = false
-symbol = "󰍛 "
-style = "#3D0000"
-format = "[│](#1A0000) [$symbol$ram]($style) "
-threshold = 0
+disabled = true
+
+[jobs]
+disabled = true
