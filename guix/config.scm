@@ -604,7 +604,6 @@ and a custom mode-line layout. Invoke with M-x book-mode.")
                           (@ (gnu packages emacs-xyz) emacs-magit)
                           (@ (gnu packages emacs-xyz) emacs-meow)
                           (@ (gnu packages emacs-xyz) emacs-modus-themes)
-                          (@ (gnu packages emacs-xyz) emacs-nano-modeline)
                           (@ (gnu packages emacs-xyz) emacs-nerd-icons)
                           (@ (gnu packages emacs-xyz) emacs-org-appear)
                           (@ (gnu packages emacs-xyz) emacs-org-auto-tangle)
@@ -617,7 +616,9 @@ and a custom mode-line layout. Invoke with M-x book-mode.")
                           (@ (gnu packages emacs-xyz) emacs-tempel)
                           (@ (gnu packages emacs-xyz) emacs-wgrep)
                           (@ (gnu packages emacs-xyz) emacs-yasnippet)
-                          emacs-nano-theme
+                          emacs-org-superstar
+                          emacs-org-fancy-priorities
+			  emacs-svg-tag-mode
                           emacs-book-mode
                           git
 			  jujutsu
