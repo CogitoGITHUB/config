@@ -2,19 +2,18 @@ let keybindings = [
   {
     name: Weather
     modifier: control
-    keycode: char_W
-    mode: emacs
+    keycode: char_w
+    mode: [emacs, vi_insert, vi_normal]
     event: {
       send: executehostcommand
       cmd: "ManifoldOS-Weather"
     }
   }
-  
-{
+  {
     name: rmpc
     modifier: control
     keycode: char_p
-    mode: emacs
+    mode: [emacs, vi_insert, vi_normal]
     event: {
       send: executehostcommand
       cmd: "rmpc"
@@ -24,7 +23,7 @@ let keybindings = [
     name: htop
     modifier: control
     keycode: char_h
-    mode: emacs
+    mode: [emacs, vi_insert, vi_normal]
     event: {
       send: executehostcommand
       cmd: "htop"
@@ -34,20 +33,20 @@ let keybindings = [
     name: opencode
     modifier: control
     keycode: char_o
-    mode: emacs
+    mode: [emacs, vi_insert, vi_normal]
     event: {
       send: executehostcommand
       cmd: "opencode"
     }
   }
-{
-    name: zoxide_fzf
-    modifier: control
-    keycode: char_u
-    mode: emacs
+  {
+    name: dired
+    modifier: none
+    keycode: char_d
+    mode: vi_normal
     event: {
       send: executehostcommand
-      cmd: "let sel = (try { zoxide query --list | to text | fzf } catch { '' }); if ($sel | str trim) != '' { cd ($sel | str trim) }"
+      cmd: "emacs -nw ."
     }
   }
 ];

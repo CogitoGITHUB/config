@@ -4,8 +4,7 @@ source "~/.config/nushell/modules/substrate/theme.nu"
 source "~/.config/nushell/modules/substrate/plugins.nu"
 source "~/.config/nushell/modules/substrate/completion.nu"
 
-# forms (interaction layer)
-source "~/.config/nushell/modules/forms/keybindings/editors.nu"
+
 source "~/.config/nushell/modules/forms/keybindings/ttycmd.nu"
 
 # ManifoldOS — load order matters: roots before garden
