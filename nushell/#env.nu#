@@ -1,7 +1,5 @@
 $env.PROMPT_INDICATOR_VI_INSERT = $"(ansi red): "
-$env.PROMPT_INDICATOR_VI_NORMAL = $"(ansi red)〉"
-
-# /home/aoeu/.config/nushell/env.nu
+$env.PROMPT_INDICATOR_VI_NORMAL = $"(ansi red)〉"# /home/aoeu/.config/nushell/env.nu
 
 $env.EDITOR = "emacs"
 

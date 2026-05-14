@@ -859,21 +859,21 @@ $env.config.keybindings = ($env.config.keybindings | append [
         name: ManifoldOS_Reshaping_History
         modifier: control
         keycode: char_g
-        mode: emacs
+        mode: [emacs, vi_insert, vi_normal]
         event: { send: executehostcommand cmd: "ManifoldOS-Reshaping-History" }
     }
     {
         name: jj_undo
         modifier: control
         keycode: char_z
-        mode: emacs
+        mode: [emacs, vi_insert]
         event: { send: executehostcommand cmd: "jj-undo" }
     }
     {
         name: jj_amend
         modifier: control
         keycode: char_a
-        mode: emacs
+        mode: [emacs, vi_insert]
         event: { send: executehostcommand cmd: "jj-amend" }
     }
 ])

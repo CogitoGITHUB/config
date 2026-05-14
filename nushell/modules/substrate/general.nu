@@ -66,7 +66,7 @@ $env.config = {
     buffer_editor: null
     use_ansi_coloring: true
     bracketed_paste: true
-    edit_mode: emacs
+    edit_mode: vi
 
     shell_integration: {
         osc2: true
