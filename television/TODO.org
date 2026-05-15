@@ -1,0 +1,40 @@
+** TODO Replace fzf entirely
+File finding and path completion in Nushell.
+
+** TODO Replace atuin UI
+Keep atuin as backend, use tv for history search frontend via Ctrl+R.
+
+** TODO Ctrl+T general fuzzy finding in Nushell
+
+** TODO Modules channel
+Search modules/ org files by name with content preview.
+
+** TODO Guix packages channel
+Browse package definitions across substrate files.
+
+** TODO Manifold channel browser
+Search Manifold channel package definitions.
+
+** TODO Shepherd services channel
+Browse and inspect active Shepherd services.
+
+** TODO Emacs loaded packages channel
+List lc--loaded-packages, open directly in Emacs.
+
+** TODO lc-errors bridge
+Browse *lc-errors* entries from the terminal.
+
+** TODO Open org modules into Emacs
+Launch emacsclient from tv selection.
+
+** TODO Tailscale peers channel
+Browse and connect to Tailscale peers.
+
+** TODO Hyprland keybindings channel
+Search and preview Hyprland key mappings.
+
+** TODO Denote notes channel
+Search notes by title and tag with preview.
+
+** TODO Org agenda channel
+Browse org agenda entries from the terminal.
