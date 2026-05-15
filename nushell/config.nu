@@ -27,3 +27,10 @@ $env.config.color_config = $light_theme
 
 # starship
 starship init nu | save -f ($nu.data-dir | path join "vendor/autoload/starship.nu")
+
+
+alias e = if ($env | get -i DISPLAY | is-empty) and ($env | get -i WAYLAND_DISPLAY | is-empty) {
+    emacs -nw
+} else {
+    emacs
+}
