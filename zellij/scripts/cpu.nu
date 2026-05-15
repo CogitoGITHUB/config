@@ -1,0 +1,1 @@
+sys cpu | get load_average | first | split row ", " | first | into float | into int | $"($in)%"

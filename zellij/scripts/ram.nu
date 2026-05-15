@@ -1,0 +1,1 @@
+free -h | lines | skip 1 | first | split row -r '\s+' | select 2 3 | str join "/"
