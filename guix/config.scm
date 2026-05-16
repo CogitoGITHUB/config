@@ -650,7 +650,6 @@ and a custom mode-line layout. Invoke with M-x book-mode.")
                           (@ (gnu packages emacs-xyz) emacs-wgrep)
                           (@ (gnu packages emacs-xyz) emacs-yasnippet)
                           emacs-org-superstar
-                          emacs-multiple-cursors
                           emacs-org-fancy-priorities
 			  emacs-leaf
 			  emacs-svg-tag-mode
