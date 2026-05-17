@@ -682,6 +682,7 @@ directories, and projects.")
                           (@ (gnu packages emacs-xyz) emacs-yasnippet)
                           (@ (gnu packages emacs-xyz) emacs-bookmark-plus)
                           (@ (gnu packages emacs-xyz) emacs-activities)
+                          (@ (gnu packages emacs-xyz) emacs-vundo)
                           emacs-org-superstar
                           emacs-org-ql
                           emacs-consult
