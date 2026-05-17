@@ -1,3 +1,11 @@
+# Warning: Refused to snapshot some files:
+#   manuals.org: 6.7MiB (7043034 bytes); the maximum size allowed is 1.0MiB (1048576 bytes)
+# Hint: This is to prevent large files from being added by accident. To fix this:
+#   * Add the file(s) to `.gitignore`
+#   * Run `jj config set --repo snapshot.max-new-file-size 7043034`
+#     This will increase the maximum file size allowed for new files, in this repository only.
+#   * Run `jj --config snapshot.max-new-file-size=7043034 status`
+
 # =============================================================================
 # ManifoldOS — Reshaping History
 # =============================================================================
