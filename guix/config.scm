@@ -577,6 +577,36 @@ and a custom mode-line layout. Invoke with M-x book-mode.")
     (license (@ (guix licenses) gpl3+))))
 
 
+(define-public emacs-consult-todo
+  (let ((commit "f9ba063a6714cb95ddbd886786ada93771f3c140")
+        (revision "0"))
+    (package
+      (name "emacs-consult-todo")
+      (version (git-version "0.5.0" revision commit))
+      (source
+       (origin
+         (method git-fetch)
+         (uri (git-reference
+               (url "https://github.com/liuyinz/consult-todo")
+               (commit commit)))
+         (file-name (git-file-name name version))
+         (sha256
+          (base32
+           "13lfm1kg3llda0w4mwbaai6vrsaymq3yn4kagpvkh9i0iy22a5ii"))))
+      (build-system emacs-build-system)
+      (propagated-inputs
+       (list (@ (gnu packages emacs-xyz) emacs-consult)
+             (@ (gnu packages emacs-xyz) emacs-hl-todo)))
+      (home-page "https://github.com/liuyinz/consult-todo")
+      (synopsis "Search and jump to hl-todo keywords with consult")
+      (description
+       "Provides consult-based commands to search and jump to TODO,
+FIXME, BUG, HACK and other hl-todo keywords across buffers,
+directories, and projects.")
+      (license (@ (guix licenses) gpl3+)))))
+
+
+
 (operating-system
   (locale "en_US.utf8")
   (timezone "Europe/Bucharest")
@@ -618,6 +648,7 @@ and a custom mode-line layout. Invoke with M-x book-mode.")
                           zellij
                           kanata
                           nushell
+                          emacs-consult-todo
                           (@ (gnu packages emacs) emacs-pgtk)
                           (@ (gnu packages emacs-xyz) emacs-auctex)
                           (@ (gnu packages emacs-xyz) emacs-avy)
@@ -649,7 +680,11 @@ and a custom mode-line layout. Invoke with M-x book-mode.")
                           (@ (gnu packages emacs-xyz) emacs-tempel)
                           (@ (gnu packages emacs-xyz) emacs-wgrep)
                           (@ (gnu packages emacs-xyz) emacs-yasnippet)
+                          (@ (gnu packages emacs-xyz) emacs-bookmark-plus)
+                          (@ (gnu packages emacs-xyz) emacs-activities)
                           emacs-org-superstar
+                          emacs-org-ql
+                          emacs-consult
                           emacs-org-fancy-priorities
 			  emacs-leaf
 			  emacs-svg-tag-mode
