@@ -48,6 +48,23 @@
 (define unzip (@ (gnu packages compression) unzip))
 (define patchelf (@ (gnu packages elf) patchelf))
 
+(define-public emacs-centaur-tabs-latest
+  (package
+    (inherit emacs-centaur-tabs)
+    (version "0.0.0-5ec350d")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (string-append
+             "https://github.com/ema2159/centaur-tabs/archive/"
+             "5ec350da6cacc34ac0efaac17d6ac5031ef82bd4.tar.gz"))
+       (sha256
+        (base32
+         "1hjl4zcs3rrjbvmxyis90dl5di3c84nxn2yrilb2acb9rgn7ma1d"))))
+    (arguments
+     (list #:tests? #f))
+    (propagated-inputs
+     (list emacs-powerline emacs-nerd-icons))))
 
 (define-public television
   (package
@@ -686,7 +703,7 @@ directories, and projects.")
                           emacs-org-superstar
                           emacs-nano-modeline
                           emacs-olivetti
-                          emacs-centaur-tabs
+                          emacs-centaur-tabs-latest
                           (@ (gnu packages emacs-xyz) emacs-dirvish)
                           emacs-org-ql
                           emacs-consult
