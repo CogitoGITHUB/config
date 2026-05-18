@@ -686,6 +686,7 @@ directories, and projects.")
                           emacs-org-superstar
                           emacs-nano-modeline
                           emacs-olivetti
+                          emacs-centaur-tabs
                           (@ (gnu packages emacs-xyz) emacs-dirvish)
                           emacs-org-ql
                           emacs-consult
