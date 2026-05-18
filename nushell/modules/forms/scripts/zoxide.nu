@@ -29,12 +29,13 @@ def --env __zoxide_zi [...rest: string] {
 alias z  = __zoxide_z
 alias zi = __zoxide_zi
 
+
 $env.config.keybindings = ($env.config.keybindings | append [
     {
         name: zoxide_fzf
-        modifier: none
+        modifier: control
         keycode: char_u
-        mode: vi_normal
+        mode: [emacs, vi_normal, vi_insert]
         event: { send: executehostcommand cmd: "zi" }
     }
 ])

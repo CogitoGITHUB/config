@@ -690,7 +690,7 @@ directories, and projects.")
                           emacs-org-fancy-priorities
 			  emacs-leaf
 			  emacs-svg-tag-mode
-                          emacs-book-mode
+                          
                           git
                           television
 			  jujutsu
