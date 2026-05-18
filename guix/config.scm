@@ -5,6 +5,7 @@
              (guix download)
              (guix git-download)
              (guix build-system trivial)
+             (guix import crate)
              (guix build-system gnu)
              (guix build-system cmake)
              (gnu packages ssh)
@@ -17,7 +18,9 @@
              (gnu packages emacs)
              (gnu packages web-browsers)
              (gnu packages shellutils)
+             (gnu packages rust)
              (gnu packages terminals)
+             (gnu packages linux)
              (gnu packages nushell)
              (gnu packages rust-apps)
              (gnu packages wm)
@@ -44,9 +47,30 @@
              (guix licenses)
              (gnu packages emacs-xyz)
              (gnu packages emacs-build))
-(use-service-modules networking ssh desktop xorg)
+(use-service-modules networking ssh desktop xorg nix)
 (define unzip (@ (gnu packages compression) unzip))
 (define patchelf (@ (gnu packages elf) patchelf))
+
+
+
+(define-public emacs-centered-cursor-mode
+  (package
+    (name "emacs-centered-cursor-mode")
+    (version "0.5.13")
+    (source
+     (origin
+       (method url-fetch)
+       (uri "https://raw.githubusercontent.com/andre-r/centered-cursor-mode.el/master/centered-cursor-mode.el")
+       (sha256
+        (base32 "1f2g2ln4zknak707yaayvs77j5fasrz247vsvfljy4q3zqnd4rwh"))))
+    (build-system emacs-build-system)
+    (home-page "https://github.com/andre-r/centered-cursor-mode.el")
+    (synopsis "Keep cursor vertically centered in Emacs")
+    (description
+     "Minor mode that keeps the cursor vertically centered in the window,
+so that the text scrolls past the cursor rather than the cursor moving
+through the text.")
+    (license (@ (guix licenses) gpl2+))))
 
 (define-public emacs-centaur-tabs-latest
   (package
@@ -65,6 +89,8 @@
      (list #:tests? #f))
     (propagated-inputs
      (list emacs-powerline emacs-nerd-icons))))
+
+
 
 (define-public television
   (package
@@ -718,8 +744,7 @@ directories, and projects.")
                           fzf
                           qutebrowser
                           hyprland
-                          hypridle
-                          opencode)
+                          hypridle)
                     %base-packages))
   (services
    (append (list (service tailscaled-service-type)
@@ -736,6 +761,7 @@ directories, and projects.")
                                                   #:log-file "/var/log/seatd.log"))
                                         (stop #~(make-kill-destructor))
                                         (respawn? #t))))
+                 (service nix-service-type)
                  (service openssh-service-type
                           (openssh-configuration
                            (permit-root-login #f)
