@@ -684,6 +684,7 @@ directories, and projects.")
                           (@ (gnu packages emacs-xyz) emacs-activities)
                           (@ (gnu packages emacs-xyz) emacs-vundo)
                           emacs-org-superstar
+                          emacs-nano-modeline
                           emacs-olivetti
                           (@ (gnu packages emacs-xyz) emacs-dirvish)
                           emacs-org-ql
