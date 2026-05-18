@@ -709,6 +709,7 @@ directories, and projects.")
                           emacs-consult
                           emacs-org-fancy-priorities
 			  emacs-leaf
+                          emacs-projectile
 			  emacs-svg-tag-mode
                           emacs-org-sticky-header
                           git
