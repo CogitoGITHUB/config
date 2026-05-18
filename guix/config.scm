@@ -684,13 +684,14 @@ directories, and projects.")
                           (@ (gnu packages emacs-xyz) emacs-activities)
                           (@ (gnu packages emacs-xyz) emacs-vundo)
                           emacs-org-superstar
+                          emacs-olivetti
                           (@ (gnu packages emacs-xyz) emacs-dirvish)
                           emacs-org-ql
                           emacs-consult
                           emacs-org-fancy-priorities
 			  emacs-leaf
 			  emacs-svg-tag-mode
-                          
+                          emacs-org-sticky-header
                           git
                           television
 			  jujutsu
