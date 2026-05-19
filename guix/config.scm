@@ -739,6 +739,10 @@ directories, and projects.")
 			  emacs-leaf
                           emacs-projectile
 			  emacs-svg-tag-mode
+                          emacs-hydra
+                          emacs-dash
+                          emacs-s
+                          emacs-pretty-hydra
                           emacs-org-sticky-header
                           git
                           television
