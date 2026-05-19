@@ -52,6 +52,19 @@
 (define patchelf (@ (gnu packages elf) patchelf))
 
 
+(define emacs-super-save-0.5
+  (package
+    (inherit emacs-super-save)
+    (version "0.5.0")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (string-append
+             "https://github.com/bbatsov/super-save/archive/refs/tags/v"
+             version ".tar.gz"))
+       (sha256
+        (base32
+         "0ma5qfm8l6bnqbcsmrfzw95drmhiv6a6l1kjp2b8b48clgazxb0y"))))))
 
 (define-public emacs-centered-cursor-mode
   (package
@@ -732,6 +745,7 @@ directories, and projects.")
                           emacs-centaur-tabs-latest
                           (@ (gnu packages emacs-xyz) emacs-dirvish)
                           emacs-ace-window
+                          emacs-super-save-0.5
                           emacs-centered-cursor-mode
                           emacs-org-ql
                           emacs-consult
