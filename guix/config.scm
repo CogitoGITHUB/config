@@ -731,6 +731,7 @@ directories, and projects.")
                           emacs-olivetti
                           emacs-centaur-tabs-latest
                           (@ (gnu packages emacs-xyz) emacs-dirvish)
+                          emacs-ace-window
                           emacs-centered-cursor-mode
                           emacs-org-ql
                           emacs-consult
