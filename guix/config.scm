@@ -785,6 +785,12 @@ directories, and projects.")
                           emacs-org-ql
                           emacs-consult
                           emacs-org-fancy-priorities
+                          emacs-helpful
+                          emacs-elisp-refs
+                          emacs-macrostep
+                          emacs-eros
+                          emacs-bug-hunter
+                          emacs-esup
 			  emacs-leaf
                           emacs-projectile
 			  emacs-svg-tag-mode
