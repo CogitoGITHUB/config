@@ -45,6 +45,7 @@
              (guix build-system cargo)
              (gnu packages gnome)
              (guix licenses)
+             (gnu packages package-management)
              (gnu packages emacs-xyz)
              (gnu packages emacs-build))
 (use-service-modules networking ssh desktop xorg nix)
@@ -785,6 +786,7 @@ directories, and projects.")
                           emacs-consult
                           emacs-org-fancy-priorities
                           emacs-helpful
+                          emacs-simple-httpd
                           emacs-elisp-refs
                           emacs-macrostep
                           emacs-eros
