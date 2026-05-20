@@ -787,6 +787,7 @@ directories, and projects.")
                           emacs-org-fancy-priorities
                           emacs-helpful
                           emacs-simple-httpd
+			  emacs-websocket
                           emacs-elisp-refs
                           emacs-macrostep
                           emacs-eros
