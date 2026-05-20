@@ -781,7 +781,6 @@ directories, and projects.")
                           emacs-super-save-0.5
                           emacs-centered-cursor-mode
                           emacs-consult-org-roam
-                          emacs-org-roam-ui
                           emacs-org-ql
                           emacs-consult
                           emacs-org-fancy-priorities
