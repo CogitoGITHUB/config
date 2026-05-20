@@ -52,6 +52,36 @@
 (define patchelf (@ (gnu packages elf) patchelf))
 
 
+(define emacs-org-roam-ui
+  (let ((commit "2894dcbf56d2eca8d3cae2b1ae183f51724b5db6")
+        (revision "0"))
+    (package
+      (name "emacs-org-roam-ui")
+      (version (git-version "0.1" revision commit))
+      (source
+       (origin
+         (method git-fetch)
+         (uri (git-reference
+               (url "https://github.com/org-roam/org-roam-ui")
+               (commit commit)))
+         (file-name (git-file-name name version))
+         (sha256
+          (base32
+           "14j9rx4mny7a22axs5426ljs754r3vffcvkd412s0pqkhlr0wqd2"))))
+      (build-system emacs-build-system)
+      (propagated-inputs
+       (list emacs-org-roam
+             emacs-websocket
+             emacs-simple-httpd
+             emacs-f))
+      (home-page "https://github.com/org-roam/org-roam-ui")
+      (synopsis "Web-based graph UI for org-roam")
+      (description
+       "Org-roam-ui provides a web application for visualizing and
+interacting with your org-roam notes graph.")
+      (license gpl3+))))
+
+
 (define emacs-super-save-0.5
   (package
     (inherit emacs-super-save)
@@ -750,6 +780,7 @@ directories, and projects.")
                           emacs-consult-notes
                           emacs-super-save-0.5
                           emacs-centered-cursor-mode
+                          emacs-org-roam-ui
                           emacs-org-ql
                           emacs-consult
                           emacs-org-fancy-priorities
