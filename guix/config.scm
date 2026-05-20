@@ -745,6 +745,9 @@ directories, and projects.")
                           emacs-centaur-tabs-latest
                           (@ (gnu packages emacs-xyz) emacs-dirvish)
                           emacs-ace-window
+                          emacs-org-roam
+                          emacs-org-roam-bibtex
+                          emacs-consult-notes
                           emacs-super-save-0.5
                           emacs-centered-cursor-mode
                           emacs-org-ql
