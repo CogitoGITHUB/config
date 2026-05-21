@@ -776,12 +776,9 @@ directories, and projects.")
                           emacs-centaur-tabs-latest
                           (@ (gnu packages emacs-xyz) emacs-dirvish)
                           emacs-ace-window
-                          emacs-org-roam
-                          emacs-org-roam-bibtex
                           emacs-consult-notes
                           emacs-super-save-0.5
                           emacs-centered-cursor-mode
-                          emacs-consult-org-roam
                           emacs-org-ql
                           emacs-consult
                           emacs-org-fancy-priorities
@@ -801,6 +798,73 @@ directories, and projects.")
                           emacs-s
                           emacs-pretty-hydra
                           emacs-org-sticky-header
+			  emacs-vulpea
+                 emacs-vulpea-ui
+                 emacs-org-cliplink
+                 emacs-org-generate
+                 emacs-treemacs
+                 emacs-treemacs-extra
+                 emacs-treemacs-nerd-icons
+                 emacs-password-generator
+                 emacs-vterm
+                 emacs-vterm-toggle
+                 emacs-multi-vterm
+                 emacs-everywhere
+                 emacs-hackernews
+                 emacs-youtube-dl
+                 emacs-magit-org-todos
+                 emacs-ivy-omni-org
+                 emacs-esup
+                 emacs-restart-emacs
+                 emacs-benchmark-init
+                 emacs-emojify
+                 emacs-elfeed
+                 emacs-elfeed-org
+                 emacs-elfeed-goodies
+                 emacs-goggles
+                 emacs-interleave
+                 emacs-perspective
+                 emacs-persp-mode
+                 emacs-loccur
+                 emacs-comment-tags
+                 emacs-hl-todo
+                 emacs-org-rainbow-tags
+                 emacs-literate-elisp
+                 emacs-spray
+                 emacs-org-drill
+                 emacs-org-drill-table
+                 emacs-kana
+                 emacs-kanji
+                 emacs-hyperbole
+                 emacs-xhair
+                 emacs-golden-ratio
+                 emacs-minions
+                 emacs-speed-type
+                 emacs-eww-lnum
+                 emacs-auto-sudoedit
+                 emacs-caps-lock
+                 emacs-geoclue
+                 emacs-org-street
+                 emacs-mmm-mode
+                 emacs-neotree
+                 emacs-org-books
+                 emacs-org-chef
+                 emacs-org-now
+                 emacs-org-contacts
+                 emacs-miniedit
+                 emacs-toodoo
+                 emacs-polymode-org
+                 emacs-citar
+                 emacs-svg-tag-mode
+                 emacs-org-mem
+                 emacs-multifiles
+                 emacs-multiple-cursors
+                 emacs-enwc
+                 emacs-popup
+                 emacs-popup-kill-ring
+                 emacs-consult-org-roam
+                 emacs-consult-yasnippet
+                 emacs-deft
                           git
                           television
 			  jujutsu
