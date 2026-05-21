@@ -866,6 +866,10 @@ directories, and projects.")
                  emacs-consult-org-roam
                  emacs-consult-yasnippet
                  emacs-deft
+		 emacs-org-roam
+		 emacs-org-roam-ui
+		 emacs-org-roam-bibtex
+		 emacs-consult-org-roam
                           git
                           television
 			  jujutsu
