@@ -799,7 +799,8 @@ directories, and projects.")
                           emacs-pretty-hydra
                           emacs-org-sticky-header
 			  emacs-vulpea
-                 emacs-vulpea-ui
+			  emacs-vulpea-ui
+			  emacs-hide-mode-line
                  emacs-org-cliplink
                  emacs-org-generate
                  emacs-treemacs
