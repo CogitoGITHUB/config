@@ -54,6 +54,36 @@
 (define patchelf (@ (gnu packages elf) patchelf))
 
 
+
+(define-public emacs-modaled
+  (package
+    (name "emacs-modaled")
+    (version "0.9.2")
+    (source
+     (origin
+       (method git-fetch)
+       (uri (git-reference
+             (url "https://github.com/DCsunset/modaled")
+             (commit (string-append "v" version))))
+       (file-name (git-file-name name version))
+       (sha256
+        (base32
+         ;; run: guix hash -rx . inside the checkout, or
+         ;; guix download "https://github.com/DCsunset/modaled/archive/refs/tags/v0.9.2.tar.gz"
+         "1g73nmgcv0vwx40i0ymcj5l4fbw36k1z3w9wsnfhm72fwbx2h2na"))))
+    (build-system emacs-build-system)
+    (home-page "https://github.com/DCsunset/modaled")
+    (synopsis "Build your own minor modes for modal editing in Emacs")
+    (description
+     "Modaled is a fully customizable modal editing framework for Emacs.
+Unlike Evil, Meow, or Modalka, it provides no default keybindings and no
+predefined states.  Instead it exposes @code{modaled-define-state} and
+@code{modaled-define-keys} macros that let you construct an arbitrary number
+of named states, each backed by its own minor mode and keymap, as well as
+unmanaged substates that can stack on top of any state.  The result is a
+clean, composable foundation for a fully custom modal editing system.")
+    (license agpl3+)))
+
 (define emacs-org-roam-ui
   (let ((commit "2894dcbf56d2eca8d3cae2b1ae183f51724b5db6")
         (revision "0"))
@@ -752,10 +782,9 @@ directories, and projects.")
                           (@ (gnu packages emacs-xyz) emacs-denote-explore)
                           (@ (gnu packages emacs-xyz) emacs-dashboard)
                           (@ (gnu packages emacs-xyz) emacs-dash-docs)
-                          (@ (gnu packages emacs-xyz) emacs-god-mode)
-                          (@ (gnu packages emacs-xyz) emacs-magit)
-                          (@ (gnu packages emacs-xyz) emacs-meow)
-                          (@ (gnu packages emacs-xyz) emacs-modus-themes)
+                           (@ (gnu packages emacs-xyz) emacs-god-mode)
+                           (@ (gnu packages emacs-xyz) emacs-magit)
+                           (@ (gnu packages emacs-xyz) emacs-modus-themes)
                           (@ (gnu packages emacs-xyz) emacs-nerd-icons)
                           (@ (gnu packages emacs-xyz) emacs-org-appear)
                           (@ (gnu packages emacs-xyz) emacs-org-auto-tangle)
@@ -864,15 +893,12 @@ directories, and projects.")
                  emacs-enwc
                  emacs-popup
                  emacs-popup-kill-ring
-                 emacs-consult-org-roam
-                 emacs-consult-yasnippet
-                 emacs-deft
-		 emacs-org-roam
-		 emacs-org-roam-ui
-		 emacs-org-roam-bibtex
-		 emacs-consult-org-roam
-                          git
-                          television
+                  emacs-consult-org-roam
+                  emacs-consult-yasnippet
+                  emacs-deft
+                  emacs-modaled
+                  git
+                           television
 			  jujutsu
                           fswatch
                           fzf
