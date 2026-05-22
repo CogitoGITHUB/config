@@ -1,6 +1,7 @@
 (use-modules (gnu)
              (gnu services shepherd)
              (gnu services networking)
+             (gnu packages monitoring)
              (guix packages)
              (guix download)
              (guix git-download)
@@ -873,6 +874,7 @@ directories, and projects.")
                           git
                           television
 			  jujutsu
+                          fswatch
                           fzf
                           qutebrowser
                           hyprland
