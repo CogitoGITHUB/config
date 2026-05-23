@@ -887,6 +887,7 @@ directories, and projects.")
                  emacs-polymode-org
                  emacs-citar
                  emacs-svg-tag-mode
+                 emacs-doom-modeline
                  emacs-org-mem
                  emacs-multifiles
                  emacs-multiple-cursors
