@@ -892,6 +892,8 @@ directories, and projects.")
                  emacs-multifiles
                  emacs-multiple-cursors
                  emacs-doct
+                 emacs-gnosis
+                 emacs-citar
 		 emacs-git-timemachine
 		 emacs-git-gutter
 		 emacs-git-messenger
