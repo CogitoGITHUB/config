@@ -891,6 +891,7 @@ directories, and projects.")
                  emacs-org-mem
                  emacs-multifiles
                  emacs-multiple-cursors
+                 emacs-doct
 		 emacs-git-timemachine
 		 emacs-git-gutter
 		 emacs-git-messenger
