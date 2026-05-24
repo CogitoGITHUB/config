@@ -843,7 +843,7 @@ directories, and projects.")
                  emacs-everywhere
                  emacs-hackernews
                  emacs-youtube-dl
-                 emacs-magit-org-todos
+                 emacs-magit-todos
                  emacs-ivy-omni-org
                  emacs-esup
                  emacs-restart-emacs
