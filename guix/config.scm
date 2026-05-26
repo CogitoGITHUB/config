@@ -735,11 +735,7 @@ directories, and projects.")
     (bootloader (bootloader-configuration
                  (bootloader grub-efi-bootloader)
                  (targets (list "/boot/efi"))
-                 (keyboard-layout keyboard-layout)
-                 (menu-entries
-                  (list (menu-entry
-                         (label "Arch Linux ISO")
-                         (chain-loader "/archlinux-x86_64.iso"))))))
+                 (keyboard-layout keyboard-layout)))
   (swap-devices (list (swap-space
                        (target (uuid "ba2b1983-3697-4124-8183-2d4528103325")))))
   (file-systems (cons* (file-system
@@ -915,6 +911,7 @@ directories, and projects.")
                            television
 			  jujutsu
                           fswatch
+                          
                           fzf
                           qutebrowser
                           hyprland
