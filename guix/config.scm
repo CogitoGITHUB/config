@@ -1,4 +1,6 @@
 (use-modules (gnu)
+             (gnu bootloader)
+             (gnu bootloader grub)
              (gnu services shepherd)
              (gnu services networking)
              (gnu packages monitoring)
@@ -730,10 +732,14 @@ directories, and projects.")
   (timezone "Europe/Bucharest")
   (keyboard-layout (keyboard-layout "us" "dvorak"))
   (host-name "ManifoldOS")
-  (bootloader (bootloader-configuration
-               (bootloader grub-efi-bootloader)
-               (targets (list "/boot/efi"))
-               (keyboard-layout keyboard-layout)))
+    (bootloader (bootloader-configuration
+                 (bootloader grub-efi-bootloader)
+                 (targets (list "/boot/efi"))
+                 (keyboard-layout keyboard-layout)
+                 (menu-entries
+                  (list (menu-entry
+                         (label "Arch Linux ISO")
+                         (chain-loader "/archlinux-x86_64.iso"))))))
   (swap-devices (list (swap-space
                        (target (uuid "ba2b1983-3697-4124-8183-2d4528103325")))))
   (file-systems (cons* (file-system
@@ -914,26 +920,26 @@ directories, and projects.")
                           hyprland
                           hypridle)
                     %base-packages))
-  (services
-   (append (list (service tailscaled-service-type)
-                 kanata-service
-                 (simple-service 'seatd
-                                 shepherd-root-service-type
-                                 (list (shepherd-service
-                                        (provision '(seatd))
-                                        (requirement '(user-processes))
-                                        (documentation "Minimal seat management daemon")
-                                        (start #~(make-forkexec-constructor
-                                                  (list #$(file-append seatd "/bin/seatd")
-                                                        "-g" "seat")
-                                                  #:log-file "/var/log/seatd.log"))
-                                        (stop #~(make-kill-destructor))
-                                        (respawn? #t))))
-                 (service nix-service-type)
-                 (service openssh-service-type
-                          (openssh-configuration
-                           (permit-root-login #f)
-                           (password-authentication? #t))))
+    (services
+     (append (list (service tailscaled-service-type)
+                   kanata-service
+                   (simple-service 'seatd
+                                  shepherd-root-service-type
+                                  (list (shepherd-service
+                                         (provision '(seatd))
+                                         (requirement '(user-processes))
+                                         (documentation "Minimal seat management daemon")
+                                         (start #~(make-forkexec-constructor
+                                                   (list #$(file-append seatd "/bin/seatd")
+                                                         "-g" "seat")
+                                                   #:log-file "/var/log/seatd.log"))
+                                         (stop #~(make-kill-destructor))
+                                         (respawn? #t))))
+                  (service nix-service-type)
+                  (service openssh-service-type
+                           (openssh-configuration
+                            (permit-root-login #f)
+                            (password-authentication? #t))))
            (modify-services %desktop-services
              (delete gdm-service-type)
              (elogind-service-type config =>
