@@ -1,0 +1,114 @@
+{
+   "checksum": "af7453abd9e1b0b32572468dd7632cb6",
+   "roots": {
+      "bookmark_bar": {
+         "children": [  ],
+         "date_added": "13424478821591031",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "0bc5d13f-2cba-5d74-951f-3f233fe6c908",
+         "id": "1",
+         "name": "Bookmarks bar",
+         "type": "folder"
+      },
+      "other": {
+         "children": [  ],
+         "date_added": "13424478821591031",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "82b081ec-3dd3-529c-8475-ab6c344590dd",
+         "id": "2",
+         "name": "Other bookmarks",
+         "type": "folder"
+      },
+      "synced": {
+         "children": [ {
+            "date_added": "13351617701913083",
+            "date_last_used": "0",
+            "guid": "1a0d4032-26db-4d29-8822-c9b2e8fb5c9a",
+            "id": "5",
+            "meta_info": {
+               "power_bookmark_meta": ""
+            },
+            "name": "How To Hack Mobile Phone, SMS, Phone calls, WhatsApp",
+            "type": "url",
+            "url": "https://www.yumpu.com/en/document/view/66025120/how-to-hack-mobile-phone-sms-phone-calls-whatsapp"
+         }, {
+            "date_added": "13351617709176668",
+            "date_last_used": "0",
+            "guid": "a0c299f1-3c5a-4284-89f7-e05bb2a27c49",
+            "id": "6",
+            "meta_info": {
+               "power_bookmark_meta": ""
+            },
+            "name": "[PDF] How to Hack Like a Ghost: Breaching the Cloud",
+            "type": "url",
+            "url": "https://www.yumpu.com/en/document/view/67208460/pdf-how-to-hack-like-a-ghost-breaching-the-cloud"
+         }, {
+            "date_added": "13351617807086967",
+            "date_last_used": "0",
+            "guid": "29ce73f2-37d1-4c75-bcf3-f9b0dc6928f9",
+            "id": "7",
+            "meta_info": {
+               "power_bookmark_meta": ""
+            },
+            "name": "(BOOK$) How to Hack Like a GOD: Master the secrets of Hacking through real life scenarios (Hack Th",
+            "type": "url",
+            "url": "https://www.yumpu.com/en/document/view/63787310/book-how-to-hack-like-a-god-master-the-secrets-of-hacking-through-real-life-scenarios-hack-th"
+         }, {
+            "date_added": "13351617971564659",
+            "date_last_used": "0",
+            "guid": "cc411666-f3de-411f-8665-911af389dad1",
+            "id": "8",
+            "meta_info": {
+               "power_bookmark_meta": ""
+            },
+            "name": "Linux Basics For Aspiring Hackers",
+            "type": "url",
+            "url": "https://www.yumpu.com/en/document/view/67418262/linux-basics-for-aspiring-hackers"
+         }, {
+            "date_added": "13352140449414826",
+            "date_last_used": "0",
+            "guid": "8e9b1c42-2465-42ce-9e69-fb152b8c8922",
+            "id": "9",
+            "meta_info": {
+               "power_bookmark_meta": ""
+            },
+            "name": "Hacker News",
+            "type": "url",
+            "url": "https://news.ycombinator.com/news?p=6"
+         }, {
+            "date_added": "13352140806848818",
+            "date_last_used": "0",
+            "guid": "8fa820f2-237b-455d-89a8-330bba7b0877",
+            "id": "10",
+            "meta_info": {
+               "power_bookmark_meta": ""
+            },
+            "name": "Stack Overflow - Where Developers Learn, Share, & Build Careers",
+            "type": "url",
+            "url": "https://stackoverflow.com/"
+         }, {
+            "date_added": "13362424665392761",
+            "date_last_used": "0",
+            "guid": "daefd58a-d3d1-41b5-a8b0-78daffc9b6c6",
+            "id": "11",
+            "meta_info": {
+               "power_bookmark_meta": ""
+            },
+            "name": "KortanZ/dotfiles: Dotfiles managed by GNU stow.",
+            "type": "url",
+            "url": "https://github.com/KortanZ/dotfiles"
+         } ],
+         "date_added": "13424478821591031",
+         "date_last_used": "0",
+         "date_modified": "13362424665392761",
+         "guid": "4cf2e351-0e85-532b-bb37-df045d8f8d0f",
+         "id": "3",
+         "name": "Mobile bookmarks",
+         "type": "folder"
+      }
+   },
+   "sync_metadata": "CuABCr8BCIiBAhK4ASAAkgGjAQqgAQoOY2hyb21lX3N5bmNfYm0SBTUxIWJtGhIJafmTxudSBgARafmTxudSBgAiNAkmDH/G51IGABADGbv9CszYr6pzIAEqHDUxIWJtL2ZkOjkxNjM3MjM1NTk0Njg4OTMxNjEiNAkmDH/G51IGABADGbv9CszYr6pzIAEqHDUxIWJtL2ZkOjkxNjM3MjM1NTk0Njg4OTMxNjEp/xKUxudSBgDqAQwIovPi0AYQgLTj7AISACoYNlRrZ1FvTUw4L09PNkFyTGtPSmJ0QT09SAMSqwEIARKmAQoceXhKLzZmdmtlY3I3a3A1RVF6QjR0V0xwZGJFPRJOWjpBRHF0QVp6aGMvZ2RkNmRHQTFzZVphSFZ5K0h2WjlDQ2laMVl5ZzFscEtBNDBDZWtOTzVGSGlvVGZFMS9ROGhHL1RDWkVBbXUwekxBGAAgACgAMNm3pcj03pMDOABAAEocYVJDV0xnaEY5YjVJbnFLSUR2dUovanZRa0ZjPVoAZQAAAAAS7AEICxLnAQocNmVQalliODlEbGsvd3NQZFRSRU1iT3N4YXdvPRJmWjpBRHF0QVp5VXpsZGxFajdrOVVSL09YLzJmY1BEMzU5akZqWFFjdXN4eVRDdFc4Q2ZsNFNzT2UzS3ArbVRPd29ubGxjRU93QjE1ZUhqZ280VTh0SkVGeGFnc09GVDVORGlLUT09GAAgACgAMNqbxbj6zoYDOLTa8+7/MUC02vPu/zFKHEgvSWtyQUNCQWhHS0NCakZMbEtNVVlGVDgwaz1aHyId+1ZVTnQxa3djMElHNVgzRnNzblF6cmgyUXI4ND1lvXW5IhLsAQgKEucBChxvV1FjUTFuYW5XOEdMQTdSWWZRUnFOZ2NKc2M9EmZaOkFEcXRBWnlVemxkbEVqN2s5VVIvT1gvMmZjUERiYVZQNDJxbUhQUS91dnFmQU8xQitkZG9nODB1YWVMQS9jbGtYVGVwdjZqeGtieW1sRXUxWWVXZXgyL3p2SzZWb2tZK0pBPT0YACAAKAAwmIqxi9SjhAM4weWWx9kxQMHllsfZMUoccm9aQkgrdkdPZm4yMUErTytnajB2OWRYM01zPVofIh32dStpZVJmS3JvcjdkT05Xem96NGRrcnB0anZZPWV+ihgSEuwBCAkS5wEKHDBILzZOaWc0WURMYk5SMS83cy93ZzFIQ2trST0SZlo6QURxdEFaeVV6bGRsRWo3azlVUi9PWC8yZmNQRDh6V1J4enRFQW5pd1cxUkxNMnRjSU5jOStReFd0bWttUnFvbnM2MWl1eUxXUjhpMElxUCs4c1JKNC92bm84Z0RhSDVBN0E9PRgAIAAoADDMsvjg0qOEAziJ/YDH2TFAif2Ax9kxShxDaFRFR0tuWDJ4aktRKy9aKy9zdVA0cjJERkk9Wh8iHe1VRVFnZlA4VzRvdjlaWWdReEJtdGdpUGdjWjg9ZfSqrJ0S7AEICBLnAQocdm1nS2c2WlVEckhMajFCZThkNWdya29TNnFnPRJmWjpBRHF0QVp5VXpsZGxFajdrOVVSL09YLzJmY1BEanluYjdIbmtmOVJuOG9BSFpDWFF1TE9OQUtRZGpKSmlEZitvUkZwcGdXRVNxWnZPWHRSRmttT0V1cktsLzRvOU5lekYxZz09GAAgACgAMIiq57u4lIQDOO66783XMUDuuu/N1zFKHG5aQVNXNkpSczJYL1hmeTN5MkZ2Q1hmRnhGQT1aHyId2lNnbHU4TlI2NFg5SHQ3OXkwdjAra2xEZVF3bz1l8x+IcRLDAQgCEr4BChxZY1NUb252RVNQd3FDczRMMmNyVmh2NjhMOTg9EmZaOkFEcXRBWnh4UHZ0TitBUmFZQ1NqVUlIdk1nNnBwUUZ0RmltQ3dJR3BPekltYkplZXBET1Q0Rk5NOE9hbXhUaXMvUWxJSmV0b09kc0xxM3RKbnk3UDRFRW9EWGU1eE1ZejNnPT0YACAAKAAw2belyPTekwM4AEAAShxvUFZraHdCUmJWNjVLQ1dSMitJT05IV29PdTg9WgBlAAAAABLsAQgHEucBChxPVGQ4akZuckloU0x0VExDcWx0WWtWTzhidjg9EmZaOkFEcXRBWnlVemxkbEVqN2s5VVIvT1gvMmZjUERBR21jbTJLNUh4RnhCTFZ1ZGtYc2ZOeVVOV1d1Q0JucW1ZN1ZyV1hiSUVXcStkRmV4VW1xUW9peVMzQWRsQnJQekphcGdRPT0YACAAKAAw/d7dmriUhAM48LXlzdcxQPC15c3XMUocV09XTU5vRUlzVGhEMjRiSlVwWmNhbng1RXVBPVofIh21ODBoOUkxaWVhZm9PT3BoaWhTcC8rQmZPb3ZvPWXzH4hxEusBCAYS5gEKHFVwU3AwSlFGc0FLNWkxbzZwYldDUHVqNSt4az0SZlo6QURxdEFaeVV6bGRsRWo3azlVUi9PWC8yZmNQRFEwWmlGRUppMUNQTENGQnBrQ2Vuajl6ZGFsNXNmRDZBbW56b3BOTnpCVG1vT0NvL1JxR1d6NWdNcFp0Y1VQTGtUeVpNV2c9PRgAIAAoADCptfuyt5SEAzj6uN/N1zFA+rjfzdcxShxsM0RKOFY3dStibEg1aVp0Q01wR3pQUWpVbWM9Wh4iHGtBZzJBYm5zYUpBZTAwUFNvY3EvTmwxZStPQT1l8x+IcRLrAQgFEuYBChx4Z3FHbHN0OWNiY0ZGamJpT2k4d1dKbWNpa0k9EmZaOkFEcXRBWnlVemxkbEVqN2s5VVIvT1gvMmZjUEQ5M3k5MFBKd2lkQWpvZys2WnM5Vy9RaTFsVFk3VTRucWpqZkJHc2ZjRUNLR3J1VEc2ZnJOZitiR3BwZHI2QXRFMG5IUXp3PT0YACAAKAAwntfBr7eUhAM4o4DfzdcxQKOA383XMUocdUIwVWlJTDdjN08wdVFBU0RwNWdLcm5Sa3pNPVoeIhxIVmtBd0tBMWh0aVNwWmVrTnRUWTMxMCt3aUU9ZfMfiHESwwEIAxK+AQocbmpnRHU4OGVDcnZYcDg2cEQ3ZkhHY3FGcDg4PRJmWjpBRHF0QVp6M0YxVjRVcEwyc3lFYlphZnVwS1NCTmdGQUZRYlR5VE1kdjVmL0FLYmRTd2RlOVNYSk5TdFEvTXRvcVhzWkVYOU1pRVIvYW0yUzZxaEtFZGtCWkZFUzh3Z1B6UT09GAAgACgAMNm3pcj03pMDOABAAEoceXpOQjAxY241NEE3Y1JVMHVUKy9QZ21UdFVvPVoAZQAAAAAwATgA",
+   "version": 1
+}
