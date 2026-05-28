@@ -8,3 +8,5 @@ nushell/history.sqlite3*
 atuin/history.db
 atuin/history.db-wal
 atuin/history.db-shm
+google-chrome/
+mozilla/
