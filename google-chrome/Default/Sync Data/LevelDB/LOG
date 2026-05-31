@@ -1,3 +1,9 @@
-2026/05/29-01:18:21.959 7c9 Reusing MANIFEST /home/aoeu/.config/google-chrome/Default/Sync Data/LevelDB/MANIFEST-000001
-2026/05/29-01:18:21.987 7c9 Recovering log #3
-2026/05/29-01:18:21.989 7c9 Reusing old log /home/aoeu/.config/google-chrome/Default/Sync Data/LevelDB/000003.log 
+2026/05/29-01:55:44.563 267c Reusing MANIFEST /home/aoeu/.config/google-chrome/Default/Sync Data/LevelDB/MANIFEST-000001
+2026/05/29-01:55:44.564 267c Recovering log #4
+2026/05/29-01:55:44.703 267c Reusing old log /home/aoeu/.config/google-chrome/Default/Sync Data/LevelDB/000004.log 
+2026/05/31-12:49:48.920 267a Level-0 table #8: started
+2026/05/31-12:49:48.931 267a Level-0 table #8: 98315 bytes OK
+2026/05/31-12:49:48.934 267a Delete type=0 #4
+2026/05/31-18:43:53.493 268a Level-0 table #10: started
+2026/05/31-18:43:53.825 268a Level-0 table #10: 117567 bytes OK
+2026/05/31-18:43:53.944 268a Delete type=0 #7

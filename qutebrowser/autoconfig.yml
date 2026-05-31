@@ -7,5 +7,4 @@
 config_version: 2
 settings:
   content.media.audio_capture:
-    https://chatgpt.com: true
-    https://gemini.google.com: true
+    https://claude.ai: true

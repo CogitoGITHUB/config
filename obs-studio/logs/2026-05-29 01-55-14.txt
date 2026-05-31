@@ -1,0 +1,48 @@
+01:55:14.446: Platform: Wayland
+01:55:14.446: CPU Name: Intel(R) Core(TM) i3-10110U CPU @ 2.10GHz
+01:55:14.446: CPU Speed: 3199.999MHz
+01:55:14.447: Physical Cores: 2, Logical Cores: 4
+01:55:14.447: Physical Memory: 7809MB Total, 917MB Free
+01:55:14.447: Kernel Version: Linux 6.18.31-gnu
+01:55:14.447: Distribution: "Guix System" Unknown
+01:55:14.447: Desktop Environment: Hyprland
+01:55:14.447: Session Type: wayland
+01:55:14.449: Current Date/Time: 2026-05-29, 01:55:14
+01:55:14.449: Browser Hardware Acceleration: true
+01:55:14.449: Qt Version: 6.11.0 (runtime), 6.11.0 (compiled)
+01:55:14.449: Portable mode: false
+01:55:14.495: OBS 32.1.2 (linux)
+01:55:14.495: ---------------------------------
+01:55:14.496: ---------------------------------
+01:55:14.496: audio settings reset:
+01:55:14.496: 	samples per sec: 48000
+01:55:14.496: 	speakers:        2
+01:55:14.496: 	max buffering:   960 milliseconds
+01:55:14.496: 	buffering type:  dynamically increasing
+01:55:14.513: ---------------------------------
+01:55:14.513: Initializing OpenGL...
+01:55:14.513: Using EGL/Wayland
+01:55:14.513: eglGetDisplay failed
+01:55:14.513: device_create (GL) failed
+01:55:14.513: Failed to initialize video.  Your GPU may not be supported, or your graphics drivers may need to be updated.
+01:55:14.529: Failed to register with host portal QDBusError("org.freedesktop.DBus.Error.ServiceUnknown", "The name org.freedesktop.portal.Desktop was not provided by any .service files")
+01:55:37.366: Freeing OBS context data
+01:55:37.367: Crash sentinel location '/home/aoeu/.config/obs-studio/.sentinel' does not exist
+01:55:37.371: == Profiler Results =============================
+01:55:37.371: run_program_init: 23092.3 ms
+01:55:37.371:  ┣OBSApp::AppInit: 80.589 ms
+01:55:37.371:  ┃ ┗OBSApp::InitLocale: 20.878 ms
+01:55:37.371:  ┗OBSApp::OBSInit: 66.994 ms
+01:55:37.371:    ┣obs_startup: 2.264 ms
+01:55:37.371:    ┗OBSBasic::OBSInit: 18.057 ms
+01:55:37.371:      ┣OBSBasic::InitBasicConfig: 0.547 ms
+01:55:37.372:      ┣OBSBasic::ResetAudio: 0.223 ms
+01:55:37.372:      ┗OBSBasic::ResetVideo: 17.268 ms
+01:55:37.372:        ┗obs_init_graphics: 17.262 ms
+01:55:37.372: obs_hotkey_thread(25 ms): min=0 ms, median=0.001 ms, max=0.028 ms, 99th percentile=0.002 ms, 100% below 25 ms
+01:55:37.372: audio_thread(Audio): min=0.01 ms, median=0.046 ms, max=0.209 ms, 99th percentile=0.083 ms
+01:55:37.372: =================================================
+01:55:37.372: == Profiler Time Between Calls ==================
+01:55:37.372: obs_hotkey_thread(25 ms): min=25.019 ms, median=25.14 ms, max=28.647 ms, 99.0099% within ±2% of 25 ms (0% lower, 0.990099% higher)
+01:55:37.372: =================================================
+01:55:37.374: Number of memory leaks: 580
