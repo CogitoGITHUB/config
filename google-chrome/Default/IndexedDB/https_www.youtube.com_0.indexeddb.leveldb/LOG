@@ -99,3 +99,36 @@
 2026/05/31-17:32:59.359 267c Level-0 table #42: started
 2026/05/31-17:32:59.413 267c Level-0 table #42: 1593210 bytes OK
 2026/05/31-17:32:59.419 267c Delete type=0 #38
+2026/05/31-19:11:31.828 267c Compacting 1@1 + 1@2 files
+2026/05/31-19:11:31.849 267c Generated table #43@1: 1221 keys, 89957 bytes
+2026/05/31-19:11:31.849 267c Compacted 1@1 + 1@2 files => 89957 bytes
+2026/05/31-19:11:31.852 267c compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/05/31-19:11:31.852 267c Delete type=2 #42
+2026/05/31-19:11:31.853 267c Delete type=2 #40
+2026/06/03-18:08:15.287 267c Level-0 table #45: started
+2026/06/03-18:08:15.307 267c Level-0 table #45: 1758073 bytes OK
+2026/06/03-18:08:15.310 267c Delete type=0 #41
+2026/06/03-18:36:26.693 267c Compacting 1@1 + 1@2 files
+2026/06/03-18:36:26.717 267c Generated table #46@1: 1216 keys, 122604 bytes
+2026/06/03-18:36:26.718 267c Compacted 1@1 + 1@2 files => 122604 bytes
+2026/06/03-18:36:26.719 267c compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/06/03-18:36:26.720 267c Delete type=2 #43
+2026/06/03-18:36:26.720 267c Delete type=2 #45
+2026/06/05-11:48:28.804 267c Level-0 table #48: started
+2026/06/05-11:48:28.826 267c Level-0 table #48: 2876723 bytes OK
+2026/06/05-11:48:28.828 267c Delete type=0 #44
+2026/06/05-11:49:08.763 268a Compacting 1@1 + 1@2 files
+2026/06/05-11:49:08.793 268a Generated table #49@1: 1811 keys, 1547967 bytes
+2026/06/05-11:49:08.793 268a Compacted 1@1 + 1@2 files => 1547967 bytes
+2026/06/05-11:49:08.795 268a compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/06/05-11:49:08.796 268a Delete type=2 #48
+2026/06/05-11:49:08.796 268a Delete type=2 #46
+2026/06/05-11:51:56.756 267c Level-0 table #51: started
+2026/06/05-11:51:56.772 267c Level-0 table #51: 2763111 bytes OK
+2026/06/05-11:51:56.775 267c Delete type=0 #47
+2026/06/05-11:52:22.763 268a Compacting 1@1 + 1@2 files
+2026/06/05-11:52:22.787 268a Generated table #52@1: 1603 keys, 727459 bytes
+2026/06/05-11:52:22.787 268a Compacted 1@1 + 1@2 files => 727459 bytes
+2026/06/05-11:52:22.789 268a compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/06/05-11:52:22.790 268a Delete type=2 #49
+2026/06/05-11:52:22.790 268a Delete type=2 #51
