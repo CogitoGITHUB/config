@@ -228,3 +228,4 @@ emacs dir-info.nu
 tnu
 emacs dir-info.nu
 emacs 
+emacs workspace-vc-roots.nu
