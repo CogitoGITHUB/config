@@ -416,7 +416,8 @@ def check-conflicts [repo: string] {
 }
 
 def check-large-files [repo: string] {
-    let limit_bytes = ($config.max_file_size_mb * 1024 * 1024)
+    # Express limit as filesize so it's comparable to ls .size directly
+    let limit = ($config.max_file_size_mb * 1mb)
     let large = (try {
         git -C $repo status --porcelain=v1 -z
         | split row "\u{0000}"
@@ -426,7 +427,7 @@ def check-large-files [repo: string] {
             let full  = ($repo | path join $fname)
             if not ($full | path exists) { return null }
             let sz = (try { (ls $full).0.size } catch { 0b })
-            if $sz > $limit_bytes { $fname } else { null }
+            if $sz > $limit { $fname } else { null }
         }
         | where { |x| $x != null }
     } catch { [] })
@@ -730,13 +731,37 @@ def manifold-entry-prompt [repo: string, branch: string] {
     print $"(ansi red_bold)  🌹 ($branch)  ↑($sync.ahead) ↓($sync.behind)  ($changed) changed(ansi reset)"
     print $"(ansi grey)     enter = fast commit·push   space = interactive   esc/q = abort(ansi reset)"
     print ""
-    let key = (input listen --types [key])
-    let code = ($key | get code? | default "")
-    let ch   = ($key | get char? | default "")
-    if $ch == " "           { return "interactive" }
-    if $code == "Enter"     { return "fast" }
-    if $code == "Escape" or $ch == "q" { return "abort" }
-    "abort"
+
+    # input listen key event record shape (all codes are lowercase strings):
+    #   { type: "key"  key_type: "other"  code: "enter"   modifiers: [] }
+    #   { type: "key"  key_type: "char"   code: " "       modifiers: [] }
+    #   { type: "key"  key_type: "other"  code: "escape"  modifiers: [] }
+    #   { type: "key"  key_type: "char"   code: "q"       modifiers: [] }
+    #   { type: "key"  key_type: "char"   code: "c"       modifiers: ["control"] }
+    mut result = "abort"
+    loop {
+        let key = (input listen --types [key])
+        let code     = ($key.code?     | default "" | str downcase)
+        let key_type = ($key.key_type? | default "")
+        let mods     = ($key.modifiers? | default [])
+
+        # Ctrl-C — hard abort
+        if $code == "c" and ("control" in $mods) {
+            $result = "abort"
+            break
+        }
+
+        $result = match [$key_type $code] {
+            ["other" "enter"]  => "fast"
+            ["char"  " "]      => "interactive"
+            ["other" "escape"] => "abort"
+            ["char"  "q"]      => "abort"
+            _                  => "retry"
+        }
+
+        if $result != "retry" { break }
+    }
+    $result
 }
 
 # =============================================================================
