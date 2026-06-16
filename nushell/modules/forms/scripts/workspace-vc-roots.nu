@@ -776,6 +776,114 @@ def hub-sync [repo: string, bm: string] {
     input "  Press enter..." | ignore
 }
 
+# ── rebase (interactive) ──────────────────────────────────────────────────────
+def hub-rebase [repo: string, bm: string] {
+    if ($bm | is-empty) { print "  🥀 cannot rebase during rebase/merge/etc"; input "  Press enter..." | ignore; return }
+    print $"  current branch: ($bm)"
+    let total = (try { git -C $repo rev-list --count $"origin/($bm)..($bm)" | str trim | into int } catch { 0 })
+    if $total == 0 {
+        print "  🌹 no local commits to rebase — already linear"
+        input "  Press enter..." | ignore
+        return
+    }
+    print $"  ($total) local commit\(s\) not yet on origin/($bm)"
+    print -n "  how many to rebase? (default: $total): "
+    let n_raw = (input "" | str trim)
+    let n = if ($n_raw | is-empty) { $total } else { try { $n_raw | into int } catch { $total } }
+    if $n < 1 { print "  🥀 need at least 1"; input "  Press enter..." | ignore; return }
+    git -C $repo fetch origin | ignore
+    print $"  🌹 rebasing last ($n) commit\(s\)..."
+    let r = (do { git -C $repo rebase -i $"HEAD~($n)" } | complete)
+    if $r.exit_code != 0 {
+        print -e $"  🥀 rebase had conflicts — resolve then run 'git rebase --continue'"
+    } else {
+        print "  🌹 rebase complete — linear history updated"
+    }
+    input "  Press enter..." | ignore
+}
+
+# ── tags ──────────────────────────────────────────────────────────────────────
+def hub-tags [repo: string] {
+    loop {
+        let lines = (try {
+            git -C $repo tag --sort=-creatordate "--format=%(refname:short)\t%(committerdate:short)\t%(subject)"
+            | lines | where { |l| $l | is-not-empty }
+        } catch { [] })
+        if ($lines | is-empty) {
+            print "  🌹 no tags yet"
+            print -n "  create first tag name: "
+            let name = (input "" | str trim)
+            if ($name | is-empty) { return }
+            git -C $repo tag $name | ignore
+            git -C $repo push origin $name | ignore
+            print $"  🌹 created and pushed tag ($name)"
+            input "  Press enter..." | ignore
+            continue
+        }
+
+        let preview = $"git -C ($repo) show --color=always --stat {1}"
+        let result = (fzf-run ($lines | str join "\n") [
+            "--ansi"
+            "--tabstop=1"
+            "--delimiter=\t"
+            "--prompt=  🌹 tags  "
+            "--header=  enter=inspect  ctrl-n=new  ctrl-d=delete  ctrl-p=push all  esc=back"
+            $"--preview=($preview)"
+            "--preview-window=right:55%:wrap"
+            "--expect=ctrl-d,ctrl-n,ctrl-p"
+            "--bind=esc:abort"
+        ])
+
+        if ($result.stdout | is-empty) { return }
+
+        let all_lines = ($result.stdout | lines)
+        let key = ($all_lines | first | str trim)
+        let selected = ($all_lines | skip 1 | str join "\n" | str trim)
+
+        if $key == "ctrl-d" {
+            let tag = ($selected | split row "\t" | get 0 | str trim)
+            if ($tag | is-empty) { continue }
+            print -n $"  delete tag ($tag) locally and on remote? [y/N] "
+            let yn = (input "" | str trim | str downcase)
+            if $yn == "y" {
+                git -C $repo tag -d $tag | ignore
+                git -C $repo push origin --delete refs/tags/$tag | ignore
+                print $"  🌹 ($tag) deleted"
+                input "  Press enter..." | ignore
+            }
+            continue
+        }
+
+        if $key == "ctrl-n" {
+            print -n "  🌹 new tag name: "
+            let name = (input "" | str trim)
+            if ($name | is-empty) { continue }
+            git -C $repo tag $name | ignore
+            git -C $repo push origin $name | ignore
+            print $"  🌹 created and pushed tag ($name)"
+            input "  Press enter..." | ignore
+            continue
+        }
+
+        if $key == "ctrl-p" {
+            let r = (do { git -C $repo push origin --tags } | complete)
+            if $r.exit_code == 0 {
+                print "  🌹 all tags pushed to remote"
+            } else {
+                print -e $"  🥀 push failed: ($r.stderr)"
+            }
+            input "  Press enter..." | ignore
+            continue
+        }
+
+        if $key == "enter" {
+            let tag = ($selected | split row "\t" | get 0 | str trim)
+            git -C $repo show --stat $tag | print
+            input "  Press enter..." | ignore
+        }
+    }
+}
+
 # ── fix head ──────────────────────────────────────────────────────────────────
 def hub-fix-head [repo: string] {
     let branch = (resolve-branch $repo)
@@ -873,26 +981,37 @@ def interactive-hub [repo: string, msg: string] {
     let branch  = (resolve-branch $repo)
     let sync    = (resolve-ahead-behind $repo $branch)
     let changed = (capture-changed $repo | length)
+    let tags    = (try { git -C $repo tag | lines | length } catch { 0 })
+    let head_tag = (try { git -C $repo tag --points-at HEAD | lines | first | str trim } catch { "" })
+    let last_commit = (try { git -C $repo log -1 "--format=%h %s" --color=never | str trim } catch { "" })
+    let stash_cnt = (try { git -C $repo stash list | lines | length } catch { 0 })
+    let remote_url = (try { git -C $repo remote get-url origin | str trim | str replace --regex "^.*:" "" } catch { "" })
     let state   = if ($branch | str starts-with "__") { $"(ansi red_bold)⚠ ($branch)(ansi reset)" } else { $branch }
 
     # Display git information above the menu
     print -n "\e[2J\e[H"
     print $"(ansi red_bold)🌹 MANIFOLD(ansi reset)"
-    print $"  Branch: (ansi cyan_bold)($state)(ansi reset)"
-    print $"  Sync: (ansi yellow)↑($sync.ahead) ↓($sync.behind)(ansi reset)"
-    print $"  Changes: (ansi green)($changed)(ansi reset)"
+    print $"  (ansi red)Branch: ($state)(ansi reset)"
+    print $"  (ansi red)Sync: ↑($sync.ahead) ↓($sync.behind)  Stash: ($stash_cnt)(ansi reset)"
+    if ($last_commit | is-not-empty) { print $"  (ansi red)Commit: ($last_commit)(ansi reset)" }
+    let tags_display = if ($head_tag | is-not-empty) { $head_tag } else { $tags | into string }
+    print $"  (ansi red)Tags: ($tags_display)(ansi reset)"
+    print $"  (ansi red)Changes: ($changed)(ansi reset)"
+    if ($remote_url | is-not-empty) { print $"  (ansi red)Remote: ($remote_url)(ansi reset)" }
     print ""
 
       let options = [
           $"commit & push  \(($changed) changed\)  \(stage & submit all\)"
           "branches  (switch / create / delete)"
           "log  (view commit history)"
+          "tags  (list / create / delete version markers)"
           "stash  (save & restore work in progress)"
           "diff  (review unstaged changes)"
+          "rebase  (interactive — reorder/squash local commits)"
           "squash  (combine recent commits)"
           "amend  (edit last commit message & files)"
           "undo  (revert last action)"
-          "sync  (fetch & merge remote changes)"
+          "sync  (fetch & rebase on remote — linear history)"
           "merge into  (merge current branch into selected)"
           "fix head  (repair detached or broken HEAD)"
       ] | str join "\n"
@@ -1062,12 +1181,13 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
              "commit"   => { hub-commit-push $repo $safe_bm $msg; return }
              "branches" => { 
                  hub-branches $repo
-                 # Refresh display after branch switch
                  print -n "\e[2J\e[H"
              }
              "log"      => { hub-log $repo }
+             "tags"     => { hub-tags $repo }
              "stash"    => { hub-stash $repo }
              "diff"     => { hub-diff $repo }
+             "rebase"   => { hub-rebase $repo $safe_bm }
              "squash"   => { hub-squash $repo $safe_bm }
              "amend"    => { hub-amend $repo }
              "undo"     => { hub-undo $repo }
