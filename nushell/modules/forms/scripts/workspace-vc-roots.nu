@@ -730,36 +730,36 @@ def manifold-entry-prompt [repo: string, branch: string] {
     print ""
     print $"(ansi red_bold)  🌹 ($branch)  ↑($sync.ahead) ↓($sync.behind)  ($changed) changed(ansi reset)"
     print $"(ansi grey)     enter = fast commit·push   space = interactive   esc/q = abort(ansi reset)"
+    print $"(ansi grey)     [DEBUG: press any key to see raw event](ansi reset)"
     print ""
 
-    # input listen key event record shape (all codes are lowercase strings):
-    #   { type: "key"  key_type: "other"  code: "enter"   modifiers: [] }
-    #   { type: "key"  key_type: "char"   code: " "       modifiers: [] }
-    #   { type: "key"  key_type: "other"  code: "escape"  modifiers: [] }
-    #   { type: "key"  key_type: "char"   code: "q"       modifiers: [] }
-    #   { type: "key"  key_type: "char"   code: "c"       modifiers: ["control"] }
     mut result = "abort"
     loop {
-        let key = (input listen --types [key])
-        let code     = ($key.code?     | default "" | str downcase)
-        let key_type = ($key.key_type? | default "")
-        let mods     = ($key.modifiers? | default [])
+        let key  = (input listen --types [key])
+        # Print the raw event so we can see exactly what Nu reports
+        print $"  DEBUG raw key event: ($key | to nuon)"
+        let pair = [$key.code $key.modifiers]
+        print $"  DEBUG pair: ($pair | to nuon)"
 
-        # Ctrl-C — hard abort
-        if $code == "c" and ("control" in $mods) {
+        if $key.code == 'enter' and $key.modifiers == [] {
+            $result = "fast"
+            break
+        } else if $key.code == ' ' and $key.modifiers == [] {
+            $result = "interactive"
+            break
+        } else if $key.code == 'escape' and $key.modifiers == [] {
             $result = "abort"
             break
+        } else if $key.code == 'q' and $key.modifiers == [] {
+            $result = "abort"
+            break
+        } else if $key.code == 'c' and $key.modifiers == ['keymodifiers(control)'] {
+            $result = "abort"
+            break
+        } else {
+            print $"  DEBUG unrecognized — retrying"
+            continue
         }
-
-        $result = match [$key_type $code] {
-            ["other" "enter"]  => "fast"
-            ["char"  " "]      => "interactive"
-            ["other" "escape"] => "abort"
-            ["char"  "q"]      => "abort"
-            _                  => "retry"
-        }
-
-        if $result != "retry" { break }
     }
     $result
 }
