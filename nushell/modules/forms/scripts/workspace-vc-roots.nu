@@ -531,14 +531,22 @@ def hub-branches [repo: string] {
                 $stash_yn = (input "" | str trim | str downcase)
             }
             if $dirty > 0 and $stash_yn != "n" {
-                git -C $repo stash push -m "auto-stash before branch switch" | ignore
-                print "  🌹 stashed"
+                let stash_ok = (do { git -C $repo stash push -m "auto-stash before branch switch" } | complete)
+                if $stash_ok.exit_code == 0 {
+                    print "  🌹 stashed"
+                } else {
+                    print -e $"  🥀 stash failed: ($stash_ok.stderr | str trim)"
+                    continue
+                }
             }
 
             let checkout = (do { git -C $repo checkout $target } | complete)
             if $checkout.exit_code == 0 {
                 if $dirty > 0 and $stash_yn != "n" {
-                    git -C $repo stash pop | ignore
+                    let pop_ok = (do { git -C $repo stash pop } | complete)
+                    if $pop_ok.exit_code != 0 {
+                        print -e $"  �0 stash pop failed — run 'git stash drop' to clean up: ($pop_ok.stderr | str trim)"
+                    }
                 }
                 print $"  🌹 switched to ($target)"
                 input "  Press enter..." | ignore
@@ -952,7 +960,12 @@ def hub-merge-into [repo: string] {
     let has_changes = ((git -C $repo status --porcelain | str trim) | is-not-empty)
     if $has_changes {
         print "  🌹 stashing local changes..."
-        git -C $repo stash push -m "auto-stash before merge" | ignore
+        let stash_ok = (do { git -C $repo stash push -m "auto-stash before merge" } | complete)
+        if $stash_ok.exit_code != 0 {
+            print -e $"  🥀 stash failed: ($stash_ok.stderr | str trim)"
+            input "  Press enter..." | ignore
+            return
+        }
     }
 
     print $"  🌹 switching to ($target)..."
@@ -960,7 +973,7 @@ def hub-merge-into [repo: string] {
     if $switch.exit_code != 0 {
         print -e $"  🥀 Failed to switch to ($target)"
         print -e $switch.stderr
-        if $has_changes { git -C $repo stash pop | ignore }
+        if $has_changes { do { git -C $repo stash pop } | complete | ignore }
         input "  Press enter..." | ignore
         return
     }
@@ -984,7 +997,10 @@ def hub-merge-into [repo: string] {
     git -C $repo checkout $current | ignore
     if $has_changes {
         print "  🌹 restoring stashed changes..."
-        git -C $repo stash pop | ignore
+        let pop_ok = (do { git -C $repo stash pop } | complete)
+        if $pop_ok.exit_code != 0 {
+            print -e $"  🥀 stash pop failed — run 'git stash drop' to clean up: ($pop_ok.stderr | str trim)"
+        }
     }
 
     input "  Press enter..." | ignore
