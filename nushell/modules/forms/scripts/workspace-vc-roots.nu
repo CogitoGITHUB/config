@@ -414,6 +414,7 @@ def fzf-run [input_str: string, args: list<string>] {
 
 # ── commit & push ─────────────────────────────────────────────────────────────
 def hub-commit-push [repo: string, bm: string, msg: string] {
+    print "  🌹 fetching..."
     let fetch_result = (do { git -C $repo fetch origin } | complete)
     if $fetch_result.exit_code != 0 { render-failure "FETCH" $fetch_result.stderr; return }
     if (check-divergence $repo $bm)   { return }
@@ -428,9 +429,11 @@ def hub-commit-push [repo: string, bm: string, msg: string] {
         $"[($bm)] (date now | format date '%Y-%m-%d %H:%M')"
     } else { $msg }
     let author = $"($config.author_name) <($config.author_email)>"
+    print "  🌹 staging & committing..."
     git -C $repo add -A | ignore
     let ci = (do { git -C $repo commit -m $commit_msg --author $author } | complete)
     if $ci.exit_code != 0 { render-failure "COMMIT" $ci.stderr; return }
+    print "  🌹 pushing..."
     let pr = (do-push $repo $bm)
     if $pr.exit_code != 0 { render-failure "PUSH" $pr.stderr; return }
     try { git -C $repo fetch origin } catch { }
