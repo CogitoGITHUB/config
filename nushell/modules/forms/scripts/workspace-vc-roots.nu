@@ -386,14 +386,14 @@ def render-summary [bm: string, changed: list, commit_msg: string, sync: record,
         print $"  ($sym) ($f.status)  ($f.file)"
     }
     print ""
-    let total   = ($changed | length)
-    let deleted = ($changed | where status == "deleted" | length)
-    let health  = if $total == 0 { "nothing changed" }
-        else if $deleted == $total { $"($wilt)($wilt)($wilt)  everything was lost" }
-        else if $deleted > ($total / 2 | math floor) { $"($rose)($wilt)($wilt)  the history shifts" }
-        else { $"($rose)($rose)($rose)($rose)($rose)  the history has been reshaped" }
-    print $"  ($health)"
-    print ""
+     let total   = ($changed | length)
+     let deleted = ($changed | where status == "deleted" | length)
+     let health  = (if $total == 0 { "nothing changed" }
+         else if $deleted == $total { $"($wilt)($wilt)($wilt)  everything was lost" }
+         else if $deleted > ($total / 2 | math floor) { $"($rose)($wilt)($wilt)  the history shifts" }
+         else { $"($rose)($rose)($rose)($rose)($rose)  the history has been reshaped" })
+     print $"  ($health)"
+     print ""
 }
 
 def render-failure [stage: string, reason: string] {
