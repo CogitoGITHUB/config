@@ -521,8 +521,9 @@ def hub-branches [repo: string] {
              let co = (do { git -C $repo checkout $target } | complete)
              if $co.exit_code == 0 { 
                  print $"  🌹 switched to ($target)"
-                 # Continue looping to show updated state instead of returning
-                 continue
+                 sleep 500ms
+                 # Return to main menu to refresh branch info
+                 return
              } else { 
                  print -e $"  🥀 ($co.stderr)"
                  continue
@@ -940,7 +941,11 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
 
          match $action {
              "commit"   => { hub-commit-push $repo $safe_bm $msg; return }
-             "branches" => { hub-branches $repo }
+             "branches" => { 
+                 hub-branches $repo
+                 # Refresh display after branch switch
+                 print -n "\e[2J\e[H"
+             }
              "log"      => { hub-log $repo }
              "stash"    => { hub-stash $repo }
              "diff"     => { hub-diff $repo }
