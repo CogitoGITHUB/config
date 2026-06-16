@@ -994,13 +994,13 @@ def interactive-hub [repo: string, msg: string] {
     # Display git information above the menu
     print -n "\e[2J\e[H"
     print $"(ansi red_bold)🌹 MANIFOLD(ansi reset)"
-    print $"  (ansi red)Branch: ($state)(ansi reset)"
-    print $"  (ansi red)Sync: ↑($sync.ahead) ↓($sync.behind)  Stash: ($stash_cnt)(ansi reset)"
-    if ($last_commit | is-not-empty) { print $"  (ansi red)Commit: ($last_commit)(ansi reset)" }
+    print $"  (ansi red)🌹 Branch: ($state)(ansi reset)"
+    print $"  (ansi red)🌹 Sync: ↑($sync.ahead) ↓($sync.behind)  Stash: ($stash_cnt)(ansi reset)"
+    if ($last_commit | is-not-empty) { print $"  (ansi red)🌹 Commit: ($last_commit)(ansi reset)" }
     let tags_display = if ($head_tag | is-not-empty) { $head_tag } else { $tags | into string }
-    print $"  (ansi red)Tags: ($tags_display)(ansi reset)"
-    print $"  (ansi red)Changes: ($changed)(ansi reset)"
-    if ($remote_url | is-not-empty) { print $"  (ansi red)Remote: ($remote_url)(ansi reset)" }
+    print $"  (ansi red)🌹 Tags: ($tags_display)(ansi reset)"
+    print $"  (ansi red)🌹 Changes: ($changed)(ansi reset)"
+    if ($remote_url | is-not-empty) { print $"  (ansi red)🌹 Remote: ($remote_url)(ansi reset)" }
     print ""
 
       let options = [
