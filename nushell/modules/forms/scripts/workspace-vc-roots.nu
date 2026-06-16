@@ -483,7 +483,12 @@ def hub-branches [repo: string] {
         )
 
          if ($action | str starts-with "__delete__") {
-             let target  = ($action | str replace "__delete__:" "" | str trim | split row "\t" | get 0)
+             let action_data = ($action | str replace "__delete__:" "")
+             "DELETE action data: " + $action_data | save -a /tmp/manifold_debug.log
+             let parts = ($action_data | split row "\t")
+             "DELETE parts: " + ($parts | to json) | save -a /tmp/manifold_debug.log
+             let target  = ($parts | get 0 | str trim)
+             "DELETE target: " + $target | save -a /tmp/manifold_debug.log
              let current = (resolve-branch $repo)
              if $target == $current { print "  🥀 cannot delete current branch"; continue }
              let unpushed = (try { git -C $repo rev-list --count $"origin/($target)..($target)" | str trim | into int } catch { 0 })
@@ -889,19 +894,20 @@ def interactive-hub [repo: string, msg: string] {
     print $"  Changes: (ansi green)($changed)(ansi reset)"
     print ""
 
-     let options = [
-         $"commit & push  \(($changed) changed\)"
-         "abort"
-         "branches"
-         "log"
-         "stash"
-         "diff"
-         "squash"
-         "amend"
-         "undo"
-         "sync"
-         "fix head"
-     ] | str join "\n"
+      let options = [
+          $"commit & push  \(($changed) changed\)"
+          "abort"
+          "branches"
+          "log"
+          "stash"
+          "diff"
+          "squash"
+          "amend"
+          "undo"
+          "sync"
+          "merge into"
+          "fix head"
+      ] | str join "\n"
 
       let result = (fzf-run $options [
           "--ansi"
@@ -917,6 +923,91 @@ def interactive-hub [repo: string, msg: string] {
       if ($choice | is-empty) or ($choice | str starts-with "─") { return "" }
       if $choice == "abort" { return "abort" }
       $choice | split row " " | get 0
+}
+
+# ── merge current branch into selected target branch ──────────────────────────
+def hub-merge-into [repo: string] {
+    let current = (resolve-branch $repo)
+    
+    # Get all branches
+    let branches = (try {
+        git -C $repo branch -a | str trim | lines | each { |line|
+            ($line | str replace -a "* " "" | str replace -a "  " "" | str trim)
+        }
+    } catch { [] })
+    
+    if ($branches | is-empty) {
+        print "  🥀 No branches found"
+        input "  Press enter..." | ignore
+        return
+    }
+    
+    # Filter out remote tracking branches (keep origin/xxx for reference) and current branch
+    let local_branches = ($branches | where { |b| not ($b | str starts-with "remotes/") and $b != $current })
+    
+    if ($local_branches | is-empty) {
+        print "  🥀 No other branches available to merge into"
+        input "  Press enter..." | ignore
+        return
+    }
+    
+    let branches_str = ($local_branches | str join "\n")
+    let target = (fzf-run $branches_str [
+        "--ansi"
+        "--prompt=  🌹 merge ($current) into  "
+        "--header=select target branch"
+        "--no-sort"
+        "--height=~15"
+    ]).stdout | str trim
+    
+    if ($target | is-empty) {
+        print "  🥀 merge cancelled"
+        return
+    }
+    
+    print $"  🌹 fetching latest..."
+    git -C $repo fetch origin | ignore
+
+    # Stash any local changes before switching branches
+    let has_changes = ((git -C $repo status --porcelain | str trim) | is-not-empty)
+    if $has_changes {
+        print "  🌹 stashing local changes..."
+        git -C $repo stash push -m "auto-stash before merge" | ignore
+    }
+
+    print $"  🌹 switching to ($target)..."
+    let switch = (do { git -C $repo checkout $target } | complete)
+    if $switch.exit_code != 0 {
+        print -e $"  🥀 Failed to switch to ($target)"
+        print -e $switch.stderr
+        if $has_changes { git -C $repo stash pop | ignore }
+        input "  Press enter..." | ignore
+        return
+    }
+
+    print $"  🌹 merging ($current) into ($target)..."
+    let merge = (do { git -C $repo merge $current } | complete)
+    if $merge.exit_code == 0 {
+        print $"  🌹 successfully merged ($current) into ($target)"
+        let push = (do { git -C $repo push origin $target } | complete)
+        if $push.exit_code == 0 {
+            print $"  🌹 pushed ($target) to remote"
+        } else {
+            print -e $"  🥀 push failed: ($push.stderr)"
+        }
+    } else {
+        print -e $"  🥀 merge failed: ($merge.stderr)"
+    }
+
+    # Switch back to original branch and restore stash
+    print $"  🌹 switching back to ($current)..."
+    git -C $repo checkout $current | ignore
+    if $has_changes {
+        print "  🌹 restoring stashed changes..."
+        git -C $repo stash pop | ignore
+    }
+
+    input "  Press enter..." | ignore
 }
 
 # =============================================================================
@@ -985,6 +1076,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
              "amend"    => { hub-amend $repo }
              "undo"     => { hub-undo $repo }
              "sync"     => { hub-sync $repo $safe_bm }
+             "merge"    => { hub-merge-into $repo }
              "fix"      => { hub-fix-head $repo }
              _          => { }
          }
