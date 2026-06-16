@@ -379,19 +379,19 @@ def render-summary [bm: string, changed: list, commit_msg: string, sync: record,
     print ""
     print $"(ansi red_bold)  ($rose) ($bm)  ↑($sync.ahead) ↓($sync.behind)  ($elapsed)(ansi reset)"
     print ""
-    print $"(ansi red_bold)  ($rose) ($commit_msg)(ansi reset)"
+    print $"(ansi red)  ($rose) ($commit_msg)(ansi reset)"
     print ""
     for f in $changed {
         let sym = match $f.status { "deleted" => $wilt _ => $rose }
-        print $"  ($sym) ($f.status)  ($f.file)"
+        print $"(ansi red)  ($sym) ($f.status)  ($f.file)(ansi reset)"
     }
     print ""
      let total   = ($changed | length)
      let deleted = ($changed | where status == "deleted" | length)
-     let health  = (if $total == 0 { "nothing changed" }
-         else if $deleted == $total { $"($wilt)($wilt)($wilt)  everything was lost" }
-         else if $deleted > ($total / 2 | math floor) { $"($rose)($wilt)($wilt)  the history shifts" }
-         else { $"($rose)($rose)($rose)($rose)($rose)  the history has been reshaped" })
+     let health  = (if $total == 0 { $"(ansi red)nothing changed(ansi reset)" }
+         else if $deleted == $total { $"(ansi red)($wilt)($wilt)($wilt)  everything was lost(ansi reset)" }
+         else if $deleted > ($total / 2 | math floor) { $"(ansi red)($rose)($wilt)($wilt)  the history shifts(ansi reset)" }
+         else { $"(ansi red)($rose)($rose)($rose)($rose)($rose)  the history has been reshaped(ansi reset)" })
      print $"  ($health)"
      print ""
 }
