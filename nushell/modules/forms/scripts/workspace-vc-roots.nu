@@ -514,20 +514,52 @@ def hub-branches [repo: string] {
         }
 
          if $result.exit_code == 0 {
-             let target = ($result.stdout | str trim | split row "\t" | get 1)
-             if ($target | is-empty) { return }
+             let full_line = ($result.stdout | str trim)
+             let parts = ($full_line | split row "\t")
+             # The format is: marker\tbranch_name\tsync_info\tlast_commit
+             # Index 0 = branch_name, Index 1 = sync_info
+             let target = if ($parts | length) > 0 { 
+                 $parts | get 0
+             } else { 
+                 $full_line 
+             }
+             
+             # Write debug info to file
+             let debug_msg = $"Selected full line: ($full_line)\nParts count: ($parts | length)\nTarget at 0: ($target)\n"
+             $debug_msg | save -a /tmp/manifold_debug.log
+             
+             if ($target | is-empty) { 
+                 "❌ Target is empty\n" | save -a /tmp/manifold_debug.log
+                 return 
+             }
+             
              let current = (resolve-branch $repo)
-             if $target == $current { print $"  🌹 already on ($target)"; continue }
-             let co = (do { git -C $repo checkout $target } | complete)
+             $"Current: ($current)\n" | save -a /tmp/manifold_debug.log
+             
+             if $target == $current { 
+                 print $"  🌹 already on ($target)"; 
+                 continue 
+             }
+             
+             # Trim any whitespace from target
+             let target_clean = ($target | str trim)
+             $"Target clean: ($target_clean)\nAttempting checkout...\n" | save -a /tmp/manifold_debug.log
+             
+             let co = (do { git -C $repo checkout $target_clean } | complete)
+             $"Exit: ($co.exit_code)\nStdout: ($co.stdout)\nStderr: ($co.stderr)\n" | save -a /tmp/manifold_debug.log
+             
              if $co.exit_code == 0 { 
-                 print $"  🌹 switched to ($target)"
+                 "✅ SUCCESS\n" | save -a /tmp/manifold_debug.log
+                 print $"  🌹 switched to ($target_clean)"
                  sleep 500ms
-                 # Return to main menu to refresh branch info
                  return
              } else { 
-                 print -e $"  🥀 ($co.stderr)"
+                 "❌ FAILED\n" | save -a /tmp/manifold_debug.log
+                 print -e $"  ❌ checkout failed"
                  continue
              }
+         } else {
+             $"FZF exit code: ($result.exit_code)\n" | save -a /tmp/manifold_debug.log
          }
         return
     }
