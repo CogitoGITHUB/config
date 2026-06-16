@@ -189,8 +189,8 @@ def resolve-ahead-behind [repo: string, branch: string] {
         (do { git -C $repo rev-parse --verify $"origin/($branch)" } | complete).exit_code == 0
     } catch { false })
     if not $remote_exists { return { ahead: 0  behind: 0 } }
-    let ahead  = (try { git -C $repo rev-list --count $"origin/($branch)..($branch)"  | str trim | into int } catch { 0 })
-    let behind = (try { git -C $repo rev-list --count $"($branch)..origin/($branch)"  | str trim | into int } catch { 0 })
+    let ahead  = (try { do { git -C $repo rev-list --count $"origin/($branch)..($branch)" } | complete | get stdout | str trim | into int } catch { 0 })
+    let behind = (try { do { git -C $repo rev-list --count $"($branch)..origin/($branch)" } | complete | get stdout | str trim | into int } catch { 0 })
     { ahead: $ahead  behind: $behind }
 }
 
@@ -261,7 +261,7 @@ def check-behind [repo: string, branch: string] {
     if not (remote-branch-exists $repo $branch) { return false }
     let behind = (try { git -C $repo rev-list --count $"($branch)..origin/($branch)" | str trim | into int } catch { 0 })
     if $behind == 0 { return false }
-    print $"(ansi red_bold)  🥀 BEHIND REMOTE — ($branch) is ($behind) commit(s) behind(ansi reset)"
+    print $"(ansi red_bold)  🥀 BEHIND REMOTE — ($branch) is ($behind) commit\(s\) behind(ansi reset)"
     let choice = ([
         "fast-forward  — rebase local commits on top of remote (recommended)"
         "pull only     — move branch to remote tip, discard local"
@@ -330,7 +330,7 @@ def check-large-files [repo: string] {
 def check-stash [repo: string] {
     let count = (try { git -C $repo stash list | lines | length } catch { 0 })
     if $count > 0 {
-        print $"(ansi red_bold)  🥀 STASHED CHANGES — ($count) stash(es)(ansi reset)"
+        print $"(ansi red_bold)  🥀 STASHED CHANGES — ($count) stashes(ansi reset)"
         git -C $repo stash list | lines | print
         let choice = (["continue anyway" "abort"] | input list --fuzzy "Stash detected — proceed?")
         $choice == "abort"
@@ -455,12 +455,12 @@ def branch-fzf-lines [repo: string] {
 }
 
 def hub-branches [repo: string] {
-    let sentinel = ($env.HOME | path join ".manifold_action")
     loop {
         let lines = (branch-fzf-lines $repo | str join "\n")
         if ($lines | str trim | is-empty) { print "  🥀 no branches"; return }
 
         let preview = $"git -C ($repo) log --oneline --color=always -12 {2}"
+        let current = (resolve-branch $repo)
         let result  = (fzf-run $lines [
             "--ansi"
             "--tabstop=1"
@@ -468,32 +468,30 @@ def hub-branches [repo: string] {
             "--with-nth=2.."
             "--nth=1"
             "--prompt=  🌹 branch  "
-            "--header=  enter=switch  ctrl-n=new  ctrl-d=delete  esc=back"
+            $"--header=($current)  enter=switch  ctrl-n=new  ctrl-d=delete  esc=back"
             $"--preview=($preview)"
             "--preview-window=right:45%:wrap"
-            $"--bind=ctrl-n:execute(echo __new__ > ($sentinel))+abort"
-            $"--bind=ctrl-d:execute(echo __delete__:{2} > ($sentinel))+abort"
+            "--expect=ctrl-d,ctrl-n"
             "--bind=esc:abort"
         ])
 
-        let action = (
-            if ($sentinel | path exists) {
-                let v = (open $sentinel | str trim); rm -f $sentinel; $v
-            } else { "" }
-        )
+        if ($result.stdout | is-empty) { return }
 
-         if ($action | str starts-with "__delete__") {
-             let action_data = ($action | str replace "__delete__:" "")
-             "DELETE action data: " + $action_data | save -a /tmp/manifold_debug.log
-             let parts = ($action_data | split row "\t")
-             "DELETE parts: " + ($parts | to json) | save -a /tmp/manifold_debug.log
-             let target  = ($parts | get 0 | str trim)
-             "DELETE target: " + $target | save -a /tmp/manifold_debug.log
-             let current = (resolve-branch $repo)
-             if $target == $current { print "  🥀 cannot delete current branch"; continue }
-             let unpushed = (try { git -C $repo rev-list --count $"origin/($target)..($target)" | str trim | into int } catch { 0 })
-             let unpushed_msg = if $unpushed > 0 { $" \($unpushed) unpushed" } else { "" }
-             print -n $"  delete ($target)$unpushed_msg? [y/N] "
+        # --expect outputs the key name as first line for ALL keys including enter
+        let all_lines = ($result.stdout | lines)
+        let key = ($all_lines | first | str trim)
+        let selected = ($all_lines | skip 1 | str join "\n" | str trim)
+
+        if $key == "ctrl-d" {
+            let target = ($selected | split row "\t" | get 0 | str trim)
+            if ($target | is-empty) { continue }
+            let current = (resolve-branch $repo)
+            if $target == $current { print "  🥀 cannot delete current branch"; continue }
+            let unpushed = (try { do { git -C $repo rev-list --count $"origin/($target)..($target)" } | complete | get stdout | str trim | into int } catch { 0 })
+            let unpushed_msg = if $unpushed > 0 {
+                " (" + ($unpushed | into string) + ") unpushed"
+            } else { "" }
+            print -n $"  delete ($target)($unpushed_msg)? [y/N] "
             let yn = (input "" | str trim | str downcase)
             if $yn == "y" {
                 git -C $repo branch -D $target | ignore
@@ -508,7 +506,7 @@ def hub-branches [repo: string] {
             continue
         }
 
-        if $action == "__new__" {
+        if $key == "ctrl-n" {
             print -n "  🌹 new branch name: "
             let name = (input "" | str trim)
             if ($name | is-empty) { continue }
@@ -518,55 +516,38 @@ def hub-branches [repo: string] {
             continue
         }
 
-         if $result.exit_code == 0 {
-             let full_line = ($result.stdout | str trim)
-             let parts = ($full_line | split row "\t")
-             # The format is: marker\tbranch_name\tsync_info\tlast_commit
-             # Index 0 = branch_name, Index 1 = sync_info
-             let target = if ($parts | length) > 0 { 
-                 $parts | get 0
-             } else { 
-                 $full_line 
-             }
-             
-             # Write debug info to file
-             let debug_msg = $"Selected full line: ($full_line)\nParts count: ($parts | length)\nTarget at 0: ($target)\n"
-             $debug_msg | save -a /tmp/manifold_debug.log
-             
-             if ($target | is-empty) { 
-                 "❌ Target is empty\n" | save -a /tmp/manifold_debug.log
-                 return 
-             }
-             
-             let current = (resolve-branch $repo)
-             $"Current: ($current)\n" | save -a /tmp/manifold_debug.log
-             
-             if $target == $current { 
-                 print $"  🌹 already on ($target)"; 
-                 continue 
-             }
-             
-             # Trim any whitespace from target
-             let target_clean = ($target | str trim)
-             $"Target clean: ($target_clean)\nAttempting checkout...\n" | save -a /tmp/manifold_debug.log
-             
-             let co = (do { git -C $repo checkout $target_clean } | complete)
-             $"Exit: ($co.exit_code)\nStdout: ($co.stdout)\nStderr: ($co.stderr)\n" | save -a /tmp/manifold_debug.log
-             
-             if $co.exit_code == 0 { 
-                 "✅ SUCCESS\n" | save -a /tmp/manifold_debug.log
-                 print $"  🌹 switched to ($target_clean)"
-                 sleep 500ms
-                 return
-             } else { 
-                 "❌ FAILED\n" | save -a /tmp/manifold_debug.log
-                 print -e $"  ❌ checkout failed"
-                 continue
-             }
-         } else {
-             $"FZF exit code: ($result.exit_code)\n" | save -a /tmp/manifold_debug.log
-         }
-        return
+        if $key == "enter" {
+            let parts = ($selected | split row "\t")
+            let target = if ($parts | length) > 0 { $parts | get 0 } else { $selected }
+            if ($target | is-empty) { return }
+
+            let current = (resolve-branch $repo)
+            if $target == $current { print $"  🌹 already on ($target)"; continue }
+
+            let dirty = (try { git -C $repo status --porcelain | length } catch { 0 })
+            mut stash_yn = "n"
+            if $dirty > 0 {
+                print -n "  🌹 stash changes before switching? [Y/n] "
+                $stash_yn = (input "" | str trim | str downcase)
+            }
+            if $dirty > 0 and $stash_yn != "n" {
+                git -C $repo stash push -m "auto-stash before branch switch" | ignore
+                print "  🌹 stashed"
+            }
+
+            let checkout = (do { git -C $repo checkout $target } | complete)
+            if $checkout.exit_code == 0 {
+                if $dirty > 0 and $stash_yn != "n" {
+                    git -C $repo stash pop | ignore
+                }
+                print $"  🌹 switched to ($target)"
+                input "  Press enter..." | ignore
+                return
+            } else {
+                print -e $"  🥀 checkout failed: ($checkout.stderr)"
+                input "  Press enter..." | ignore
+            }
+        }
     }
 }
 
@@ -895,18 +876,17 @@ def interactive-hub [repo: string, msg: string] {
     print ""
 
       let options = [
-          $"commit & push  \(($changed) changed\)"
-          "abort"
-          "branches"
-          "log"
-          "stash"
-          "diff"
-          "squash"
-          "amend"
-          "undo"
-          "sync"
-          "merge into"
-          "fix head"
+          $"commit & push  \(($changed) changed\)  \(stage & submit all\)"
+          "branches  (switch / create / delete)"
+          "log  (view commit history)"
+          "stash  (save & restore work in progress)"
+          "diff  (review unstaged changes)"
+          "squash  (combine recent commits)"
+          "amend  (edit last commit message & files)"
+          "undo  (revert last action)"
+          "sync  (fetch & merge remote changes)"
+          "merge into  (merge current branch into selected)"
+          "fix head  (repair detached or broken HEAD)"
       ] | str join "\n"
 
       let result = (fzf-run $options [
@@ -918,9 +898,9 @@ def interactive-hub [repo: string, msg: string] {
           "--bind=esc:abort"
       ])
 
+      if $result.exit_code != 0 { return "abort" }
       let choice = ($result.stdout | str trim)
-      # Skip separators and empty selections by returning empty string (which continues the loop)
-      if ($choice | is-empty) or ($choice | str starts-with "─") { return "" }
+      if ($choice | is-empty) { return "" }
       if $choice == "abort" { return "abort" }
       $choice | split row " " | get 0
 }
