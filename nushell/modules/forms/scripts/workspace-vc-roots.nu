@@ -513,15 +513,21 @@ def hub-branches [repo: string] {
             continue
         }
 
-        if $result.exit_code == 0 {
-            let target = ($result.stdout | str trim | split row "\t" | get 1)
+         if $result.exit_code == 0 {
+             let target = ($result.stdout | str trim | split row "\t" | get 1)
              if ($target | is-empty) { return }
              let current = (resolve-branch $repo)
              if $target == $current { print $"  🌹 already on ($target)"; continue }
              let co = (do { git -C $repo checkout $target } | complete)
-             if $co.exit_code != 0 { print -e $"  🥀 ($co.stderr)" } else { print $"  🌹 switched to ($target)"; return }
-            continue
-        }
+             if $co.exit_code == 0 { 
+                 print $"  🌹 switched to ($target)"
+                 # Continue looping to show updated state instead of returning
+                 continue
+             } else { 
+                 print -e $"  🥀 ($co.stderr)"
+                 continue
+             }
+         }
         return
     }
 }
@@ -842,36 +848,42 @@ def interactive-hub [repo: string, msg: string] {
     let changed = (capture-changed $repo | length)
     let state   = if ($branch | str starts-with "__") { $"(ansi red_bold)⚠ ($branch)(ansi reset)" } else { $branch }
 
-    let options = [
-        $"commit & push  \(($changed) changed\)"
-        "─── explore ───────────────────────"
-        "branches"
-        "log"
-        "stash"
-        "diff"
-        "─── rewrite ───────────────────────"
-        "squash"
-        "amend"
-        "undo"
-        "sync"
-        "─── recover ───────────────────────"
-        "fix head"
-        "─────────────────────────────────"
-        "abort"
-    ] | str join "\n"
+    # Display git information above the menu
+    print -n "\e[2J\e[H"
+    print $"(ansi red_bold)🌹 MANIFOLD(ansi reset)"
+    print $"  Branch: (ansi cyan_bold)($state)(ansi reset)"
+    print $"  Sync: (ansi yellow)↑($sync.ahead) ↓($sync.behind)(ansi reset)"
+    print $"  Changes: (ansi green)($changed)(ansi reset)"
+    print ""
 
-    let result = (fzf-run $options [
-        "--ansi"
-        "--prompt=  🌹 manifold  "
-        $"--header=  ($state)  ↑($sync.ahead) ↓($sync.behind)  ($changed) changed"
-        "--no-sort"
-        "--height=~20"
-        "--bind=esc:abort"
-    ])
+     let options = [
+         $"commit & push  \(($changed) changed\)"
+         "abort"
+         "branches"
+         "log"
+         "stash"
+         "diff"
+         "squash"
+         "amend"
+         "undo"
+         "sync"
+         "fix head"
+     ] | str join "\n"
 
-    let choice = ($result.stdout | str trim)
-    if ($choice | is-empty) or ($choice == "abort") or ($choice | str starts-with "─") { return "abort" }
-    $choice | split row " " | get 0
+      let result = (fzf-run $options [
+          "--ansi"
+          "--prompt=  🌹 manifold  "
+          $"--header=  ($state)  ↑($sync.ahead) ↓($sync.behind)  ($changed) changed"
+          "--no-sort"
+          "--height=~20"
+          "--bind=esc:abort"
+      ])
+
+      let choice = ($result.stdout | str trim)
+      # Skip separators and empty selections by returning empty string (which continues the loop)
+      if ($choice | is-empty) or ($choice | str starts-with "─") { return "" }
+      if $choice == "abort" { return "abort" }
+      $choice | split row " " | get 0
 }
 
 # =============================================================================
@@ -916,29 +928,30 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
 
     if (check-remote-reachable $repo) { return }
 
-    # ── Hub loop ──────────────────────────────────────────────────────────────
-    loop {
-        let action = (interactive-hub $repo $msg)
+     # ── Hub loop ──────────────────────────────────────────────────────────────
+     loop {
+         let action = (interactive-hub $repo $msg)
 
-        if $action == "abort" { return }
+         if $action == "abort" { return }
+         if ($action | is-empty) { continue }
 
-        let current_bm = (resolve-branch $repo)
-        let safe_bm = if ($current_bm | str starts-with "__") { "" } else { $current_bm }
+         let current_bm = (resolve-branch $repo)
+         let safe_bm = if ($current_bm | str starts-with "__") { "" } else { $current_bm }
 
-        match $action {
-            "commit"   => { hub-commit-push $repo $safe_bm $msg; return }
-            "branches" => { hub-branches $repo }
-            "log"      => { hub-log $repo }
-            "stash"    => { hub-stash $repo }
-            "diff"     => { hub-diff $repo }
-            "squash"   => { hub-squash $repo $safe_bm }
-            "amend"    => { hub-amend $repo }
-            "undo"     => { hub-undo $repo }
-            "sync"     => { hub-sync $repo $safe_bm }
-            "fix"      => { hub-fix-head $repo }
-            _          => { }
-        }
-    }
+         match $action {
+             "commit"   => { hub-commit-push $repo $safe_bm $msg; return }
+             "branches" => { hub-branches $repo }
+             "log"      => { hub-log $repo }
+             "stash"    => { hub-stash $repo }
+             "diff"     => { hub-diff $repo }
+             "squash"   => { hub-squash $repo $safe_bm }
+             "amend"    => { hub-amend $repo }
+             "undo"     => { hub-undo $repo }
+             "sync"     => { hub-sync $repo $safe_bm }
+             "fix"      => { hub-fix-head $repo }
+             _          => { }
+         }
+     }
 }
 
 # =============================================================================
