@@ -1173,7 +1173,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
      loop {
          let action = (interactive-hub $repo $msg)
 
-         if $action == "abort" { return }
+         if $action == "abort" { print -n "\e[2J\e[H"; return }
          if ($action | is-empty) { continue }
 
          let current_bm = (resolve-branch $repo)
