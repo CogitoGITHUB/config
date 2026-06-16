@@ -1020,7 +1020,6 @@ def interactive-hub [repo: string, msg: string] {
           "--ansi"
           "--prompt=  🌹 manifold  "
           $"--header=  ($state)  ↑($sync.ahead) ↓($sync.behind)  ($changed) changed"
-          "--no-sort"
           "--height=~20"
           "--bind=esc:abort"
       ])
