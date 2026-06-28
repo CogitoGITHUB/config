@@ -1,48 +1,73 @@
-# 🌹 ManifoldOS Starship — Garden Theme
-add_newline = true
+add_newline = false
 command_timeout = 800
 
-format = """$git_status🌹
+format = """
+[](#8B0000)🌹 \
+$username\
+[](#8B0000) @ \
+$hostname\
+ [](#8B0000)\
+$directory\
+ [](#8B0000)\
+$git_branch\
+ [](#8B0000)\
+$git_status\
+[](#8B0000)\
+$fill\
+[](#8B0000)\
+$time\
+[](#8B0000)
+[](#8B0000)\
+$character\
 """
 
-right_format = ""
-
-# ── Git Status ─────────────────────────────────────────────
-[git_status]
-style = "#6B0000"
-format = '([$all_status$ahead_behind]($style) )'
-conflicted  = "🥀 "
-ahead       = "↑$count "
-behind      = "↓$count "
-diverged    = "🥀🥀 "
-untracked   = "? "
-stashed     = "↪ "
-modified    = "~$count "
-staged      = "+$count "
-renamed     = "» "
-deleted     = "🥀$count "
-
-# ── Disabled ───────────────────────────────────────────────
-[git_branch]
-disabled = true
-
-# ── Disabled ───────────────────────────────────────────────
-[directory]
-disabled = true
-
-[cmd_duration]
-disabled = true
-
-[character]
-disabled = true
-
-[time]
-disabled = true
-
 [username]
-disabled = true
+style_user = "#8B0000"
+style_root = "#8B0000"
+format = "[$user]($style)"
+show_always = true
 
 [hostname]
+style = "#8B0000"
+format = "[$hostname]($style)"
+ssh_only = false
+
+[directory]
+style = "#8B0000"
+format = "[$path]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[git_branch]
+style = "#8B0000"
+format = "[\\($branch\\)]($style)"
+
+[git_status]
+style = "#8B0000"
+format = " [$all_status$ahead_behind]($style)"
+conflicted = "✗$count"
+ahead = "↑$count"
+behind = "↓$count"
+diverged = "↕$count"
+untracked = "?$count"
+stashed = "⚑$count"
+modified = "~$count"
+staged = "+$count"
+renamed = "»$count"
+deleted = "✗$count"
+
+[time]
+disabled = false
+style = "#8B0000"
+time_format = "%Y-%m-%d %H:%M"
+format = "[ $time]($style)"
+
+[character]
+format = "$symbol"
+success_symbol = "[❯](bold #8B0000)"
+error_symbol = "[❯](bold #8B0000)"
+
+[cmd_duration]
 disabled = true
 
 [battery]
