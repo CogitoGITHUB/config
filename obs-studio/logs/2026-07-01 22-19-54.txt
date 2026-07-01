@@ -1,0 +1,148 @@
+22:19:54.758: Command Line Arguments: --startrecording
+22:19:54.759: Platform: Wayland
+22:19:54.759: CPU Name: Intel(R) Core(TM) i3-10110U CPU @ 2.10GHz
+22:19:54.759: CPU Speed: 2005.821MHz
+22:19:54.759: Physical Cores: 2, Logical Cores: 4
+22:19:54.759: Physical Memory: 7809MB Total, 1568MB Free
+22:19:54.759: Kernel Version: Linux 6.18.31
+22:19:54.759: Distribution: "Guix System" Unknown
+22:19:54.759: Desktop Environment: Hyprland
+22:19:54.759: Session Type: wayland
+22:19:54.763: Current Date/Time: 2026-07-01, 10:19:54 PM
+22:19:54.763: Browser Hardware Acceleration: true
+22:19:54.763: Qt Version: 6.9.2 (runtime), 6.9.2 (compiled)
+22:19:54.763: Portable mode: false
+22:19:54.850: OBS 32.0.4 (linux)
+22:19:54.850: ---------------------------------
+22:19:54.857: ---------------------------------
+22:19:54.857: audio settings reset:
+22:19:54.857: 	samples per sec: 48000
+22:19:54.857: 	speakers:        2
+22:19:54.857: 	max buffering:   960 milliseconds
+22:19:54.857: 	buffering type:  dynamically increasing
+22:19:54.861: ---------------------------------
+22:19:54.862: Initializing OpenGL...
+22:19:54.863: Using EGL/Wayland
+22:19:54.886: Initialized EGL 1.5
+22:19:54.930: Loading up OpenGL on adapter Intel Mesa Intel(R) UHD Graphics (CML GT2)
+22:19:54.930: OpenGL loaded successfully, version 4.6 (Core Profile) Mesa 26.0.2, shading language 4.60
+22:19:55.002: ---------------------------------
+22:19:55.002: video settings reset:
+22:19:55.002: 	base resolution:   1920x1080
+22:19:55.002: 	output resolution: 1280x720
+22:19:55.002: 	downscale filter:  Bicubic
+22:19:55.002: 	fps:               30/1
+22:19:55.002: 	format:            NV12
+22:19:55.002: 	YUV mode:          Rec. 709/Partial
+22:19:55.002: NV12 texture support enabled
+22:19:55.002: P010 texture support not available
+22:19:55.021: Audio monitoring device:
+22:19:55.021: 	name: Default
+22:19:55.021: 	id: default
+22:19:55.024: ---------------------------------
+22:19:55.027: Failed to load 'en-US' text for module: 'decklink-captions.so'
+22:19:55.031: Failed to load 'en-US' text for module: 'decklink-output-ui.so'
+22:19:55.033: A DeckLink iterator could not be created.  The DeckLink drivers may not be installed
+22:19:55.033: Failed to initialize module 'decklink.so'
+22:19:55.290: [pipewire] No capture sources available
+22:19:55.327: v4l2loopback not installed, virtual camera not registered
+22:19:55.403: VAAPI: Failed to initialize display in vaapi_device_h264_supported
+22:19:55.403: FFmpeg VAAPI H264 encoding not supported
+22:19:55.403: VAAPI: Failed to initialize display in vaapi_device_av1_supported
+22:19:55.403: FFmpeg VAAPI AV1 encoding not supported
+22:19:55.403: VAAPI: Failed to initialize display in vaapi_device_hevc_supported
+22:19:55.403: FFmpeg VAAPI HEVC encoding not supported
+22:19:55.456: [obs-websocket] [obs_module_load] you can haz websockets (Version: 5.6.3 | RPC Version: 1)
+22:19:55.456: [obs-websocket] [obs_module_load] Qt version (compile-time): 6.9.2 | Qt version (run-time): 6.9.2
+22:19:55.456: [obs-websocket] [obs_module_load] Linked ASIO Version: 103600
+22:19:55.471: [obs-websocket] [obs_module_load] Module loaded.
+22:19:55.484: [vlc-video]: VLC 3.0.23 Vetinari found, VLC video source enabled
+22:19:55.484: ---------------------------------
+22:19:55.484:   Loaded Modules:
+22:19:55.484:     vlc-video.so
+22:19:55.484:     text-freetype2.so
+22:19:55.484:     rtmp-services.so
+22:19:55.484:     obs-x264.so
+22:19:55.484:     obs-websocket.so
+22:19:55.484:     obs-webrtc.so
+22:19:55.484:     obs-vst.so
+22:19:55.484:     obs-transitions.so
+22:19:55.484:     obs-outputs.so
+22:19:55.484:     obs-filters.so
+22:19:55.484:     obs-ffmpeg.so
+22:19:55.484:     linux-v4l2.so
+22:19:55.484:     linux-pulseaudio.so
+22:19:55.484:     linux-pipewire.so
+22:19:55.484:     linux-capture.so
+22:19:55.484:     linux-alsa.so
+22:19:55.484:     image-source.so
+22:19:55.484:     frontend-tools.so
+22:19:55.484:     decklink-output-ui.so
+22:19:55.485:     decklink-captions.so
+22:19:55.485: ---------------------------------
+22:19:55.486: ---------------------------------
+22:19:55.486: Available Encoders:
+22:19:55.486:   Video Encoders:
+22:19:55.487: 	- ffmpeg_svt_av1 (SVT-AV1)
+22:19:55.487: 	- ffmpeg_aom_av1 (AOM AV1)
+22:19:55.487: 	- obs_x264 (x264)
+22:19:55.487:   Audio Encoders:
+22:19:55.487: 	- ffmpeg_aac (FFmpeg AAC)
+22:19:55.487: 	- ffmpeg_opus (FFmpeg Opus)
+22:19:55.487: 	- ffmpeg_pcm_s16le (FFmpeg PCM (16-bit))
+22:19:55.487: 	- ffmpeg_pcm_s24le (FFmpeg PCM (24-bit))
+22:19:55.487: 	- ffmpeg_pcm_f32le (FFmpeg PCM (32-bit float))
+22:19:55.487: 	- ffmpeg_alac (FFmpeg ALAC (24-bit))
+22:19:55.487: 	- ffmpeg_flac (FFmpeg FLAC (16-bit))
+22:19:55.487: ==== Startup complete ===============================================
+22:19:55.564: All scene data cleared
+22:19:55.564: ------------------------------------------------
+22:19:55.578: Device for 'Audio Output Capture' source Desktop Audio is also used for audio monitoring.
+22:19:55.578: Deduplication logic is being applied to all monitored sources.
+22:19:55.578: pulse-input: Server name: 'pulseaudio 16.1'
+22:19:55.579: pulse-input: Audio format: s16le, 44100 Hz, 2 channels
+22:19:55.579: pulse-input: Started recording from 'alsa_output.pci-0000_00_1f.3.analog-stereo.monitor' (default)
+22:19:55.579: [Loaded global audio device]: 'Desktop Audio'
+22:19:55.588: pulse-input: Server name: 'pulseaudio 16.1'
+22:19:55.589: pulse-input: Audio format: s16le, 44100 Hz, 2 channels
+22:19:55.590: pulse-input: Started recording from 'alsa_input.pci-0000_00_1f.3.analog-stereo' (default)
+22:19:55.590: [Loaded global audio device]: 'Mic/Aux'
+22:19:55.590: Source ID 'pipewire-desktop-capture-source' not found
+22:19:55.590: Failed to create source 'Display Capture'!
+22:19:55.591: obs-data.c: [obs_data_create_from_json] Failed reading json string (1): '[' or '{' expected near end of file
+22:19:55.594: Device for 'Audio Output Capture' source Desktop Audio is also used for audio monitoring.
+22:19:55.594: Deduplication logic is being applied to all monitored sources.
+22:19:55.597: Switched to scene 'Scene'
+22:19:55.598: Starting recording due to command line parameter
+22:19:55.598: ------------------------------------------------
+22:19:55.598: Loaded scenes:
+22:19:55.598: - scene 'Scene':
+22:19:55.598:     - source: 'Display Capture' (pipewire-desktop-capture-source)
+22:19:55.598:     - source: 'Video Capture Device (PipeWire) (BETA)' (pipewire-camera-source)
+22:19:55.598: ------------------------------------------------
+22:19:55.702: ---------------------------------
+22:19:55.702: [x264 encoder: 'advanced_video_stream'] preset: veryfast
+22:19:55.703: [x264 encoder: 'advanced_video_stream'] settings:
+22:19:55.703: 	rate_control: CBR
+22:19:55.703: 	bitrate:      6000
+22:19:55.703: 	buffer size:  6000
+22:19:55.703: 	crf:          23
+22:19:55.703: 	fps_num:      30
+22:19:55.703: 	fps_den:      1
+22:19:55.703: 	width:        1280
+22:19:55.703: 	height:       720
+22:19:55.703: 	keyint:       60
+22:19:55.703: 
+22:19:55.712: ---------------------------------
+22:19:55.717: [FFmpeg aac encoder: 'Track1'] bitrate: 160, channels: 2, channel_layout: stereo, track: 1
+22:19:55.717: 
+22:19:55.723: ==== Recording Start ===============================================
+22:19:55.723: [mp4 output: 'adv_file_output'] Writing Hybrid MP4/MOV file '/home/aoeu/2026-07-01 22-19-55.mp4'...
+22:19:55.735: [camera-portal] Error accessing camera: GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod: No such interface “org.freedesktop.portal.Camera” on object at path /org/freedesktop/portal/desktop
+22:19:56.137: adding 42 milliseconds of audio buffering, total audio buffering is now 42 milliseconds (source: Mic/Aux)
+22:19:56.137: 
+22:20:25.725: Failed to create xdg-screensaver: 13
+22:20:55.728: Failed to create xdg-screensaver: 13
+22:21:25.728: Failed to create xdg-screensaver: 13
+22:21:55.729: Failed to create xdg-screensaver: 13
+22:22:25.729: Failed to create xdg-screensaver: 13

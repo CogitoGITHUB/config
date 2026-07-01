@@ -1,0 +1,1 @@
+22:22:47.072: Crash or unclean shutdown detected

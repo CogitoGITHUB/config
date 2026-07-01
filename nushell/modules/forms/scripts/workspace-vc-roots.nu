@@ -629,6 +629,25 @@ def hub-log [repo: string] {
         if $yn == "y" {
             let r = (do { git -C $repo reset --hard $hash } | complete)
             if $r.exit_code != 0 { print -e $"  🥀 ($r.stderr)" } else { print $"  🌹 reset to ($hash)" }
+            let current = (try { git -C $repo branch --show-current | str trim } catch { "" })
+            if ($current | is-empty) {
+                let nearby = (try {
+                    git -C $repo branch --contains HEAD | lines | where { |l| $l | is-not-empty }
+                    | each { |l| $l | str replace --regex '^\*?\s+' '' }
+                } catch { [] })
+                if not ($nearby | is-empty) {
+                    let target = ($nearby | first)
+                    git -C $repo checkout $target | ignore
+                    print $"  🌹 re-attached to ($target)"
+                } else {
+                    print -n "  create new branch at this commit? name: "
+                    let name = (input "" | str trim)
+                    if ($name | is-not-empty) {
+                        git -C $repo checkout -b $name | ignore
+                        print $"  🌹 switched to new branch ($name)"
+                    }
+                }
+            }
             input "  Press enter..." | ignore
         }
         return

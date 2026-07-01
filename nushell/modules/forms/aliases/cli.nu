@@ -8,3 +8,6 @@ alias e = emacs -nw
 alias d = emacs -nw .
 alias t = emacs -nw TODO.org
 
+# needs sudo to work
+alias gazelle = sudo gazelle
+

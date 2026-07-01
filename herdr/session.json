@@ -1,0 +1,138 @@
+{
+  "version": 3,
+  "workspaces": [
+    {
+      "id": "w6",
+      "custom_name": "Agents",
+      "identity_cwd": "/home/aoeu/.emacs.d",
+      "public_pane_numbers": {
+        "11": 16,
+        "1": 1,
+        "2": 2,
+        "5": 10,
+        "8": 13,
+        "15": 20
+      },
+      "next_public_pane_number": 21,
+      "public_tab_numbers": [
+        1,
+        2,
+        10,
+        13,
+        16,
+        20
+      ],
+      "next_public_tab_number": 21,
+      "tabs": [
+        {
+          "custom_name": "Emacs Conf",
+          "layout": {
+            "Pane": 1
+          },
+          "panes": {
+            "1": {
+              "cwd": "/home/aoeu/.emacs.d"
+            }
+          },
+          "zoomed": false,
+          "focused": 1,
+          "root_pane": 1
+        },
+        {
+          "custom_name": "Emacs Test",
+          "layout": {
+            "Pane": 2
+          },
+          "panes": {
+            "2": {
+              "cwd": "/home/aoeu/test"
+            }
+          },
+          "zoomed": false,
+          "focused": 2,
+          "root_pane": 2
+        },
+        {
+          "custom_name": "manifold work",
+          "layout": {
+            "Pane": 5
+          },
+          "panes": {
+            "5": {
+              "cwd": "/ManifoldOS",
+              "agent_session": {
+                "source": "herdr:opencode",
+                "agent": "opencode",
+                "kind": "id",
+                "value": "ses_0f09853e7ffeWeye2MhNU4rsDX"
+              }
+            }
+          },
+          "zoomed": false,
+          "focused": 5,
+          "root_pane": 5
+        },
+        {
+          "custom_name": "hypr keys",
+          "layout": {
+            "Pane": 8
+          },
+          "panes": {
+            "8": {
+              "cwd": "/home/aoeu/.config/hypr",
+              "agent_session": {
+                "source": "herdr:opencode",
+                "agent": "opencode",
+                "kind": "id",
+                "value": "ses_0e1113b60ffeiES23vf6YarReS"
+              }
+            }
+          },
+          "zoomed": false,
+          "focused": 8,
+          "root_pane": 8
+        },
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 11
+          },
+          "panes": {
+            "11": {
+              "cwd": "/home/aoeu/.emacs.d",
+              "agent_session": {
+                "source": "herdr:opencode",
+                "agent": "opencode",
+                "kind": "id",
+                "value": "ses_0e1080bfeffe2UX6u8QAROXVE1"
+              }
+            }
+          },
+          "zoomed": false,
+          "focused": 11,
+          "root_pane": 11
+        },
+        {
+          "custom_name": "herdr setup",
+          "layout": {
+            "Pane": 15
+          },
+          "panes": {
+            "15": {
+              "cwd": "/home/aoeu/.config"
+            }
+          },
+          "zoomed": false,
+          "focused": 15,
+          "root_pane": 15
+        }
+      ],
+      "active_tab": 5
+    }
+  ],
+  "active": 0,
+  "selected": 0,
+  "sidebar_width": 27,
+  "sidebar_section_split": 0.5,
+  "collapsed_space_keys": []
+}
