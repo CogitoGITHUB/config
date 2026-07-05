@@ -1,0 +1,20 @@
+{
+  "carapace": {
+    "FlagArg": "bright-white",
+    "FlagMultiArg": "bright-white",
+    "FlagNoArg": "bright-white",
+    "FlagOptArg": "bright-white",
+    "Highlight1": "bright-white",
+    "Highlight10": "bright-white",
+    "Highlight11": "bright-white",
+    "Highlight12": "bright-white",
+    "Highlight2": "bright-white",
+    "Highlight3": "bright-white",
+    "Highlight4": "bright-white",
+    "Highlight5": "bright-white",
+    "Highlight6": "bright-white",
+    "Highlight7": "bright-white",
+    "Highlight8": "bright-white",
+    "Highlight9": "bright-white"
+  }
+}

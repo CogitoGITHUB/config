@@ -1,0 +1,253 @@
+13:01:48.139: Platform: Wayland
+13:01:48.139: CPU Name: Intel(R) Core(TM) i3-10110U CPU @ 2.10GHz
+13:01:48.139: CPU Speed: 3370.367MHz
+13:01:48.139: Physical Cores: 2, Logical Cores: 4
+13:01:48.139: Physical Memory: 7809MB Total, 2576MB Free
+13:01:48.139: Kernel Version: Linux 6.18.31
+13:01:48.139: Distribution: "Guix System" Unknown
+13:01:48.139: Desktop Environment: Hyprland
+13:01:48.139: Session Type: wayland
+13:01:48.141: Current Date/Time: 2026-07-05, 01:01:48 PM
+13:01:48.141: Browser Hardware Acceleration: true
+13:01:48.141: Qt Version: 6.9.2 (runtime), 6.9.2 (compiled)
+13:01:48.141: Portable mode: false
+13:01:48.184: OBS 32.0.4 (linux)
+13:01:48.184: ---------------------------------
+13:01:48.185: ---------------------------------
+13:01:48.185: audio settings reset:
+13:01:48.185: 	samples per sec: 48000
+13:01:48.185: 	speakers:        2
+13:01:48.185: 	max buffering:   960 milliseconds
+13:01:48.185: 	buffering type:  dynamically increasing
+13:01:48.186: ---------------------------------
+13:01:48.186: Initializing OpenGL...
+13:01:48.186: Using EGL/Wayland
+13:01:48.198: Initialized EGL 1.5
+13:01:48.216: Loading up OpenGL on adapter Intel Mesa Intel(R) UHD Graphics (CML GT2)
+13:01:48.216: OpenGL loaded successfully, version 4.6 (Core Profile) Mesa 26.0.2, shading language 4.60
+13:01:48.252: ---------------------------------
+13:01:48.252: video settings reset:
+13:01:48.252: 	base resolution:   1920x1080
+13:01:48.252: 	output resolution: 1920x1080
+13:01:48.252: 	downscale filter:  Bicubic
+13:01:48.252: 	fps:               30/1
+13:01:48.252: 	format:            NV12
+13:01:48.252: 	YUV mode:          Rec. 709/Partial
+13:01:48.252: NV12 texture support enabled
+13:01:48.252: P010 texture support not available
+13:01:48.267: Audio monitoring device:
+13:01:48.267: 	name: Default
+13:01:48.267: 	id: default
+13:01:48.268: ---------------------------------
+13:01:48.270: Failed to load 'en-US' text for module: 'decklink-captions.so'
+13:01:48.273: Failed to load 'en-US' text for module: 'decklink-output-ui.so'
+13:01:48.276: A DeckLink iterator could not be created.  The DeckLink drivers may not be installed
+13:01:48.276: Failed to initialize module 'decklink.so'
+13:01:48.395: [pipewire] Available capture sources:
+13:01:48.395: [pipewire]     - Monitor source
+13:01:48.395: [pipewire]     - Window source
+13:01:48.400: v4l2loopback not installed, virtual camera not registered
+13:01:48.418: VAAPI: Failed to initialize display in vaapi_device_h264_supported
+13:01:48.418: FFmpeg VAAPI H264 encoding not supported
+13:01:48.418: VAAPI: Failed to initialize display in vaapi_device_av1_supported
+13:01:48.418: FFmpeg VAAPI AV1 encoding not supported
+13:01:48.418: VAAPI: Failed to initialize display in vaapi_device_hevc_supported
+13:01:48.418: FFmpeg VAAPI HEVC encoding not supported
+13:01:48.435: [obs-websocket] [obs_module_load] you can haz websockets (Version: 5.6.3 | RPC Version: 1)
+13:01:48.435: [obs-websocket] [obs_module_load] Qt version (compile-time): 6.9.2 | Qt version (run-time): 6.9.2
+13:01:48.435: [obs-websocket] [obs_module_load] Linked ASIO Version: 103600
+13:01:48.440: [obs-websocket] [obs_module_load] Module loaded.
+13:01:48.446: [vlc-video]: VLC 3.0.23 Vetinari found, VLC video source enabled
+13:01:48.446: ---------------------------------
+13:01:48.446:   Loaded Modules:
+13:01:48.446:     vlc-video.so
+13:01:48.446:     text-freetype2.so
+13:01:48.446:     rtmp-services.so
+13:01:48.446:     obs-x264.so
+13:01:48.446:     obs-websocket.so
+13:01:48.446:     obs-webrtc.so
+13:01:48.446:     obs-vst.so
+13:01:48.446:     obs-transitions.so
+13:01:48.446:     obs-outputs.so
+13:01:48.446:     obs-filters.so
+13:01:48.446:     obs-ffmpeg.so
+13:01:48.446:     linux-v4l2.so
+13:01:48.446:     linux-pulseaudio.so
+13:01:48.446:     linux-pipewire.so
+13:01:48.446:     linux-capture.so
+13:01:48.446:     linux-alsa.so
+13:01:48.446:     image-source.so
+13:01:48.446:     frontend-tools.so
+13:01:48.446:     decklink-output-ui.so
+13:01:48.446:     decklink-captions.so
+13:01:48.446: ---------------------------------
+13:01:48.446: [obs-websocket] [obs_module_post_load] WebSocket server is enabled, starting...
+13:01:48.446: [obs-websocket] [WebSocketServer::Start] Not locked to IPv4 bindings
+13:01:48.447: [obs-websocket] [WebSocketServer::ServerRunner] IO thread started.
+13:01:48.447: [obs-websocket] [WebSocketServer::Start] Server started successfully on port 4455. Possible connect address: 100.99.219.49
+13:01:48.447: ---------------------------------
+13:01:48.447: Available Encoders:
+13:01:48.447:   Video Encoders:
+13:01:48.447: 	- ffmpeg_svt_av1 (SVT-AV1)
+13:01:48.447: 	- ffmpeg_aom_av1 (AOM AV1)
+13:01:48.447: 	- obs_x264 (x264)
+13:01:48.447:   Audio Encoders:
+13:01:48.447: 	- ffmpeg_aac (FFmpeg AAC)
+13:01:48.447: 	- ffmpeg_opus (FFmpeg Opus)
+13:01:48.447: 	- ffmpeg_pcm_s16le (FFmpeg PCM (16-bit))
+13:01:48.447: 	- ffmpeg_pcm_s24le (FFmpeg PCM (24-bit))
+13:01:48.447: 	- ffmpeg_pcm_f32le (FFmpeg PCM (32-bit float))
+13:01:48.447: 	- ffmpeg_alac (FFmpeg ALAC (24-bit))
+13:01:48.447: 	- ffmpeg_flac (FFmpeg FLAC (16-bit))
+13:01:48.447: ==== Startup complete ===============================================
+13:01:48.485: All scene data cleared
+13:01:48.485: ------------------------------------------------
+13:01:48.488: Device for 'Audio Output Capture' source Desktop Audio is also used for audio monitoring.
+13:01:48.488: Deduplication logic is being applied to all monitored sources.
+13:01:48.488: pulse-input: Server name: 'pulseaudio 16.1'
+13:01:48.489: pulse-input: Audio format: s16le, 48000 Hz, 2 channels
+13:01:48.489: pulse-input: Started recording from 'alsa_output.pci-0000_00_1f.3.analog-stereo.monitor' (default)
+13:01:48.489: [Loaded global audio device]: 'Desktop Audio'
+13:01:48.489: pulse-input: Server name: 'pulseaudio 16.1'
+13:01:48.489: pulse-input: Audio format: s16le, 44100 Hz, 2 channels
+13:01:48.489: pulse-input: Started recording from 'alsa_input.pci-0000_00_1f.3.analog-stereo' (default)
+13:01:48.489: [Loaded global audio device]: 'Mic/Aux'
+13:01:48.489: PipeWire initialized
+13:01:48.492: Switched to scene 'Scene'
+13:01:48.492: ------------------------------------------------
+13:01:48.492: Loaded scenes:
+13:01:48.492: - scene 'Scene':
+13:01:48.492:     - source: 'Display Capture' (pipewire-desktop-capture-source)
+13:01:48.492: ------------------------------------------------
+13:01:48.503: Device for 'Audio Output Capture' source Desktop Audio is also used for audio monitoring.
+13:01:48.503: Deduplication logic is being applied to all monitored sources.
+13:01:48.570: [pipewire] Screencast session created
+13:01:51.013: [pipewire] Asking for monitor
+13:01:51.021: [pipewire] source selected, setting up screencast
+13:01:51.032: [pipewire] Server version: 1.6.2
+13:01:51.032: [pipewire] Library version: 1.6.2
+13:01:51.032: [pipewire] Header version: 1.6.2
+13:01:51.032: [pipewire] Created stream 0x285bd540
+13:01:51.032: [pipewire] Stream 0x285bd540 state: "connecting" (error: none)
+13:01:51.033: [pipewire] Playing stream 0x285bd540
+13:01:51.037: [pipewire] Stream 0x285bd540 state: "paused" (error: none)
+13:01:51.047: [pipewire] Negotiated format:
+13:01:51.047: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:01:51.047: [pipewire]     Modifier: 0x0
+13:01:51.047: [pipewire]     Size: 1920x1080
+13:01:51.047: [pipewire]     Framerate: 0/1
+13:01:51.053: [pipewire] Negotiated format:
+13:01:51.053: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:01:51.053: [pipewire]     Modifier: 0x100000000000004
+13:01:51.053: [pipewire]     Size: 1920x1080
+13:01:51.053: [pipewire]     Framerate: 0/1
+13:01:51.065: [pipewire] Stream 0x285bd540 state: "streaming" (error: none)
+13:01:51.079: Cannot create EGLImage: Arguments are inconsistent (for example, a valid context requires buffers not supplied by a valid surface).
+13:01:51.080: [pipewire] Renegotiating stream
+13:01:51.080: [pipewire] Stream 0x285bd540 state: "paused" (error: none)
+13:01:51.080: [pipewire] Negotiated format:
+13:01:51.080: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:01:51.080: [pipewire]     Modifier: 0x100000000000004
+13:01:51.080: [pipewire]     Size: 1920x1080
+13:01:51.080: [pipewire]     Framerate: 0/1
+13:01:51.085: [pipewire] Negotiated format:
+13:01:51.085: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:01:51.085: [pipewire]     Modifier: 0x100000000000002
+13:01:51.085: [pipewire]     Size: 1920x1080
+13:01:51.085: [pipewire]     Framerate: 0/1
+13:01:51.105: [pipewire] Negotiated format:
+13:01:51.105: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:01:51.105: [pipewire]     Modifier: 0x100000000000002
+13:01:51.105: [pipewire]     Size: 1920x1080
+13:01:51.105: [pipewire]     Framerate: 0/1
+13:01:51.105: [pipewire] Negotiated format:
+13:01:51.105: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:01:51.105: [pipewire]     Modifier: 0x100000000000002
+13:01:51.105: [pipewire]     Size: 1920x1080
+13:01:51.105: [pipewire]     Framerate: 0/1
+13:01:51.120: [pipewire] Stream 0x285bd540 state: "streaming" (error: none)
+13:02:09.948: [pipewire] Stream 0x285bd540 state: "paused" (error: none)
+13:02:09.948: [pipewire] Negotiated format:
+13:02:09.948: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:02:09.948: [pipewire]     Modifier: 0x100000000000002
+13:02:09.948: [pipewire]     Size: 1920x1080
+13:02:09.948: [pipewire]     Framerate: 0/1
+13:02:09.981: [pipewire] Negotiated format:
+13:02:09.981: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:02:09.982: [pipewire]     Modifier: 0x100000000000002
+13:02:09.982: [pipewire]     Size: 1920x1080
+13:02:09.982: [pipewire]     Framerate: 0/1
+13:02:09.983: [pipewire] Negotiated format:
+13:02:09.983: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:02:09.983: [pipewire]     Modifier: 0x100000000000002
+13:02:09.983: [pipewire]     Size: 1920x1080
+13:02:09.983: [pipewire]     Framerate: 0/1
+13:02:10.002: [pipewire] Negotiated format:
+13:02:10.002: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:02:10.002: [pipewire]     Modifier: 0x100000000000002
+13:02:10.002: [pipewire]     Size: 1920x1080
+13:02:10.002: [pipewire]     Framerate: 0/1
+13:02:10.026: [pipewire] Stream 0x285bd540 state: "streaming" (error: none)
+13:02:21.548: ---------------------------------
+13:02:21.548: [x264 encoder: 'simple_video_recording'] preset: veryfast
+13:02:21.549: [x264 encoder: 'simple_video_recording'] settings:
+13:02:21.549: 	rate_control: CBR
+13:02:21.549: 	bitrate:      6000
+13:02:21.549: 	buffer size:  6000
+13:02:21.549: 	crf:          23
+13:02:21.549: 	fps_num:      30
+13:02:21.549: 	fps_den:      1
+13:02:21.549: 	width:        1920
+13:02:21.549: 	height:       1080
+13:02:21.549: 	keyint:       250
+13:02:21.549: 
+13:02:21.555: ---------------------------------
+13:02:21.555: [FFmpeg aac encoder: 'simple_aac_recording0'] bitrate: 192, channels: 2, channel_layout: stereo, track: 1
+13:02:21.555: 
+13:02:21.564: ==== Recording Start ===============================================
+13:02:21.564: [ffmpeg muxer: 'simple_file_output'] Writing file '/home/aoeu/2026-07-05 13-02-21.mp4'...
+13:02:23.985: [ffmpeg muxer: 'simple_file_output'] Output of file '/home/aoeu/2026-07-05 13-02-21.mp4' stopped
+13:02:23.985: Output 'simple_file_output': stopping
+13:02:23.985: Output 'simple_file_output': Total frames output: 52
+13:02:23.985: Output 'simple_file_output': Total drawn frames: 73
+13:02:23.987: ==== Recording Stop ================================================
+13:02:25.171: ---------------------------------
+13:02:25.171: [x264 encoder: 'simple_video_recording'] preset: veryfast
+13:02:25.171: [x264 encoder: 'simple_video_recording'] settings:
+13:02:25.171: 	rate_control: CBR
+13:02:25.171: 	bitrate:      6000
+13:02:25.171: 	buffer size:  6000
+13:02:25.171: 	crf:          23
+13:02:25.171: 	fps_num:      30
+13:02:25.171: 	fps_den:      1
+13:02:25.171: 	width:        1920
+13:02:25.171: 	height:       1080
+13:02:25.171: 	keyint:       250
+13:02:25.171: 
+13:02:25.178: ---------------------------------
+13:02:25.178: [FFmpeg aac encoder: 'simple_aac_recording0'] bitrate: 192, channels: 2, channel_layout: stereo, track: 1
+13:02:25.178: 
+13:02:25.192: ==== Recording Start ===============================================
+13:02:25.192: [ffmpeg muxer: 'simple_file_output'] Writing file '/home/aoeu/2026-07-05 13-02-25.mp4'...
+13:02:28.913: [ffmpeg muxer: 'simple_file_output'] Output of file '/home/aoeu/2026-07-05 13-02-25.mp4' stopped
+13:02:28.913: Output 'simple_file_output': stopping
+13:02:28.913: Output 'simple_file_output': Total frames output: 91
+13:02:28.913: Output 'simple_file_output': Total drawn frames: 112
+13:02:28.915: ==== Recording Stop ================================================
+13:04:54.024: ==== Shutting down ==================================================
+13:04:54.030: pulse-input: Stopped recording from 'alsa_output.pci-0000_00_1f.3.analog-stereo.monitor'
+13:04:54.030: pulse-input: Got 0 packets with 0 frames
+13:04:54.030: Deduplication logic stopped.
+13:04:54.031: pulse-input: Stopped recording from 'alsa_input.pci-0000_00_1f.3.analog-stereo'
+13:04:54.031: pulse-input: Got 0 packets with 0 frames
+13:04:54.033: [pipewire] Stream 0x285bd540 state: "paused" (error: none)
+13:04:54.033: [pipewire] Stream 0x285bd540 state: "unconnected" (error: none)
+13:04:54.088: All scene data cleared
+13:04:54.088: ------------------------------------------------
+13:04:54.172: [obs-websocket] [obs_module_unload] Shutting down...
+13:04:54.172: [obs-websocket] [WebSocketServer::ServerRunner] IO thread exited.
+13:04:54.172: [obs-websocket] [WebSocketServer::Stop] Server stopped successfully
+13:04:54.172: Tried to call obs_frontend_remove_event_callback with no callbacks!
+13:04:54.172: [obs-websocket] [obs_module_unload] Finished shutting down.
+13:04:54.180: [Scripting] Total detached callbacks: 0
+13:04:54.181: Freeing OBS context data

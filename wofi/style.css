@@ -1,0 +1,53 @@
+window {
+    background: transparent;
+    border: 2px solid #4a0000;
+    border-radius: 0;
+}
+
+#outer-box {
+    background: transparent;
+    margin: 0;
+    padding: 0;
+}
+
+#input {
+    background: transparent;
+    color: #cc0000;
+    border: 2px solid #4a0000;
+    border-radius: 0;
+    margin: 4px;
+    padding: 4px;
+}
+
+#scroll {
+    background: transparent;
+}
+
+#inner-box {
+    background: transparent;
+    margin: 0;
+    padding: 0;
+}
+
+#entry {
+    background: transparent;
+    color: #cc0000;
+    border: none;
+    padding: 4px;
+}
+
+#entry:selected {
+    background: #4a0000;
+}
+
+#entry:selected #text {
+    color: #ff4444;
+}
+
+#text {
+    background: transparent;
+    color: #cc0000;
+    border: none;
+    margin: 0;
+    padding: 0;
+}

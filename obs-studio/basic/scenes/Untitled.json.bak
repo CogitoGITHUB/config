@@ -81,7 +81,8 @@
                 "capture_cursor": true,
                 "video_format": 0,
                 "framerate_numerator": 30,
-                "framerate_denominator": 1
+                "framerate_denominator": 1,
+                "RestoreToken": ""
             },
             "mixers": 0,
             "sync": 0,
@@ -113,61 +114,6 @@
                     {
                         "name": "Display Capture",
                         "source_uuid": "3e917158-1a14-45dc-aa9d-5e13d6c76c22",
-                        "visible": false,
-                        "locked": false,
-                        "rot": 0.0,
-                        "scale_ref": {
-                            "x": 1920.0,
-                            "y": 1080.0
-                        },
-                        "align": 5,
-                        "bounds_type": 0,
-                        "bounds_align": 0,
-                        "bounds_crop": false,
-                        "crop_left": 0,
-                        "crop_top": 0,
-                        "crop_right": 0,
-                        "crop_bottom": 0,
-                        "id": 2,
-                        "group_item_backup": false,
-                        "pos": {
-                            "x": -2.0,
-                            "y": -1.0
-                        },
-                        "pos_rel": {
-                            "x": -1.7810699939727783,
-                            "y": -1.0018517971038818
-                        },
-                        "scale": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "scale_rel": {
-                            "x": 1.0,
-                            "y": 1.0
-                        },
-                        "bounds": {
-                            "x": 0.0,
-                            "y": 0.0
-                        },
-                        "bounds_rel": {
-                            "x": 0.0,
-                            "y": 0.0
-                        },
-                        "scale_filter": "disable",
-                        "blend_method": "default",
-                        "blend_type": "normal",
-                        "show_transition": {
-                            "duration": 0
-                        },
-                        "hide_transition": {
-                            "duration": 0
-                        },
-                        "private_settings": {}
-                    },
-                    {
-                        "name": "Video Capture Device (PipeWire) (BETA)",
-                        "source_uuid": "d16867f3-5713-4285-ae34-94a03f126594",
                         "visible": true,
                         "locked": false,
                         "rot": 0.0,
@@ -183,7 +129,7 @@
                         "crop_top": 0,
                         "crop_right": 0,
                         "crop_bottom": 0,
-                        "id": 3,
+                        "id": 2,
                         "group_item_backup": false,
                         "pos": {
                             "x": 0.0,
@@ -236,38 +182,12 @@
             "hotkeys": {
                 "OBSBasic.SelectScene": [],
                 "libobs.show_scene_item.2": [],
-                "libobs.hide_scene_item.2": [],
-                "libobs.show_scene_item.3": [],
-                "libobs.hide_scene_item.3": []
+                "libobs.hide_scene_item.2": []
             },
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
             "monitoring_type": 0,
             "canvas_uuid": "6c69626f-6273-4c00-9d88-c5136d61696e",
-            "private_settings": {}
-        },
-        {
-            "prev_ver": 536870916,
-            "name": "Video Capture Device (PipeWire) (BETA)",
-            "uuid": "d16867f3-5713-4285-ae34-94a03f126594",
-            "id": "pipewire-camera-source",
-            "versioned_id": "pipewire-camera-source",
-            "settings": {},
-            "mixers": 0,
-            "sync": 0,
-            "flags": 0,
-            "volume": 1.0,
-            "balance": 0.5,
-            "enabled": true,
-            "muted": false,
-            "push-to-mute": false,
-            "push-to-mute-delay": 0,
-            "push-to-talk": false,
-            "push-to-talk-delay": 0,
-            "hotkeys": {},
-            "deinterlace_mode": 0,
-            "deinterlace_field_order": 0,
-            "monitoring_type": 0,
             "private_settings": {}
         }
     ],
@@ -301,8 +221,8 @@
     "current_transition": "Fade",
     "transition_duration": 300,
     "preview_locked": false,
-    "scaling_enabled": true,
-    "scaling_level": -11,
+    "scaling_enabled": false,
+    "scaling_level": -12,
     "scaling_off_x": 0.0,
     "scaling_off_y": 0.0,
     "modules": {

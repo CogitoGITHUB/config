@@ -1,0 +1,175 @@
+13:21:53.231: Platform: Wayland
+13:21:53.231: CPU Name: Intel(R) Core(TM) i3-10110U CPU @ 2.10GHz
+13:21:53.231: CPU Speed: 3299.993MHz
+13:21:53.231: Physical Cores: 2, Logical Cores: 4
+13:21:53.231: Physical Memory: 7809MB Total, 2277MB Free
+13:21:53.231: Kernel Version: Linux 6.18.31
+13:21:53.231: Distribution: "Guix System" Unknown
+13:21:53.231: Desktop Environment: Hyprland
+13:21:53.231: Session Type: wayland
+13:21:53.232: Current Date/Time: 2026-07-05, 01:21:53 PM
+13:21:53.232: Browser Hardware Acceleration: true
+13:21:53.232: Qt Version: 6.9.2 (runtime), 6.9.2 (compiled)
+13:21:53.232: Portable mode: false
+13:21:53.273: OBS 32.0.4 (linux)
+13:21:53.273: ---------------------------------
+13:21:53.278: ---------------------------------
+13:21:53.278: audio settings reset:
+13:21:53.278: 	samples per sec: 48000
+13:21:53.278: 	speakers:        2
+13:21:53.278: 	max buffering:   960 milliseconds
+13:21:53.278: 	buffering type:  dynamically increasing
+13:21:53.279: ---------------------------------
+13:21:53.279: Initializing OpenGL...
+13:21:53.279: Using EGL/Wayland
+13:21:53.288: Initialized EGL 1.5
+13:21:53.306: Loading up OpenGL on adapter Intel Mesa Intel(R) UHD Graphics (CML GT2)
+13:21:53.306: OpenGL loaded successfully, version 4.6 (Core Profile) Mesa 26.0.2, shading language 4.60
+13:21:53.346: ---------------------------------
+13:21:53.346: video settings reset:
+13:21:53.346: 	base resolution:   1920x1080
+13:21:53.346: 	output resolution: 1920x1080
+13:21:53.346: 	downscale filter:  Bicubic
+13:21:53.346: 	fps:               30/1
+13:21:53.346: 	format:            NV12
+13:21:53.346: 	YUV mode:          Rec. 709/Partial
+13:21:53.346: NV12 texture support enabled
+13:21:53.346: P010 texture support not available
+13:21:53.359: Audio monitoring device:
+13:21:53.359: 	name: Default
+13:21:53.359: 	id: default
+13:21:53.364: ---------------------------------
+13:21:53.367: Failed to load 'en-US' text for module: 'decklink-captions.so'
+13:21:53.370: Failed to load 'en-US' text for module: 'decklink-output-ui.so'
+13:21:53.371: A DeckLink iterator could not be created.  The DeckLink drivers may not be installed
+13:21:53.371: Failed to initialize module 'decklink.so'
+13:21:53.508: [pipewire] Available capture sources:
+13:21:53.509: [pipewire]     - Monitor source
+13:21:53.509: [pipewire]     - Window source
+13:21:53.518: v4l2loopback not installed, virtual camera not registered
+13:21:53.576: VAAPI: Failed to initialize display in vaapi_device_h264_supported
+13:21:53.576: FFmpeg VAAPI H264 encoding not supported
+13:21:53.577: VAAPI: Failed to initialize display in vaapi_device_av1_supported
+13:21:53.577: FFmpeg VAAPI AV1 encoding not supported
+13:21:53.577: VAAPI: Failed to initialize display in vaapi_device_hevc_supported
+13:21:53.577: FFmpeg VAAPI HEVC encoding not supported
+13:21:53.614: [obs-websocket] [obs_module_load] you can haz websockets (Version: 5.6.3 | RPC Version: 1)
+13:21:53.614: [obs-websocket] [obs_module_load] Qt version (compile-time): 6.9.2 | Qt version (run-time): 6.9.2
+13:21:53.614: [obs-websocket] [obs_module_load] Linked ASIO Version: 103600
+13:21:53.622: [obs-websocket] [obs_module_load] Module loaded.
+13:21:53.637: [vlc-video]: VLC 3.0.23 Vetinari found, VLC video source enabled
+13:21:53.637: ---------------------------------
+13:21:53.637:   Loaded Modules:
+13:21:53.637:     vlc-video.so
+13:21:53.637:     text-freetype2.so
+13:21:53.637:     rtmp-services.so
+13:21:53.637:     obs-x264.so
+13:21:53.637:     obs-websocket.so
+13:21:53.637:     obs-webrtc.so
+13:21:53.637:     obs-vst.so
+13:21:53.637:     obs-transitions.so
+13:21:53.637:     obs-outputs.so
+13:21:53.637:     obs-filters.so
+13:21:53.637:     obs-ffmpeg.so
+13:21:53.637:     linux-v4l2.so
+13:21:53.637:     linux-pulseaudio.so
+13:21:53.637:     linux-pipewire.so
+13:21:53.637:     linux-capture.so
+13:21:53.637:     linux-alsa.so
+13:21:53.637:     image-source.so
+13:21:53.637:     frontend-tools.so
+13:21:53.637:     decklink-output-ui.so
+13:21:53.637:     decklink-captions.so
+13:21:53.637: ---------------------------------
+13:21:53.637: [obs-websocket] [obs_module_post_load] WebSocket server is enabled, starting...
+13:21:53.637: [obs-websocket] [WebSocketServer::Start] Not locked to IPv4 bindings
+13:21:53.638: [obs-websocket] [WebSocketServer::ServerRunner] IO thread started.
+13:21:53.638: [obs-websocket] [WebSocketServer::Start] Server started successfully on port 4455. Possible connect address: 100.99.219.49
+13:21:53.638: ---------------------------------
+13:21:53.638: Available Encoders:
+13:21:53.638:   Video Encoders:
+13:21:53.638: 	- ffmpeg_svt_av1 (SVT-AV1)
+13:21:53.638: 	- ffmpeg_aom_av1 (AOM AV1)
+13:21:53.638: 	- obs_x264 (x264)
+13:21:53.638:   Audio Encoders:
+13:21:53.638: 	- ffmpeg_aac (FFmpeg AAC)
+13:21:53.638: 	- ffmpeg_opus (FFmpeg Opus)
+13:21:53.638: 	- ffmpeg_pcm_s16le (FFmpeg PCM (16-bit))
+13:21:53.638: 	- ffmpeg_pcm_s24le (FFmpeg PCM (24-bit))
+13:21:53.638: 	- ffmpeg_pcm_f32le (FFmpeg PCM (32-bit float))
+13:21:53.638: 	- ffmpeg_alac (FFmpeg ALAC (24-bit))
+13:21:53.638: 	- ffmpeg_flac (FFmpeg FLAC (16-bit))
+13:21:53.638: ==== Startup complete ===============================================
+13:21:53.706: All scene data cleared
+13:21:53.706: ------------------------------------------------
+13:21:53.712: Device for 'Audio Output Capture' source Desktop Audio is also used for audio monitoring.
+13:21:53.712: Deduplication logic is being applied to all monitored sources.
+13:21:53.712: pulse-input: Server name: 'pulseaudio 16.1'
+13:21:53.713: pulse-input: Audio format: s16le, 48000 Hz, 2 channels
+13:21:53.713: pulse-input: Started recording from 'alsa_output.pci-0000_00_1f.3.analog-stereo.monitor' (default)
+13:21:53.713: [Loaded global audio device]: 'Desktop Audio'
+13:21:53.714: pulse-input: Server name: 'pulseaudio 16.1'
+13:21:53.714: pulse-input: Audio format: s16le, 44100 Hz, 2 channels
+13:21:53.714: pulse-input: Started recording from 'alsa_input.pci-0000_00_1f.3.analog-stereo' (default)
+13:21:53.714: [Loaded global audio device]: 'Mic/Aux'
+13:21:53.714: PipeWire initialized
+13:21:53.717: Switched to scene 'Scene'
+13:21:53.717: ------------------------------------------------
+13:21:53.717: Loaded scenes:
+13:21:53.717: - scene 'Scene':
+13:21:53.717:     - source: 'Display Capture' (pipewire-desktop-capture-source)
+13:21:53.717: ------------------------------------------------
+13:21:53.724: Device for 'Audio Output Capture' source Desktop Audio is also used for audio monitoring.
+13:21:53.724: Deduplication logic is being applied to all monitored sources.
+13:21:53.804: [pipewire] Screencast session created
+13:21:56.384: [pipewire] Asking for monitor
+13:21:56.387: [pipewire] source selected, setting up screencast
+13:21:56.413: [pipewire] Server version: 1.6.2
+13:21:56.413: [pipewire] Library version: 1.6.2
+13:21:56.413: [pipewire] Header version: 1.6.2
+13:21:56.413: [pipewire] Created stream 0x2013d6b0
+13:21:56.413: [pipewire] Stream 0x2013d6b0 state: "connecting" (error: none)
+13:21:56.413: [pipewire] Playing stream 0x2013d6b0
+13:21:56.414: [pipewire] Stream 0x2013d6b0 state: "paused" (error: none)
+13:21:56.421: [pipewire] Negotiated format:
+13:21:56.421: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:21:56.421: [pipewire]     Modifier: 0x0
+13:21:56.421: [pipewire]     Size: 1920x1080
+13:21:56.421: [pipewire]     Framerate: 0/1
+13:21:56.427: [pipewire] Negotiated format:
+13:21:56.427: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:21:56.427: [pipewire]     Modifier: 0x100000000000004
+13:21:56.427: [pipewire]     Size: 1920x1080
+13:21:56.427: [pipewire]     Framerate: 0/1
+13:21:56.441: [pipewire] Stream 0x2013d6b0 state: "streaming" (error: none)
+13:21:56.459: Cannot create EGLImage: Arguments are inconsistent (for example, a valid context requires buffers not supplied by a valid surface).
+13:21:56.459: [pipewire] Renegotiating stream
+13:21:56.460: [pipewire] Stream 0x2013d6b0 state: "paused" (error: none)
+13:21:56.460: [pipewire] Negotiated format:
+13:21:56.460: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:21:56.460: [pipewire]     Modifier: 0x100000000000004
+13:21:56.460: [pipewire]     Size: 1920x1080
+13:21:56.460: [pipewire]     Framerate: 0/1
+13:21:56.463: [pipewire] Negotiated format:
+13:21:56.463: [pipewire]     Format: 12 (Spa:Enum:VideoFormat:BGRA)
+13:21:56.463: [pipewire]     Modifier: 0x100000000000002
+13:21:56.463: [pipewire]     Size: 1920x1080
+13:21:56.463: [pipewire]     Framerate: 0/1
+13:21:56.472: [pipewire] Stream 0x2013d6b0 state: "streaming" (error: none)
+13:21:59.432: ==== Shutting down ==================================================
+13:21:59.447: pulse-input: Stopped recording from 'alsa_output.pci-0000_00_1f.3.analog-stereo.monitor'
+13:21:59.448: pulse-input: Got 0 packets with 0 frames
+13:21:59.448: Deduplication logic stopped.
+13:21:59.448: pulse-input: Stopped recording from 'alsa_input.pci-0000_00_1f.3.analog-stereo'
+13:21:59.448: pulse-input: Got 0 packets with 0 frames
+13:21:59.449: [pipewire] Stream 0x2013d6b0 state: "paused" (error: none)
+13:21:59.449: [pipewire] Stream 0x2013d6b0 state: "unconnected" (error: none)
+13:21:59.513: All scene data cleared
+13:21:59.513: ------------------------------------------------
+13:21:59.598: [obs-websocket] [obs_module_unload] Shutting down...
+13:21:59.598: [obs-websocket] [WebSocketServer::ServerRunner] IO thread exited.
+13:21:59.598: [obs-websocket] [WebSocketServer::Stop] Server stopped successfully
+13:21:59.598: Tried to call obs_frontend_remove_event_callback with no callbacks!
+13:21:59.598: [obs-websocket] [obs_module_unload] Finished shutting down.
+13:21:59.609: [Scripting] Total detached callbacks: 0
+13:21:59.609: Freeing OBS context data

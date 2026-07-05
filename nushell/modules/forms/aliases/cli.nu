@@ -11,3 +11,9 @@ alias t = emacs -nw TODO.org
 # needs sudo to work
 alias gazelle = sudo gazelle
 
+alias sleep = psleep --style bar
+
+alias cp = cpx
+
+alias whois = quien
+

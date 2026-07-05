@@ -6,6 +6,7 @@ hl.bind(mod .. " + BackSpace",  hl.dsp.window.close())
 hl.bind(mod .. " + E",          hl.dsp.exec_cmd("emacs"))
 hl.bind(mod .. " + O",          hl.dsp.exec_cmd("qutebrowser"))
 hl.bind(mod .. " + C",          hl.dsp.exec_cmd("google-chrome"))
+hl.bind(mod .. " + D",          hl.dsp.exec_cmd("wofi --show drun"))
 -- ── Fullscreen ─────────────────────────────────────────────────────────────
 hl.bind(mod .. " + Space",      hl.dsp.window.fullscreen())
 -- ── Layout navigation ──────────────────────────────────────────────────────
@@ -32,6 +33,14 @@ end
 hl.bind(mod .. " + 0",          hl.dsp.focus({ workspace = "10" }))
 hl.bind(mod .. " + CTRL + 0",   hl.dsp.window.move({ workspace = "10" }))
 -- TODO: special/scratchpad workspaces -- figure out later
+-- ── DMS Shell ────────────────────────────────────────────────────────────────
+hl.bind(mod .. " + V",          hl.dsp.exec_cmd("dms ipc call clipboard toggle"))
+hl.bind(mod .. " + M",          hl.dsp.exec_cmd("dms ipc call processlist toggle"))
+hl.bind(mod .. " + N",          hl.dsp.exec_cmd("dms ipc call notifications toggle"))
+hl.bind(mod .. " + P",          hl.dsp.exec_cmd("dms ipc call notepad toggle"))
+hl.bind(mod .. " + X",          hl.dsp.exec_cmd("dms ipc call powermenu toggle"))
+hl.bind(mod .. " + SHIFT + L",  hl.dsp.exec_cmd("dms ipc call lock lock"))
+hl.bind(mod .. " + SHIFT + Space", hl.dsp.exec_cmd("dms ipc call spotlight toggle"))
 -- ── Audio ──────────────────────────────────────────────────────────────────
 hl.bind("XF86AudioRaiseVolume",  hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"),  { repeating = true })
 hl.bind("XF86AudioLowerVolume",  hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),       { repeating = true })

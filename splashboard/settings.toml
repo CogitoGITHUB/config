@@ -1,0 +1,20 @@
+# Written by `splashboard install`. User preferences that apply to every dashboard.
+# Safe to edit by hand. Re-running `splashboard install` leaves this file alone
+# unless you pass `--yes`, which backs it up as `settings.toml.bak` before rewriting.
+
+[theme]
+bg = "#ffffff"
+bg_subtle = "#ffffff"
+text = "#cc0000"
+text_secondary = "#cc0000"
+text_dim = "#cc0000"
+panel_title = "#cc0000"
+panel_border = "#cc0000"
+status_ok = "#cc0000"
+status_warn = "#cc0000"
+status_error = "#cc0000"
+accent_today = "#cc0000"
+accent_event = "#cc0000"
+palette_series = ["#cc0000", "#cc0000", "#cc0000", "#cc0000"]
+palette_heatmap = ["#cc0000", "#cc0000", "#cc0000", "#cc0000", "#cc0000"]
+
