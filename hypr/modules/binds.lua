@@ -7,6 +7,7 @@ hl.bind(mod .. " + E",          hl.dsp.exec_cmd("emacs"))
 hl.bind(mod .. " + O",          hl.dsp.exec_cmd("qutebrowser"))
 hl.bind(mod .. " + C",          hl.dsp.exec_cmd("google-chrome"))
 hl.bind(mod .. " + D",          hl.dsp.exec_cmd("wofi --show drun"))
+hl.bind(mod .. " + S",          hl.dsp.exec_cmd("omarchy-tui-shell toggle"))
 -- ── Fullscreen ─────────────────────────────────────────────────────────────
 hl.bind(mod .. " + Space",      hl.dsp.window.fullscreen())
 -- ── Layout navigation ──────────────────────────────────────────────────────

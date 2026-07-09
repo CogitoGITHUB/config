@@ -13,11 +13,11 @@
 
 #-- File Editor
 # Default: $EDITOR
-editor = "nvim"
+editor = "emacs"
 
 #-- Directory Editor
 # 
-dir_editor = "nvim"
+dir_editor = "emacs"
 
 #-- Auto check for update
 auto_check_update = true
@@ -173,12 +173,28 @@ zoxide_support = true
 #   pdf = "zathura"
 #   conf = "nvim"
 [open_with]
-txt = "nvim"
-md = "nvim"
-conf = "nvim"
-log = "nvim"
-json = "nvim"
-toml = "nvim"
-yaml = "nvim"
-yml = "nvim"
-sh = "nvim"
+txt = "emacs"
+md = "emacs"
+conf = "emacs"
+log = "emacs"
+json = "emacs"
+toml = "emacs"
+yaml = "emacs"
+yml = "emacs"
+sh = "emacs"
+el = "emacs"
+org = "emacs"
+scm = "emacs"
+lisp = "emacs"
+py = "emacs"
+rb = "emacs"
+rs = "emacs"
+c = "emacs"
+h = "emacs"
+cpp = "emacs"
+hpp = "emacs"
+css = "emacs"
+html = "emacs"
+js = "emacs"
+ts = "emacs"
+xml = "emacs"

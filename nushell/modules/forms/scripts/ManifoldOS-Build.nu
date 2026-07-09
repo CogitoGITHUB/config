@@ -6,7 +6,7 @@ def mb-flow [current: string, timings: record] {
     print $"(ansi red_bold)🌹 MANIFOLD // BUILD 🌹(ansi reset)"
     print ""
     for step in ["Cache" "Build"] {
-        let elapsed   = ($timings | get -i $step | default "")
+        let elapsed   = ($timings | get --optional $step | default "")
         let is_done   = ($elapsed | is-not-empty)
         let is_active = ($step == $current)
         let symbol    = if $is_done and not $is_active { "🌹" } else if $is_active { "►" } else { "○" }

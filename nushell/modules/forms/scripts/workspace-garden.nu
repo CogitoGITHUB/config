@@ -287,7 +287,7 @@ def jj-push-confirmed [] {
     }
     print ""
     print -n $"(ansi purple)  Push? [y/N]: (ansi reset)"
-    let ans = (input "" | str trim | str downcase)
+    let ans = (input "" | str trim | str lowercase)
     if $ans == "y" {
         ManifoldOS-Reshaping-History
         print $"(ansi green)  ✓ pushed(ansi reset)"
@@ -456,7 +456,7 @@ def workspace-loop [] {
 # EXPORTS
 # =============================================================================
 export def maybe-open-todo [] {
-    if ($env | get -i __skip_workspace) == true {
+    if ($env | get --optional __skip_workspace) == true {
         $env.__skip_workspace = false
         return
     }

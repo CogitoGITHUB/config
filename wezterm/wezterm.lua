@@ -34,6 +34,12 @@ local modal = wezterm.plugin.require("https://github.com/MLFlexer/modal.wezterm"
 modal.apply_to_config(config)
 modal.set_default_keys(config)
 
+-- ===== Workspace manager plugin =====
+local workspace_manager = wezterm.plugin.require("https://github.com/ryanmsnyder/workspace-manager.wezterm")
+workspace_manager.session_enabled = true
+workspace_manager.session_restore_on_startup = true
+workspace_manager.apply_to_config(config)
+
 -- ===== Window frame / tab-bar background =====
 config.window_frame = {
 active_titlebar_bg = '#ffffff',

@@ -125,7 +125,7 @@ def rs-flow [steps: list, current: string, timings: record, substage: string = "
 
     for step in $steps {
         let name      = $step.name
-        let elapsed   = ($timings | get -i $name | default "")
+        let elapsed   = ($timings | get --optional $name | default "")
         let is_done   = ($elapsed | is-not-empty)
         let is_active = ($name == $current)
         let symbol    = if $is_done and not $is_active { "🌹" } else if $is_active { "►" } else { "○" }

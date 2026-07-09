@@ -40,6 +40,16 @@ let keybindings = [
     }
   }
   {
+    name: superfile
+    modifier: control
+    keycode: char_s
+    mode: [emacs, vi_insert, vi_normal]
+    event: {
+      send: executehostcommand
+      cmd: "superfile"
+    }
+  }
+  {
     name: dired
     modifier: none
     keycode: char_d
