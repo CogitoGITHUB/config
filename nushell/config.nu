@@ -9,7 +9,7 @@ source "~/.config/nushell/modules/forms/keybindings/ttycmd.nu"
 
 # ManifoldOS — load order matters: roots before garden
 source "~/.config/nushell/modules/forms/scripts/workspace-vc-roots.nu"
-#source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping.nu"
+source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping.nu"
 source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Build.nu"
 source "~/.config/nushell/modules/forms/scripts/ManifoldOS-Weather.nu"
 

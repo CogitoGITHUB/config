@@ -75,7 +75,7 @@ def github-create-repo [name: string, token: string] {
         $resp.body.ssh_url 
     } else if $resp.status == 422 {
         try {
-            http get --full --allow-errors --headers $gh_headers $"https://api.github.com/repos/($config.github_user)/($name)" | .body.ssh_url
+            http get --full --allow-errors --headers $gh_headers $"https://api.github.com/repos/($config.github_user)/($name)" | get body.ssh_url
         } catch { null }
     } else { null }
 }
@@ -372,7 +372,7 @@ def do-push [repo: string, branch: string] {
 # =============================================================================
 # SECTION 5 — RENDER
 # =============================================================================
-def render-summary [bm: string, changed: list, commit_msg: string, sync: record, elapsed: string] {
+def hub-render-summary [bm: string, changed: list, commit_msg: string, sync: record, elapsed: string] {
     let rose = "🌹"
     let wilt = "🥀"
     print -n "\e[2J\e[H"
@@ -438,7 +438,7 @@ def hub-commit-push [repo: string, bm: string, msg: string] {
     if $pr.exit_code != 0 { render-failure "PUSH" $pr.stderr; return }
     try { git -C $repo fetch origin } catch { }
     let sync    = (resolve-ahead-behind $repo $bm)
-    render-summary $bm $changed $commit_msg $sync "done"
+    hub-render-summary $bm $changed $commit_msg $sync "done"
 }
 
 # ── branches ──────────────────────────────────────────────────────────────────

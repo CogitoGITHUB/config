@@ -100,8 +100,27 @@
 #     fetch-commits-from [repo, n]
 # =============================================================================
 
-source ~/.config/nushell/modules/forms/scripts/ManifoldOS-Reshaping-History.nu
+source ~/.config/nushell/modules/forms/scripts/workspace-vc-roots.nu
 
+def print-section [label: string, subtitle: string, rows: list] {
+    print $"  (ansi red_bold)(char rose) ($label)(ansi reset)"
+    print $"  (ansi grey)($subtitle)(ansi reset)"
+    print ""
+    if ($rows | is-not-empty) {
+        $rows | table | print
+    }
+}
+
+def print-git-sections [repo: string, changed: list, push_results: list] {
+    let branch = (try { git -C $repo branch --show-current | str trim } catch { "unknown" })
+    let remote = (try { git -C $repo remote get-url origin | str trim } catch { "" })
+    let status_count = (try { git -C $repo status --short | lines | length } catch { 0 })
+    print $"  (ansi red_bold)(char rose) GIT(ansi reset)"
+    print $"  (ansi grey)branch: ($branch)(ansi reset)"
+    if ($remote | is-not-empty) { print $"  (ansi grey)remote: ($remote)(ansi reset)" }
+    print $"  (ansi grey)changed: ($changed | length) files(ansi reset)"
+    print ""
+}
 
 # =============================================================================
 # SECTION 1 — FLOW ENGINE

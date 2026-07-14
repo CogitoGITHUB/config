@@ -229,3 +229,27 @@ tnu
 emacs dir-info.nu
 emacs 
 emacs workspace-vc-roots.nu
+opencode
+cd ..
+cd .config/nushell/modules/forms/scripts/
+opencodu
+opencode
+netstat
+netwatch 
+cd .config/nushell/modules/forms/scripts/
+opecode
+opencode
+rip
+opencode
+cd .config/nushell/modules/forms/scripts/
+opencode
+herdr
+cd ..
+e config.nu
+emacs config.nu
+nu
+exit
+cd .config/nushell/
+emacs config.nu
+nu
+cd .config/nushell/
