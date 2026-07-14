@@ -2,53 +2,31 @@
   "version": 3,
   "workspaces": [
     {
-      "id": "w1A",
+      "id": "w1H",
       "custom_name": null,
       "identity_cwd": "/home/aoeu",
       "public_pane_numbers": {
-        "1": 1,
-        "2": 2
+        "10": 1
       },
-      "next_public_pane_number": 4,
+      "next_public_pane_number": 2,
       "public_tab_numbers": [
-        1,
-        2
+        1
       ],
-      "next_public_tab_number": 4,
+      "next_public_tab_number": 2,
       "tabs": [
         {
-          "custom_name": "AI Emacs Test",
+          "custom_name": null,
           "layout": {
-            "Pane": 1
+            "Pane": 10
           },
           "panes": {
-            "1": {
-              "cwd": "/home/aoeu",
-              "agent_session": {
-                "source": "herdr:opencode",
-                "agent": "opencode",
-                "kind": "id",
-                "value": "ses_0bac64674ffeEbko8kLhJifJfv"
-              }
+            "10": {
+              "cwd": "/home/aoeu"
             }
           },
           "zoomed": false,
-          "focused": 1,
-          "root_pane": 1
-        },
-        {
-          "custom_name": "Test Emacs",
-          "layout": {
-            "Pane": 2
-          },
-          "panes": {
-            "2": {
-              "cwd": "/home/aoeu/test"
-            }
-          },
-          "zoomed": false,
-          "focused": 2,
-          "root_pane": 2
+          "focused": 10,
+          "root_pane": 10
         }
       ],
       "active_tab": 0

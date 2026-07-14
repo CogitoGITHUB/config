@@ -253,3 +253,10 @@ cd .config/nushell/
 emacs config.nu
 nu
 cd .config/nushell/
+e .
+opencode --session ses_0bac64674ffeEbko8kLhJifJfv
+nu
+nu
+cd test/
+ls
+nu

@@ -5,7 +5,7 @@
 const WEATHER_LOCATION = ""  # empty = wttr.in auto-detects from IP
 
 def get-weather-emoji [condition: string] {
-    match ($condition | str lowercase) {
+    match ($condition | str downcase) {
         "sunny" | "clear"                          => "☀️"
         "partly cloudy"                             => "🌤️"
         "cloudy" | "overcast"                       => "☁️"
