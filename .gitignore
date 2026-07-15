@@ -10,3 +10,6 @@ atuin/history.db-wal
 atuin/history.db-shm
 google-chrome/
 mozilla/
+
+# ---- Splashboard runtime cache ----
+splashboard/cache/

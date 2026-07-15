@@ -1,219 +1,289 @@
-# home_daily — "everything at a glance" preset. Dense 2-column dashboard built from
-# zero-config widgets: quote of the day at the top, then a calendar + sky panel and
-# a world-clock + system panel side-by-side, with time-elapsed gauges full-width at
-# the bottom. `splashboard install → home_daily` renders a filled dashboard on
-# first run without any `[widget.options]` editing.
-#
-# For weather or sunrise/sunset you need latitude + longitude per widget; drop a
-# `weather` or `clock_sunrise` block in `$HOME/.splashboard/home.dashboard.toml`
-# with your own coordinates.
-
 # ── Widgets ────────────────────────────────────────────────────────
 
 [[widget]]
 id = "quote"
-fetcher = "random_quote"
-render = { type = "list_plain", align = "center" }
+fetcher = "basic_static"
+shape = "text_block"
+format = "🌹 \"L'enfer, c'est les autres\" 🌹"
+render = { type = "animated_splitflap", align = "center", color = "text_secondary" }
+
+[[widget]]
+id = "greeting"
+fetcher = "basic_static"
+format = "🌹 Good Evening 🌹"
+render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "hero"
 fetcher = "clock"
-format = "%a %e"
-render = { type = "text_ascii", style = "blocks", pixel_size = "quadrant", color = "panel_title", align = "center" }
+format = "%H:%M"
+render = { type = "text_ascii", style = "blocks", pixel_size = "full", color = "panel_title", align = "center" }
 
 [[widget]]
 id = "date"
 fetcher = "clock"
 format = "%A  ·  %e %B %Y  ·  day %j of %Y"
+render = { type = "animated_typewriter", align = "center" }
+
+
+
+
+# ── Weather ─────────────────────────────────────────────────────────
+# Change lat/lon to your location. Tokyo and Seoul are fixed.
+
+[[widget]]
+id = "weather_title"
+fetcher = "basic_static"
+format = "🌹 Weather 🌹"
+render = { type = "animated_typewriter", align = "center", color = "panel_title" }
+
+[[widget]]
+id = "system_name"
+fetcher = "system_info_host"
+kind = "os"
 render = { type = "text_plain", align = "center" }
 
 [[widget]]
-id = "calendar"
-fetcher = "clock"
-render = { type = "grid_calendar", align = "center" }
+id = "sartre_title"
+fetcher = "basic_static"
+format = "🌹 Jean-Paul Sartre 🌹"
+render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
 
-# `clock_almanac` returns Entries of today's astro / calendric rollup (moon /
-# season / zodiac / chinese / iso week / day of year) in a single widget so it
-# can sit next to calendar in the same row-cell.
-#
-# Add `hemisphere = "south"` if you're below the equator so the season row
-# reads Autumn in April instead of Spring.
-[[widget]]
-id = "almanac"
-fetcher = "clock_almanac"
-render = { type = "grid_table", layout = "rows", column_align = ["left", "left"] }
-
-# World clock — UTC + five cities. Each entry is either a plain IANA zone
-# (displayed verbatim) or a `{ tz, label }` pair for a short header.
 [[widget]]
 id = "world_clock"
 fetcher = "clock_timezones"
 format = "%H:%M"
-render = { type = "grid_table", layout = "rows", column_align = ["left", "left"] }
+shape = "text_block"
+render = { type = "animated_splitflap", align = "center" }
   [widget.options]
   timezones = [
-    "UTC",
-    { tz = "America/Los_Angeles", label = "LA" },
-    { tz = "America/New_York", label = "NYC" },
-    { tz = "Europe/London", label = "London" },
+    { tz = "Europe/Bucharest", label = "Bucharest" },
     { tz = "Asia/Tokyo", label = "Tokyo" },
-    { tz = "Australia/Sydney", label = "Sydney" },
+    { tz = "Asia/Seoul", label = "Seoul" },
+    { tz = "America/New_York", label = "NYC" },
   ]
 
-# System — os / host / uptime / load / cpu / memory as a 6-row Entries table so
-# it matches the world-clock column height.
 [[widget]]
-id = "system"
-fetcher = "system_monitor_host"
-render = { type = "grid_table", layout = "rows", column_align = ["left", "left"] }
+id = "title_world_clock"
+fetcher = "basic_static"
+format = "🌹 World Clock 🌹"
+render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
 
-# Gauge labels padded to 5 characters so the bars line up vertically across rows.
 [[widget]]
-id = "year_ratio"
-fetcher = "clock_ratio"
-render = { type = "gauge_line", label = "year ", value_format = "percent" }
+id = "title_home"
+fetcher = "basic_static"
+format = "🌹 Home 🌹"
+render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+
+[[widget]]
+id = "title_tokyo"
+fetcher = "basic_static"
+format = "🌹 Tokyo 🌹"
+render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+
+[[widget]]
+id = "title_seoul"
+fetcher = "basic_static"
+format = "🌹 Seoul 🌹"
+render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+
+[[widget]]
+id = "title_nyc"
+fetcher = "basic_static"
+format = "🌹 NYC 🌹"
+render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+
+[[widget]]
+id = "title_crypto"
+fetcher = "basic_static"
+format = "🌹 Crypto 🌹"
+render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+
+[[widget]]
+id = "title_stocks"
+fetcher = "basic_static"
+format = "🌹 Stocks 🌹"
+render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+
+[[widget]]
+id = "weather_home"
+fetcher = "weather"
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
   [widget.options]
-  period = "year"
+  latitude = 45.44
+  longitude = 28.05
+  units = "metric"
 
 [[widget]]
-id = "quarter_ratio"
-fetcher = "clock_ratio"
-render = { type = "gauge_line", label = "qtr  ", value_format = "percent" }
+id = "weather_tokyo"
+fetcher = "weather"
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
   [widget.options]
-  period = "quarter"
+  latitude = 35.6762
+  longitude = 139.6503
+  units = "metric"
 
 [[widget]]
-id = "month_ratio"
-fetcher = "clock_ratio"
-render = { type = "gauge_line", label = "month", value_format = "percent" }
+id = "weather_seoul"
+fetcher = "weather"
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
   [widget.options]
-  period = "month"
+  latitude = 37.5665
+  longitude = 126.9780
+  units = "metric"
 
 [[widget]]
-id = "week_ratio"
-fetcher = "clock_ratio"
-render = { type = "gauge_line", label = "week ", value_format = "percent" }
+id = "weather_nyc"
+fetcher = "weather"
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
   [widget.options]
-  period = "week"
+  latitude = 40.71
+  longitude = -74.01
+  units = "metric"
+
+
+
+# ── Crypto ──────────────────────────────────────────────────────────
 
 [[widget]]
-id = "day_ratio"
-fetcher = "clock_ratio"
-render = { type = "gauge_line", label = "day  ", value_format = "percent" }
+id = "crypto"
+fetcher = "crypto_watchlist"
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
   [widget.options]
-  period = "day"
+  coins = ["bitcoin", "monero", "ethereum", "solana"]
+  vs_currency = "usd"
 
-# ── Layout ─────────────────────────────────────────────────────────
+# ── Stocks ──────────────────────────────────────────────────────────
+
+[[widget]]
+id = "stocks"
+fetcher = "stock_watchlist"
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
+  [widget.options]
+  symbols = ["TSLA", "SPCX", "AAPL", "MSFT", "GOOG"]
+
+
+# ── Layout ──────────────────────────────────────────────────────────
 
 [[row]]
 height = { length = 1 }
 
-# Quote — two centred lines at the top. Deterministic per calendar day.
 [[row]]
-height = { length = 2 }
+height = { length = 1 }
 flex = "center"
   [[row.child]]
-  widget = "quote"
-  width = { length = 88 }
+  widget = "greeting"
+  width = { length = 70 }
 
 [[row]]
 height = { length = 1 }
 
-# Hero + date (full-width, no divider needed).
 [[row]]
-height = { length = 4 }
+height = { length = 6 }
   [[row.child]]
   widget = "hero"
 
 [[row]]
 height = { length = 1 }
+
+[[row]]
+height = { length = 1 }
+flex = "center"
   [[row.child]]
-  widget = "date"
+  widget = "title_world_clock"
+  width = { length = 70 }
+
+[[row]]
+height = { length = 4 }
+flex = "center"
+  [[row.child]]
+  widget = "world_clock"
+  width = { length = 70 }
 
 [[row]]
 height = { length = 1 }
 
-# Row 1: calendar | sky almanac — two 34-cell columns with centred dividers.
-# Row height 8 fits the calendar (1 border + month header + weekday + 5 weeks);
-# almanac is 7 rows (1 border + 6 entries) and leaves one trailing blank row.
 [[row]]
-height = { length = 8 }
+height = { length = 1 }
+flex = "center"
+  [[row.child]]
+  widget = "weather_title"
+  width = { length = 70 }
+
+[[row]]
+height = { length = 1 }
 flex = "center"
 gap = 2
   [[row.child]]
-  widget = "calendar"
-  width = { length = 34 }
-  border = "top"
-  title = "  this month  "
-  title_align = "center"
+  widget = "title_home"
+  width = { length = 16 }
   [[row.child]]
-  widget = "almanac"
-  width = { length = 34 }
-  border = "top"
-  title = "  sky  "
-  title_align = "center"
+  widget = "title_tokyo"
+  width = { length = 16 }
+  [[row.child]]
+  widget = "title_seoul"
+  width = { length = 16 }
+  [[row.child]]
+  widget = "title_nyc"
+  width = { length = 16 }
+
+[[row]]
+height = { length = 4 }
+flex = "center"
+gap = 2
+  [[row.child]]
+  widget = "weather_home"
+  width = { length = 16 }
+  [[row.child]]
+  widget = "weather_tokyo"
+  width = { length = 16 }
+  [[row.child]]
+  widget = "weather_seoul"
+  width = { length = 16 }
+  [[row.child]]
+  widget = "weather_nyc"
+  width = { length = 16 }
 
 [[row]]
 height = { length = 1 }
 
-# Row 2: world clock | system. Both panels are 6 rows of content + 1 border = 7.
+[[row]]
+height = { length = 1 }
+flex = "center"
+gap = 2
+  [[row.child]]
+  widget = "title_crypto"
+  width = { length = 34 }
+  [[row.child]]
+  widget = "title_stocks"
+  width = { length = 34 }
+
 [[row]]
 height = { length = 7 }
 flex = "center"
 gap = 2
   [[row.child]]
-  widget = "world_clock"
+  widget = "crypto"
   width = { length = 34 }
-  border = "top"
-  title = "  world clock  "
-  title_align = "center"
   [[row.child]]
-  widget = "system"
+  widget = "stocks"
   width = { length = 34 }
-  border = "top"
-  title = "  system  "
-  title_align = "center"
 
 [[row]]
 height = { length = 1 }
-
-# Time-elapsed gauges — full-width stack. First row carries the divider.
-[[row]]
-height = { length = 2 }
-flex = "center"
-  [[row.child]]
-  widget = "year_ratio"
-  width = { length = 70 }
-  border = "top"
-  title = "  time elapsed  "
-  title_align = "center"
 
 [[row]]
 height = { length = 1 }
 flex = "center"
   [[row.child]]
-  widget = "quarter_ratio"
+  widget = "sartre_title"
   width = { length = 70 }
 
 [[row]]
 height = { length = 1 }
 flex = "center"
   [[row.child]]
-  widget = "month_ratio"
-  width = { length = 70 }
-
-[[row]]
-height = { length = 1 }
-flex = "center"
-  [[row.child]]
-  widget = "week_ratio"
-  width = { length = 70 }
-
-[[row]]
-height = { length = 1 }
-flex = "center"
-  [[row.child]]
-  widget = "day_ratio"
+  widget = "quote"
   width = { length = 70 }
 
 [[row]]
