@@ -3,7 +3,8 @@ $env.PROMPT_INDICATOR_VI_NORMAL = $"(ansi red)〉"
 
 # /home/aoeu/.config/nushell/env.nu
 
-$env.EDITOR = "emacs"
+$env.EDITOR = "emacsclient"
+$env.ALTERNATE_EDITOR = ""
 
 
 $env.XDG_RUNTIME_DIR = $"/run/user/(id -u | str trim)"

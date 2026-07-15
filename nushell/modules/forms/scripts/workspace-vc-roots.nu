@@ -495,7 +495,7 @@ def hub-branches [repo: string] {
                 " (" + ($unpushed | into string) + ") unpushed"
             } else { "" }
             print -n $"  delete ($target)($unpushed_msg)? [y/N] "
-            let yn = (input "" | str trim | str downcase)
+            let yn = (input "" | str trim | str lowercase)
             if $yn == "y" {
                 git -C $repo branch -D $target | ignore
                 if (remote-branch-exists $repo $target) {
@@ -531,7 +531,7 @@ def hub-branches [repo: string] {
             mut stash_yn = "n"
             if $dirty > 0 {
                 print -n "  🌹 stash changes before switching? [Y/n] "
-                $stash_yn = (input "" | str trim | str downcase)
+                $stash_yn = (input "" | str trim | str lowercase)
             }
             if $dirty > 0 and $stash_yn != "n" {
                 let stash_ok = (do { git -C $repo stash push -m "auto-stash before branch switch" } | complete)
@@ -625,7 +625,7 @@ def hub-log [repo: string] {
     }
     if ($action | str starts-with "__undo__") {
         print -n $"  reset HEAD to ($hash)? This discards all commits after it. [y/N] "
-        let yn = (input "" | str trim | str downcase)
+        let yn = (input "" | str trim | str lowercase)
         if $yn == "y" {
             let r = (do { git -C $repo reset --hard $hash } | complete)
             if $r.exit_code != 0 { print -e $"  🥀 ($r.stderr)" } else { print $"  🌹 reset to ($hash)" }
@@ -702,7 +702,7 @@ def hub-stash [repo: string] {
         }
         if ($action | str starts-with "__drop__") {
             print -n $"  drop ($ref)? [y/N] "
-            let yn = (input "" | str trim | str downcase)
+            let yn = (input "" | str trim | str lowercase)
             if $yn == "y" {
                 git -C $repo stash drop $ref | ignore
                 print $"  🌹 stash dropped"
@@ -866,7 +866,7 @@ def hub-tags [repo: string] {
             let tag = ($selected | split row "\t" | get 0 | str trim)
             if ($tag | is-empty) { continue }
             print -n $"  delete tag ($tag) locally and on remote? [y/N] "
-            let yn = (input "" | str trim | str downcase)
+            let yn = (input "" | str trim | str lowercase)
             if $yn == "y" {
                 git -C $repo tag -d $tag | ignore
                 git -C $repo push origin --delete refs/tags/$tag | ignore

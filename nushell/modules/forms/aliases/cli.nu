@@ -4,9 +4,10 @@ def zellij-clean [] {
 
 
 
-alias e = emacs -nw
-alias d = emacs -nw .
-alias t = emacs -nw TODO.org
+alias emacs = emacsclient
+alias e = emacsclient -nw
+alias d = emacsclient -nw .
+alias t = emacsclient -nw TODO.org
 
 # needs sudo to work
 alias gazelle = sudo gazelle
