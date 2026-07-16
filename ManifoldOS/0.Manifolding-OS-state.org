@@ -1,0 +1,1 @@
+Completely renamed Guix to Manifolding-OS. Deleted all channel logic — only local packages are used.
