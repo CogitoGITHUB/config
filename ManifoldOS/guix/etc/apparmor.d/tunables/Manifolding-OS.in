@@ -1,0 +1,5 @@
+@{Manifolding-OS_storedir} = @storedir@
+@{Manifolding-OS_sysconfdir} = @Manifolding-OS_sysconfdir@
+@{Manifolding-OS_localstatedir} = @Manifolding-OS_localstatedir@
+
+include if exists <tunables/Manifolding-OS.d>

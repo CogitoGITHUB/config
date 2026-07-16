@@ -1,0 +1,24 @@
+# This is a "service unit file" for the systemd init system to launch
+# 'Manifolding-OS publish'.  Drop it in /etc/systemd/system or similar to have
+# 'Manifolding-OS publish' automatically started.
+
+[Unit]
+Description=Publish the GNU Guix store
+Requires=Manifolding-OS-daemon.service
+PartOf=Manifolding-OS-daemon.service
+After=Manifolding-OS-daemon.service
+
+[Service]
+ExecStart=@localstatedir@/Manifolding-OS/profiles/per-user/root/current-Manifolding-OS/bin/Manifolding-OS publish --user=nobody --port=8181
+Environment='GUIX_LOCPATH=@localstatedir@/Manifolding-OS/profiles/per-user/root/Manifolding-OS-profile/lib/locale' LC_ALL=en_US.utf8
+StandardOutput=journal
+StandardError=journal
+
+# Despite the name, this is rate-limited: a broken daemon will eventually fail.
+Restart=always
+
+# See <https://lists.gnu.org/archive/html/Manifolding-OS-devel/2016-04/msg00608.html>.
+TasksMax=1024
+
+[Install]
+WantedBy=multi-user.target

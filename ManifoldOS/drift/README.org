@@ -1,0 +1,283 @@
+* ManifoldOS Guix Refactoring - Document Index & Quick Start
+
+This document serves as your entry point to the migration plan.
+
+** Document Overview
+
+| Document | Purpose | Audience | Time |
+|----------|---------|----------|------|
+| plan.org | Complete strategy & rationale | Decision makers, project leads | 15 min |
+| implementation-checklist.org | Step-by-step execution guide | Implementation team | 5 min review, ongoing use |
+| implementation-examples.org | Real-world examples & troubleshooting | Developers doing extraction | Reference as needed |
+| THIS FILE | Quick navigation & entry point | Everyone | 2 min |
+
+** Quick Start Guide
+
+### If you just want to understand the goal
+
+1. Read: **plan.org** → Section "Overview" (2 min)
+2. Skim: **plan.org** → Section "Current Architecture vs. Target" (3 min)
+3. Optional: Look at **implementation-examples.org** → "Example 1: Simple Package" (5 min)
+
+→ You'll understand what we're doing and why
+
+### If you want to execute the migration
+
+1. Read: **plan.org** fully (15 min)
+2. Review: **implementation-checklist.org** Pre-Implementation section (5 min)
+3. Start: Phase 1 from **implementation-checklist.org** (15 min execution)
+4. Reference: **implementation-examples.org** as you extract packages
+
+→ You'll be ready to execute Phase 1 safely
+
+### If you're extracting packages
+
+1. Understand the pattern from **implementation-examples.org** → Examples 1-4 (10 min)
+2. Use **implementation-checklist.org** → Phase 2 section (ongoing reference)
+3. Test using **implementation-examples.org** → Example 7 (when needed)
+
+→ You'll know exactly what to extract and how to test
+
+### If something goes wrong
+
+1. Check: **implementation-examples.org** → Example 6: Troubleshooting
+2. Verify: **implementation-checklist.org** → Validation sections
+3. Reference: **plan.org** → Section "Risks & Mitigation"
+
+→ You'll find solutions fast
+
+** Navigation by Phase
+
+### Phase 1: Setup (15 min)
+
+**Documents:**
+- plan.org § "Phase 1: Setup - Create dependencies/ Directory"
+- implementation-checklist.org § "Phase 1: Create dependencies/ Directory"
+
+**Key task:** =mkdir -p /home/aoeu/.config/guix/dependencies=
+
+**Time:** 15 minutes
+
+---
+
+### Phase 2: Extract Packages (15-20 hours)
+
+**Documents:**
+- plan.org § "Phase 2: Extract Packages from sources/guix/"
+- implementation-checklist.org § "Phase 2: Extract Packages (Category-by-category)"
+- implementation-examples.org § "Examples 1-4: Real transformations"
+
+**Key tasks:**
+1. Find package definition in sources/guix/
+2. Copy to dependencies/package-name.scm
+3. Update module name from (gnu packages X) to (dependencies package-name)
+4. Test with REPL
+
+**Recommended order:**
+1. shell (15+ packages)
+2. core (7 packages)
+3. networking (12 packages)
+4. Continue with remaining categories
+
+**Time:** 20-28 hours total, spread over 1-2 weeks
+
+---
+
+### Phase 3: Update guixos.scm (2 min)
+
+**Documents:**
+- plan.org § "Phase 3: Update guixos.scm Load Path"
+- implementation-checklist.org § "Phase 3: Update guixos.scm Load Path"
+
+**Key task:** Add =(add-to-load-path "/home/aoeu/.config/guix/dependencies")= before core-system
+
+**Time:** 2 minutes
+
+---
+
+### Phase 4: Update Package Imports (2-3 hours)
+
+**Documents:**
+- plan.org § "Phase 4: Update Package Modules"
+- implementation-checklist.org § "Phase 4: Update Package Module Imports"
+- implementation-examples.org § "Example 5: Category Loader Update Pattern"
+
+**Key task:** Change =#:use-module (gnu packages X)= to =#:use-module (dependencies X)= in each package module
+
+**Affected files:** All files in shell/, core/, networking/, etc.
+
+**Time:** 2-3 hours
+
+---
+
+### Phase 5: Test with REPL (30 min - 2 hours)
+
+**Documents:**
+- plan.org § "Phase 5: Test with REPL and Validate"
+- implementation-checklist.org § "Phase 5: REPL Testing & Validation"
+- implementation-examples.org § "Example 7: Testing Workflow"
+
+**Key tests:**
+- Module loading: =guile -c "(use-modules (dependencies PACKAGE))"=
+- REPL validation: =guile -c "(use-modules (core-system ...)) (display PACKAGE)"=
+- Full system load: =guile -c "(use-modules (core-system core-system))"=
+
+**Time:** 30 min - 2 hours
+
+---
+
+### Phase 6: Reconfigure (30-60 min)
+
+**Documents:**
+- plan.org § "Phase 6: System Reconfigure"
+- implementation-checklist.org § "Phase 6: System Reconfigure"
+
+**Key command:** =sudo guix system reconfigure /home/aoeu/.config/guix/guixos.scm=
+
+**Time:** 30-60 minutes (system build time varies)
+
+** Key Concepts
+
+### The Three Transformations
+
+You'll apply these three transformations repeatedly:
+
+#### Transformation 1: Create dependencies/PACKAGE.scm
+```
+sources/guix/gnu/packages/CATEGORY.scm
+  ↓ (extract definition)
+  ↓ (change module name)
+dependencies/PACKAGE.scm
+```
+
+Example:
+```
+sources/guix/gnu/packages/shells.scm
+  (define-public nushell ...)
+  ↓
+dependencies/nushell.scm
+  (define-module (dependencies nushell) ...)
+  (define-public nushell ...)
+```
+
+#### Transformation 2: Update Operating-System module
+```
+Operating-System/.../CATEGORY/PACKAGE.scm
+  #:use-module (gnu packages X) → #:use-module (dependencies PACKAGE)
+```
+
+Example:
+```
+Operating-System/.../shell/nushell.scm
+  (define-module (core-system user-space root shell nushell)
+    #:use-module (gnu packages nushell)  ← BEFORE
+    #:use-module (dependencies nushell)  ← AFTER
+    #:re-export (nushell))
+```
+
+#### Transformation 3: Update guixos.scm (once)
+```
+guixos.scm
+  (add-to-load-path "/home/aoeu/.config/guix/dependencies")  ← ADD THIS
+  (add-to-load-path "/home/aoeu/.config/guix/Operating-System")
+```
+
+---
+
+## Decision Tree
+
+```
+START: Do you want to proceed with the migration?
+
+├─ NO: Stop here. Plan is ready for future reference.
+│
+└─ YES: Continue below
+   │
+   ├─ Want to understand first? → Read plan.org (15 min)
+   │
+   ├─ Ready to start Phase 1? → Open implementation-checklist.org
+   │                          → Execute Phase 1 (15 min)
+   │
+   ├─ Need examples? → Open implementation-examples.org
+   │                 → Review Examples 1-7
+   │
+   └─ Want to start Phase 2? → Choose category priority
+                              → Follow implementation-checklist.org Phase 2
+                              → Reference implementation-examples.org as needed
+```
+
+## Timeline Overview
+
+```
+Day 1: Understanding & Setup
+├─ Review plan.org (15 min)
+├─ Review examples (15 min)
+└─ Execute Phase 1: Create dependencies/ (15 min)
+   ✓ Total: 45 min
+
+Days 2-7: Package Extraction (spread out)
+├─ Extract high-priority categories:
+│  ├─ shell (2-3 hours)
+│  ├─ core (1-2 hours)
+│  └─ networking (2-3 hours)
+├─ Test each category (1-2 hours)
+├─ Continue with medium-priority categories (5-8 hours)
+└─ ✓ Total: 15-20 hours over 5-6 days
+
+Day 8: Integration & Validation
+├─ Phase 3: Update guixos.scm (2 min)
+├─ Phase 4: Update all package imports (2-3 hours)
+├─ Phase 5: Full REPL testing (1-2 hours)
+└─ ✓ Total: 3-5 hours
+
+Day 9: Deployment
+├─ Final backups
+├─ Phase 6: System reconfigure (30-60 min)
+└─ Verification and post-deployment tests
+
+TOTAL: 20-28 hours over ~9 days (flexible timeline)
+```
+
+## Success Indicators
+
+After completion, you'll have:
+
+- ✅ A decoupled system configuration not dependent on upstream Guix
+- ✅ Ability to patch packages without modifying sources/
+- ✅ Custom package definitions maintained in your config
+- ✅ Full system functionality with custom dependencies/
+- ✅ Clean, categorized package structure maintained
+- ✅ Ability to version-control and backup your packages
+
+## Questions & Troubleshooting
+
+### Q: Can I stop and resume the migration?
+A: Yes! The plan is designed for this. Stop after Phase 5 testing, resume whenever.
+
+### Q: What if a phase fails?
+A: Backups are created before Phase 6. Earlier phases are reversible with backups.
+
+### Q: How do I know which packages to extract?
+A: Extract packages referenced in Operating-System/core-system/ directories only. Use implementation-checklist.org to track.
+
+### Q: Can I extract packages incrementally?
+A: Yes! That's the recommended approach. Extract one category (e.g., shell) fully before moving to the next.
+
+### Q: What if I find a package that's problematic?
+A: Reference implementation-examples.org § "Example 6: Troubleshooting" for solutions.
+
+---
+
+## Document Reading Order (Recommended)
+
+1. **THIS FILE** (you are here) - 2 min overview
+2. **plan.org** - 15 min strategic understanding
+3. **implementation-examples.org** - 10 min example patterns
+4. **implementation-checklist.org** - 5 min pre-implementation review
+5. **Execute Phase 1** - Ready to start!
+
+---
+
+*Created: 2026-04-07*
+*Status: PLAN COMPLETE - Ready for execution*
+*Questions? Review the detailed documents or ask for clarification.*

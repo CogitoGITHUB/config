@@ -1,0 +1,565 @@
+* ManifoldOS Guix Refactoring - Implementation Examples
+
+This document provides detailed examples of the actual transformations that will occur during migration.
+
+** Example 1: Simple Package - nushell
+
+*** Source (guixos/gnu/packages/shells.scm)
+
+What exists in =sources/guix/gnu/packages/shells.scm=:
+
+#+begin_src scheme
+(define-module (gnu packages shells)
+  #:use-module (guix packages)
+  #:use-module (guix build-system cargo)
+  #:use-module (guix records)
+  #:use-module (guix utils)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:use-module (gnu packages compression)
+  #:use-module (gnu packages pkg-config)
+  #:use-module (gnu packages rust)
+  #:use-module (gnu packages tls)
+  ...
+  #:export (nushell ...))
+
+(define-public nushell
+  (package
+    (name "nushell")
+    (version "0.96.1")
+    (source
+      (origin
+        (method url-fetch)
+        (uri (crate-uri "nu" version))
+        (sha256
+          (base32 "some-hash-here"))))
+    (build-system cargo-build-system)
+    (inputs
+      (list openssl
+            pkg-config))
+    (synopsis "A new type of shell")
+    (description "...")
+    (home-page "https://www.nushell.sh")
+    (license license:mit)))
+#+end_src
+
+*** Step 1: Create dependencies/nushell.scm
+
+Extract ONLY the nushell package definition and update module name:
+
+#+begin_src scheme
+(define-module (dependencies nushell)
+  #:use-module (guix packages)
+  #:use-module (guix build-system cargo)
+  #:use-module (guix records)
+  #:use-module (guix utils)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:use-module (gnu packages compression)
+  #:use-module (gnu packages pkg-config)
+  #:use-module (gnu packages rust)
+  #:use-module (gnu packages tls)
+  #:export (nushell))
+
+(define-public nushell
+  (package
+    (name "nushell")
+    (version "0.96.1")
+    (source
+      (origin
+        (method url-fetch)
+        (uri (crate-uri "nu" version))
+        (sha256
+          (base32 "some-hash-here"))))
+    (build-system cargo-build-system)
+    (inputs
+      (list openssl
+            pkg-config))
+    (synopsis "A new type of shell")
+    (description "...")
+    (home-page "https://www.nushell.sh")
+    (license license:mit)))
+#+end_src
+
+*Key changes:*
+- Module name: =(gnu packages shells)= → =(dependencies nushell)=
+- Export: =#:export (nushell ...)= → =#:export (nushell)=
+- Everything else: UNCHANGED (including all imports from gnu packages)
+
+*** Step 2: Update shell/nushell.scm
+
+Current state:
+#+begin_src scheme
+(define-module (core-system user-space root shell nushell)
+  #:use-module (gnu packages nushell)
+  #:re-export (nushell))
+#+end_src
+
+⚠️  Note: This imports from =(gnu packages nushell)= which doesn't exist!
+   The original definition is in =(gnu packages shells)=.
+   After migration:
+
+#+begin_src scheme
+(define-module (core-system user-space root shell nushell)
+  #:use-module (dependencies nushell)
+  #:re-export (nushell))
+#+end_src
+
+*Key change:*
+- Replace: =(gnu packages xyz)= → =(dependencies nushell)=
+- Keep: =#:re-export (nushell)= UNCHANGED
+
+*** Step 3: Verify with REPL
+
+#+begin_src bash
+guile
+scheme@(guile-user)> (use-modules (dependencies nushell))
+scheme@(guile-user)> (display nushell)
+#<package nushell@0.96.1 gnu/packages/shells.scm:...>
+scheme@(guile-user)> ,q
+#+end_src
+
+---
+
+** Example 2: Complex Package with Sub-modules - emacs
+
+*** Source (sources/guix/gnu/packages/emacs.scm)
+
+This file is more complex:
+
+#+begin_src scheme
+(define-module (gnu packages emacs)
+  #:use-module (guix packages)
+  #:use-module (guix gexp)
+  #:use-module (guix build-system gnu)
+  #:use-module (guix download)
+  #:use-module (guix git-download)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:use-module (gnu packages alignment)
+  #:use-module (gnu packages base)
+  #:use-module (gnu packages compression)
+  #:use-module (gnu packages glib)
+  #:use-module (gnu packages gtk)
+  #:use-module (gnu packages lisp)
+  #:use-module (gnu packages xml)
+  ... many more imports
+  #:export (emacs
+            emacs-minimal
+            emacs-next
+            ... many more exports))
+
+(define-public emacs-minimal
+  (package
+    (name "emacs")
+    ...))
+
+(define-public emacs
+  (package
+    (name "emacs")
+    ...))
+
+(define-public emacs-next
+  (package
+    (name "emacs")
+    ...))
+#+end_src
+
+*** Step 1: Create dependencies/emacs.scm
+
+Key insight: This file has MULTIPLE package definitions but we ONLY extract the public ones used.
+
+Option A: If only emacs is used in your config:
+#+begin_src scheme
+(define-module (dependencies emacs)
+  #:use-module (guix packages)
+  #:use-module (guix gexp)
+  #:use-module (guix build-system gnu)
+  #:use-module (guix download)
+  #:use-module (guix git-download)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:use-module (gnu packages alignment)
+  #:use-module (gnu packages base)
+  #:use-module (gnu packages compression)
+  #:use-module (gnu packages glib)
+  #:use-module (gnu packages gtk)
+  #:use-module (gnu packages lisp)
+  #:use-module (gnu packages xml)
+  ... all required imports ...
+  #:export (emacs))
+
+(define-public emacs
+  (package
+    (name "emacs")
+    ...))
+#+end_src
+
+Option B: If your config uses both emacs and emacs-minimal, include both exports:
+#+begin_src scheme
+(define-module (dependencies emacs)
+  ...
+  #:export (emacs emacs-minimal))
+
+(define-public emacs-minimal
+  (package ...))
+
+(define-public emacs
+  (package ...))
+#+end_src
+
+*Key decision:* Only include packages that are actually used in your config.
+
+*** Step 2: Update editors/emacs.scm
+
+Current:
+#+begin_src scheme
+(define-module (core-system user-space root editors emacs)
+  #:use-module (gnu packages emacs)
+  #:re-export (emacs))
+#+end_src
+
+After:
+#+begin_src scheme
+(define-module (core-system user-space root editors emacs)
+  #:use-module (dependencies emacs)
+  #:re-export (emacs))
+#+end_src
+
+---
+
+** Example 3: Package with Nested Imports - git
+
+*** Source (sources/guix/gnu/packages/version-control.scm)
+
+#+begin_src scheme
+(define-module (gnu packages version-control)
+  #:use-module (guix packages)
+  #:use-module (guix records)
+  #:use-module (guix gexp)
+  #:use-module (guix build-system gnu)
+  #:use-module (guix download)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:use-module (gnu packages curl)
+  #:use-module (gnu packages libffi)
+  #:use-module (gnu packages openssl)
+  #:use-module (gnu packages perl)
+  #:use-module (gnu packages python)
+  #:use-module (gnu packages ssh)
+  ... more imports
+  #:export (git ...))
+
+(define-public git
+  (package
+    (name "git")
+    (version "2.40.0")
+    ...
+    (inputs
+      (list curl
+            zlib
+            openssl
+            libffi
+            ...))))
+#+end_src
+
+*** Step 1: Create dependencies/git.scm
+
+#+begin_src scheme
+(define-module (dependencies git)
+  #:use-module (guix packages)
+  #:use-module (guix records)
+  #:use-module (guix gexp)
+  #:use-module (guix build-system gnu)
+  #:use-module (guix download)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:use-module (gnu packages curl)
+  #:use-module (gnu packages libffi)
+  #:use-module (gnu packages openssl)
+  #:use-module (gnu packages perl)
+  #:use-module (gnu packages python)
+  #:use-module (gnu packages ssh)
+  ... all required imports ...
+  #:export (git))
+
+(define-public git
+  (package
+    (name "git")
+    (version "2.40.0")
+    ...
+    (inputs
+      (list curl
+            zlib
+            openssl
+            libffi
+            ...))))
+#+end_src
+
+*** Step 2: Update networking/version-control/git.scm
+
+Current:
+#+begin_src scheme
+(define-module (core-system user-space root networking version-control git)
+  #:use-module (gnu packages version-control)
+  #:re-export (git))
+#+end_src
+
+After:
+#+begin_src scheme
+(define-module (core-system user-space root networking version-control git)
+  #:use-module (dependencies git)
+  #:re-export (git))
+#+end_src
+
+---
+
+** Example 4: Package with Custom Dependency - hyprland
+
+This is more complex because hyprland may depend on other custom packages in dependencies/
+
+*** Scenario
+
+Assume you have:
+- =dependencies/hyprland.scm= (main package)
+- =dependencies/wayland.scm= (dependency)
+- =dependencies/libxkbcommon.scm= (dependency)
+
+And hyprland's original definition has:
+
+#+begin_src scheme
+(define-module (gnu packages wm)
+  ...
+  #:use-module (gnu packages wm)      ;; contains both hyprland and wayland utilities
+  ...
+  #:export (hyprland ...))
+
+(define-public hyprland
+  (package
+    (name "hyprland")
+    ...
+    (inputs
+      (list wayland
+            libxkbcommon
+            ...))))
+#+end_src
+
+*** Step 1: Create dependencies/hyprland.scm
+
+When creating hyprland.scm, if it depends on wayland package defined in dependencies/:
+
+#+begin_src scheme
+(define-module (dependencies hyprland)
+  #:use-module (guix packages)
+  #:use-module (guix build-system cmake)
+  #:use-module (guix download)
+  #:use-module ((guix licenses) #:prefix license:)
+  ;; GNU package inputs
+  #:use-module (gnu packages freedesktop)
+  #:use-module (gnu packages wm)
+  ;; CUSTOM package if in dependencies
+  #:use-module (dependencies libxkbcommon)
+  #:export (hyprland))
+
+(define-public hyprland
+  (package
+    (name "hyprland")
+    ...
+    (inputs
+      (list (assoc-ref (@ (dependencies libxkbcommon) libxkbcommon))
+            ...))))
+#+end_src
+
+Alternative approach (simpler):
+- Keep input references to packages in =(gnu packages ...)=
+- Only import from =(dependencies ...)= if the package IS in your dependencies/
+
+*** Step 2: Update desktop/hyprland.scm
+
+Unchanged pattern:
+#+begin_src scheme
+(define-module (core-system user-space root desktop hyprland)
+  #:use-module (dependencies hyprland)
+  #:re-export (hyprland))
+#+end_src
+
+---
+
+** Example 5: Troubleshooting - Missing Imports
+
+*** Problem Scenario
+
+You extract =curl.scm= and test with REPL:
+
+#+begin_src bash
+guile -c "(use-modules (dependencies curl))" 2>&1
+#+end_src
+
+You get error:
+#+begin_src
+ERROR: In procedure read-record-header:
+  Unbound variable: zlib
+#+end_src
+
+*** Diagnosis
+
+The curl package definition uses ~zlib~ but the import is missing:
+
+Look in original source:
+#+begin_src scheme
+(define-public curl
+  (package
+    ...
+    (inputs (list zlib ...))))
+#+end_src
+
+But you didn't copy:
+#+begin_src scheme
+#:use-module (gnu packages compression)  ;; provides zlib
+#+end_src
+
+*** Solution
+
+Add missing import to dependencies/curl.scm:
+
+#+begin_src scheme
+(define-module (dependencies curl)
+  #:use-module (guix packages)
+  #:use-module (guix build-system gnu)
+  #:use-module (guix download)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:use-module (gnu packages compression)  ;; ← ADD THIS
+  #:use-module (gnu packages perl)
+  #:export (curl))
+#+end_src
+
+Re-test:
+#+begin_src bash
+guile -c "(use-modules (dependencies curl))" && echo "OK"
+#+end_src
+
+---
+
+** Example 6: Category Loader Update Pattern
+
+*** Before Migration
+
+=loaders/shell.scm=:
+
+#+begin_src scheme
+(define-module (core-system user-space root loaders shell)
+  #:use-module (core-system user-space root shell nushell)
+  #:use-module (core-system user-space root shell bash)
+  #:use-module (core-system user-space root shell starship)
+  #:use-module (core-system user-space root shell fzf)
+  #:use-module (core-system user-space root shell zoxide)
+  #:use-module (core-system user-space root shell zellij)
+  #:use-module (core-system user-space root shell carapace)
+  #:use-module (core-system user-space root shell atuin)
+  #:use-module (core-system user-space root shell superfile)
+  #:use-module (core-system user-space root shell television)
+  #:use-module (core-system user-space root shell power)
+  #:use-module (core-system user-space root shell system-monitor)
+  #:use-module (core-system user-space root shell fetch neofetch)
+  #:use-module (core-system user-space root shell fetch fastfetch)
+  #:use-module (core-system user-space root shell rip)
+  #:use-module (core-system user-space root shell archive)
+  #:re-export (nushell bash starship fzf zoxide zellij carapace atuin superfile television rip-cli
+               btop htop ncdu glances
+               upower tlp acpi
+               zip unzip 7zip unrar-free zstd xz
+               neofetch fastfetch)
+  #:export (root-shell-packages
+            root-shell-system-monitor-packages
+            root-shell-power-packages
+            root-shell-archive-packages
+            root-shell-fetch-packages))
+
+(define root-shell-packages
+  (list nushell bash starship fzf zoxide zellij carapace atuin superfile television rip-cli))
+
+(define-public root-shell-system-monitor-packages
+  (list btop htop ncdu glances))
+
+(define-public root-shell-power-packages
+  (list upower tlp acpi))
+
+(define-public root-shell-archive-packages
+  (list zip unzip 7zip unrar-free zstd xz))
+
+(define-public root-shell-fetch-packages
+  (list neofetch fastfetch))
+#+end_src
+
+⚠️  IMPORTANT: Loaders DO NOT CHANGE during migration!
+   The changes only happen in the imported modules (shell/*.scm files).
+
+---
+
+** Example 7: Testing Workflow
+
+### Step 1: After extracting nushell to dependencies/
+
+#+begin_src bash
+# Verify file exists
+ls -l /home/aoeu/.config/guix/dependencies/nushell.scm
+
+# Test syntax
+guile --no-auto-compile -c "(use-modules (dependencies nushell))" && echo "✓ Syntax OK"
+
+# Test repl
+guile -c "(use-modules (dependencies nushell)) (display nushell)" && echo "✓ REPL OK"
+#+end_src
+
+Expected output:
+#+begin_src
+#<package nushell@0.96.1 gnu/packages/shells.scm:...>✓ REPL OK
+#+end_src
+
+### Step 2: After updating shell/nushell.scm
+
+#+begin_src bash
+# Test module load
+guile -c "(use-modules (core-system user-space root shell nushell))" && echo "✓ Module OK"
+
+# Test package availability
+guile -c "(use-modules (core-system user-space root shell nushell)) (display nushell)" && echo "✓ Package OK"
+#+end_src
+
+### Step 3: After updating entire shell category
+
+#+begin_src bash
+# Test all shell imports
+guile -c "(use-modules (core-system user-space root loaders shell))" && echo "✓ Loader OK"
+
+# Test specific exports
+guile -c "(use-modules (core-system user-space root loaders shell)) (display (length root-shell-packages))"
+#+end_src
+
+Expected: Number of shell packages (should be 11+)
+
+### Step 4: After Phase 5 - Full system test
+
+#+begin_src bash
+# Test full system load
+guile -c "(use-modules (core-system core-system))" && echo "✓ Full system OK"
+
+# Check for any unbound variables
+guile -c "(use-modules (core-system core-system))" 2>&1 | grep -i "unbound"
+# (should output nothing if no errors)
+#+end_src
+
+---
+
+## Quick Reference: Import Changes
+
+Use this table when updating package modules:
+
+| File | From | To |
+|------|------|-----|
+| shell/nushell.scm | (gnu packages nushell) | (dependencies nushell) |
+| shell/bash.scm | (gnu packages bash) | (dependencies bash) |
+| editors/emacs.scm | (gnu packages emacs) | (dependencies emacs) |
+| networking/curl.scm | (gnu packages curl) | (dependencies curl) |
+| networking/version-control/git.scm | (gnu packages version-control) | (dependencies git) |
+| desktop/hyprland.scm | (gnu packages wm) | (dependencies hyprland) |
+| [pattern] | (gnu packages X) | (dependencies package-name) |
+
+---
+
+*Generated: 2026-04-07*
+*Status: REFERENCE DOCUMENT - Use with implementation-checklist.org*

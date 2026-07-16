@@ -1,0 +1,100 @@
+* Adding Packages — Workflow
+
+** !! OPERATIONAL MODE !!
+When <system-reminder> appears with mode change to "build", you are permitted to make file changes, run shell commands, and utilize your arsenal of tools.
+
+** Decision Tree — before writing any code
+
+Is the package already in Guix proper?
+  YES -> Template A (thin submodule, just #:re-export)
+         confirm: guix search <name>
+  NO  -> search web for existing Guix channel recipe
+           FOUND     -> copy define-public from channel source -> Template B
+           NOT FOUND -> write from scratch                     -> Template B
+                        get hash: guix download <url>
+
+** Decision Branch: Tool Not In Guix
+- Has prebuilt release? → url-fetch + trivial-build-system (rmpc pattern)
+- No release, Rust source? → guix shell build → hash binary → trivial-build-system (wiremix pattern)
+- Needs weird runtime env? → patchelf the binary after building
+- Just need it temporarily? → guix shell --container
+
+** No external channels — ever
+Never add to channels.scm.
+Copy package definitions directly into your submodule. Self-contained always.
+
+** Step-by-step: adding a new package
+
+*** Step 1 — Pick category
+See [[../reference/loaders.org][loaders reference]] for all 28 categories.
+No fitting category -> create new dir + loader (Template C + Template D from [[../templates/infrastructure.org][templates/infrastructure]]).
+
+Current categories: core, networking, shell, editors, desktop, desktop/wallpaper,
+desktop/wayland, desktop/video, desktop/image, desktop/3d, terminal, containers,
+keyboard, ai, audio, fonts, sandbox, monitoring, programming-languages, security,
+formatters, lsp, scheduling, compute, ci, data, guix, password-manager, games.
+
+*** Step 2 — Create submodule file
+File:   Manifold/substrate/user-space/root/<category>/<name>.scm
+Module: (substrate user-space root <category> <name>)
+Use Template A or B from [[../templates/basic.org][templates/basic]].
+
+*** Step 3 — Validate submodule in REPL
+#+BEGIN_SRC scheme
+(use-modules (substrate user-space root <category> <name>))
+<name>   ; must return package object, not an error
+#+END_SRC
+Do not proceed if this fails.
+
+*** Step 4 — Update the loader
+In loaders/<category>.scm:
+1. Add #:use-module (substrate user-space root <category> <name>)
+2. Add symbol to #:re-export (...)
+3. Add symbol to root-<category>-packages list
+Validate loader in REPL before continuing.
+
+*** Step 5 — Update root.scm (new loader only)
+1. Add #:use-module (substrate user-space root loaders <category>)
+2. Append root-<category>-packages to root-system-packages
+3. If services: append root-<category>-services to root-system-services
+
+*** Step 6 — Validate root in REPL
+#+BEGIN_SRC scheme
+(use-modules (substrate user-space root root))
+root-system-packages  ; must load clean
+#+END_SRC
+
+*** Step 7 — Reconfigure
+Use reshape command: =reshape=
+Or run directly:
+#+BEGIN_SRC sh
+reshape
+#+END_SRC
+
+*** Step 8 — Test each package binary works
+After reconfigure, verify every new package actually runs — not just that the system reconfigures:
+#+BEGIN_SRC sh
+# Test each binary: --version, -v, -V, or just run it
+<package> --version 2>&1
+<package> -v 2>&1
+<package> -V 2>&1
+<package> 2>&1  # some packages exit with error but that's ok if binary runs
+#+END_SRC
+For services:
+#+BEGIN_SRC sh
+sudo herd status <service-name>  # should show running
+sudo grep -i <service-name> /var/log/messages | tail -5  # check for errors
+#+END_SRC
+If a binary is "command not found" or a service logs errors — FIX IT. Do not skip this step.
+
+*** Step 9 — Update next-tools.org
+Remove the tool from next-tools.org after successful install and testing.
+
+** Getting the correct hash
+#+BEGIN_SRC sh
+guix download https://example.com/package-1.0.tar.gz
+# use result as: (base32 "0abc...")
+#+END_SRC
+Never use sha256sum or guix hash — wrong format.
+
+See also: [[./patterns.org][Patterns & Lessons Learned]]

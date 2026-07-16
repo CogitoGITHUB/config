@@ -1,0 +1,293 @@
+#+TITLE: Guix Source Development Setup
+#+AUTHOR:
+#+DATE: <%%(org-insert-time-stamp (current-time) nil t)>
+#+STARTUP: overview indent
+#+STARTUP: hidestars
+#+OPTIONS: toc:3 num:t ^:nil
+#+PROPERTY: header-args:shell :results output :exports both
+
+* Overview
+
+This document tracks the full workflow for setting up, building, and hacking
+on [[https://git.savannah.gnu.org/cgit/guix.git][GNU Guix from source]]. Each phase can be folded/unfolded independently.
+
+* Phase 1: Clone & Build Guix from Source
+:PROPERTIES:
+:CATEGORY: setup
+:END:
+
+** 1.1 Clone the repository
+
+#+begin_src shell
+git clone https://git.savannah.gnu.org/git/guix.git
+cd guix
+#+end_src
+
+** 1.2 Authenticate the repo (verify commits)
+
+This step ensures the commit history is cryptographically signed and trusted.
+
+#+begin_src shell
+guix git authenticate \
+  9edb3f66fd807b096b48283debdcddccfea34bad \
+  "BBB0 2DDF 2CEA F6A8 0D1D  E643 A2A0 6DF2 A33A 54FA"
+#+end_src
+
+** 1.3 Enter the development shell
+
+All build dependencies are made available via =guix shell=.
+
+#+begin_src shell
+guix shell -D guix -CPW
+echo $(pwd) >> ~/.config/guix/shell-authorized-directories
+#+end_src
+
+#+begin_quote
+ðŸ’¡ *Tip:* =-D= pulls in all declared inputs of the =guix= package. =-CPW=
+gives you a container (=-C=), a pure environment (=-P=), and host network
+(=-W=, writable /dev/shm). Re-enter this shell each time you open a new
+terminal in the repo.
+#+end_quote
+
+** 1.4 Bootstrap & build
+
+#+begin_src shell
+./bootstrap
+./configure --localstatedir=/var
+make -j$(nproc)
+#+end_src
+
+** 1.5 Run the test suite
+
+#+begin_src shell
+make check
+#+end_src
+
+#+begin_quote
+âš  The full suite can take a while. See [[*Phase 3: Development Workflow][Phase 3]] for targeted test runs.
+#+end_quote
+
+** Checklist
+- [ ] Repo cloned
+- [ ] Authentication passed
+- [ ] Dev shell entered & directory authorized
+- [ ] Bootstrap succeeded
+- [ ] =./configure= succeeded
+- [ ] =make= completed
+- [ ] =make check= passed
+
+* Phase 2: Understand the Architecture
+:PROPERTIES:
+:CATEGORY: architecture
+:END:
+
+** 2.1 Key source directories
+
+| Directory            | Purpose                                                        |
+|----------------------+----------------------------------------------------------------|
+| =guix/=              | Core Guile library â€” store, derivations, build systems, pkgs  |
+| =guix/store.scm=     | Store protocol â€” how Guix CLI talks to the daemon             |
+| =guix/build-system/= | Build system implementations (gnu, cmake, cargo, meson, â€¦)    |
+| =guix/packages.scm=  | Package definition model                                       |
+| =guix/derivations.scm= | Derivation generation                                        |
+| =guix/scripts/=      | CLI subcommands (guix build, guix package, â€¦)                 |
+| =gnu/packages/=      | All package definitions                                        |
+| =gnu/services/=      | System service definitions                                     |
+| =nix/libstore/=      | C++ daemon code â€” the actual build daemon                     |
+| =nix/local.mk=       | C build rules for the daemon                                   |
+
+** 2.2 Daemon architecture
+
+- The daemon is written in *C++* (inherited from Nix), but Guix is
+  actively migrating to a *Guile daemon* (see the =guile-daemon= branch).
+- Responsibilities:
+  - Manages =/gnu/store=
+  - Handles builds and build isolation (sandboxing via namespaces)
+  - Garbage collection
+  - Offloading builds to remote machines
+- Communicates with the CLI via a *binary protocol* defined in =guix/store.scm=.
+
+** 2.3 Layered architecture diagram
+
+#+begin_example
++-----------------------------------+
+|  guix CLI  (guix/scripts/)        |  <- Scheme / Guile
++-----------------------------------+
+|  Guile library  (guix/*.scm)      |  <- packages, derivations, store client
++-----------------------------------+
+|  store protocol  (socket)         |  <- guix/store.scm <-> daemon
++-----------------------------------+
+|  guix-daemon  (nix/libstore/)     |  <- C++ (-> Guile daemon someday)
++-----------------------------------+
+|  /gnu/store                       |  <- immutable, content-addressed FS
++-----------------------------------+
+#+end_example
+
+* Phase 3: Development Workflow
+:PROPERTIES:
+:CATEGORY: workflow
+:END:
+
+** 3.1 Edit â†’ test loop
+
+1. Edit source files.
+2. Run targeted tests (see below).
+3. Smoke-test with =./pre-inst-env=.
+4. Full =make check= before submitting a patch.
+
+** 3.2 Targeted test runs
+
+#+begin_src shell
+# Run only store tests
+make check TESTS="tests/store.scm"
+
+# Run only package tests
+make check TESTS="tests/packages.scm"
+
+# Run a single test file pattern
+make check TESTS="tests/derivations.scm"
+#+end_src
+
+** 3.3 Testing without installing
+
+=./pre-inst-env= prepends your local build to the load path so you use
+*your* modified Guix, not the system one.
+
+#+begin_src shell
+./pre-inst-env guix build hello
+./pre-inst-env guix package -A python
+./pre-inst-env guix system build my-config.scm
+#+end_src
+
+** 3.4 Install your build (optional)
+
+#+begin_src shell
+sudo make install
+#+end_src
+
+#+begin_quote
+âš  Only do this if you want your local build to become the *system* Guix.
+Prefer =./pre-inst-env= during active development.
+#+end_quote
+
+** 3.5 Emacs / Geiser integration
+
+If you use Geiser inside this repo, point it at the local Guile:
+
+#+begin_src emacs-lisp
+;; In your Emacs config or a .dir-locals.el at the repo root:
+((scheme-mode
+  (geiser-guile-binary . "guile")
+  (geiser-repl-add-project-paths . t)))
+#+end_src
+
+Start a REPL with =M-x geiser-guile= inside the dev shell and you can
+interactively load and test =guix/*.scm= modules.
+
+* Phase 4: Key Areas to Hack
+:PROPERTIES:
+:CATEGORY: hacking
+:END:
+
+** 4.1 Daemon (C++)
+
+| Path             | What lives there                             |
+|------------------+----------------------------------------------|
+| =nix/libstore/=  | Store implementation, build scheduling       |
+| =nix/libutil/=   | Utility functions                            |
+
+*Focus areas:* build isolation, store optimisation, garbage-collection algorithms.
+
+** 4.2 Build system (Guile)
+
+| Path                | What lives there                                  |
+|---------------------+---------------------------------------------------|
+| =guix/build-system/= | Add or modify build systems                      |
+| =guix/build/=        | Build-side code (runs *inside* build containers) |
+
+*Focus areas:* how packages are built, sandboxing, build phases.
+
+** 4.3 Store protocol
+
+| Path                   | What lives there                        |
+|------------------------+-----------------------------------------|
+| =guix/store.scm=       | Client-side protocol                    |
+| =guix/derivations.scm= | How derivations are created             |
+
+*Focus areas:* new store operations, derivation optimisation.
+
+** 4.4 CLI commands
+
+| Path             | What lives there                          |
+|------------------+-------------------------------------------|
+| =guix/scripts/=  | Each subcommand is its own Scheme file    |
+
+*Focus areas:* new subcommands, UX improvements, new flags.
+
+** 4.5 Packages & services
+
+| Path              | What lives there              |
+|-------------------+-------------------------------|
+| =gnu/packages/=   | All package definitions       |
+| =gnu/services/=   | System service definitions    |
+
+*Focus areas:* adding packages, fixing build recipes, new services.
+
+* Phase 5: Testing Your Changes
+:PROPERTIES:
+:CATEGORY: testing
+:END:
+
+** 5.1 Quick smoke test
+
+#+begin_src shell
+./pre-inst-env guix build hello --no-substitutes
+#+end_src
+
+** 5.2 Use a modified package path
+
+#+begin_src shell
+export GUIX_PACKAGE_PATH=/path/to/guix/gnu/packages
+guix build my-modified-package
+#+end_src
+
+** 5.3 Create a test channel
+
+Define a channel that depends on your local Guix checkout:
+
+#+begin_src scheme
+;; ~/.config/guix/channels.scm
+(list
+ (channel
+  (name 'my-channel)
+  (url "file:///path/to/your/channel")
+  (dependencies
+   (list
+    (channel
+     (name 'guix)
+     (url "file:///path/to/guix"))))))
+#+end_src
+
+** 5.4 Submitting patches
+
+#+begin_src shell
+# Format as mbox-ready patches
+git format-patch origin/master
+
+# Or use the Guix debbugs helper (if installed)
+./pre-inst-env guix style gnu/packages/your-file.scm
+#+end_src
+
+Send patches to =guix-patches@gnu.org=.
+
+* Resources & Links
+:PROPERTIES:
+:CATEGORY: reference
+:END:
+
+- [[https://guix.gnu.org/manual/en/html_node/Contributing.html][Contributing to Guix]] â€” official contributing guide
+- [[https://guix.gnu.org/manual/en/html_node/Building-from-Git.html][Building from Git]] â€” official build-from-source instructions
+- [[https://issues.guix.gnu.org][Guix issue tracker (Debbugs)]]
+- [[https://logs.guix.gnu.org/guix/][IRC logs â€” #guix on Libera.Chat]]
+- [[https://hpc.guix.info/blog/][Guix HPC blog]] â€” deep dives into internals
+- Mailing list: =guix-devel@gnu.org=

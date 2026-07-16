@@ -1,0 +1,55 @@
+(define-module (substrate user-space root audio music rmpc)
+  #:use-module (guix packages)
+  #:use-module (guix download)
+  #:use-module (guix gexp)
+  #:use-module (guix build-system trivial)
+  #:use-module (gnu packages base)
+  #:use-module (substrate user-space root shell archive unzip)
+  #:use-module (substrate user-space root shell archive gzip)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:export (rmpc))
+
+(define-public rmpc
+  (package
+    (name "rmpc")
+    (version "0.11.0")
+    (source
+      (origin
+        (method url-fetch)
+        (uri (string-append
+              "https://github.com/mierak/rmpc/releases/download/v" version
+              "/rmpc-v" version "-x86_64-unknown-linux-musl.tar.gz"))
+        (sha256 (base32 "0x2spyvi7bp63rlnfv4qncxkng9ikvd5cl26mcv87raas6bnbvww"))))
+    (build-system trivial-build-system)
+    (inputs (list tar gzip))
+    (arguments
+      (list #:modules '((guix build utils))
+            #:builder
+             #~(begin
+                 (use-modules (srfi srfi-1) (srfi srfi-26))
+                 (use-modules (guix build utils))
+                (let* ((out  (assoc-ref %outputs "out"))
+                       (src  (assoc-ref %build-inputs "source"))
+                       (tar  (string-append (assoc-ref %build-inputs "tar")  "/bin/tar"))
+                       (gzip (string-append (assoc-ref %build-inputs "gzip") "/bin")))
+                  (setenv "PATH" gzip)
+                  (mkdir-p (string-append out "/bin"))
+                  (mkdir-p (string-append out "/share/man/man1"))
+                  (mkdir-p (string-append out "/share/fish/vendor_completions.d"))
+                  (mkdir-p (string-append out "/share/bash-completion/completions"))
+                  (mkdir-p (string-append out "/share/zsh/site-functions"))
+                  (invoke tar "-xzf" src "-C" out)
+                  (rename-file (string-append out "/rmpc")
+                               (string-append out "/bin/rmpc"))
+                  (rename-file (string-append out "/man/rmpc.1")
+                               (string-append out "/share/man/man1/rmpc.1"))
+                  (rename-file (string-append out "/completions/rmpc.fish")
+                               (string-append out "/share/fish/vendor_completions.d/rmpc.fish"))
+                  (rename-file (string-append out "/completions/rmpc.bash")
+                               (string-append out "/share/bash-completion/completions/rmpc.bash"))
+                  (rename-file (string-append out "/completions/_rmpc")
+                               (string-append out "/share/zsh/site-functions/_rmpc"))))))
+    (home-page "https://github.com/mierak/rmpc")
+    (synopsis "Modern terminal based MPD client")
+    (description "rmpc is a modern, configurable, terminal based MPD client with album art support.")
+    (license license:bsd-3)))

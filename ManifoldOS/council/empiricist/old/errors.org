@@ -1,0 +1,109 @@
+* Troubleshooting — Errors & Diagnostics
+
+** Golden rule: REPL first, never reconfigure to debug a module
+Every error below can be caught in REPL. See [[../guix-repl.org][guix-repl.org]].
+
+** Error: "<symbol>: unbound variable"
+
+Cause: symbol used but not exported/imported somewhere in the chain.
+Test each layer bottom-up in REPL:
+
+#+BEGIN_SRC scheme
+(use-modules (substrate user-space root <category> <name>))    ; submodule
+(use-modules (substrate user-space root loaders <category>))   ; loader
+(use-modules (substrate user-space root root))                  ; root
+#+END_SRC
+
+Fix checklist:
+- Submodule has #:re-export (<symbol>) or #:export (<symbol>)?
+- Loader has #:use-module for that submodule?
+- Loader has #:re-export (<symbol>)?
+- Loader has symbol in root-*-packages list?
+- root.scm has #:use-module for that loader?
+
+** Error: "<symbol>: unbound variable" where symbol is a gnu package (e.g. shadow)
+
+Cause: Missing #:use-module (gnu packages <module>) in submodule or loader.
+
+Find correct module in REPL:
+#+BEGIN_SRC scheme
+,apropos shadow
+#+END_SRC
+
+Or from shell:
+#+BEGIN_SRC sh
+guix search shadow
+# check: location: gnu/packages/<module>.scm
+#+END_SRC
+
+Add the missing import to your submodule.
+
+** Error: "no code for module (substrate user-space root <category> <name>)"
+
+Cause: Wrong module path OR file missing.
+
+Check:
+1. File exists: ls Manifold/substrate/user-space/root/<category>/<name>.scm
+2. define-module in file matches exactly: (substrate user-space root <category> <name>)
+3. REPL launched with correct flag: -L /home/aoeu/.config/guix/Manifold
+
+** Error: "invalid-base32-character" or hash format errors
+
+Cause: Wrong hash tool used.
+
+#+BEGIN_SRC sh
+guix download <url>
+# copy result directly as: (base32 "0abc...")
+#+END_SRC
+Never use sha256sum or guix hash.
+
+** Error: "wrong type argument" in operating-system
+
+Cause: A root-*-packages list contains a non-package object, or service list contains a non-service.
+
+#+BEGIN_SRC scheme
+(use-modules (substrate user-space root loaders <category>))
+root-<category>-packages  ; inspect the actual value
+#+END_SRC
+
+** System won't boot
+
+#+BEGIN_SRC sh
+# At GRUB: select previous generation entry
+sudo guix system roll-back
+sudo guix system switch-generation N
+#+END_SRC
+
+** Service not starting
+
+#+BEGIN_SRC sh
+sudo herd status <service-name>
+sudo herd log <service-name>
+sudo herd start <service-name>
+#+END_SRC
+
+** Post-reconfigure: always test package binaries
+
+A successful reconfigure does NOT mean packages work. Always test each new binary:
+
+#+BEGIN_SRC sh
+# After reconfigure, test every new package:
+<package> --version 2>&1 || <package> -v 2>&1 || <package> -V 2>&1 || <package> 2>&1
+#+END_SRC
+
+Common patterns:
+- `--version` works for most packages (rmpc, pipewire, pulseaudio, amixer)
+- `-v` or `-V` for some (cava uses `-v`)
+- Just running the binary — some exit with error but that's ok if it runs
+- For services: `sudo herd status <name>` and check `/var/log/messages`
+
+Example for audio packages:
+#+BEGIN_SRC sh
+rmpc --help 2>&1; cava -v 2>&1; pipewire --version 2>&1; \
+pulseaudio --version 2>&1; amixer --version 2>&1
+#+END_SRC
+
+If any binary returns "command not found" — the package wasn't built into the profile.
+Check: `guix build <package>` and `guix package -I <package>`.
+
+See also: [[./fixes.org][Build Fixes & Patterns]]

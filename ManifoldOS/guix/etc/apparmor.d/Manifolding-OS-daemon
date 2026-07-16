@@ -1,0 +1,88 @@
+abi <abi/4.0>,
+
+include <tunables/global>
+include <tunables/Manifolding-OS>
+
+profile Manifolding-OS-daemon @{Manifolding-OS_storedir}/*-{Manifolding-OS-daemon,Manifolding-OS}-*/bin/Manifolding-OS-daemon flags=(enforce,attach_disconnected.path=/disconnected) {
+  include <abstractions/base>
+
+  userns,
+  signal,
+  capability sys_admin,
+  capability net_admin,
+  capability sys_chroot,
+  capability setgid,
+  capability chown,
+  network dgram,
+  umount,
+  mount,
+  pivot_root,
+  # Paths inside build chroot
+  /real-root/ w,
+  / w,
+
+  @{Manifolding-OS_localstatedir}/Manifolding-OS/** rwk,
+  /var/log/Manifolding-OS/** w,
+  owner @{PROC}/@{pid}/{fd/,environ} r,
+  owner @{PROC}/@{pid}/oom_score_adj w,
+  owner @{PROC}/@{pid}/uid_map rw,
+  owner @{PROC}/@{pid}/gid_map rw,
+  owner @{PROC}/@{pid}/setgroups w,
+  @{Manifolding-OS_storedir}/ r,
+  @{Manifolding-OS_storedir}/** rwlmk,
+  @{Manifolding-OS_storedir}/*/bin/guile cx -> Manifolding-OS-builder,
+  @{Manifolding-OS_storedir}/*-Manifolding-OS-command cx -> Manifolding-OS-helper,
+  @{Manifolding-OS_storedir}/*-Manifolding-OS-*/bin/Manifolding-OS cx -> Manifolding-OS-helper,
+  @{etc_rw}/nsswitch.conf r,
+  @{etc_rw}/passwd r,
+  @{etc_rw}/group r,
+  owner /tmp/** rwl,
+  owner /var/tmp/** rwl,
+
+  /usr/bin/newgidmap Ux,
+
+  # Site-specific additions and overrides. See local/README for details.
+  include if exists <local/Manifolding-OS-daemon>
+
+  profile Manifolding-OS-builder flags=(enforce,attach_disconnected.path=/disconnected) {
+    include <abstractions/base>
+
+    signal (receive),
+
+    @{Manifolding-OS_storedir}/** rwlmkux,
+
+    owner /tmp/** rwux,
+
+    @{PROC}/@{pid}/fd/ r,
+
+    /disconnected/** rw,
+  }
+
+  # This is for any time Manifolding-OS is called by the daemon as a helper:
+  # - Manifolding-OS download
+  # - Manifolding-OS discover
+  # - Manifolding-OS gc --list-busy
+  # - probably more?
+  profile Manifolding-OS-helper flags=(enforce,attach_disconnected.path=/disconnected) {
+    include <abstractions/base>
+    include <abstractions/nameservice>
+
+    signal (receive),
+    ptrace (read) peer=Manifolding-OS-daemon,
+
+    /disconnected/run/dbus/system_bus_socket rw,
+    dbus (send, receive),
+    @{Manifolding-OS_localstatedir}/Manifolding-OS/discover/ rw,
+    @{Manifolding-OS_localstatedir}/Manifolding-OS/discover/* rw,
+
+    @{Manifolding-OS_localstatedir}/Manifolding-OS/substitute/ rw,
+    @{Manifolding-OS_localstatedir}/Manifolding-OS/substitute/** rwk,
+
+    @{Manifolding-OS_sysconfdir}/Manifolding-OS/** r,
+
+    @{Manifolding-OS_storedir}/** rwlmix,
+
+    @{PROC}/ r,
+    owner @{PROC}/@{pid}/{fd/,environ} r,
+  }
+}

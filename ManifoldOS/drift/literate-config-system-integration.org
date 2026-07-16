@@ -1,0 +1,519 @@
+* Emacs literate-config-system Integration - Implementation Plan
+
+** Overview
+
+Transform your `literate-config-system` package into a fully-integrated system where:
+1. Emacs package initialization loads from `.org` literate configs
+2. Each `.org` file defines both Emacs configs AND Guix package metadata
+3. Guix package modules contain configuration code (not separate from package definition)
+4. Everything is unified in one place: no duplication between Emacs and Guix
+
+## Current State
+
+### literate-config-system.el (288 lines)
+- Location: `/home/aoeu/.config/emacs/lisp/literate-config-system/literate-config-system.el`
+- Purpose: Load `.org` files from `~/Literative Configurations/`
+- Process:
+  1. Scans directory for `.org` files
+  2. Extracts `PACKAGE` property from level-1 headings
+  3. Reads code blocks tagged with `:tangle: init` and `:tangle: config`
+  4. Builds `leaf` forms or bare require statements
+  5. Evaluates and loads packages
+
+### Current .org File Format
+
+Example: `avy.org`
+```org
+* AVY — Jump Navigation
+:PROPERTIES:
+:PACKAGE:  avy
+:STRAIGHT: avy              ← OLD: points to straight.el (external package manager)
+:CATEGORY: navigation
+:VERSION:  0.5.0
+:END:
+
+** Description
+...
+
+** Initialization
+:PROPERTIES:
+:tangle: init              ← Code block marked for init phase
+:END:
+
+#+begin_src emacs-lisp
+...code...
+#+end_src
+
+** Configuration
+:PROPERTIES:
+:tangle: config            ← Code block marked for config phase
+:END:
+
+#+begin_src emacs-lisp
+...code...
+#+end_src
+```
+
+### Current Emacs Package Structure
+- avy.org (Emacs config)
+- god-mode.org (Emacs config)
+- modus-theme.org (Emacs config)
+- multiple-cursors.org (Emacs config)
+
+Files in: `~/.config/emacs/Literative Configurations/`
+
+### Current Guix Structure
+- `editors/emacs-packages/` - Wrapper modules for custom Emacs packages
+- Each is a 3-line module importing from `(gnu packages emacs-xyz)`
+- No connection to Emacs `.org` configs
+
+## Target State
+
+### 1. Update .org Format: Replace :STRAIGHT: with :REQUIRE:
+
+**Files to update:**
+- `avy.org` - MOVE to `future work/` + add Guix declaration
+- `god-mode.org` - MOVE to `future work/` + add Guix declaration
+- `multiple-cursors.org` - MOVE to `future work/` + add Guix declaration
+- `modus-theme.org` - KEEP in Literative Configurations/ (keep as-is or update)
+
+**New format example:**
+
+```org
+* AVY — Jump Navigation
+:PROPERTIES:
+:PACKAGE:  avy
+:REQUIRE:  avy            ← NEW: Guix provides this package
+:CATEGORY: navigation
+:VERSION:  0.5.0
+:GUIX_PACKAGE: yes        ← NEW: This is a Guix-managed package
+:END:
+
+** Guix Package Declaration
+:PROPERTIES:
+:tangle: no
+:END:
+
+This package is provided by Guix. See the Guix package module at:
+`Operating-System/core-system/user-space/root/editors/emacs-packages/avy.scm`
+
+The Guix module contains both package definition and configuration.
+
+** Description
+...
+
+** Initialization
+:PROPERTIES:
+:tangle: init
+:END:
+
+#+begin_src emacs-lisp
+...code...
+#+end_src
+
+** Configuration
+...
+```
+
+**Changes:**
+- Remove `:STRAIGHT:` property
+- Add `:REQUIRE:` property (points to package name in Guix)
+- Add `:GUIX_PACKAGE:` property (marks as Guix-managed)
+- Add "Guix Package Declaration" section referencing the Guix module
+- All else remains the same
+
+### 2. Guix Package Module Structure with Embedded Configuration
+
+**Location:** `Operating-System/core-system/user-space/root/editors/emacs-packages/`
+
+**Current structure (3-line module):**
+```scheme
+(define-module (core-system user-space root editors emacs-packages avy)
+  #:use-module (gnu packages emacs-xyz)
+  #:re-export (avy))
+```
+
+**New structure (with embedded configuration):**
+
+```scheme
+(define-module (core-system user-space root editors emacs-packages avy)
+  #:use-module (gnu packages emacs-xyz)
+  #:export (avy-config))
+
+;; Configuration metadata for literate-config-system
+(define avy-config
+  '((package . avy)
+    (category . navigation)
+    (description . "Jump to visible text using character-based decision tree")
+    (init . ,(lambda ()
+              ;; Initialization code from avy.org
+              (require 'avy)))
+    (config . ,(lambda ()
+                ;; Configuration code from avy.org
+                (setq avy-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
+                (setq avy-highlight-first t)
+                ;; ...rest of config...
+                ))))
+
+;; Re-export the actual package
+(re-export (avy #:from (gnu packages emacs-xyz)))
+```
+
+**Rationale:**
+- Package definition stays in Guix (gnu packages emacs-xyz)
+- We wrap it and add metadata
+- Configuration code lives in Guix module (not duplicated in .org)
+- literate-config-system can read this metadata if needed
+- Clear separation: Guix manages packages, Emacs config loads from Guix
+
+### 3. Reorganize Files
+
+**Keep:**
+- `~/.config/emacs/Literative Configurations/modus-theme.org` (unchanged or with new format)
+
+**Move to future work:**
+- `~/.config/emacs/future work/avy.org` (with :REQUIRE: format)
+- `~/.config/emacs/future work/god-mode.org` (with :REQUIRE: format)
+- `~/.config/emacs/future work/multiple-cursors.org` (with :REQUIRE: format)
+
+**Reason:** These are now managed by Guix (not loaded from .org files directly).
+Future work shows the design/philosophy but doesn't auto-load them.
+
+### 4. How literate-config-system.el Adapts
+
+**Current behavior:**
+- Loads ALL .org files from directory
+- Requires packages to be available (either via straight.el or Guix)
+- Uses `:tangle: init` and `:tangle: config` blocks
+
+**New behavior (minimal changes):**
+- Still loads .org files
+- Reads `:REQUIRE:` property instead of `:STRAIGHT:`
+- If `:GUIX_PACKAGE:` property present, log that it's Guix-managed
+- Configuration still works the same way (leaf or require fallback)
+
+**No code changes needed!** The system already:
+1. Reads arbitrary properties (line 90-98)
+2. Extracts init and config code blocks (lines 104-130)
+3. Builds leaf forms with `:require t` instead of `:straight` (line 145)
+4. Falls back to bare require if needed (lines 167-176)
+
+The existing code is ALREADY compatible with :REQUIRE: instead of :STRAIGHT:!
+
+---
+
+## Implementation Plan
+
+### Phase 1: Update .org Files (30 min)
+
+**Files to modify:**
+
+1. **avy.org** → Move to `future work/` + Update format
+   - Change `:STRAIGHT: avy` → `:REQUIRE: avy`
+   - Add `:GUIX_PACKAGE: yes`
+   - Add "Guix Package Declaration" section
+   - Copy to: `~/.config/emacs/future work/avy.org`
+
+2. **god-mode.org** → Move to `future work/` + Update format
+   - Change `:STRAIGHT: god-mode` → `:REQUIRE: god-mode`
+   - Add `:GUIX_PACKAGE: yes`
+   - Add "Guix Package Declaration" section
+   - Copy to: `~/.config/emacs/future work/god-mode.org`
+
+3. **multiple-cursors.org** → Move to `future work/` + Update format
+   - Change `:STRAIGHT: multiple-cursors` → `:REQUIRE: multiple-cursors`
+   - Add `:GUIX_PACKAGE: yes`
+   - Add "Guix Package Declaration" section
+   - Copy to: `~/.config/emacs/future work/multiple-cursors.org`
+
+4. **modus-theme.org** → Keep in Literative Configurations/ (either unchanged or update to new format)
+   - Recommendation: Keep as-is for now (it works)
+   - OR update to :REQUIRE: format if you want consistency
+
+**Old files location:**
+- Delete from: `~/.config/emacs/Literative Configurations/avy.org`
+- Delete from: `~/.config/emacs/Literative Configurations/god-mode.org`
+- Delete from: `~/.config/emacs/Literative Configurations/multiple-cursors.org`
+
+### Phase 2: Create Guix Package Modules with Embedded Config (1-2 hours)
+
+**For each package (avy, god-mode, multiple-cursors):**
+
+1. Create/Update: `editors/emacs-packages/[package].scm`
+2. Include:
+   - Module declaration
+   - Package import/re-export
+   - Configuration metadata as data structure
+   - Comments referencing the .org file in future work
+
+**Structure for avy:**
+
+```scheme
+(define-module (core-system user-space root editors emacs-packages avy)
+  #:use-module (gnu packages emacs-xyz)
+  #:export (avy avy-config))
+
+;; ════════════════════════════════════════════════════════════════════
+;; AVERSION — Jump Navigation
+;; ════════════════════════════════════════════════════════════════════
+;;
+;; This package provides the 'avy' Emacs package.
+;; Configuration and additional details are documented in:
+;;   ~/.config/emacs/future work/avy.org
+;;
+;; When literate-config-system loads, it will execute the initialization
+;; and configuration code from that file automatically.
+;; ════════════════════════════════════════════════════════════════════
+
+;; Metadata for literate-config-system
+(define avy-config
+  '((package . avy)
+    (category . navigation)
+    (description . "Jump to visible text using avy")
+    (version . "0.5.0")))
+
+;; Re-export the package from Guix
+(re-export (avy #:from (gnu packages emacs-xyz)))
+```
+
+### Phase 3: Verify literate-config-system.el Works (5 min)
+
+**Test:**
+1. Emacs loads `init.el`
+2. `init.el` calls `(literate-config-load)`
+3. literate-config-system scans `~/.config/emacs/Literative Configurations/`
+4. Finds `modus-theme.org` (and any others kept there)
+5. Loads it successfully
+
+**Expected result:**
+- modus-theme loads fine
+- Other .org files in future work/ are NOT loaded automatically (correct)
+- All custom Emacs packages still available via Guix
+
+### Phase 4: Register literate-config-system in Guix (PARALLEL WITH EMACS INTEGRATION PLAN)
+
+**As planned in emacs-integration-plan.org:**
+1. Create: `editors/emacs-packages/literate-config-system.scm`
+2. Register in Guix operating-system
+3. Makes it available system-wide
+
+This is independent of phases 1-3 (Emacs side changes).
+
+---
+
+## Detailed Example: avy.org
+
+### BEFORE:
+```org
+* AVY — Jump Navigation
+:PROPERTIES:
+:PACKAGE:  avy
+:STRAIGHT: avy
+:CATEGORY: navigation
+:VERSION:  0.5.0
+:END:
+
+** Description
+:PROPERTIES:
+:tangle: no
+:END:
+
+Avy configuration for Emacs. Jump to visible text using character-based decision tree.
+
+Version: 0.5.0
+
+** Initialization
+:PROPERTIES:
+:tangle: init
+:END:
+
+#+begin_src emacs-lisp
+(require 'avy)
+#+end_src
+
+** Configuration
+
+#+begin_src emacs-lisp
+(setq avy-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
+(setq avy-highlight-first t)
+(setq avy-background t)
+(setq avy-all-windows t)
+(setq avy-case-fold-search t)
+(setq avy-timeout-seconds 0.5)
+(setq avy-style 'at-full)
+#+end_src
+```
+
+### AFTER (in `future work/avy.org`):
+```org
+* AVY — Jump Navigation
+:PROPERTIES:
+:PACKAGE:  avy
+:REQUIRE:  avy
+:CATEGORY: navigation
+:VERSION:  0.5.0
+:GUIX_PACKAGE: yes
+:END:
+
+** Guix Package Declaration
+:PROPERTIES:
+:tangle: no
+:END:
+
+This package is provided by Guix and configured via the Guix module:
+=Operating-System/core-system/user-space/root/editors/emacs-packages/avy.scm=
+
+The Guix module contains package metadata and re-exports the avy package.
+Configuration code is executed by literate-config-system when this file is loaded.
+
+** Description
+:PROPERTIES:
+:tangle: no
+:END:
+
+Avy configuration for Emacs. Jump to visible text using character-based decision tree.
+
+Version: 0.5.0
+
+** Initialization
+:PROPERTIES:
+:tangle: init
+:END:
+
+#+begin_src emacs-lisp
+(require 'avy)
+#+end_src
+
+** Configuration
+
+#+begin_src emacs-lisp
+(setq avy-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
+(setq avy-highlight-first t)
+(setq avy-background t)
+(setq avy-all-windows t)
+(setq avy-case-fold-search t)
+(setq avy-timeout-seconds 0.5)
+(setq avy-style 'at-full)
+#+end_src
+```
+
+### GUIX MODULE (avy.scm):
+```scheme
+(define-module (core-system user-space root editors emacs-packages avy)
+  #:use-module (gnu packages emacs-xyz)
+  #:export (avy avy-config))
+
+;; ════════════════════════════════════════════════════════════════════
+;; AVY — Jump Navigation
+;; ════════════════════════════════════════════════════════════════════
+;;
+;; Provides the avy Emacs package from Guix.
+;; Configuration and initialization code is in:
+;;   ~/.config/emacs/future work/avy.org
+;;
+;; The literate-config-system loads this .org file and executes
+;; the initialization and configuration code blocks.
+;; ════════════════════════════════════════════════════════════════════
+
+(define avy-config
+  '((package . avy)
+    (category . navigation)
+    (description . "Jump to visible text using avy")
+    (version . "0.5.0")))
+
+;; Re-export the actual package from Guix
+(re-export (avy #:from (gnu packages emacs-xyz)))
+```
+
+---
+
+## File Organization Summary
+
+### AFTER MIGRATION:
+
+```
+~/.config/emacs/
+├── init.el                               (unchanged)
+├── Literative Configurations/
+│   └── modus-theme.org                  (kept here, unchanged or updated)
+└── future work/
+    ├── avy.org                          (moved here, updated format)
+    ├── god-mode.org                     (moved here, updated format)
+    ├── multiple-cursors.org             (moved here, updated format)
+    ├── manuals.org                      (unchanged - master design doc)
+    └── [other future work files]
+
+Operating-System/core-system/user-space/root/editors/emacs-packages/
+├── literate-config-system.scm           (NEW: registers in Guix)
+├── avy.scm                              (UPDATED: add metadata)
+├── god-mode.scm                         (UPDATED: add metadata)
+├── multiple-cursors.scm                 (UPDATED: add metadata)
+├── modus-theme.scm                      (UNCHANGED or updated)
+├── [other emacs packages...]
+└── [other custom packages...]
+```
+
+---
+
+## Why This Approach
+
+1. **Single Source of Truth**
+   - Emacs config lives in .org files
+   - Guix packages wrap Guix-provided packages
+   - Configuration code is in .org (not duplicated in Guix modules)
+
+2. **Clear Separation**
+   - .org files = human-readable documentation + code
+   - Guix modules = package metadata + exports
+   - literate-config-system = loader that ties them together
+
+3. **Guix Integration**
+   - Packages are Guix-managed (not external)
+   - literate-config-system itself becomes a Guix package
+   - Complete system decoupling from upstream
+
+4. **Flexibility**
+   - Can move packages to/from future work without breaking Guix
+   - Can have Guix-managed packages not in Literative Configurations
+   - Can keep designing in Literative Configurations without affecting system
+
+5. **Minimal Changes**
+   - literate-config-system.el needs NO code changes
+   - Already supports :require: instead of :straight:
+   - Already handles arbitrary properties
+
+---
+
+## Success Criteria
+
+- [ ] avy.org moved to future work/ with :REQUIRE: format
+- [ ] god-mode.org moved to future work/ with :REQUIRE: format
+- [ ] multiple-cursors.org moved to future work/ with :REQUIRE: format
+- [ ] modus-theme.org stays in Literative Configurations/
+- [ ] All three Guix modules updated with metadata
+- [ ] Emacs loads successfully with M-x literate-config-load
+- [ ] All packages still available and working
+
+---
+
+## Next Steps
+
+Ready to execute when you request one of:
+
+1. "Execute Phase 1 - Update .org files"
+   - Move files and update format (30 min)
+
+2. "Execute Phase 2 - Create Guix modules"
+   - Add metadata and configuration (1-2 hours)
+
+3. "Execute both Phase 1 + Phase 2"
+   - Complete reorganization (2-2.5 hours)
+
+4. "Review plan first"
+   - Ask clarifications or modify approach
+
+---
+
+*Created: 2026-04-07*
+*Status: READY FOR EXECUTION*
+*Related: emacs-integration-plan.org (Guix registration plan)*

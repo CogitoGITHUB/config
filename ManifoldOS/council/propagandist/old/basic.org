@@ -1,0 +1,130 @@
+* Module Templates — Basic
+
+Zero prose. Copy, fill blanks, validate in REPL before touching anything else.
+<ANGLE_BRACKETS> = fill in.
+
+** ALWAYS FULL DECLARATION — NEVER THIN RE-EXPORT
+
+Every submodule MUST contain a full package definition. Never use thin re-export.
+
+** Template A — Full declaration for package from Guix
+
+#+BEGIN_SRC scheme
+(define-module (substrate user-space root <CATEGORY> <NAME>)
+  #:use-module (guix packages)
+  #:use-module (guix download)
+  #:use-module (guix build-system <BUILD-SYSTEM>)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:use-module (gnu packages <GNU-MODULE>)
+  #:export (<NAME>))
+
+(define-public <NAME>
+  (package
+    (name "<name>")
+    (version "<version>")
+    (source
+      (origin
+        (method url-fetch)
+        (uri "<url>")
+        (sha256 (base32 "<hash>"))))
+    (build-system <BUILD-SYSTEM>-build-system)
+    (inputs (list <dep>))
+    (home-page "<url>")
+    (synopsis "<short description>")
+    (description "<longer description>")
+    (license license:<LICENSE>)))
+#+END_SRC
+
+Find the correct (gnu packages ...) module:
+#+BEGIN_SRC sh
+guix search <name>
+# look at: location: gnu/packages/<module>.scm
+#+END_SRC
+Or in REPL: ,apropos <name>
+
+Real example:
+#+BEGIN_SRC scheme
+(define-module (substrate user-space root shell nushell)
+  #:use-module (gnu packages nushell)
+  #:re-export (nushell))
+#+END_SRC
+
+** Template B — Custom package (not in Guix)
+
+#+BEGIN_SRC scheme
+(define-module (substrate user-space root <CATEGORY> <NAME>)
+  #:use-module (guix packages)
+  #:use-module (guix download)
+  #:use-module (guix build-system <BUILD-SYSTEM>)
+  #:use-module ((guix licenses) #:prefix license:)   ; note: prefix required!
+  #:use-module (gnu packages <DEPS>)
+  #:export (<NAME>))
+
+(define-public <NAME>
+  (package
+    (name "<name>")
+    (version "<version>")
+    (source (origin
+              (method url-fetch)
+              (uri "<url>")
+              (sha256 (base32 "<hash-from-guix-download>"))))
+    (build-system <BUILD-SYSTEM>-build-system)
+    (inputs (list <dep1> <dep2>))
+    (synopsis "<short description>")
+    (description "<longer description>")
+    (home-page "<url>")
+    (license license:<license>)))
+#+END_SRC
+
+*** npm fixed-output derivation pattern
+
+For npm packages where the tarball URL is unstable, use fixed-output derivation:
+
+#+BEGIN_SRC scheme
+(source
+ (origin
+   (method url-fetch)
+   (uri "https://registry.npmjs.org/<package>/-/<package>-<version>.tgz")
+   (sha256
+    (base32 "<hash>"))
+   (snippet #~(delete-file-recursively "node_modules"))))  ; remove any bundled deps
+#+END_SRC
+
+For packages with bundled dependencies, use copy-build-system:
+
+#+BEGIN_SRC scheme
+(define-public <NAME>
+  (package
+    (name "<name>")
+    (version "<version>")
+    (source (origin
+              (method url-fetch)
+              (uri "<url>")
+              (sha256 (base32 "<hash>"))))
+    (build-system copy-build-system)
+    (arguments
+     '(#:install-plan
+       '(("dist/" "bin/"))))  ; adjust paths as needed
+    (synopsis "<short description>")
+    (description "<longer description>")
+    (home-page "<url>")
+    (license license:<license>)))
+#+END_SRC
+
+*** Common build systems
+
+| Build system             | Use case                               |
+|--------------------------|----------------------------------------|
+| node-build-system        | npm packages                           |
+| gnu-build-system         | autotools/configure scripts           |
+| cmake-build-system       | CMake-based projects                  |
+| cargo-build-system       | Rust crates                            |
+| python-build-system      | Python packages (setup.py/pyproject)  |
+| pyproject-build-system   | Python packages (pyproject.toml)      |
+| trivial-build-system     | Copy/patch binaries, no build         |
+| go-build-system          | Go packages                           |
+| maven-build-system       | Java (Maven)                          |
+| copy-build-system        | Pre-built binaries, just copy to out  |
+| emacs-build-system       | Emacs .el packages                     |
+
+See also: [[./specialized.org][Specialized Templates]], [[./npm-fod.org][npm FOD Pattern]], [[./infrastructure.org][Infrastructure Templates]]

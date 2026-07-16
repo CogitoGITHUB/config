@@ -1,0 +1,286 @@
+* Troubleshooting — Build Fixes & Patterns
+
+** Error: "error while loading shared libraries: libstdc++.so.6" (prebuilt binary)
+
+Cause: Prebuilt binary needs libstdc++ at runtime but the rpath doesn't include gcc's lib output.
+
+Fix: Add gcc (lib output) to inputs and set rpath with patchelf:
+#+BEGIN_SRC scheme
+(inputs (list bash tar zstd patchelf glibc `(,gcc "lib")))
+;; In builder:
+(let* ((glibc (assoc-ref %build-inputs "glibc"))
+       (gcc (assoc-ref %build-inputs "gcc"))  ; this is the "lib" output
+       (interp (string-append glibc "/lib/ld-linux-x86-64.so.2"))
+       (libstdc++ (string-append gcc "/lib")))
+  (invoke patchelf "--set-interpreter" interp "--set-rpath"
+          (string-append glibc "/lib:" libstdc++) binary))
+#+END_SRC
+
+Note: Guix splits gcc into multiple outputs. The "lib" output contains libstdc++.so.6.
+When using `(,gcc "lib")` as an input, it's still named "gcc" in %build-inputs but
+points to the lib output directory (e.g. gcc-14.3.0-lib).
+
+** Error: "Cannot open: No such file or directory" during tar extraction
+
+Cause: The output directory doesn't exist before tar tries to extract to it.
+
+Fix: Add `(mkdir-p out)` before the tar extraction command.
+
+** Error: "rename-file: No such file or directory" with prebuilt tarball
+
+Cause: Extracting to wrong directory. If archive has `bin/ollama` inside it and you
+use `tar xf - -C out/bin`, it extracts to `out/bin/bin/ollama`.
+
+Fix: Extract to `out/` instead of `out/bin/`. The archive's internal directory
+structure will resolve correctly: `bin/ollama` -> `out/bin/ollama`.
+
+** Emacs package fails to byte-compile with "Cannot open load file"
+
+Cause: The package has `(require 'some-dep)` at the top level but the dependency
+isn't available during the build phase.
+
+Fix: Add the dependency as BOTH `inputs` AND `propagated-inputs`:
+#+BEGIN_SRC scheme
+(inputs (list emacs-<dep>))
+(propagated-inputs (list emacs-<dep>))
+#+END_SRC
+
+`inputs` makes it available at compile time. `propagated-inputs` makes it
+available at runtime. You need BOTH for top-level requires.
+
+** Hash mismatch on git-fetch packages
+
+Cause: `guix hash --recursive /path/to/checkout` includes `.git/` directory,
+but Guix's `git-fetch` excludes it. The hashes will never match.
+
+Fix: Use the actual hash from the failed build log:
+#+BEGIN_SRC sh
+zcat /var/log/guix/drvs/<XX>/<hash>.drv.gz | grep "actual hash"
+#+END_SRC
+
+The actual hash always starts with `0` or `1` (base32).
+
+** Python package sanity-check fails due to version mismatch
+
+Cause: The package requires a newer version of a dependency than Guix provides.
+The pyproject-build-system's sanity-check phase validates version constraints.
+
+Fix: Delete the sanity-check phase:
+#+BEGIN_SRC scheme
+(arguments
+ '(#:tests? #f
+   #:phases
+   (modify-phases %standard-phases
+     (delete 'sanity-check))))
+#+END_SRC
+
+** Go package build fails — "go.mod needs updating" or "go install requires a version"
+
+Cause 1: The `go.mod` specifies a Go version newer than Guix provides.
+Fix: Patch go.mod in a source snippet:
+#+BEGIN_SRC scheme
+(modules '((guix build utils)))
+(snippet #~(begin
+             (substitute* "go.mod"
+               (("go 1.25.5") "go 1.24"))))
+#+END_SRC
+
+Cause 2: `#:import-path` points to `cmd/<name>/` instead of the module root.
+The go.mod is at the root — `#:import-path` must match.
+Fix: Use root import path, override build phase to install cmd/:
+#+BEGIN_SRC scheme
+#:import-path "github.com/user/repo"   ; NOT github.com/user/repo/cmd/name
+#:phases #~(modify-phases %standard-phases
+    (replace 'build
+      (lambda* (#:key import-path #:allow-other-keys)
+        (invoke "go" "install" "-ldflags=-s -w" "-trimpath"
+                (string-append import-path "/cmd/name")))))
+#+END_SRC
+
+Cause 3: Go dependency version mismatch between go.mod and what's in Guix.
+Fix: Check versions with `guix package --show=go-github-com-<name>` and compare
+to go.mod. If versions don't match, you may need to package the correct version.
+
+** npm FOD build fails — "EACCES: permission denied, mkdir '/homeless-shelter'"
+
+Cause: npm tries to write to $HOME/.npm which doesn't exist in the build sandbox.
+Fix: Set HOME and npm config vars to the output directory:
+#+BEGIN_SRC scheme
+(setenv "HOME" out)
+(setenv "npm_config_cache" tmp)
+(setenv "npm_config_tmp" tmp)
+#+END_SRC
+
+** npm FOD build fails — "tar: gzip: Cannot exec"
+
+Cause: tar needs gzip for .tgz files but gzip isn't in PATH.
+Fix: Use `--use-compress-program` with the full gzip path:
+#+BEGIN_SRC scheme
+(invoke tar "--use-compress-program" gzip "-xf" src "-C" work)
+#+END_SRC
+And add both tar and gzip to inputs.
+
+** n8n (or similar) runs but --version shows nothing
+
+Cause: The wrapper script points to `dist/index.js` instead of `bin/<name>`.
+The bin script has version checks, config loading, and module imports.
+Fix: Point wrapper to the bin entry point:
+#+BEGIN_SRC scheme
+(format p "#!/bin/sh\nexec ~a ~a/bin/<name> \"$@\"\n" node lib)
+#+END_SRC
+
+** WiFi device unavailable: cfg80211 regulatory.db signature error
+
+Error in dmesg:
+: cfg80211: loaded regulatory.db is malformed or signature is missing/invalid
+
+Cause: Linux kernel's cfg80211 requires a signed regulatory database. The signature file
+(regulatory.db.p7s) must match the database exactly.
+
+Fix: Disable signature checks in kernel config via nonguix:
+
+In kernel-space/linux.scm:
+#+BEGIN_SRC scheme
+(define-public kernel
+  (package
+    (inherit (corrupt-linux linux-libre-6.18
+                          #:configs '()))
+    (name "linux-with-regdb-fix")
+    (source
+     (origin
+       (inherit (package-source linux-libre-6.18))
+       (snippet
+        #~(begin
+            (when (file-exists? "arch/x86/configs/guix_defconfig")
+              (let ((defconfig "arch/x86/configs/guix_defconfig"))
+                (substitute* defconfig
+                  (("CONFIG_CFG80211_REQUIRE_SIGNED_REGDB=y")
+                   "CONFIG_CFG80211_REQUIRE_SIGNED_REGDB=n")
+                  (("CONFIG_CFG80211_USE_KERNEL_REGDB_KEYS=y")
+                   "CONFIG_CFG80211_USE_KERNEL_REGDB_KEYS=n"))
+                (format #t "Patched ~a~%" defconfig)))))))))
+#+END_SRC
+
+This patches the guix_defconfig to disable signature verification before the kernel
+builds. The kernel will then accept any regulatory.db without signature validation.
+
+** Linux-libre blocks non-free firmware
+
+With linux-libre kernel:
+: Missing Free firmware (non-Free firmware loading is disabled)
+: Direct firmware load for rtw88_8821ce failed
+
+Cause: linux-libre refuses to load proprietary firmware blobs.
+
+Fix: Use nonguix's corrupt-linux instead, which includes non-free firmware.
+
+Note: Realtek RTL8821CE and similar chips REQUIRE proprietary firmware to function.
+
+** Python TUI package with trivial-build-system (PYTHONPATH pattern)
+
+When packaging a Python TUI app that doesn't use standard build systems:
+
+Cause: The app imports Python modules but isn't a proper Python package with setup.py/pyproject.toml.
+
+Fix: Use trivial-build-system, extract source, create wrapper script with PYTHONPATH:
+#+BEGIN_SRC scheme
+(build-system trivial-build-system)
+(inputs (list python python-textual python-rich ...))
+(arguments
+ '(#:builder
+   (begin
+     (use-modules (guix build utils))
+     (let* ((out (assoc-ref %outputs "out"))
+            (bin (string-append out "/bin"))
+            (share (string-append out "/share/<name>"))
+            (pylib (string-append
+                     share ":"
+                     textual "/lib/python3.11/site-packages:"
+                     rich "/lib/python3.11/site-packages:")))
+       (mkdir-p bin)
+       (copy-recursively "tmp" share)
+       (with-output-to-file (string-append bin "/<name>")
+         (lambda ()
+           (format #t "#!/bin/sh~%export PYTHONPATH=\"~a\"~%exec ~a/bin/python3 ... \"$@\"~%"
+                   pylib python)))
+       (chmod (string-append bin "/<name>") #o755)))))
+#+END_SRC
+See gazelle-tui.scm for a working example.
+
+** Simple-service pattern for system-level services
+
+When you need to run a service as root outside the normal service-type system:
+
+#+BEGIN_SRC scheme
+(define-public my-service
+  (simple-service 'my-service-name
+                  shepherd-root-service-type
+                  (list (shepherd-service
+                          (provision '(my-service))
+                          (requirement '(user-processes))
+                          (start #~(make-forkexec-constructor
+                                     (list #$(file-append my-package "/bin/my-bin"))
+                                     #:user "root"
+                                     #:log-file "/var/log/my-service.log")))
+                          (stop #~(make-kill-destructor))
+                          (respawn? #t)))))
+#+END_SRC
+See audio/pipewire.scm and audio/alsa.scm for working examples.
+
+** Alias pattern — wrapping an existing Guix package
+
+When you want to export a package under a different name:
+#+BEGIN_SRC scheme
+(define-public bind-dns isc-bind)
+#+END_SRC
+This is useful when the Guix package name differs from what you want to call it.
+See networking/tools.scm for an example.
+
+** Loader imports directly from (gnu packages ...) instead of submodule
+
+Some loaders (networking, core) import packages directly from (gnu packages ...)
+rather than through submodule files. This is valid when:
+- The package already exists in Guix
+- No custom configuration or service is needed
+- You want to keep things simple
+
+Files like networking/curl.scm, networking/openssh.scm, networking/nss-certs.scm
+exist but are NOT used by the loader — the loader imports directly from gnu packages.
+This is intentional and not an error. Don't "fix" this unless asked.
+
+See also: [[./errors.org][Errors & Diagnostics]]
+
+** PipeWire Bluetooth Not Working
+Symptom: br-connection-profile-unavailable
+
+Fix 1 - seat-monitoring (TTY/SSH sessions):
+#+begin_src bash
+mkdir -p ~/.config/wireplumber/wireplumber.conf.d
+#+end_src
+#+begin_src conf
+# ~/.config/wireplumber/wireplumber.conf.d/disable-logind.conf
+wireplumber.profiles = {
+  main = {
+    monitor.bluez.seat-monitoring = disabled
+  }
+}
+#+end_src
+Then: herd restart wireplumber
+
+Fix 2 - Missing env vars in shepherd services:
+PipeWire/WirePlumber started by home shepherd need explicit env:
+- DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+- DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
+- XDG_RUNTIME_DIR=/run/user/1000
+- SPA_PLUGIN_PATH=<pipewire-store>/lib/spa-0.2
+- PIPEWIRE_MODULE_DIR=<pipewire-store>/lib/pipewire-0.3
+
+Use make-forkexec-constructor with #:environment-variables in shepherd service.
+
+** Wrong Module: guix-home-service-type
+guix-home-service-type is in (gnu services guix) NOT (gnu home services)
+
+** Home env-vars don't reach shepherd
+home-environment-variables-service-type only sets shell session vars.
+Shepherd services inherit none of them.
+Must pass env vars directly in make-forkexec-constructor.

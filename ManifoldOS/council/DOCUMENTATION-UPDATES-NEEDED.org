@@ -1,0 +1,853 @@
+* Documentation Updates Required — Based on Session 2 Changes
+
+This document identifies all outdated information in the agents/ documentation following the emacs daemon fixes, home services integration, and system configuration changes completed in Session 2.
+
+** Summary of Changes Made (Session 2)
+
+1. *daemon.scm* - Fixed emacs daemon startup issues
+   - Added XDG_RUNTIME_DIR=/run/user/{uid} explicitly
+   - Disabled native compilation with EMACS_NATIVECOMP_AOTCOMP=no and EMACS_NATIVECOMP_DRIVER=no
+   - Added proper environment variables to make-forkexec-constructor
+
+2. *init.el* - Added server-start with error handling
+   - Added (daemonp) check before (server-start) call
+   - Wrapped literate-config-load in condition-case for error recovery
+   - Ensures daemon mode properly initializes emacsclient socket
+
+3. *home.scm* - Added home services import
+   - Added (gnu services guix) import to services list
+   - Clarifies that home-environment-variables are different from system services
+
+4. *System reconfiguration* - Completed successfully
+   - All changes persist across reconfigure
+   - Socket now created in /run/user/1000/emacs/server (correct location)
+   - emacsclient -e works properly
+
+---
+
+* FILE 1: troubleshooting/errors.org
+
+** ISSUE 1: Service not starting — Missing emacs daemon troubleshooting (Lines 77-83)
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+** Service not starting
+
+#+BEGIN_SRC sh
+sudo herd status <service-name>
+sudo herd log <service-name>
+sudo herd start <service-name>
+#+END_SRC
+#+END_SRC
+
+PROBLEM:
+- Only shows system-level service troubleshooting
+- Does not cover home-environment services (like emacs daemon)
+- emacs daemon is in home-shepherd-service-type, not sudo-accessible
+- Users will try "sudo herd" which won't show home services
+
+SUGGESTED UPDATE:
+Add a new subsection before "Service not starting":
+
+#+BEGIN_SRC org
+** Service not starting — home-environment services vs system services
+
+Home-environment services (in ~/.config/guix/home/) are managed by USER shepherd, NOT root.
+Use `herd` WITHOUT sudo:
+
+#+BEGIN_SRC sh
+# Home services (emacs daemon, wireplumber, etc)
+herd status emacs          ; no sudo
+herd log emacs             ; no sudo
+herd restart emacs         ; no sudo
+#+END_SRC
+
+System services use sudo (network, ssh, etc). Never use sudo with home services.
+
+** Service not starting — emacs daemon specific
+
+The emacs daemon requires several environment variables to create socket correctly:
+
+#+BEGIN_SRC sh
+# Check if daemon is running
+herd status emacs
+
+# Check logs for errors
+herd log emacs | tail -20
+
+# Restart if not running
+herd restart emacs
+#+END_SRC
+
+Common issues:
+- Socket missing at ~/.emacs.d/server — check XDG_RUNTIME_DIR is set
+- Error: "Cannot create socket" — verify /run/user/{uid} exists and is writable
+- Error: "native compilation" — daemon.scm must have EMACS_NATIVECOMP_AOTCOMP=no
+
+See also: [[../../Manifold/substrate/user-space/home/emacs/daemon.scm][daemon.scm]]
+
+** Service not starting — system services
+
+#+BEGIN_SRC sh
+sudo herd status <service-name>
+sudo herd log <service-name>
+sudo herd start <service-name>
+#+END_SRC
+#+END_SRC
+
+---
+
+** ISSUE 2: Missing note about native compilation errors (Line 109)
+
+CURRENT TEXT ends with:
+#+BEGIN_SRC org
+If any binary returns "command not found" — the package wasn't built into the profile.
+Check: `guix build <package>` and `guix package -I <package>`.
+
+See also: [[./fixes.org][Build Fixes & Patterns]]
+#+END_SRC
+
+PROBLEM:
+- Does not mention native compilation (.eln files) issues that can prevent daemon startup
+- Emacs daemon specifically fails if EMACS_NATIVECOMP_AOTCOMP is not disabled
+- Error messages can be cryptic ("socket not created" when real issue is compilation)
+
+SUGGESTED UPDATE:
+Add new error section before "Service not starting":
+
+#+BEGIN_SRC org
+** Error: emacs daemon won't start / socket not created
+
+Cause 1: Native compilation (.eln files) attempting to compile during daemon startup.
+Fix: daemon.scm must set environment variables BEFORE startup:
+#+BEGIN_SRC scheme
+#:environment-variables
+(list "EMACS_NATIVECOMP_AOTCOMP=no"
+      "EMACS_NATIVECOMP_DRIVER=no")
+#+END_SRC
+
+Cause 2: XDG_RUNTIME_DIR not set, socket created in /tmp instead of /run/user/{uid}
+Fix: daemon.scm must explicitly set XDG_RUNTIME_DIR:
+#+BEGIN_SRC scheme
+(string-append "XDG_RUNTIME_DIR=/run/user/" (number->string (getuid)))
+#+END_SRC
+
+Cause 3: init.el not calling server-start in daemon mode.
+Fix: init.el must have:
+#+BEGIN_SRC elisp
+(when (daemonp)
+  (unless (server-running-p)
+    (server-start)))
+#+END_SRC
+
+Verify fix:
+#+BEGIN_SRC sh
+herd restart emacs
+emacsclient -e '(+ 1 2)'  ; should return 3
+ls ~/.emacs.d/server      ; socket should exist
+#+END_SRC
+#+END_SRC
+
+---
+
+** ISSUE 3: "no code for module" error (Line 41-48)
+
+CURRENT TEXT mentions only system modules:
+#+BEGIN_SRC org
+** Error: "no code for module (substrate user-space root <category> <name>)"
+
+Cause: Wrong module path OR file missing.
+
+Check:
+1. File exists: ls Manifold/substrate/user-space/root/<category>/<name>.scm
+2. define-module in file matches exactly: (substrate user-space root <category> <name>)
+3. REPL launched with correct flag: -L /home/aoeu/.config/guix/Manifold
+#+END_SRC
+
+PROBLEM:
+- Does not cover home-environment modules (under user-space/home/)
+- User might create home modules but use wrong REPL flag
+- home modules have different path structure
+
+SUGGESTED UPDATE:
+Add note about home modules:
+
+#+BEGIN_SRC org
+** Error: "no code for module (substrate user-space root <category> <name>)"
+
+Cause: Wrong module path OR file missing.
+
+Check:
+1. File exists: ls Manifold/substrate/user-space/root/<category>/<name>.scm
+2. define-module in file matches exactly: (substrate user-space root <category> <name>)
+3. REPL launched with correct flag: -L /home/aoeu/.config/guix/Manifold
+
+Note: Same rule applies to home-environment modules under user-space/home/:
+- File: Manifold/substrate/user-space/home/<category>/<name>.scm
+- Module: (substrate user-space home <category> <name>)
+- Same REPL flag works for both: -L /home/aoeu/.config/guix/Manifold
+#+END_SRC
+
+---
+
+* FILE 2: troubleshooting/fixes.org
+
+** ISSUE 1: New section needed — Emacs daemon environment variables (After line 49)
+
+CURRENT FILE: Does not have emacs daemon environment variable documentation.
+
+PROBLEM:
+- Emacs daemon requires specific environment variables not covered in the file
+- Native compilation disabling is not documented
+- Socket location configuration is missing
+- These are now critical for daemon.scm implementation
+
+SUGGESTED UPDATE:
+Add new section after "Emacs package fails to byte-compile":
+
+#+BEGIN_SRC org
+** Emacs daemon fails to start — environment variables missing
+
+Cause: make-forkexec-constructor must pass environment variables for socket creation
+and native compilation handling.
+
+Fix: Set environment variables explicitly in daemon.scm:
+#+BEGIN_SRC scheme
+#:environment-variables
+(list (string-append "HOME=" (getenv "HOME"))
+      (string-append "XDG_RUNTIME_DIR=/run/user/" (number->string (getuid)))
+      "EMACS_NATIVECOMP_AOTCOMP=no"
+      "EMACS_NATIVECOMP_DRIVER=no")
+#+END_SRC
+
+Critical environment variables:
+- HOME — must be set to user's home directory for socket path
+- XDG_RUNTIME_DIR — where socket is created (/run/user/{uid})
+- EMACS_NATIVECOMP_AOTCOMP — disable to prevent compilation failures during daemon startup
+- EMACS_NATIVECOMP_DRIVER — disable to prevent compiler driver loading
+
+Without these, daemon startup fails with cryptic "socket not created" or
+"native compilation error" messages.
+
+See: /home/aoeu/.config/guix/Manifold/substrate/user-space/home/emacs/daemon.scm
+#+END_SRC
+
+---
+
+** ISSUE 2: Missing note about home vs system services (New section)
+
+CURRENT FILE: Assumes all services are system-level.
+
+PROBLEM:
+- emacs daemon is a home-environment service, not a system service
+- PipeWire Bluetooth issue (line 253+) is also a home service
+- Documentation should clarify when to use home-shepherd-service-type vs shepherd-root-service-type
+- Users might try to put home services in wrong place
+
+SUGGESTED UPDATE:
+Add new section at the END of the file:
+
+#+BEGIN_SRC org
+** Home-environment services vs system services
+
+NOT ALL SERVICES ARE SYSTEM-LEVEL. Understand the difference:
+
+*System services* (use shepherd-root-service-type, in Manifold):
+- Run as root
+- Start at boot
+- Accessible via `sudo herd status`
+- Examples: sshd, nginx, user accounts
+- Location: Manifold/substrate/user-space/root/*/
+- Use: (simple-service 'name shepherd-root-service-type ...)
+
+*Home-environment services* (use home-shepherd-service-type, in home-environment):
+- Run as current user
+- Start when home-environment is activated
+- Accessible via `herd status` (no sudo)
+- Examples: emacs daemon, wireplumber, user daemons
+- Location: Manifold/substrate/user-space/home/*/
+- Use: (simple-service 'name home-shepherd-service-type ...)
+
+Current home services:
+- emacs daemon (Manifold/substrate/user-space/home/emacs/daemon.scm)
+- PipeWire services (check home loaders)
+
+If you create a new user-level daemon, use home-shepherd-service-type.
+#+END_SRC
+
+---
+
+** ISSUE 3: PipeWire Bluetooth section (Line 253-286) — Update to include XDG_RUNTIME_DIR
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+Fix 2 - Missing env vars in shepherd services:
+PipeWire/WirePlumber started by home shepherd need explicit env:
+- DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+- DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
+- XDG_RUNTIME_DIR=/run/user/1000
+- SPA_PLUGIN_PATH=<pipewire-store>/lib/spa-0.2
+- PIPEWIRE_MODULE_DIR=<pipewire-store>/lib/pipewire-0.3
+
+Use make-forkexec-constructor with #:environment-variables in shepherd service.
+#+END_SRC
+
+PROBLEM:
+- Hardcodes /run/user/1000, should use getuid()
+- Doesn't show the actual code pattern
+- "Fix 2" suggests there are multiple fixes but only one is shown
+
+SUGGESTED UPDATE:
+#+BEGIN_SRC org
+Fix 2 - Missing env vars in shepherd services:
+PipeWire/WirePlumber started by home shepherd need explicit env vars.
+CRITICAL: Never hardcode 1000 — use (getuid) to get actual user id:
+
+#+BEGIN_SRC scheme
+#:environment-variables
+(list (string-append "HOME=" (getenv "HOME"))
+      (string-append "XDG_RUNTIME_DIR=/run/user/" (number->string (getuid)))
+      "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
+      (string-append "SPA_PLUGIN_PATH=" pipewire "/lib/spa-0.2")
+      (string-append "PIPEWIRE_MODULE_DIR=" pipewire "/lib/pipewire-0.3"))
+#+END_SRC
+
+Or use the getuid pattern consistently:
+#+BEGIN_SRC scheme
+(let ((uid (number->string (getuid))))
+  (list (string-append "HOME=" (getenv "HOME"))
+        (string-append "XDG_RUNTIME_DIR=/run/user/" uid)
+        (string-append "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/" uid "/bus")))
+#+END_SRC
+
+See: emacs daemon implementation for working example.
+#+END_SRC
+
+---
+
+** ISSUE 4: Wrong Module section (Line 280-285) — Already partially addressed, clarify home services
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+** Wrong Module: guix-home-service-type
+guix-home-service-type is in (gnu services guix) NOT (gnu home services)
+
+** Home env-vars don't reach shepherd
+home-environment-variables-service-type only sets shell session vars.
+Shepherd services inherit none of them.
+Must pass env vars directly in make-forkexec-constructor.
+#+END_SRC
+
+PROBLEM:
+- Correct but incomplete — should clarify which module is correct
+- Doesn't explain when to use each
+- Second item is good but could reference the actual code pattern
+
+SUGGESTED UPDATE:
+#+BEGIN_SRC org
+** Wrong Module: guix-home-service-type vs home-shepherd-service-type
+
+- guix-home-service-type is in (gnu services guix) — for Guix configuration in home
+- home-shepherd-service-type is in (gnu home services shepherd) — for home user services
+- NOT in (gnu home services) — that's the wrong module!
+
+Current usage in home.scm:
+- (gnu services guix) — manages guix configuration from home-environment
+- (gnu home services shepherd) — manages emacs daemon and other user services
+
+** Home environment variables don't reach shepherd
+home-environment-variables-service-type only sets shell session vars (.bashrc, etc).
+Shepherd services inherit NONE of them.
+
+CRITICAL: Pass env vars directly in make-forkexec-constructor:
+#+BEGIN_SRC scheme
+(make-forkexec-constructor
+  (list #$(file-append program "/bin/name"))
+  #:environment-variables
+  (list (string-append "XDG_RUNTIME_DIR=/run/user/" (number->string (getuid)))
+        "OTHER_VAR=value"))
+#+END_SRC
+
+Do NOT rely on home-environment-variables-service-type for daemon config.
+#+END_SRC
+
+---
+
+* FILE 3: adding-packages/workflow.org
+
+** ISSUE 1: Step 7 — Reconfigure command missing home-environment (Line 67-70)
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+*** Step 7 — Reconfigure
+#+BEGIN_SRC sh
+sudo guix system reconfigure /home/aoeu/.config/guix/guixos.scm
+#+END_SRC
+#+END_SRC
+
+PROBLEM:
+- Only shows system reconfiguration
+- Does not mention home-environment reconfiguration
+- Users adding home packages (like emacs daemon) won't know to reconfigure home
+- Suggests both system and home changes are system-level
+
+SUGGESTED UPDATE:
+#+BEGIN_SRC org
+*** Step 7 — Reconfigure
+
+If adding packages to *root-level Manifold* (system-wide):
+#+BEGIN_SRC sh
+sudo guix system reconfigure /home/aoeu/.config/guix/guixos.scm
+#+END_SRC
+
+If adding *home-environment packages or services* (user profile + daemons):
+#+BEGIN_SRC sh
+guix home reconfigure /home/aoeu/.config/guix/Manifold/substrate/user-space/home/home.scm
+#+END_SRC
+
+Both may be needed if you modified both system and home files.
+After home reconfigure, restart home services:
+#+BEGIN_SRC sh
+herd restart emacs  ; if you modified emacs daemon
+herd restart pipewire  ; if you modified audio services
+#+END_SRC
+#+END_SRC
+
+---
+
+** ISSUE 2: Decision Tree — Doesn't distinguish home vs system packages (Line 6-14)
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+** Decision Tree — before writing any code
+
+Is the package already in Guix proper?
+  YES -> Template A (thin submodule, just #:re-export)
+         confirm: guix search <name>
+  NO  -> search web for existing Guix channel recipe
+           FOUND     -> copy define-public from channel source -> Template B
+           NOT FOUND -> write from scratch                     -> Template B
+                        get hash: guix download <url>
+#+END_SRC
+
+PROBLEM:
+- Doesn't explain where to put home vs system packages
+- emacs-packages are system-level but show up in home-profile
+- New users might put home packages in wrong location
+
+SUGGESTED UPDATE:
+#+BEGIN_SRC org
+** Decision Tree — before writing any code
+
+First: SYSTEM package or HOME package?
+  SYSTEM (system-wide, for all users):
+    Location: Manifold/substrate/user-space/root/
+    Reconfigure: sudo guix system reconfigure
+    Example: Most packages (core, shell, editors, etc.)
+  
+  HOME (current user profile + daemons):
+    Location: Manifold/substrate/user-space/home/
+    Reconfigure: guix home reconfigure
+    Example: emacs daemon, user-specific packages
+
+Then: Is the package already in Guix proper?
+  YES -> Template A (thin submodule, just #:re-export)
+         confirm: guix search <name>
+  NO  -> search web for existing Guix channel recipe
+           FOUND     -> copy define-public from channel source -> Template B
+           NOT FOUND -> write from scratch                     -> Template B
+                        get hash: guix download <url>
+#+END_SRC
+
+---
+
+** ISSUE 3: Current categories list outdated (Line 32-35)
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+Current categories: core, networking, shell, editors, desktop, desktop/wallpaper,
+desktop/wayland, desktop/video, desktop/image, desktop/3d, terminal, containers,
+keyboard, ai, audio, fonts, sandbox, monitoring, programming-languages, security,
+formatters, lsp, scheduling, compute, ci, data, guix, password-manager, games.
+#+END_SRC
+
+PROBLEM:
+- Missing "home" category (newly created for home-environment services)
+- Not clear which are system vs home
+- Should reference the loaders reference document
+
+SUGGESTED UPDATE:
+#+BEGIN_SRC org
+Current SYSTEM categories: core, networking, shell, editors, desktop, desktop/wallpaper,
+desktop/wayland, desktop/video, desktop/image, desktop/3d, terminal, containers,
+keyboard, ai, audio, fonts, sandbox, monitoring, programming-languages, security,
+formatters, lsp, scheduling, compute, ci, data, guix, password-manager, games.
+
+Current HOME categories: emacs (daemon), audio (services), loaders.
+
+See [[../reference/loaders.org][loaders reference]] for complete list with descriptions.
+#+END_SRC
+
+---
+
+* FILE 4: templates/specialized.org
+
+** ISSUE 1: Missing emacs daemon template (New section)
+
+PROBLEM:
+- File has templates for prebuilt binaries, Emacs packages, Go packages, Rust binaries
+- Does NOT have template for emacs daemon as a shepherd service
+- Users implementing home services won't have a reference
+
+SUGGESTED UPDATE:
+Add new section at the END:
+
+#+BEGIN_SRC org
+** Emacs daemon service (shepherd service pattern)
+
+Home-environment services use a different pattern than packages. Here's the working pattern
+for emacs daemon (can adapt for other user-level daemons):
+
+#+BEGIN_SRC scheme
+(define-module (substrate user-space home emacs daemon)
+  #:use-module (gnu home services)
+  #:use-module (gnu home services shepherd)
+  #:use-module (gnu packages emacs)
+  #:use-module (guix gexp)
+  #:export (home-emacs-daemon-service))
+
+(define-public home-emacs-daemon-service
+  (simple-service 'emacs-daemon
+                  home-shepherd-service-type
+                  (list
+                    (shepherd-service
+                      (provision '(emacs))
+                      (documentation "Start the Emacs daemon for use with emacsclient.")
+                      (requirement '())
+                      (start #~(make-forkexec-constructor
+                                 (list #$(file-append emacs "/bin/emacs")
+                                       "--daemon")
+                                 #:environment-variables
+                                 (list (string-append "HOME=" (getenv "HOME"))
+                                       (string-append "XDG_RUNTIME_DIR=/run/user/" 
+                                                      (number->string (getuid)))
+                                       "EMACS_NATIVECOMP_AOTCOMP=no"
+                                       "EMACS_NATIVECOMP_DRIVER=no")
+                                 #:log-file (string-append (getenv "HOME") "/.emacs.d/daemon.log")
+                                 #:directory (getenv "HOME")))
+                      (stop #~(make-kill-destructor))
+                      (respawn? #f)
+                      (one-shot? #f)))))
+#+END_SRC
+
+Key differences from system services:
+1. Module path: (substrate user-space home ...) NOT (substrate user-space root ...)
+2. Service type: home-shepherd-service-type NOT shepherd-root-service-type
+3. #:environment-variables: CRITICAL for proper socket creation and daemon startup
+4. Export: use #:export (not #:re-export) for the service definition
+5. Logging: use user's ~/.emacs.d/daemon.log, NOT /var/log/
+
+Critical environment variables for emacs daemon:
+- XDG_RUNTIME_DIR — where socket is created (must use getuid, never hardcode)
+- EMACS_NATIVECOMP_AOTCOMP=no — prevents native compilation failures
+- EMACS_NATIVECOMP_DRIVER=no — prevents compiler driver loading at startup
+
+See: /home/aoeu/.config/guix/Manifold/substrate/user-space/home/emacs/daemon.scm
+#+END_SRC
+
+---
+
+** ISSUE 2: Emacs package template (Line 86-112) — Add note about dependencies
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+** Emacs package with dependencies
+
+When an Emacs package requires other Emacs packages at compile time (has `(require 'some-dep)` at top level), you MUST list them as BOTH `inputs` AND `propagated-inputs`:
+...
+CRITICAL: `inputs` makes deps available during byte-compilation. `propagated-inputs` makes them available at runtime. You need BOTH when the package has `(require 'dep)` at the top level.
+#+END_SRC
+
+PROBLEM:
+- Good information, but should add note about propagated-inputs in loaders
+- Users might export Emacs packages that need proper profile handling
+- Should mention that emacs-packages are loaded into home-profile (see home.scm)
+
+SUGGESTED UPDATE:
+Add after the CRITICAL note:
+
+#+BEGIN_SRC org
+Note: Emacs packages defined in editors/emacs-packages/ are aggregated in root-emacs-packages
+and loaded into the home-profile (user's ~/.guix-home/profile). If an Emacs package has
+propagated-inputs, they will be available in the Emacs site-lisp path automatically.
+
+See: Manifold/substrate/user-space/root/editors/emacs-packages.scm
+#+END_SRC
+
+---
+
+* FILE 5: guix-repl.org
+
+** ISSUE 1: REPL section missing home-environment module examples (Line 62-74)
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+** Workflow: validate container modules
+
+#+BEGIN_SRC scheme
+(use-modules (systems containers core-container))
+container-os       ; base os object
+...
+#+END_SRC
+#+END_SRC
+
+PROBLEM:
+- Only shows container module validation
+- Does not show how to validate home-environment modules
+- Users implementing home services won't have REPL validation steps
+
+SUGGESTED UPDATE:
+Add new section after "Workflow: validate container modules":
+
+#+BEGIN_SRC org
+** Workflow: validate home-environment modules
+
+Home-environment modules use the SAME load-path and validation as system modules:
+
+#+BEGIN_SRC scheme
+;; Load a home service module
+(use-modules (substrate user-space home emacs daemon))
+home-emacs-daemon-service  ; must return service object
+
+;; Load a home loader
+(use-modules (substrate user-space home loaders emacs))
+home-emacs-services  ; must include the services
+#+END_SRC
+
+Full home validation before reconfigure:
+#+BEGIN_SRC scheme
+(use-modules (substrate user-space home home))
+literative-home-environment  ; must load clean without errors
+#+END_SRC
+
+After validation, reconfigure home:
+#+BEGIN_SRC sh
+guix home reconfigure /home/aoeu/.config/guix/Manifold/substrate/user-space/home/home.scm
+#+END_SRC
+#+END_SRC
+
+---
+
+** ISSUE 2: Launch section — Add home-environment REPL note (Line 6-15)
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+** Launch
+
+Both system and container modules use the same flag:
+#+BEGIN_SRC sh
+guix repl --load-path=/home/aoeu/.config/guix/Manifold
+#+END_SRC
+#+END_SRC
+
+PROBLEM:
+- Says "system and container" but doesn't mention home-environment
+- Might confuse users about whether home modules use the same flag
+- Should clarify all three use the same flag
+
+SUGGESTED UPDATE:
+#+BEGIN_SRC org
+** Launch
+
+System, home-environment, and container modules ALL use the same load-path flag:
+#+BEGIN_SRC sh
+guix repl --load-path=/home/aoeu/.config/guix/Manifold
+#+END_SRC
+
+This works for:
+- System modules: (substrate user-space root ...)
+- Home-environment modules: (substrate user-space home ...)
+- Container modules: (systems containers ...)
+
+Note: The older syntax `guix repl -- -L /path` no longer works. Also, the warning
+"note: source file ... newer than compiled ..." is harmless noise — it just means
+the cache is stale. The module loads correctly regardless.
+#+END_SRC
+
+---
+
+** ISSUE 3: Module command examples incomplete (Line 22)
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+| ,module (substrate ...) | Switch into a module's namespace |
+#+END_SRC
+
+PROBLEM:
+- Example shows "substrate ..." without actual path
+- Should show both system and home examples
+- New users might not know the exact syntax
+
+SUGGESTED UPDATE:
+#+BEGIN_SRC org
+| ,module (substrate ...) | Switch into a module's namespace (e.g., ,module (substrate user-space root shell nushell)) |
+#+END_SRC
+
+Or replace entire table with more examples:
+
+#+BEGIN_SRC org
+| Command                              | What it does                              |
+|--------------------------------------|-------------------------------------------|
+| (use-modules (substrate ...))     | Load a module                             |
+| ,module (substrate user-space ...) | Switch into a module's namespace          |
+| ,module (systems containers ...)     | Switch into container module namespace    |
+| ,bindings                            | List all bindings in current module       |
+| ,apropos <name>                      | Search for a symbol across loaded modules |
+| ,describe <symbol>                   | Show documentation for a symbol           |
+| ,reload (substrate ...)            | Reload a module after editing             |
+| ,quit                                | Exit REPL                                 |
+#+END_SRC
+
+---
+
+** ISSUE 4: Workflow diagram clarity — Add note about emacs daemon testing (After line 100)
+
+CURRENT TEXT:
+#+BEGIN_SRC org
+** Workflow: debug "unbound variable" bottom-up
+
+#+BEGIN_SRC scheme
+;; Stop at first error — that layer is where the fix goes
+(use-modules (substrate user-space root <category> <name>))     ; 1. submodule ok?
+<name>                                                              ; 2. symbol accessible?
+(use-modules (substrate user-space root loaders <category>))    ; 3. loader ok?
+root-<category>-packages                                           ; 4. list correct?
+(use-modules (substrate user-space root root))                   ; 5. root ok?
+root-system-packages                                               ; 6. full list ok?
+#+END_SRC
+#+END_SRC
+
+PROBLEM:
+- Only shows root (system) module validation
+- Doesn't mention home-environment validation
+- Users adding home services have no guidance
+
+SUGGESTED UPDATE:
+Add after the root debugging workflow:
+
+#+BEGIN_SRC org
+Similar workflow for home-environment modules:
+#+BEGIN_SRC scheme
+;; Stop at first error — that layer is where the fix goes
+(use-modules (substrate user-space home <category> <name>))     ; 1. submodule ok?
+home-<name>-service                                                ; 2. symbol accessible?
+(use-modules (substrate user-space home loaders <category>))    ; 3. loader ok?
+home-<category>-services                                           ; 4. list correct?
+(use-modules (substrate user-space home home))                   ; 5. home-environment ok?
+literative-home-environment                                        ; 6. full config ok?
+#+END_SRC
+#+END_SRC
+
+---
+
+** ISSUE 5: Success/failure examples (Line 109-128) — Add home-environment example
+
+CURRENT TEXT:
+Only shows root module success/failure examples.
+
+PROBLEM:
+- No example of successful home-environment module load
+- Users validating daemon services have no reference
+
+SUGGESTED UPDATE:
+Add after root examples:
+
+#+BEGIN_SRC org
+Home-environment success example:
+#+BEGIN_SRC
+scheme@(guile-user)> (use-modules (substrate user-space home emacs daemon))
+scheme@(guile-user)> home-emacs-daemon-service
+$1 = #<service 'emacs-daemon' (shepherd-root-service-type) ...>
+#+END_SRC
+
+Home-environment failure — wrong path:
+#+BEGIN_SRC
+ERROR: no code for module (substrate user-space root emacs daemon)
+#+END_SRC
+-> Should be (substrate user-space *home* emacs daemon), not root!
+
+Home-environment failure — unbound variable:
+#+BEGIN_SRC
+ERROR: Unbound variable: home-emacs-daemon-service
+#+END_SRC
+-> home-emacs-daemon-service not exported or loader not re-exporting it.
+#+END_SRC
+
+---
+
+* Summary of Updates Needed
+
+| File | Issue Type | Lines | Priority | Fix Type |
+|------|-----------|-------|----------|----------|
+| errors.org | Missing home service section | 77-83 | HIGH | Add subsections |
+| errors.org | Missing daemon errors | End of file | HIGH | New section |
+| errors.org | Missing home module note | 41-48 | MEDIUM | Update note |
+| fixes.org | Missing daemon env vars | After 49 | HIGH | New section |
+| fixes.org | Missing home vs system | End | HIGH | New section |
+| fixes.org | PipeWire hardcoded UID | 253-286 | MEDIUM | Update example |
+| fixes.org | Module clarity | 280-285 | MEDIUM | Clarify language |
+| workflow.org | Missing home reconfigure | 67-70 | HIGH | Update step |
+| workflow.org | Missing home/system decision | 6-14 | HIGH | Update tree |
+| workflow.org | Categories list | 32-35 | LOW | Update list |
+| specialized.org | Missing daemon template | End | HIGH | New section |
+| specialized.org | Emacs package note | 112 | LOW | Add note |
+| guix-repl.org | Missing home modules | 62-74 | HIGH | New section |
+| guix-repl.org | Launch section incomplete | 6-15 | HIGH | Clarify |
+| guix-repl.org | Module command examples | 22 | MEDIUM | Improve examples |
+| guix-repl.org | Bottom-up debugging | After 100 | MEDIUM | Add home variant |
+| guix-repl.org | Success/failure examples | 109-128 | MEDIUM | Add home examples |
+
+** High Priority Updates (Should be done first)
+
+1. errors.org — Add home service troubleshooting section
+2. errors.org — Add emacs daemon specific errors
+3. fixes.org — Add emacs daemon environment variables section
+4. fixes.org — Add home vs system services clarification
+5. workflow.org — Update step 7 to include home reconfigure
+6. workflow.org — Update decision tree to distinguish home vs system
+7. guix-repl.org — Add home-environment validation workflow
+8. guix-repl.org — Clarify launch section covers all module types
+9. specialized.org — Add emacs daemon shepherd service template
+
+** Files NOT Requiring Updates (Based on Analysis)
+
+- agents/start.org — General introduction, no specific changes needed
+- agents/getting-started.org — High-level overview, still valid
+- agents/org-mode-guide.org — Emacs org-mode reference, unrelated
+- agents/architecture/ — System design docs, no emacs-specific info
+- agents/reference/ — Still valid, references exist
+- agents/templates/basic.org — Basic templates still valid
+- agents/templates/infrastructure.org — Infrastructure templates still valid
+- agents/templates/npm-fod.org — npm templates unrelated
+- agents/adding-packages/patterns.org — General patterns still valid
+- agents/index.org — Navigation doc, no updates needed
+
+---
+
+* Next Steps for Implementation
+
+1. Create UPDATED versions of the 5 files with all suggested changes
+2. Replace originals OR create -updated.org versions for comparison
+3. Consider creating a "Home Services" section in agents/ with dedicated guide
+4. Update index.org if new guides are created
+
+---
+
+* Implementation Notes
+
+- All updates maintain the existing org-mode format and structure
+- All updates reference actual file paths in the codebase
+- All updates include working code examples from Session 2 changes
+- Updates emphasize the home vs system distinction throughout
+- Environment variable handling is consistently explained
+- All changes are backwards-compatible with existing documentation

@@ -1,0 +1,54 @@
+* ManifoldOS — Architecture: Categories & Kernel
+
+** Current Categories (accurate as of 2026-04-06)
+
+| Category              | Loader exports                                    |
+|----------------------|---------------------------------------------------|
+| core                 | root-core-packages                                 |
+| networking           | root-networking-packages, root-networking-services |
+| shell               | root-shell-packages, root-shell-*-packages         |
+| editors              | root-editors-packages                              |
+| desktop              | root-desktop-packages                              |
+| desktop/wallpaper    | (loaded via desktop loader)                        |
+| desktop/wayland      | root-desktop-wayland-packages                      |
+| desktop/video        | root-desktop-video-packages                        |
+| desktop/image        | root-desktop-image-packages                        |
+| desktop/3d           | root-desktop-3d-packages                           |
+| terminal             | root-terminal-packages                             |
+| containers           | root-containers-packages, root-containers-services |
+| keyboard             | root-keyboard-packages, root-keyboard-services     |
+| ai                  | root-ai-packages                                  |
+| audio               | root-audio-packages, root-audio-services           |
+| fonts               | font-packages                                     |
+| sandbox             | sandbox-packages                                  |
+| monitoring           | root-monitoring-packages, root-monitoring-services |
+| programming-languages | root-programming-languages-packages              |
+| security           | root-security-packages, root-security-services     |
+| formatters           | root-formatters-packages                          |
+| lsp                 | root-lsp-packages                                 |
+| scheduling           | root-scheduling-packages                          |
+| compute             | root-compute-packages                             |
+| ci                  | root-ci-packages, root-ci-services                |
+| data                | root-data-packages                                |
+| guix                | root-guix-packages, root-guix-services           |
+| password-manager     | root-password-manager-packages                    |
+| games               | root-games-packages                               |
+
+** No external channels
+Never add external channels. Package definitions go directly into submodules.
+
+** Kernel Space
+
+kernel-space/linux.scm exports:
+- linux (from nonguix)
+
+kernel-space/kernel-space.scm aggregates:
+- bootloader, filesystem, hostname, keyboard, locale, elogind, udev, kmod
+
+** Container System
+
+systems/containers/ — separate namespace (systems containers ...)
+See [[../containers.scm][containers.scm]] (agent file) for details.
+Uses flat pattern, not loader pattern yet.
+
+See also: [[./overview.org][Overview & Directory Structure]], [[./notes.org][Notes & Gotchas]]

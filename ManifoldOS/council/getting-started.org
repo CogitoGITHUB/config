@@ -1,0 +1,78 @@
+* Getting Started
+
+** OpenCode Commands
+Use OpenCode commands for quick access:
+- =/guix-pull= - Pull latest Guix
+- =/guix-reconfigure= - Apply system changes
+- =/rollback= - Rollback to previous generation
+- =/show-generations= - List all system generations
+- =/git-gg= - Git add, commit "update", and push
+
+** Creating New Commands
+Commands are defined as markdown files in:
+=~/.config/opencode/commands/=
+
+To create a new command:
+1. Create =~/.config/opencode/commands/<name>.md=
+2. Add frontmatter with description (and optional agent):
+   #+BEGIN_SRC markdown
+   ---
+   description: What the command does
+   agent: build
+   ---
+   #+END_SRC
+3. Add the prompt/task below the frontmatter
+4. Use with =/name= in OpenCode
+
+Example command file:
+#+BEGIN_SRC markdown
+---
+description: Run tests
+agent: build
+---
+Run the full test suite and show results.
+#+END_SRC
+
+** Pull latest Guix
+#+BEGIN_SRC sh
+guix pull
+#+END_SRC
+
+** Reconfigure system
+#+BEGIN_SRC sh
+reshape
+#+END_SRC
+
+Or manually:
+#+BEGIN_SRC sh
+sudo guix system reconfigure /ManifoldOS/constitution.scm
+#+END_SRC
+
+** Rollback if something breaks
+#+BEGIN_SRC sh
+guix system roll-back
+#+END_SRC
+
+** List generations
+#+BEGIN_SRC sh
+guix system list-generations
+#+END_SRC
+
+** Switch to previous generation
+#+BEGIN_SRC sh
+guix system switch-generation N
+#+END_SRC
+
+** Profile management
+#+BEGIN_SRC sh
+# Your current profile (from symlink)
+ls -la ~/.config/guix/current
+
+# List packages in profile
+guix package -p ~/.config/guix/current --list-available
+#+END_SRC
+
+** Build without applying (dry run)
+#+BEGIN_SRC sh
+guix system build /home/aoeu/.config/guix/guixos.scm
+#+END_SRC

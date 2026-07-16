@@ -1,6 +1,0 @@
-[submodule "emacs/lisp/dashboard"]
-	path = emacs/lisp/dashboard
-	url = https://github.com/emacs-dashboard/dashboard.git
-[submodule "emacs/lisp/org-supertag"]
-	path = emacs/lisp/org-supertag
-	url = https://github.com/yibie/org-supertag.git

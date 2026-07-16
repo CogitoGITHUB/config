@@ -1,0 +1,310 @@
+* ManifoldOS Guix Refactoring Plan
+** Overview
+
+Migrate from direct GNU package imports to a custom ~dependencies/~ directory structure that holds
+extracted package definitions from ~sources/guix/~. This decouples your system config from upstream
+Guix changes and allows selective package overrides.
+
+** Current Architecture vs. Target Architecture
+
+*** Current State
+- Package modules: 3-5 lines, import from ~(gnu packages category)~ and re-export
+  - Example: =shell/nushell.scm= imports ~(gnu packages nushell)~ and re-exports ~nushell~
+- Loaders: Aggregate multiple packages and re-export for system composition
+  - Example: =loaders/shell.scm= imports from all shell/* modules
+- Direct coupling: System depends on upstream Guix module naming
+
+*** Target State
+- =dependencies/= flat directory contains full package definitions (one file per package)
+  - Example: =dependencies/nushell.scm= has complete package definition + all imports
+- Load path: ~guixos.scm~ adds ~/home/aoeu/.config/guix/dependencies~ to load path
+- Package modules: 3-5 lines, import from ~(dependencies package-name)~ and re-export
+  - Example: =shell/nushell.scm~ imports from ~(dependencies nushell)~ instead of ~(gnu packages nushell)~
+- Loaders: Unchanged, still aggregate and re-export (no modifications needed)
+- Decoupled: System uses custom package definitions, can override/patch freely
+
+** Directory Structure (Target)
+
+#+begin_src
+/home/aoeu/.config/guix/
+├── dependencies/                          # NEW - FLAT structure
+│   ├── nushell.scm                        # Full package definition
+│   ├── emacs.scm                          # Full package definition
+│   ├── gtk.scm                            # Full package definition
+│   ├── curl.scm                           # Full package definition
+│   ├── openssh.scm                        # Full package definition
+│   ├── git.scm                            # Full package definition
+│   ├── hyprland.scm                       # Full package definition
+│   └── ... (one file per package)
+│
+├── Operating-System/                      # EXISTING - UNCHANGED
+│   └── core-system/user-space/root/
+│       ├── shell/nushell.scm             # Updated: imports from (dependencies nushell)
+│       ├── shell/bash.scm                # Updated: imports from (dependencies bash)
+│       ├── desktop/hyprland.scm          # Updated: imports from (dependencies hyprland)
+│       ├── loaders/shell.scm             # UNCHANGED - aggregates shell packages
+│       └── ...
+│
+├── sources/                               # EXISTING - Source reference
+│   ├── guix/                              # Full upstream Guix repository
+│   └── nonguix/                           # Non-GNU packages
+│
+└── guixos.scm                             # UPDATED: add load path
+#+end_src
+
+** Migration Process (6 Phases)
+
+*** Phase 1: Setup - Create dependencies/ Directory
+   :PROPERTIES:
+   :EFFORT:   15 min
+   :STATUS:   pending
+   :END:
+
+Create the flat dependencies directory:
+#+begin_src bash
+mkdir -p /home/aoeu/.config/guix/dependencies
+#+end_src
+
+No other files created yet — only the directory structure.
+
+*** Phase 2: Extract Packages from sources/guix/
+   :PROPERTIES:
+   :EFFORT:   Varies (depends on number of packages)
+   :STATUS:   pending
+   :SUBTASKS: 28 category loaders to process
+   :END:
+
+For each package used in the categorized structure:
+1. Find package definition in ~sources/guix/gnu/packages/*~ or ~sources/guix/guix/packages/*~
+2. Extract full module definition (with all ~#:use-module~ imports)
+3. Create new file in ~dependencies/package-name.scm~
+4. Update module name from ~(gnu packages category)~ to ~(dependencies package-name)~
+5. Export the package-public-name
+
+*Example workflow for nushell:*
+
+- Source file: =/home/aoeu/.config/guix/sources/guix/gnu/packages/shells.scm=
+- Extract: The full ~(define-public nushell ...)~ definition + all required imports
+- Create: =/home/aoeu/.config/guix/dependencies/nushell.scm=
+- Content:
+  #+begin_src scheme
+  (define-module (dependencies nushell)
+    #:use-module (guix packages)
+    #:use-module (guix build-system cargo)
+    #:use-module (gnu packages crates-io)
+    #:use-module (gnu packages pkg-config)
+    #:use-module (gnu packages tls)
+    #:export (nushell))
+
+  (define-public nushell
+    (package ...))
+  #+end_src
+
+*Important notes:*
+- Dependencies may require imports from ~(gnu packages ...)~ — leave these as-is
+- Only extract ONE package per file (even if source file has multiple)
+- Preserve all original imports, comments, and metadata
+- If a package depends on another custom package, add ~#:use-module (dependencies other-package)~
+
+*Categories and approximate package counts:*
+| Loader | Category | Packages | Priority |
+|--------|----------|----------|----------|
+| shell  | 15+ | High (foundation) |
+| core | 7 | High (essential) |
+| networking | 12 | High (ssh, git, curl) |
+| editors | 4 | Medium |
+| desktop | 25+ | Medium |
+| audio | 6 | Medium |
+| containers | 2 | Low |
+| data | 3 | Low |
+| ... | ... | ... | ... |
+
+*** Phase 3: Update guixos.scm Load Path
+   :PROPERTIES:
+   :EFFORT:   2 min
+   :STATUS:   pending
+   :END:
+
+Add dependencies/ to load path before core-system:
+
+*Before:*
+#+begin_src scheme
+(add-to-load-path "/home/aoeu/.config/guix/Operating-System")
+(add-to-load-path "/home/aoeu/.config/guix/Operating-System/core-system/user-space/root/security/sops/modules")
+#+end_src
+
+*After:*
+#+begin_src scheme
+(add-to-load-path "/home/aoeu/.config/guix/dependencies")
+(add-to-load-path "/home/aoeu/.config/guix/Operating-System")
+(add-to-load-path "/home/aoeu/.config/guix/Operating-System/core-system/user-space/root/security/sops/modules")
+#+end_src
+
+*** Phase 4: Update Package Modules (category by category)
+   :PROPERTIES:
+   :EFFORT:   Varies (1-2 hours for all categories)
+   :STATUS:   pending
+   :END:
+
+Update all 3-line package wrapper modules to import from dependencies instead of gnu packages.
+
+*Example: shell/nushell.scm*
+
+*Before:*
+#+begin_src scheme
+(define-module (core-system user-space root shell nushell)
+  #:use-module (gnu packages nushell)
+  #:re-export (nushell))
+#+end_src
+
+*After:*
+#+begin_src scheme
+(define-module (core-system user-space root shell nushell)
+  #:use-module (dependencies nushell)
+  #:re-export (nushell))
+#+end_src
+
+*Process for each category (e.g., shell):*
+1. List all files in ~shell/~
+2. For each ~shell/*.scm~ file:
+   - Change ~#:use-module (gnu packages xyz)~ to ~#:use-module (dependencies xyz)~
+   - If imports from multiple ~(gnu packages ...)~, consolidate to ~(dependencies ...)~ only
+   - Keep ~#:re-export~ unchanged
+3. Test with REPL: ~guile -c "(use-modules (core-system user-space root shell nushell)) (display nushell)"~
+
+*28 category loaders to update (in recommended priority order):*
+
+**HIGH PRIORITY (foundation):**
+- shell (15+ packages)
+- core (7 packages)
+- networking (12 packages)
+
+**MEDIUM PRIORITY (common usage):**
+- editors (4 packages)
+- desktop (25+ packages)
+- audio (6 packages)
+- keyboard (2 packages)
+- terminal (1 package)
+- containers (2 packages)
+- data (3 packages)
+- formatters (4 packages)
+- fonts (1 package)
+- guix (8 packages)
+- lsp (1 package)
+- password-manager (3 packages)
+- programming-languages (2 packages)
+
+**LOWER PRIORITY (specialized usage):**
+- 3d (1 package)
+- ai (5 packages)
+- ci (1 package)
+- compute (5 packages)
+- games (1 package)
+- image (1 package)
+- monitoring (3 packages)
+- sandbox (1 package)
+- scheduling (1 package)
+- security (5 packages)
+- video (9 packages)
+- wayland (8 packages)
+
+*** Phase 5: Test with REPL and Validate
+   :PROPERTIES:
+   :EFFORT:   30 min
+   :STATUS:   pending
+   :END:
+
+After each category completion:
+
+1. Test loading modules in Guile REPL:
+   #+begin_src bash
+   guile
+   scheme@(guile-user)> (use-modules (core-system user-space root shell nushell))
+   scheme@(guile-user)> (display nushell)
+   scheme@(guile-user)> ,q
+   #+end_src
+
+2. Validate syntax with:
+   #+begin_src bash
+   guile -c "(use-modules (core-system user-space root loaders shell))" && echo "OK"
+   #+end_src
+
+3. Check for missing modules:
+   #+begin_src bash
+   guile --no-auto-compile -c "(use-modules (core-system core-system))" 2>&1 | grep -i "unbound\|no code"
+   #+end_src
+
+4. Only after testing: Create system configuration snapshot
+   #+begin_src bash
+   sudo guix system describe > /tmp/guix-config-before.txt
+   #+end_src
+
+*** Phase 6: System Reconfigure (when ready)
+   :PROPERTIES:
+   :EFFORT:   30-60 min (system build time)
+   :STATUS:   pending
+   :END:
+
+After all packages migrated and REPL tests pass:
+
+#+begin_src bash
+sudo guix system reconfigure /home/aoeu/.config/guix/guixos.scm
+#+end_src
+
+Verify:
+#+begin_src bash
+sudo guix system describe
+guix describe
+#+end_src
+
+** Risks & Mitigation
+
+| Risk | Mitigation |
+|------|-----------|
+| Missing dependencies in extracted packages | Verify all ~#:use-module~ lines before extraction |
+| Packages depend on patches from gnu | Check for patches in original definitions; copy to dependencies/ if needed |
+| Circular imports between custom packages | Use REPL to test each module after creation |
+| Load order issues | Add dependencies/ first in load-path (before core-system) |
+| Large number of files (1336 total in sources/) | Process by category; not all packages are used by your config |
+
+** Rationale for This Approach
+
+1. **Decoupling**: System no longer depends on upstream Guix package locations
+2. **Selective overrides**: Easy to patch packages without modifying guix source
+3. **Version stability**: Pin specific package versions in your config
+4. **Custom packages**: Add new packages to dependencies/ without contributing upstream
+5. **Gradual migration**: Can deploy category-by-category, test between each
+
+** Success Criteria
+
+- [_] All 28 loaders' packages have entries in dependencies/
+- [_] guixos.scm load path includes dependencies/
+- [_] All package modules updated to import from (dependencies ...)
+- [_] REPL tests pass for all categories
+- [_] guix system reconfigure succeeds without errors
+- [_] All packages available after system reconfiguration
+- [_] No regression in package functionality
+
+** Next Steps (User Decision)
+
+1. **Start Phase 1** (create dependencies/ directory)
+2. **Prioritize extraction** (start with shell, core, networking for high-impact testing)
+3. **Weekly milestones** (aim for 5-7 loaders per week to avoid overwhelm)
+4. **Document deviations** (if a package needs patches, note it in plan.org)
+5. **Test frequently** (REPL validation after each category)
+
+** Timeline Estimate
+
+- Phase 1 (setup): 15 min
+- Phase 2 (package extraction): 15-20 hours (assuming ~1 package per 10 min on average)
+- Phase 3 (guixos.scm): 2 min
+- Phase 4 (module updates): 2-3 hours
+- Phase 5 (testing): 30 min - 2 hours
+- Phase 6 (reconfigure): 30-60 min (system-dependent)
+
+**Total: 20-28 hours** of focused work, spread over 1-2 weeks for safety & validation.
+
+---
+
+*Last updated: 2026-04-07*
+*Status: PLAN COMPLETE - AWAITING EXECUTION APPROVAL*

@@ -1,0 +1,232 @@
+* Adding Packages — Patterns & Lessons Learned
+
+** npm packages
+
+For packages installed via npm (Node.js):
+
+1. Find version:
+   #+BEGIN_SRC sh
+   npm show <package> version   # or check npmjs.com
+   #+END_SRC
+
+2. Construct tarball URL:
+   #+BEGIN_SRC
+   https://registry.npmjs.org/<package>/-/<package>-<version>.tgz
+   #+END_SRC
+   Example for openclaw v2026.3.28:
+   https://registry.npmjs.org/openclaw/-/openclaw-2026.3.28.tgz
+
+3. Get hash:
+   #+BEGIN_SRC sh
+   guix download https://registry.npmjs.org/openclaw/-/openclaw-2026.3.28.tgz
+   #+END_SRC
+
+4. Use node-build-system in Template B.
+
+** npm packages with dependencies
+
+When an npm package has runtime dependencies (most do), the npm tarball from
+the registry does NOT include node_modules. The build sandbox blocks network
+access, so `npm install` fails. Two approaches:
+
+*** Approach 1: Pre-built tarball (simplest for personal use)
+
+1. Install the package locally: `npm install -g <package>`
+2. Find the global node_modules directory: `npm prefix -g`
+3. Create a tarball of the entire node_modules:
+   #+BEGIN_SRC sh
+   cd $(npm prefix -g)/lib
+   tar czf <package>-<version>-with-deps.tar.gz node_modules
+   #+END_SRC
+4. Place the tarball in your config tree (e.g., `ai/sources/<package>-<version>.tar.gz`)
+5. Use `local-file` as source with `trivial-build-system`:
+   #+BEGIN_SRC scheme
+   (source (local-file "sources/<package>-<version>.tar.gz"))
+   ;; Builder: extract to out/, create wrapper script pointing to entry point
+   #+END_SRC
+6. Set `propagated-inputs` to `(list node)` so node is available at runtime
+
+*** Approach 2: guix import npm-binary (for full Guix integration)
+
+The `guix import npm-binary <package>` command generates a package expression
+that lists all dependencies as individual `node-*` package inputs. This requires
+all dependencies to exist in Guix — if any are missing, you must package them
+too. Works well for small packages with few dependencies, impractical for large
+ones like openclaw (~90 deps).
+
+*** Key insight
+
+The npm registry tarball (`registry.npmjs.org/<pkg>/-/<pkg>-<version>.tgz`)
+contains only source code, NOT node_modules. Any approach using this as source
+must either: (a) run npm install during build (needs network, not available
+in sandbox), or (b) bundle node_modules separately (approach 1 above).
+
+** Adding a service
+#+BEGIN_SRC scheme
+;; In the loader:
+(define-public root-<category>-services
+  (list (service your-service-type)))
+
+;; In root.scm:
+(define-public root-system-services
+  (append ...
+          root-<category>-services
+          ...))
+#+END_SRC
+
+** Common service imports
+
+| Service Type               | Module                    |
+|----------------------------|---------------------------|
+| openssh-service-type       | (gnu services ssh)        |
+| dhcpcd-service-type        | (gnu services networking) |
+| iwd-service-type           | (gnu services networking) |
+| docker-service-type        | (gnu services docker)     |
+| containerd-service-type    | (gnu services docker)     |
+| oci-container-service-type | (gnu services docker)     |
+
+** Lessons Learned from Real Package Additions
+
+*** Python packages (pyproject-build-system)
+
+When packaging Python tools from PyPI:
+1. Use `guix import pypi <package-name>` to get a starting expression
+2. Check ALL propagated-inputs exist in Guix — if any are missing, package them first
+3. If the package has a version constraint that Guix's version doesn't meet (e.g., `keyring>=24.0.0` but Guix has `23.9.3`), add `#:tests? #f` AND delete the `sanity-check` phase:
+#+BEGIN_SRC scheme
+(arguments
+ '(#:tests? #f
+   #:phases
+   (modify-phases %standard-phases
+     (delete 'sanity-check))))
+#+END_SRC
+
+*** npm FOD pattern (large packages with many dependencies)
+
+For npm packages with hundreds/thousands of dependencies (e.g., n8n has 2443
+packages), the npm tarball from the registry contains only the package's own
+files (bin/, dist/, templates/) — NO node_modules. Use a two-phase FOD pattern:
+
+Phase 1: Create an FOD package that runs `npm install --ignore-scripts` to
+produce a fixed, reproducible node_modules tree. The FOD's hash is the same
+as the npm tarball hash since the source is identical.
+
+Phase 2: Main package unpacks the same tarball and symlinks the FOD's
+node_modules into it, then creates a wrapper script.
+
+CRITICAL:
+- `--ignore-scripts` is REQUIRED — prevents arbitrary code execution during
+  npm install, which is needed for Guix reproducibility
+- Set HOME and npm_config_cache/tmp to output dir to avoid /homeless-shelter errors
+- Use `tar --use-compress-program gzip` — tar can't find gzip otherwise
+- Wrapper must point to `bin/<name>` entry point, NOT dist/index.js
+- See [[../templates/npm-fod.org][templates/npm-fod]] for full template
+
+*** Emacs packages with dependencies
+
+- Check the .el file for `(require 'something)` at the top level
+- Each dependency that isn't in Guix must be packaged first
+- Dependencies must be BOTH `inputs` (for compile-time) AND `propagated-inputs` (for runtime)
+- Use specific git commits, not branch names like "master" — branch names produce different hashes
+- Hash from local `guix hash` will differ from Guix's expected hash because `.git/` is excluded — use the actual hash from the build log
+
+*** Go packages — cmd/<name> binary pattern
+
+Most Go projects have `go.mod` at the root but the main binary lives in `cmd/<name>/`.
+The `go-build-system` requires `#:import-path` to point to the module ROOT (where
+go.mod is), NOT the cmd/ subdirectory. You MUST override the build phase:
+
+#+BEGIN_SRC scheme
+(arguments
+ (list
+  #:import-path "github.com/user/repo"   ; module root, NOT cmd/
+  #:install-source? #f
+  #:phases
+  #~(modify-phases %standard-phases
+      (replace 'build
+        (lambda* (#:key import-path #:allow-other-keys)
+          (invoke "go" "install" "-ldflags=-s -w" "-trimpath"
+                  (string-append import-path "/cmd/binary")))))))
+#+END_SRC
+
+If `go.mod` specifies a Go version newer than Guix has (e.g., `go 1.25.5` when
+Guix only has `go-1.24`), patch it in a source snippet:
+
+#+BEGIN_SRC scheme
+(source (origin
+  ...
+  (modules '((guix build utils)))
+  (snippet #~(begin
+               (substitute* "go.mod"
+                 (("go 1.25.5") "go 1.24"))))))
+#+END_SRC
+
+To find all Go dependencies: `guix import go github.com/user/repo`
+To verify they exist in Guix: check both `(gnu packages golang)` and `(gnu packages golang-xyz)`
+Go deps use long names like `go-github-com-charmbracelet-bubbletea`
+
+*** Finding which Guix module exports a package
+
+When you get "unbound variable" for a gnu package:
+#+BEGIN_SRC sh
+guix package --show=<package-name> | grep "^location:"
+#+END_SRC
+This gives the exact file and line, e.g., `location: gnu/packages/python-xyz.scm:12345`
+Then add `#:use-module (gnu packages python-xyz)` to your submodule.
+
+** Shell Preference — Nushell First
+
+ALWAYS use nushell (`nu`) over bash for file operations, data processing, and system inspection.
+Use bash ONLY for guix commands (guix search, guix download, guix repl, sudo guix system reconfigure).
+
+Nushell advantages:
+- `ls` returns a table with size, type, modified — pipeable
+- `open file.json` natively parses JSON, YAML, TOML, CSV
+- `| where`, `| select`, `| group-by`, `| sort-by` for data manipulation
+- Structured output means no awk/sed/cut needed
+
+** Use Kelora for Log Analysis
+
+Kelora is installed and available for log processing. Use it instead of chaining grep/awk/jq:
+
+#+BEGIN_SRC nushell
+# Kelora parses, nushell analyzes
+kelora -f logfmt /var/log/messages --filter 'e.level == "ERROR"' -F json | from json | where level == "ERROR" | group-by service | length
+
+# Pattern discovery with kelora, sorting with nushell
+kelora -j logs.jsonl --drain -k message | from json | sort-by count -r | first 10
+#+END_SRC
+
+Kelora excels at:
+- Replacing `grep | awk | jq | custom-script.py` chains
+- Parsing custom log formats without regex
+- Stateful logic (counting, tracking sessions, windowed metrics)
+- Pattern discovery with the Drain algorithm
+- Extracting JSON from unstructured text
+
+Nushell excels at:
+- Sorting, grouping, selecting columns from kelora's JSON output
+- Native parsing of JSON, YAML, TOML, CSV
+- Tables, charts, and structured data manipulation
+
+** Rust Binary (No Guix Package, No Releases)
+When a Rust tool isn't in Guix and has no prebuilt releases:
+
+1. Build it with guix shell:
+#+begin_src bash
+guix shell rust pkg-config gcc-toolchain clang linux-libre-headers <other-deps> -- bash -c '
+  export CC=gcc
+  export LIBCLANG_PATH=$(dirname $(find /gnu/store -name "libclang.so*" | head -1))
+  export BINDGEN_EXTRA_CLANG_ARGS="-I$(find /gnu/store -path "*/include/linux" | head -1 | xargs dirname)"
+  cargo install --git https://github.com/user/tool --root /tmp/tool-build
+'
+#+end_src
+
+2. Hash the binary:
+#+begin_src bash
+guix download /tmp/tool-build/bin/toolname
+#+end_src
+
+3. Package it with trivial-build-system (see [[../templates/specialized.org][templates/specialized]])
+
+See also: [[./workflow.org][Workflow & Steps]]

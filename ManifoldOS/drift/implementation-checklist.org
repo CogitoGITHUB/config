@@ -1,0 +1,286 @@
+* ManifoldOS Guix Refactoring - Implementation Checklist
+** Pre-Implementation (BEFORE Phase 1)
+
+- [ ] Read complete plan in plans/plan.org
+- [ ] Review current system with =guix describe=
+- [ ] Back up guixos.scm: =cp guixos.scm guixos.scm.backup=
+- [ ] Back up entire Operating-System directory
+- [ ] Verify sources/ contains guix and nonguix: =ls sources/=
+
+** Phase 1: Create dependencies/ Directory
+
+- [ ] Create directory: =mkdir -p /home/aoeu/.config/guix/dependencies=
+- [ ] Verify creation: =ls -ld /home/aoeu/.config/guix/dependencies=
+- [ ] Confirm empty: =ls /home/aoeu/.config/guix/dependencies | wc -l= (should be 0)
+
+✅ Phase 1 COMPLETE
+
+** Phase 2: Extract Packages (Category-by-category)
+
+### Shell Category (HIGH PRIORITY)
+
+*Packages to extract (from shell/ directory):*
+- [ ] nushell
+- [ ] bash
+- [ ] starship
+- [ ] fzf
+- [ ] zoxide
+- [ ] zellij
+- [ ] carapace
+- [ ] atuin
+- [ ] superfile
+- [ ] television
+- [ ] rip
+- [ ] archive tools (zip, unzip, 7zip, unrar-free, zstd, xz)
+- [ ] system monitor (btop, htop, ncdu, glances)
+- [ ] power tools (upower, tlp, acpi)
+- [ ] fetch tools (neofetch, fastfetch)
+
+*For each package:*
+- [ ] Find source definition in =sources/guix/gnu/packages/=
+- [ ] Copy full definition to =dependencies/package-name.scm=
+- [ ] Update module name to =(dependencies package-name)=
+- [ ] Verify all imports are correct
+- [ ] Check REPL: =guile -c "(use-modules (dependencies package-name)) (display package)"=
+
+### Core Category (HIGH PRIORITY)
+
+*Packages to extract (from core/ directory):*
+- [ ] coreutils
+- [ ] findutils
+- [ ] grep
+- [ ] inetutils
+- [ ] kmod
+- [ ] sudo
+- [ ] util-linux
+
+*For each package:*
+- [ ] Find source definition
+- [ ] Copy to =dependencies/=
+- [ ] Update module name
+- [ ] Test with REPL
+
+### Networking Category (HIGH PRIORITY)
+
+*Packages to extract (from networking/ directory):*
+- [ ] curl
+- [ ] openssh
+- [ ] git
+- [ ] github-cli
+- [ ] lazygit
+- [ ] network-manager
+- [ ] nss-certs
+- [ ] tailscale
+- [ ] bluetooth
+- [ ] bluetuith
+- [ ] tools
+- [ ] yt-dlp
+
+*For each package:*
+- [ ] Find source definition
+- [ ] Copy to =dependencies/=
+- [ ] Update module name
+- [ ] Test with REPL
+
+### Other Categories (MEDIUM & LOW PRIORITY)
+
+Continue with remaining categories in order:
+- [ ] editors (emacs, neovim)
+- [ ] desktop (hyprland, waybar, etc)
+- [ ] audio (pipewire, mpd, etc)
+- [ ] keyboard (keyd, kanata)
+- [ ] terminal (wezterm)
+- [ ] containers (docker, lazydocker)
+- [ ] data (postgresql, sqlite)
+- [ ] formatters (prettier, ruff, etc)
+- [ ] fonts (nerd-fonts)
+- [ ] guix (guix, gwl, etc)
+- [ ] lsp (rust-analyzer)
+- [ ] password-manager (pass, etc)
+- [ ] programming-languages (guile, etc)
+- [ ] [Continue with remaining 15 categories...]
+
+✅ Phase 2 COMPLETE (after all packages extracted and REPL tested)
+
+## Post-Extraction Validation
+
+- [ ] Count extracted files: =ls dependencies/ | wc -l=
+- [ ] Verify all files are .scm: =ls dependencies/ | grep -v "\.scm$"= (should be empty)
+- [ ] Quick syntax check on sample: =guile -c "(use-modules (dependencies nushell))"=
+
+## Phase 2 Testing Summary
+
+After completing shell extraction test:
+- [ ] REPL test shell/nushell: =guile -c "(use-modules (core-system user-space root shell nushell))"=
+- [ ] REPL test shell loader: =guile -c "(use-modules (core-system user-space root loaders shell))"=
+
+Document any issues found: _______________________________________________
+
+** Phase 3: Update guixos.scm Load Path
+
+- [ ] Open guixos.scm in editor
+- [ ] Add line after first comment block:
+  =(add-to-load-path "/home/aoeu/.config/guix/dependencies")=
+- [ ] Verify order (dependencies/ should come BEFORE core-system)
+- [ ] Save file
+- [ ] Quick syntax check: =guile --no-auto-compile -c "(load \"guixos.scm\")"=
+
+✅ Phase 3 COMPLETE
+
+## Phase 3 Validation
+
+- [ ] Verify load path in file: =grep "add-to-load-path" guixos.scm=
+
+** Phase 4: Update Package Module Imports (Category-by-category)
+
+### For each category (starting with shell, core, networking):
+
+- [ ] List files in category: =ls Operating-System/core-system/user-space/root/CATEGORY/=
+- [ ] For each .scm file in category:
+  - [ ] Edit file
+  - [ ] Find line: =#:use-module (gnu packages ...)=
+  - [ ] Replace with: =#:use-module (dependencies PACKAGE-NAME)=
+  - [ ] Save file
+  - [ ] Quick test: =guile -c "(use-modules (core-system user-space root CATEGORY FILE))"=
+
+### Shell Category Update
+
+- [ ] nushell.scm: =(gnu packages nushell)= → =(dependencies nushell)=
+- [ ] bash.scm: =(gnu packages bash)= → =(dependencies bash)=
+- [ ] starship.scm: =(gnu packages shells)= → =(dependencies starship)=
+- [ ] fzf.scm: =(gnu packages fzf)= → =(dependencies fzf)=
+- [ ] [Continue for remaining shell packages...]
+
+### Core Category Update
+
+- [ ] coreutils.scm
+- [ ] findutils.scm
+- [ ] grep.scm
+- [ ] inetutils.scm
+- [ ] kmod.scm
+- [ ] sudo.scm
+- [ ] util-linux.scm
+
+### Networking Category Update
+
+- [ ] curl.scm
+- [ ] openssh.scm
+- [ ] git.scm
+- [ ] [Continue for remaining networking packages...]
+
+### Other Categories (continue same pattern)
+
+- [ ] [List all remaining 25 categories with their files...]
+
+✅ Phase 4 COMPLETE (all package modules updated)
+
+## Phase 4 Validation
+
+After completing each category update:
+- [ ] Test category loader: =guile -c "(use-modules (core-system user-space root loaders CATEGORY))"=
+- [ ] Document any failures: _______________________________________________
+
+After ALL categories updated:
+- [ ] Test full core-system load: =guile -c "(use-modules (core-system core-system))"=
+
+** Phase 5: REPL Testing & Validation
+
+### Test each category in sequence
+
+*Shell (test first after extraction):*
+- [ ] =guile=
+- [ ] =scheme@(guile-user)> (use-modules (core-system user-space root loaders shell)=
+- [ ] =scheme@(guile-user)> (display nushell)=
+- [ ] =scheme@(guile-user)> ,q=
+- [ ] Result: ________________
+
+*Core (test after phase 4 completion):*
+- [ ] =guile=
+- [ ] =scheme@(guile-user)> (use-modules (core-system user-space root loaders core)=
+- [ ] =scheme@(guile-user)> (display coreutils)=
+- [ ] =scheme@(guile-user)> ,q=
+- [ ] Result: ________________
+
+*Networking (test after phase 4 completion):*
+- [ ] Similar tests for curl, openssh, git
+- [ ] Result: ________________
+
+*Full system validation:*
+- [ ] =guile=
+- [ ] =scheme@(guile-user)> (use-modules (core-system core-system)=
+- [ ] =scheme@(guile-user)> ,q=
+- [ ] Result: ________________
+
+### Syntax validation (non-interactive)
+
+- [ ] =guile --no-auto-compile -c "(use-modules (core-system core-system))"=
+- [ ] =echo $?= (should be 0)
+
+### Check for unbound variables
+
+- [ ] =guile --no-auto-compile -c "(use-modules (core-system core-system))" 2>&1 | grep -i "unbound"=
+- [ ] Result: ________________ (should be empty)
+
+✅ Phase 5 COMPLETE (all tests pass)
+
+## Phase 5 Issues Log
+
+| Issue | Category | Resolution | Status |
+|-------|----------|-----------|--------|
+| | | | |
+
+** Phase 6: System Reconfigure
+
+⚠️  STOP: Do not proceed until ALL Phase 5 tests pass
+
+- [ ] Final backup: =cp guixos.scm guixos.scm.pre-reconfigure=
+- [ ] Final backup: =sudo guix system describe > /tmp/guix-before.txt=
+- [ ] Run reconfigure: =sudo guix system reconfigure /home/aoeu/.config/guix/guixos.scm=
+- [ ] Wait for build to complete (may take 30-60 minutes)
+- [ ] Verify success: =echo $?= (should be 0)
+
+### Post-Reconfigure Verification
+
+- [ ] Check system description: =sudo guix system describe=
+- [ ] Compare with backup: =diff /tmp/guix-before.txt <(sudo guix system describe)=
+- [ ] Test package availability: =which nushell=
+- [ ] Test package availability: =which git=
+- [ ] Test package availability: =which emacs=
+- [ ] Verify no errors in system services: =sudo herd status=
+- [ ] Reboot and test (optional but recommended):
+  - [ ] =sudo reboot=
+  - [ ] Verify system boots normally
+  - [ ] Verify packages still available after reboot
+
+✅ Phase 6 COMPLETE (system running with new configuration)
+
+## Phase 6 Issues Log
+
+| Issue | Resolution | Status |
+|-------|-----------|--------|
+| | | |
+
+** Post-Migration
+
+- [ ] Document final state in plans/plan.org (mark as COMPLETE)
+- [ ] Archive backups: =mkdir -p /home/aoeu/.config/guix/backups=
+- [ ] Copy backups: =cp guixos.scm.backup guixos.scm.pre-reconfigure /tmp/guix-before.txt backups/=
+- [ ] Create migration summary: _______________________________________________
+
+## Success Verification Checklist
+
+- [ ] All 28 loaders' packages in dependencies/
+- [ ] guixos.scm has dependencies/ in load path (before core-system)
+- [ ] All ~100+ package modules updated to import from (dependencies ...)
+- [ ] REPL tests pass for all major categories
+- [ ] guix system reconfigure completed successfully
+- [ ] All packages functional after reconfiguration
+- [ ] System boots and runs normally
+
+✅ MIGRATION COMPLETE
+
+---
+
+*Template Version: 1.0*
+*Last Updated: 2026-04-07*
+*Status: READY FOR EXECUTION*

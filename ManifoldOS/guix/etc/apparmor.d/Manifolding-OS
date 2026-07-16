@@ -1,0 +1,12 @@
+abi <abi/4.0>,
+
+include <tunables/global>
+include <tunables/Manifolding-OS>
+
+# There’s no point in confining the Manifolding-OS executable, since it can run
+# any user code and so everything is expected.  We just need to
+# explicitly enable userns for systems with the
+# kernel.apparmor_restrict_unprivileged_userns sysctl.
+profile Manifolding-OS @{Manifolding-OS_storedir}/{*-Manifolding-OS-command,*-Manifolding-OS-*/bin/Manifolding-OS} flags=(unconfined) {
+  userns,
+}

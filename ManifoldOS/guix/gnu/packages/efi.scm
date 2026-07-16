@@ -1,0 +1,206 @@
+;;; GNU Guix --- Functional package management for GNU
+;;; Copyright © 2019 Danny Milosavljevic <dannym@scratchpost.org>
+;;; Copyright © 2019, 2026 Efraim Flashner <efraim@flashner.co.il>
+;;; Copyright © 2019–2021 Tobias Geerinckx-Rice <me@tobias.gr>
+;;; Copyright © 2021 Vincent Legoll <vincent.legoll@gmail.com>
+;;;
+;;; This file is part of GNU Guix.
+;;;
+;;; GNU Guix is free software; you can redistribute it and/or modify it
+;;; under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 3 of the License, or (at
+;;; your option) any later version.
+;;;
+;;; GNU Guix is distributed in the hope that it will be useful, but
+;;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with GNU Guix.  If not, see <http://www.gnu.org/licenses/>.
+
+(define-module (gnu packages efi)
+  #:use-module (gnu packages autotools)
+  #:use-module (gnu packages bash)
+  #:use-module (gnu packages linux)
+  #:use-module (gnu packages man)
+  #:use-module (gnu packages perl)
+  #:use-module (gnu packages pkg-config)
+  #:use-module (gnu packages tls)
+  #:use-module (gnu packages)
+  #:use-module ((Manifolding-OS licenses) #:prefix license:)
+  #:use-module (Manifolding-OS build-system gnu)
+  #:use-module (Manifolding-OS download)
+  #:use-module (Manifolding-OS gexp)
+  #:use-module (Manifolding-OS git-download)
+  #:use-module (Manifolding-OS packages)
+  #:use-module (Manifolding-OS utils)
+  #:use-module (ice-9 match))
+
+(define-public gnu-efi
+  (package
+    (name "gnu-efi")
+    (version "3.0.18")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (string-append "mirror://sourceforge/gnu-efi/"
+                           "gnu-efi-" version ".tar.bz2"))
+       (sha256
+        (base32 "0p1z87vkrlzgrn6bvw19hmyksiz586v6f4jkzgp7wm36xsb2q8bz"))))
+    (build-system gnu-build-system)
+    (arguments
+     `(#:tests? #f                      ; none exist
+       #:make-flags
+       (list (string-append "PREFIX=" (assoc-ref %outputs "out")))
+       #:phases
+       (modify-phases %standard-phases
+         (delete 'configure))))
+    (synopsis "EFI toolchain")
+    (description "This package provides an @acronym{EFI, Extensible Firmware
+Interface} toolchain for building programs that can run in the
+environment presented by Intel's EFI.")
+    (home-page "https://directory.fsf.org/wiki/GNU_EFI")
+    ;; Distribution is allowed only when accepting all those licenses.
+    (license (list license:bsd-2 license:bsd-3 license:bsd-4 license:expat))))
+
+(define-public efi-analyzer
+  (let ((commit "77c9e3a67cd7c2fca48a4292dad25a5429872f95")
+        (revision "0"))
+    (package
+      (name "efi-analyzer")
+      (version (git-version "0.0.0" revision commit))
+      (source
+       (origin
+         (method git-fetch)
+         (uri (git-reference
+               (url "https://github.com/xypron/efi_analyzer")
+               (commit commit)))
+         (file-name (git-file-name name version))
+         (sha256
+          (base32 "1izdkzybqyvzpzqz6kx4j7y47j6aa2dsdrychzgs65466x1a4br1"))))
+      (build-system gnu-build-system)
+      (arguments
+       `(#:make-flags
+         (list (string-append "prefix=" (assoc-ref %outputs "out")))
+         #:phases
+         (modify-phases %standard-phases
+           (add-after 'unpack 'support-cross-compilation
+             (lambda _
+               (substitute* "Makefile"
+                 (("gcc") ,(cc-for-target)))
+               #t))
+           (delete 'configure))))       ; no configure script
+      (home-page "https://github.com/xypron/efi_analyzer")
+      (synopsis "Analyze EFI binaries")
+      (description
+       "The EFI Analyzer checks EFI binaries and prints out header and section
+information.")
+      (license license:bsd-2))))
+
+(define-public sbsigntools
+  (package
+    (name "sbsigntools")
+    (version "0.9.5")
+    (source
+     (origin
+       (method git-fetch)
+       (uri
+        (git-reference
+         (url "https://git.kernel.org/pub/scm/linux/kernel/git/jejb/sbsigntools.git")
+         (commit (string-append "v" version))
+         (recursive? #t)))
+       (file-name (git-file-name name version))
+       (sha256
+        (base32 "060n6w0dx1mrilhdv482ncckanqz6pdv53piimiki0bm15d2fcp4"))))
+    (build-system gnu-build-system)
+    (arguments
+     (list
+      #:phases
+      #~(modify-phases %standard-phases
+          (add-after 'unpack 'patch-more-shebangs
+            (lambda* (#:key inputs native-inputs #:allow-other-keys)
+              (substitute* "lib/ccan.git/tools/create-ccan-tree"
+                (("#!/bin/bash")
+                 (string-append "#!"
+                                (search-input-file (or native-inputs inputs)
+                                                   "/bin/bash"))))))
+          (add-after 'unpack 'patch
+            (lambda _
+              (substitute* '("configure.ac"
+                             "tests/Makefile.am")
+                (("/usr/include/efi")
+                 (string-append #$(this-package-input "gnu-efi")
+                                "/include/efi"))
+                (("/usr/lib/gnuefi")
+                 (string-append #$(this-package-input "gnu-efi")
+                                "/lib")))))
+          (add-after 'unpack 'setenv
+            (lambda _
+              (setenv "CC" #$(cc-for-target)))))))
+    (native-inputs
+     (list autoconf
+           automake
+           bash
+           help2man
+           pkg-config
+           util-linux)) ; getopt
+    (inputs
+     (list gnu-efi
+           `(,util-linux "lib") ; libuuid
+           openssl))
+    (synopsis "EFI signing tools")
+    (description "This package provides tools for signing EFI binaries.")
+    (home-page "https://git.kernel.org/pub/scm/linux/kernel/git/jejb/sbsigntools.git/")
+    (license license:gpl3+)))
+
+(define-public efitools
+  (package
+    (name "efitools")
+    (version "1.9.2")
+    (source
+     (origin
+       (method git-fetch)
+       (uri (git-reference
+             (url "https://git.kernel.org/pub/scm/linux/kernel/git/jejb/efitools.git")
+             (commit (string-append "v" version))))
+       (file-name (git-file-name name version))
+       (sha256
+        (base32 "0jabgl2pxvfl780yvghq131ylpf82k7banjz0ksjhlm66ik8gb1i"))
+       (patches (search-patches "efitools-riscv64-support.patch"))))
+    (build-system gnu-build-system)
+    (arguments
+     (list
+       #:tests? #f          ; No tests exist.
+       #:parallel-build? #f ; Makefile contains a race condition.
+       #:make-flags
+       #~(list "CC=gcc -g -O2 -Wno-error=implicit-function-declaration")
+       #:phases
+       #~(modify-phases %standard-phases
+           (add-after 'unpack 'patch
+             (lambda _
+               (let ((gnu-efi (assoc-ref %build-inputs "gnu-efi")))
+                 (substitute* "Make.rules"
+                   (("/usr/include/efi")
+                    (string-append gnu-efi "/include/efi"))
+                   (("\\$\\(DESTDIR\\)/usr")
+                    #$output)
+                   (("/usr/lib/gnuefi")
+                    (string-append gnu-efi "/lib"))))))
+           (add-after 'unpack 'patch-more-shebangs
+             (lambda _
+               (substitute* "xxdi.pl"
+                 (("/usr/bin/env perl")
+                  (search-input-file %build-inputs "/bin/perl")))))
+           (delete 'configure))))
+    (native-inputs (list help2man perl perl-file-slurp sbsigntools))
+    (inputs (list gnu-efi openssl))
+    (synopsis "EFI tools (key management, variable management)")
+    (description "This package provides EFI tools for EFI key management
+and EFI variable management.")
+    (home-page
+     "https://blog.hansenpartnership.com/efitools-1-4-with-linux-key-manipulation-utilities-released/")
+    ;; Programs are under GPL 2.
+    ;; Library routines (in lib/) are under LGPL 2.1.
+    ;; Compiling/linking/using OpenSSL is permitted.
+    (license (list license:gpl2 license:lgpl2.1))))

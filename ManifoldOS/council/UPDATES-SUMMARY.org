@@ -1,0 +1,212 @@
+* Documentation Updates — Quick Reference
+
+**Session Completed:** Session 2 changes to emacs daemon, init.el, and home services
+**Analysis Date:** Session 3
+**Files Analyzed:** 5 key documentation files in agents/ directory
+**Update Recommendations:** 17 specific issues identified, 9 high-priority
+
+---
+
+** Executive Summary
+
+The system changes in Session 2 (emacs daemon fixes, home services integration, environment variable handling) require significant documentation updates. Most critical are:
+
+1. **Missing home vs system services distinction** — docs only cover system services
+2. **Missing emacs daemon troubleshooting** — no guidance for daemon-specific errors
+3. **Missing home-environment REPL validation** — users won't know how to test home modules
+4. **Incomplete reconfigure documentation** — only shows system, not home reconfigure
+
+---
+
+## By Severity
+
+### HIGH PRIORITY (9 issues — should update first)
+
+| File | Line(s) | Issue | Why Important |
+|------|---------|-------|---------------|
+| **errors.org** | 77-83 | Service troubleshooting only covers system services | Users will try `sudo herd emacs` which won't work for home services |
+| **errors.org** | ~109 | No emacs daemon specific error documentation | Daemon fails silently without guidance |
+| **fixes.org** | After 49 | No emacs daemon environment variables section | XDG_RUNTIME_DIR and native compilation settings are critical |
+| **fixes.org** | End | No home vs system services clarification | Users won't know when to use which service type |
+| **workflow.org** | 67-70 | Step 7 only shows system reconfigure, missing home | Home packages/services won't be activated without `guix home reconfigure` |
+| **workflow.org** | 6-14 | Decision tree doesn't distinguish home vs system | New users won't know where to put home services |
+| **guix-repl.org** | 6-15 | Launch section doesn't mention home modules | Implies home modules need different setup (they don't) |
+| **guix-repl.org** | 62-74 | Missing home-environment validation workflow | Users testing home services have no REPL guidance |
+| **specialized.org** | End | Missing emacs daemon shepherd service template | No reference implementation for home services pattern |
+
+### MEDIUM PRIORITY (5 issues)
+
+| File | Issue | Why Needed |
+|------|-------|-----------|
+| **fixes.org** | PipeWire Bluetooth hardcodes UID 1000 | Should use `(getuid)` to support different users |
+| **fixes.org** | Module imports clarity | Recent changes added (gnu services guix), should clarify |
+| **workflow.org** | Categories list missing "home" | New category exists but documentation is outdated |
+| **guix-repl.org** | Module command examples show `...` instead of real paths | Users need concrete examples |
+| **guix-repl.org** | Bottom-up debugging only shows root modules | Home modules need equivalent debugging steps |
+
+### LOW PRIORITY (3 issues)
+
+| File | Issue | Notes |
+|------|-------|-------|
+| **guix-repl.org** | Success/failure examples missing home cases | Nice to have, improves completeness |
+| **specialized.org** | Emacs package template note about propagated-inputs | Minor clarity improvement |
+| **workflow.org** | Refresh categories list description | Informational only |
+
+---
+
+## Files NOT Requiring Changes
+
+These files are still accurate and don't need updates:
+- getting-started.org — High-level overview, valid
+- org-mode-guide.org — Emacs org-mode reference, unrelated
+- start.org — General introduction, valid
+- architecture/ directory — System design docs, no emacs specifics
+- reference/ directory — Module references, still valid
+- templates/basic.org — Basic templates, still valid
+- templates/infrastructure.org — Infrastructure templates, still valid
+- templates/npm-fod.org — npm patterns, unrelated
+- adding-packages/patterns.org — General patterns, still valid
+- index.org — Navigation doc, no content changes
+
+---
+
+## Key Themes Across All Updates
+
+### 1. Home vs System Services (NEW CONCEPT)
+
+**Current state:** Documentation conflates home and system services
+**Root cause:** emacs daemon was just added as home service, but docs only mention system
+**Impact:** Users trying `sudo herd emacs` instead of `herd emacs`
+
+**Updates needed in:**
+- errors.org (new section: "Service not starting — home vs system")
+- fixes.org (new section: "Home-environment services vs system services")
+- workflow.org (decision tree update)
+- guix-repl.org (validation workflows)
+
+### 2. Environment Variables in Shepherd Services (NEW)
+
+**Current state:** XDG_RUNTIME_DIR and native compilation vars not documented
+**Root cause:** These were added in Session 2, docs not yet updated
+**Impact:** Users copying daemon service patterns won't include critical env vars
+
+**Updates needed in:**
+- errors.org (emacs daemon error section)
+- fixes.org (daemon env vars section, PipeWire update)
+- specialized.org (daemon template)
+
+### 3. Home Reconfiguration Command (NEW)
+
+**Current state:** Only `sudo guix system reconfigure` is documented
+**Root cause:** Home environment is separate from system
+**Impact:** Users won't activate home packages/services after adding them
+
+**Updates needed in:**
+- workflow.org (Step 7)
+- guix-repl.org (after validation)
+
+### 4. Home-Environment Module Paths (NEW)
+
+**Current state:** Docs only show system module paths (root/)
+**Root cause:** Home modules just added to system
+**Impact:** Users won't know the correct module paths for home services
+
+**Updates needed in:**
+- errors.org (no code for module section)
+- guix-repl.org (validation workflows, success/failure examples)
+- specialized.org (new daemon template)
+
+---
+
+## Reference Implementation (Session 2 Changes)
+
+All updates are based on these actual working implementations:
+
+### daemon.scm — Emacs daemon with environment variables
+```
+File: /home/aoeu/.config/guix/Manifold/substrate/user-space/home/emacs/daemon.scm
+Key: #:environment-variables list with XDG_RUNTIME_DIR, native compilation vars
+Pattern: home-shepherd-service-type with make-forkexec-constructor
+```
+
+### init.el — Server startup with error handling
+```
+File: /home/aoeu/.config/emacs/init.el (lines 41-44)
+Key: (when (daemonp) (unless (server-running-p) (server-start)))
+Pattern: Daemon mode check before server initialization
+```
+
+### home.scm — Home services aggregation
+```
+File: /home/aoeu/.config/guix/Manifold/substrate/user-space/home/home.scm
+Key: Added (gnu services guix) import, home-shepherd-service-type usage
+Pattern: home-environment with multiple service types
+```
+
+---
+
+## Implementation Recommendation
+
+**Approach 1: Update in place (RECOMMENDED)**
+- Directly edit the 5 files with all suggested changes
+- Maintains documentation consistency
+- Takes 2-3 hours
+
+**Approach 2: Create companion guide**
+- Create new agents/home-services-guide.org
+- Consolidate home-specific information
+- Reference from other files
+- Less disruptive, easier to review
+
+**Approach 3: Create review document** (Already done)
+- DOCUMENTATION-UPDATES-NEEDED.org contains all proposed changes
+- Can review changes before applying
+- Allows incremental updates
+
+---
+
+## Quick Checklist for Updates
+
+- [ ] errors.org — Add home services troubleshooting section (HIGH)
+- [ ] errors.org — Add emacs daemon error handling (HIGH)
+- [ ] fixes.org — Add daemon environment variables (HIGH)
+- [ ] fixes.org — Add home vs system services (HIGH)
+- [ ] fixes.org — Fix PipeWire UID example (MEDIUM)
+- [ ] workflow.org — Update Step 7 with home reconfigure (HIGH)
+- [ ] workflow.org — Update decision tree (HIGH)
+- [ ] guix-repl.org — Update launch section (HIGH)
+- [ ] guix-repl.org — Add home validation workflow (HIGH)
+- [ ] guix-repl.org — Improve command examples (MEDIUM)
+- [ ] guix-repl.org — Add home debugging workflow (MEDIUM)
+- [ ] guix-repl.org — Add home success/failure examples (LOW)
+- [ ] specialized.org — Add daemon service template (HIGH)
+- [ ] specialized.org — Add emacs package note (LOW)
+- [ ] workflow.org — Update categories list (LOW)
+
+---
+
+## Supporting Documentation
+
+Full detailed updates are in: `/home/aoeu/.config/guix/agents/DOCUMENTATION-UPDATES-NEEDED.org`
+
+That file contains:
+- Exact line numbers and current text for each issue
+- Complete proposed replacement text
+- Code examples with context
+- Rationale for each change
+- File-by-file implementation guide
+
+---
+
+## Session 2 Context
+
+These documentation updates are based on the following completed changes:
+
+✅ **emacs daemon fixed** — XDG_RUNTIME_DIR + native compilation disabling
+✅ **init.el updated** — server-start call + error handling
+✅ **home.scm updated** — (gnu services guix) import added
+✅ **System reconfigured successfully** — All changes persist
+✅ **Guix version synchronization verified** — User and root guix in sync
+✅ **emacsclient verified working** — Socket creation confirmed
+
+All these changes need to be reflected in documentation to help future users understand the system architecture and troubleshoot issues.

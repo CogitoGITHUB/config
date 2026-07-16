@@ -1,0 +1,258 @@
+* Documentation Review Complete — Session 3 Analysis
+
+**Status:** ✓ COMPLETE
+**Date:** Session 3, April 7 2026
+**Context:** Reviewing documentation after Session 2 system changes
+**Files Analyzed:** 5 key documentation files in agents/
+**Issues Found:** 17 specific problems across all files
+**New Documents Created:** 3 comprehensive guides
+
+---
+
+## What Was Done
+
+This session completed a thorough analysis of the agents/ documentation to identify what needs updating based on the Session 2 changes:
+
+- Session 2 fixed emacs daemon with environment variables (XDG_RUNTIME_DIR, native compilation)
+- Session 2 added server-start to init.el with error handling
+- Session 2 integrated home services with (gnu services guix) import
+- Session 2 verified guix version synchronization
+
+These changes introduced new system architecture concepts that documentation does not yet cover:
+- **Home-environment services** (vs system services)
+- **Environment variable handling** in shepherd services
+- **Home reconfiguration** (separate from system reconfigure)
+- **Home module paths** (substrate user-space home)
+
+---
+
+## Three New Documentation Guides Created
+
+### 1. **DOCUMENTATION-UPDATES-NEEDED.org** (31 KB)
+   **Purpose:** Comprehensive reference with all proposed changes
+   **Content:**
+   - 17 specific issues listed with exact file/line numbers
+   - Current problematic text shown for each issue
+   - Complete proposed replacement text
+   - Rationale for each update
+   - Working code examples from Session 2 implementation
+   - Summary table by severity level
+   - Implementation checklist
+
+   **Best for:** Detailed review before making changes, understanding complete scope
+
+### 2. **UPDATES-SUMMARY.org** (8.9 KB)
+   **Purpose:** Quick reference and executive summary
+   **Content:**
+   - Executive summary of why updates are needed
+   - Severity breakdown (9 HIGH, 5 MEDIUM, 3 LOW priority)
+   - Files NOT requiring changes (for reference)
+   - Key themes across all updates:
+     * Home vs System Services distinction
+     * Environment variables in services
+     * Home reconfiguration command
+     * Home-environment module paths
+   - Reference implementations showing working code
+   - Implementation recommendation (approach options)
+   - Quick checklist for implementation
+
+   **Best for:** Getting oriented, understanding scope, deciding on approach
+
+### 3. **UPDATES-BEFORE-AFTER.org** (25 KB)
+   **Purpose:** Side-by-side before/after for each change
+   **Content:**
+   - All 14 specific updates shown with BEFORE and AFTER text
+   - Organized by file for easy navigation
+   - Change type noted for each update (new section, replacement, etc.)
+   - Implementation time estimate per file
+   - Priority ordering by implementation dependency
+
+   **Best for:** Reviewing specific changes before applying them, copy-paste ready
+
+---
+
+## Files Analyzed & Findings Summary
+
+### ✓ errors.org (3 issues found)
+- Missing home service vs system service distinction
+- No emacs daemon specific error documentation
+- Module path section needs home-environment note
+
+### ✓ fixes.org (4 issues found)
+- Missing emacs daemon environment variables section
+- Missing home vs system services clarification
+- PipeWire Bluetooth example hardcodes UID 1000 (should use getuid)
+- Module imports need clarification (gnu services guix vs home-shepherd-service-type)
+
+### ✓ workflow.org (3 issues found)
+- Step 7 only shows system reconfigure, missing home reconfigure
+- Decision tree doesn't distinguish home vs system packages
+- Categories list missing "home" category
+
+### ✓ specialized.org (2 issues found)
+- Missing emacs daemon shepherd service template
+- Emacs package section missing note about home-profile aggregation
+
+### ✓ guix-repl.org (5 issues found)
+- Launch section doesn't mention home-environment modules
+- Missing home-environment validation workflow
+- Module command table shows "..." instead of concrete examples
+- Bottom-up debugging only covers system modules
+- Success/failure examples missing home cases
+
+---
+
+## What to Do With These Guides
+
+### Option 1: Apply Updates (Recommended)
+Use the UPDATES-BEFORE-AFTER.org guide to apply changes directly:
+1. Start with HIGH priority files (workflow.org, guix-repl.org)
+2. Use the before/after text to make precise edits
+3. Verify with "Quick Checklist for Updates"
+4. Delete the review documents when complete
+
+Estimated time: 2-3 hours
+
+### Option 2: Review & Approve First
+If you want to review the proposed changes:
+1. Read UPDATES-SUMMARY.org for overview
+2. Read DOCUMENTATION-UPDATES-NEEDED.org for details and rationale
+3. Approve specific changes or modify them
+4. Then apply using UPDATES-BEFORE-AFTER.org
+
+Estimated time: 3-4 hours (reading + changes + verification)
+
+### Option 3: Create Companion Guide
+Instead of modifying existing files:
+1. Create new agents/home-services-guide.org
+2. Include all home-specific information in one place
+3. Reference from existing files where appropriate
+4. Easier to review and maintain separately
+
+Estimated time: 1-2 hours
+
+---
+
+## Key Themes to Understand
+
+These are the main new concepts that documentation is missing:
+
+### 1. Home vs System Services
+```
+BEFORE: Documentation only mentions system services (sudo herd)
+AFTER: Clearly distinguish home services (herd) vs system (sudo herd)
+WHY: Users trying "sudo herd emacs" won't find the home service
+```
+
+### 2. Environment Variables Matter
+```
+BEFORE: Environment variables barely mentioned
+AFTER: Explicitly document XDG_RUNTIME_DIR, native compilation vars
+WHY: Without these, daemon startup fails with cryptic errors
+```
+
+### 3. Home Reconfiguration is Different
+```
+BEFORE: Only "sudo guix system reconfigure" documented
+AFTER: Explain "guix home reconfigure" for user packages/services
+WHY: Users adding home packages won't activate them without knowing this
+```
+
+### 4. Module Paths Have Subdirectories
+```
+BEFORE: Module paths only mention (substrate user-space root ...)
+AFTER: Explain both root/ and home/ subdirectories with examples
+WHY: Users creating home services need to know the correct paths
+```
+
+---
+
+## Review Documents at a Glance
+
+| Document | Size | Best Use |
+|----------|------|----------|
+| DOCUMENTATION-UPDATES-NEEDED.org | 31 KB | Complete reference, detailed rationale |
+| UPDATES-SUMMARY.org | 8.9 KB | Quick overview, understanding scope |
+| UPDATES-BEFORE-AFTER.org | 25 KB | Actually applying the changes |
+
+All three documents are in `/home/aoeu/.config/guix/agents/`
+
+---
+
+## Next Steps
+
+1. **Decide on approach** (Apply now, Review first, or Create companion guide)
+2. **Apply changes** using one of the three documents as guide
+3. **Test changes** by having someone new try to follow the updated docs
+4. **Delete review documents** once changes are applied (or keep as reference)
+5. **Optional:** Create new guide for home-specific concepts
+
+---
+
+## Statistics
+
+- **Files analyzed:** 5
+- **Issues found:** 17 (9 HIGH, 5 MEDIUM, 3 LOW)
+- **New sections needed:** 8
+- **Text replacements needed:** 7
+- **New code examples:** 15+
+- **Documentation created:** 3 guides, ~64 KB total
+- **Implementation time:** 2-3 hours
+- **Review time:** 1-2 hours
+- **Testing time:** 30 min - 1 hour
+
+---
+
+## Files Still Valid (No Changes Needed)
+
+These files do not require updates as they remain accurate:
+- agents/start.org
+- agents/getting-started.org
+- agents/org-mode-guide.org
+- agents/architecture/* (all files)
+- agents/reference/* (all files)
+- agents/templates/basic.org
+- agents/templates/infrastructure.org
+- agents/templates/npm-fod.org
+- agents/adding-packages/patterns.org
+- agents/index.org
+
+---
+
+## Connection to Session 2 Work
+
+These documentation updates are direct results of the work completed in Session 2:
+
+✓ **emacs daemon fixed** → errors.org needs daemon troubleshooting section
+✓ **init.el updated** → guix-repl.org needs init.el debugging examples
+✓ **home.scm updated** → multiple files need home vs system clarification
+✓ **daemon.scm created** → specialized.org needs daemon service template
+✓ **XDG_RUNTIME_DIR set** → fixes.org needs env variable documentation
+✓ **Native compilation disabled** → errors.org needs compilation error section
+✓ **Guix version sync verified** → (no doc changes needed)
+
+---
+
+## Session 3 Summary
+
+**Task:** Analyze agents/ documentation to identify what needs updating
+**Status:** COMPLETE ✓
+
+**Output:**
+1. ✓ Analyzed all 5 specified files in detail
+2. ✓ Identified 17 specific issues across all files
+3. ✓ Created 3 comprehensive documentation guides
+4. ✓ Provided before/after examples for all changes
+5. ✓ Organized by priority and implementation order
+6. ✓ Saved to memory for future reference
+
+**Deliverables in /home/aoeu/.config/guix/agents/:**
+- DOCUMENTATION-UPDATES-NEEDED.org (reference guide)
+- UPDATES-SUMMARY.org (quick reference)
+- UPDATES-BEFORE-AFTER.org (implementation guide)
+
+All guides ready for review or direct application. No changes have been made to original documentation files — everything is in the review guides.
+
+---
+
+*Documentation analysis completed. Ready for review and implementation.*

@@ -1,0 +1,425 @@
+;;; SPDX-License-Identifier: GPL-3.0-or-later
+;;; Copyright © 2023-2026 Giacomo Leidi <therewasa@fishinthecalculator.me>
+
+(define-module (sops services sops)
+  #:use-module (gnu)
+  #:use-module (gnu services)
+  #:use-module (gnu services base)
+  #:use-module (gnu services configuration)
+  #:use-module (gnu services shepherd)
+  #:use-module (guix diagnostics)
+  #:use-module (guix gexp)
+  #:use-module (guix i18n)
+  #:use-module (guix modules)
+  #:use-module (guix packages)
+  #:use-module (guix records)
+  #:use-module (gnu packages gnupg)
+  #:use-module (gnu packages golang)
+  #:use-module (gnu packages golang-crypto)
+  #:use-module (sops packages sops)
+  #:use-module (sops services configuration)
+  #:use-module (sops build activation)
+  #:use-module (sops activation)
+  #:use-module (sops secrets)
+  #:use-module (sops self)
+  #:use-module (sops state)
+  #:use-module (sops validation)
+  #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-26)
+  #:use-module (srfi srfi-35)
+  ;; For backward compatibility
+  #:re-export (%default-sops-secrets-directory)
+  #:export (sops-secrets-service-type
+
+            sops-secrets-shepherd-service
+            sops-secret-decrypt-shepherd-service
+
+            sops-secret->secret-file
+
+            sops-public-key
+            sops-public-key?
+            sops-public-key-fields
+            sops-public-key-name
+            sops-public-key-value
+            sops-public-key-type
+
+            sops-service-configuration
+            sops-service-configuration?
+            sops-service-configuration-fields
+            sops-service-configuration-gnupg
+            sops-service-configuration-sops
+            sops-service-configuration-log-directory
+            sops-service-configuration-config
+            sops-service-configuration-generate-key?
+            sops-service-configuration-host-ssh-key
+            sops-service-configuration-gnupg-home
+            sops-service-configuration-age-key-file
+            sops-service-configuration-verbose?
+            sops-service-configuration-secrets-directory
+            sops-service-configuration-secrets))
+
+(define list-of-sops-secrets?
+  (list-of sops-secret?))
+
+(define* (sops-secret->secret-file secret #:key
+                                   (directory %default-sops-secrets-directory))
+  "Return the actual file name of SECRET on the filesystem.  The keyword
+argument DIRECTORY allows overriding the default directory where secrets are
+stored."
+  (string-append directory "/" (sops-secret->file-name secret)))
+
+(define-configuration/no-serialization sops-public-key
+  (name
+   (string)
+   "The name of the SOPS key.")
+  (value
+   (string)
+   "The value of the public key.")
+  (type
+   (symbol)
+   (string-append "A symbol denoting the type of public key, supported types
+are:
+
+@itemize
+@item @code{'gpg}
+@item @code{'age}
+@end itemize")))
+
+(define (sanitize-secrets secrets)
+  (let loop ((keys '())
+             (acc '())
+             (secrets secrets))
+    (if (null? secrets)
+        acc
+        (let* ((s (car secrets))
+               (key (sops-list-key->sops-string-key (sops-secret-key s))))
+          (if (member key keys)
+              (raise
+               (formatted-message
+                (G_
+                 "sops-secrets' keys are supposed to be unique but '~a' \
+is a duplicate!")
+                key))
+              (loop (cons key keys) (cons s acc) (cdr secrets)))))))
+
+(define-maybe/no-serialization gexp-or-file-like)
+(define-maybe/no-serialization string)
+
+(define-configuration/no-serialization sops-service-configuration
+  (gnupg
+   (gexp-or-string (file-append gnupg "/bin/gpg"))
+   "The @code{GnuPG} command line used to perform decryption.")
+  (sops
+   (package sops)
+   "The @code{SOPS} package used to perform decryption.")
+  (config
+   (maybe-gexp-or-file-like)
+   "A gexp or file-like object evaluating to the SOPS config file.  This field
+is deprecated and will be removed in the future.")
+  (log-directory
+   (maybe-string)
+   "The name of a directory where the sops service will create its log files.")
+  (generate-key?
+   (boolean #f)
+   "When true, a SOPS supported key will be derived from the host SSH private
+key.  For RSA keys @code{ssh-to-pgp} is used and the generated key is added to
+the keyring located at @code{gnupg-home} field value.  For ed25519 keys
+@code{ssh-to-age} is used and the generated key is appended to the keyring file
+located at @code{age-key-file} field value.  It is discouraged to generate key
+this way, unless for bootstrapping.  You are more than welcome to provision (and
+rotate) your own SOPS compatible keys.")
+  (host-ssh-key
+   (string "/etc/ssh/ssh_host_rsa_key")
+   "The file system path of the SSH private key used for automatic derivation of
+a SOPS compatible key.  If the @code{generate-key?} field is false, this field is
+ignored.")
+  (gnupg-home
+   (string "/root/.gnupg")
+   "The homedir of GnuPG, i.e. where keys used to decrypt SOPS secrets will be looked for.")
+  (age-key-file
+   (string "/root/.config/sops/age/keys.txt")
+   "The absolute path of the file containing the corresponding @code{age}
+identities where SOPS should look for when decrypting a secret.")
+  (secrets-directory
+   (string %default-sops-secrets-directory)
+   "The path on the filesystem where the secrets will be decrypted.")
+  (verbose?
+   (boolean #f)
+   "When true the service will print extensive information about its execution state.")
+  (secrets
+   (list-of-sops-secrets '())
+   "The @code{sops-secret} records managed by the @code{sops-secrets-service-type}."
+   (sanitizer sanitize-secrets)))
+
+(define (sops-service-configuration->sops-runtime-state config)
+  (match-record config <sops-service-configuration>
+                (gnupg sops generate-key? host-ssh-key gnupg-home age-key-file
+                 log-directory secrets-directory verbose? secrets)
+    (sops-runtime-state
+     (age-key-file age-key-file)
+     (gnupg-home gnupg-home)
+     (secrets secrets)
+     (sops sops)
+     (gpg-command gnupg)
+     (host-ssh-key host-ssh-key)
+     (log-directory (and (maybe-value-set? log-directory) log-directory))
+     (secrets-directory secrets-directory)
+     (generate-key? generate-key?)
+     (verbose? verbose?))))
+
+(define* (sops-secret->shepherd-service-name secret #:key home-service?)
+  (string->symbol
+   (string-append
+    (if home-service? "home-" "")
+    "sops-secret-"
+    (sops-secret->file-name secret))))
+
+(define (sops-secret->program-entrypoint secret)
+  (define (store-format key)
+    ;; Remove from KEY characters that cannot be used in the store.
+    (string-map (lambda (chr)
+                  (if (and (char-set-contains? char-set:ascii chr)
+                           (char-set-contains? char-set:graphic chr)
+                           (not (memv chr '(#\. #\/ #\space #\@))))
+                      chr
+                      #\-))
+                key))
+  (define key (sops-secret-key secret))
+  (string-append "sops-secret-"
+                 (store-format
+                  (if (string? key)
+                      key
+                      (string-join key "-")))))
+
+;; This reimplements https://codeberg.org/shepherd/shepherd/pulls/109.
+;; Once it is merged it can be dropped.
+(define make-system-constructor
+  #~(lambda* (#:key log-file . command)
+      (use-modules (srfi srfi-1))
+      (define keyword-index
+        (and log-file
+             (list-index (lambda (el) (equal? el #:log-file)) command)))
+      (define (delete-idx l idx)
+        (let loop ((i 0)
+                   (values l)
+                   (acc '()))
+          (if (null? values)
+              (reverse acc)
+              (loop (1+ i)
+                    (cdr values)
+                    (if (member i idx)
+                        acc
+                        (cons (car values) acc))))))
+      (define* (spawn-shell-command command #:key log-file)
+        (spawn-command (list (or (getenv "SHELL") "/bin/sh")
+                             "-c" command)
+                       #:directory (getcwd)
+                       #:log-file log-file))
+      (lambda args
+        (zero? (status:exit-val
+                (spawn-shell-command
+                 (string-concatenate
+                  (if log-file
+                      ;; Drop log-file keyword argument
+                      (delete-idx
+                       command (list keyword-index (1+ keyword-index)))
+                      command))
+                 #:log-file log-file))))))
+
+(define* (sops-secrets-shepherd-service runtime-state
+                                        #:key (sops-provision '(sops-secrets))
+                                        (sops-requirement '(user-processes))
+                                        home-service?)
+  (define log-directory
+    (sops-runtime-state-log-directory runtime-state))
+  (define requirement
+    (append sops-requirement
+            (map
+             (lambda (secret)
+               (sops-secret->shepherd-service-name
+                secret #:home-service? home-service?))
+             (sops-runtime-state-secrets runtime-state))))
+  (define entrypoint
+    (program-file "sops-secrets-wait"
+                  (wait-for-secrets runtime-state)))
+  (shepherd-service (provision sops-provision)
+                    (requirement requirement)
+                    (one-shot? #t)
+                    (documentation
+                     "SOPS secrets provisioning service.")
+                    (start
+                     #~(#$make-system-constructor
+                        (string-join
+                         '("exec" #$entrypoint) " ")
+                        #$@(if log-directory
+                               (list
+                                #:log-file (string-append log-directory
+                                                          "/sops-secrets.log"))
+                               '())))
+                    (stop
+                     #~(make-kill-destructor))))
+
+(define* (sops-secret-decrypt-shepherd-service secret runtime-state #:key
+                                               home-service?
+                                               sops-requirement)
+  (define log-directory
+    (sops-runtime-state-log-directory runtime-state))
+  (define secrets-directory
+    (sops-runtime-state-secrets-directory runtime-state))
+  (define generate-key?
+    (sops-runtime-state-generate-key? runtime-state))
+  (define requirement
+    (or sops-requirement
+        `(user-processes
+          ,@(if generate-key? '(sops-secrets-host-key) '())
+          ,(string->symbol
+            (string-append "file-system-" secrets-directory)))))
+  (define entrypoint-name
+    (sops-secret->program-entrypoint secret))
+  (define entrypoint
+    (program-file entrypoint-name
+                  (activate-secret secret runtime-state)))
+  (shepherd-service (provision
+                     (list
+                      (sops-secret->shepherd-service-name
+                       secret #:home-service? home-service?)))
+                    (requirement requirement)
+                    (one-shot? #t)
+                    (documentation
+                     "SOPS secret decrypting service.")
+                    (start
+                     #~(#$make-system-constructor
+                        (string-join
+                         '("exec" #$entrypoint) " ")
+                        #$@(if log-directory
+                               (list
+                                #:log-file
+                                (string-append log-directory
+                                               "/" entrypoint-name ".log"))
+                               '())))
+                    (stop
+                     #~(make-kill-destructor))))
+
+(define (sops-secrets-host-key-shepherd-service runtime-state)
+  (define log-directory
+    (sops-runtime-state-log-directory runtime-state))
+  (define secrets-directory
+    (sops-runtime-state-secrets-directory runtime-state))
+  (define entrypoint
+    (program-file "sops-secrets-generate-key"
+                  (generate-ssh-key runtime-state)))
+  (shepherd-service (provision '(sops-secrets-host-key))
+                    (requirement '(user-processes))
+                    (one-shot? #t)
+                    (documentation
+                     "Generate host key for the SOPS service to use.")
+                    (start
+                     #~(#$make-system-constructor
+                        (string-join
+                         '("exec" #$entrypoint) " ")
+                        #$@(if log-directory
+                               (list
+                                #:log-file
+                                (string-append log-directory
+                                               "/sops-secrets-host-key.log"))
+                               '())))
+                    (stop
+                     #~(make-kill-destructor))))
+
+(define (sops-secrets-shepherd-services config)
+  (when config
+    (let ((config-file
+           (sops-service-configuration-config config))
+          (runtime-state
+           (sops-service-configuration->sops-runtime-state config))
+          (generate-key?
+           (sops-service-configuration-generate-key? config)))
+      (when (maybe-value-set? config-file)
+        (warning
+         (G_
+          "the 'config' field of 'sops-service-configuration' is\
+ deprecated, you can delete it from your configuration.~%")))
+      (append
+       (list (sops-secrets-shepherd-service runtime-state))
+       (map
+        (cut sops-secret-decrypt-shepherd-service <> runtime-state)
+        (sops-service-configuration-secrets config))
+       (if generate-key?
+           (list (sops-secrets-host-key-shepherd-service runtime-state))
+           '())))))
+
+(define (%sops-secrets-file-system config)
+  (list
+   (file-system
+     (device "none")
+     (mount-point
+      (sops-service-configuration-secrets-directory config))
+     (type "ramfs")
+     (check? #f))))
+
+(define (secrets->sops-service-configuration config extension)
+  (define verbose?
+    (sops-service-configuration-verbose? config))
+  (define config-secrets
+    (sops-service-configuration-secrets config))
+  (define sops-string-key
+    (compose (lambda (k)
+               (if (list? k)
+                   (sops-list-key->sops-string-key k)
+                   k))
+             sops-secret-key))
+  (sops-service-configuration
+   (inherit config)
+   (secrets
+    (if (zero? (length extension))
+        config-secrets
+        (sanitize-secrets
+         (let loop ((acc config-secrets)
+                    (extension extension))
+           (if (null? extension)
+               acc
+               (loop
+                (if (member (sops-string-key (car extension))
+                            (map sops-string-key acc))
+                    (begin
+                      (format (current-error-port)
+                              "WARNING: Duplicate secrets detected, one will be \
+dropped: there can be only one secret with a given key but at least two were \
+found with key '~a'.~%"
+                              (sops-string-key (car extension)))
+                      acc)
+                    (cons (car extension) acc))
+                (cdr extension)))))))))
+
+(define (sops-secrets-activation config)
+  (define secrets-directory
+    (sops-service-configuration-secrets-directory config))
+  (with-imported-modules (source-module-closure
+                            '((sops build activation))
+                            #:select? sops-module-name?)
+    #~(begin
+        (use-modules (guix build utils)
+                     (sops build activation))
+
+        (define-values (secrets-directory extra-links-directory)
+          (sops-secrets-directories #$secrets-directory))
+
+        (unless (file-exists? secrets-directory)
+          (mkdir-p secrets-directory)))))
+
+(define sops-secrets-service-type
+  (service-type (name 'sops-secrets)
+                (extensions (list (service-extension profile-service-type
+                                                     (lambda (config)
+                                                       (list (sops-service-configuration-sops config))))
+                                  (service-extension file-system-service-type
+                                                     %sops-secrets-file-system)
+                                  (service-extension activation-service-type
+                                                     sops-secrets-activation)
+                                  (service-extension shepherd-root-service-type
+                                                     sops-secrets-shepherd-services)))
+                (compose concatenate)
+                (extend secrets->sops-service-configuration)
+                (description
+                 "This service decrypts @code{SOPS} secrets and places them at
+their place with the right permissions.")))

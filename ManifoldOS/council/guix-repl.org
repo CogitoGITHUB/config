@@ -1,0 +1,128 @@
+* Guix REPL — Deep Dive
+
+The REPL is the ONLY correct way to validate module changes.
+Never reconfigure to test a module. REPL first, always.
+
+** Launch
+
+Both system and container modules use the same flag:
+#+BEGIN_SRC sh
+guix repl --load-path=/home/aoeu/.config/guix/Manifold
+#+END_SRC
+
+Note: The older syntax `guix repl -- -L /path` no longer works. Also, the warning
+"note: source file ... newer than compiled ..." is harmless noise — it just means
+the cache is stale. The module loads correctly regardless.
+
+** REPL command cheatsheet
+
+| Command                        | What it does                              |
+|--------------------------------|-------------------------------------------|
+| (use-modules (substrate ...))| Load a module                             |
+| ,module (substrate ...)      | Switch into a module's namespace          |
+| ,bindings                      | List all bindings in current module       |
+| ,apropos <name>                | Search for a symbol across loaded modules |
+| ,describe <symbol>             | Show documentation for a symbol           |
+| ,reload (substrate ...)      | Reload a module after editing             |
+| ,quit                          | Exit REPL                                 |
+
+** Workflow: validate a new submodule
+
+#+BEGIN_SRC scheme
+;; 1. Load it
+(use-modules (substrate user-space root <category> <name>))
+
+;; 2. Check exports — name may throw "unbound variable" even when module loaded
+,module (substrate user-space root <category> <name>)
+,bindings
+#+END_SRC
+
+Clean load + symbol visible in bindings = safe to add to loader.
+
+Note: For packages defined with #:export (not #:re-export), directly evaluating
+the symbol name in REPL may throw "unbound variable" even when the module loaded
+correctly. Use ,bindings to verify instead.
+
+** Workflow: validate loader after adding a submodule
+
+#+BEGIN_SRC scheme
+(use-modules (substrate user-space root loaders <category>))
+root-<category>-packages  ; must include your new package
+<name>                     ; must be accessible
+#+END_SRC
+
+** Workflow: validate root after adding a new loader
+
+#+BEGIN_SRC scheme
+(use-modules (substrate user-space root root))
+root-system-packages   ; must include new packages
+root-system-services   ; if you added services
+#+END_SRC
+
+** Workflow: validate container modules
+
+#+BEGIN_SRC scheme
+(use-modules (systems containers core-container))
+container-os       ; base os object
+
+(use-modules (systems containers devsecops))
+devsecops-os       ; inherited os object
+devsecops-service  ; service object
+
+(use-modules (systems containers containers))
+all-container-services  ; full list
+#+END_SRC
+
+** Workflow: find which (gnu packages ...) module contains a symbol
+
+#+BEGIN_SRC scheme
+,apropos nushell
+;; returns: (gnu packages nushell) nushell  #<variable ...>
+;; module path is: (gnu packages nushell)
+#+END_SRC
+
+Or from shell:
+#+BEGIN_SRC sh
+guix search nushell
+# location: gnu/packages/nushell.scm -> (gnu packages nushell)
+#+END_SRC
+
+** Workflow: debug "unbound variable" bottom-up
+
+#+BEGIN_SRC scheme
+;; Stop at first error — that layer is where the fix goes
+(use-modules (substrate user-space root <category> <name>))     ; 1. submodule ok?
+<name>                                                              ; 2. symbol accessible?
+(use-modules (substrate user-space root loaders <category>))    ; 3. loader ok?
+root-<category>-packages                                           ; 4. list correct?
+(use-modules (substrate user-space root root))                   ; 5. root ok?
+root-system-packages                                               ; 6. full list ok?
+#+END_SRC
+
+** Reload after editing (no need to restart REPL)
+
+#+BEGIN_SRC scheme
+,reload (substrate user-space root <category> <name>)
+,reload (substrate user-space root loaders <category>)
+#+END_SRC
+
+** What success vs failure looks like
+
+Success:
+#+BEGIN_SRC
+scheme@(guile-user)> (use-modules (substrate user-space root shell nushell))
+scheme@(guile-user)> nushell
+$1 = #<package nushell@0.x.x gnu/packages/nushell.scm:xx xx>
+#+END_SRC
+
+Failure — wrong path:
+#+BEGIN_SRC
+ERROR: no code for module (substrate user-space root shell nushell)
+#+END_SRC
+-> file path or define-module path mismatch.
+
+Failure — unbound variable:
+#+BEGIN_SRC
+ERROR: Unbound variable: nushell
+#+END_SRC
+-> submodule missing #:re-export or not imported in loader.

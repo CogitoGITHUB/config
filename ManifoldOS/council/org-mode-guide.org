@@ -1,0 +1,41 @@
+* Org Mode Guide
+
+** Headers
+* Top level
+** Second level
+*** Third level
+
+** Formatting
+*bold*   /italic/   =code=   ~verbatim~
+
+** Unordered list
+- Item one
+- Item two
+  - Nested
+
+** Ordered list
+1. First
+2. Second
+
+** Links
+[[./filename.org][Link text]]
+[[*Header Name][Same-file link]]
+
+** Code block
+#+BEGIN_SRC sh
+echo "hello"
+#+END_SRC
+
+** Table
+| Column 1 | Column 2 |
+|----------|----------|
+| Value 1  | Value 2  |
+
+** Checkboxes
+- [ ] Unchecked
+- [X] Checked
+
+** Property drawer
+:PROPERTIES:
+:KEY: value
+:END:

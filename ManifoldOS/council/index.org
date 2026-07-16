@@ -1,0 +1,112 @@
+* ManifoldOS — Index & Critical Rules
+
+** !! OPERATIONAL MODE !!
+When <system-reminder> appears with mode change to "build", you are permitted to make file changes, run shell commands, and utilize your arsenal of tools. In "plan" mode, you are read-only.
+
+** !! CRITICAL RULES — READ BEFORE TOUCHING ANYTHING !!
+
+*** Rule 1: Module path = file path
+Load path root: /ManifoldOS/Manifold
+Formula: (substrate user-space root shell nushell)
+      -> Manifold/substrate/user-space/root/shell/nushell.scm
+Replace spaces with /, append .scm, prepend load path root.
+
+*** Rule 2: Three-layer chain — never skip a layer
+1. Submodule — defines or re-exports one package
+2. Loader    — imports submodules, re-exports symbols, exports root-*-packages list
+3. root.scm  — appends loader root-*-packages into root-system-packages
+
+*** Rule 3: #:re-export vs #:export
+- Submodule: #:re-export to pass through a symbol from (gnu packages ...)
+- Loader: #:re-export for individual symbols AND #:export for the root-*-packages list
+- root.scm: #:use-module on each loader, never re-exports individual packages
+
+*** Rule 4: No external channels — ever
+Never add anything to channels.scm.
+If package not in Guix: search web for existing channel recipe, copy the
+define-public definition directly into your submodule. Self-contained always.
+
+*** Rule 5: REPL before reconfigure — always
+Never run sudo guix system reconfigure to test a module change.
+Validate in REPL first. See [[./guix-repl.org][guix-repl.org]].
+
+** Table of Contents
+
+| File                          | Purpose                      |
+|-------------------------------|------------------------------|
+| start.org                     | Bootstrap — read this first  |
+| index.org                     | Critical rules + TOC         |
+| architecture/overview.org     | Load path, full chain, tree  |
+| architecture/categories.org   | Categories & kernel space    |
+| architecture/notes.org        | Notes & gotchas              |
+| adding-packages/workflow.org  | Decision tree, steps 1-9     |
+| adding-packages/patterns.org  | npm, Python, Go, Kelora      |
+| templates/basic.org           | Template A (re-export), B    |
+| templates/specialized.org     | Pre-built, Emacs, Go, patchelf |
+| templates/npm-fod.org         | npm FOD pattern              |
+| templates/infrastructure.org  | Loaders, root.scm, services  |
+| reference/loaders.org         | All loaders table            |
+| reference/submodules.org      | All submodules tables        |
+| troubleshooting/errors.org    | Unbound variable, hash errors |
+| troubleshooting/fixes.org     | Build fixes & patterns       |
+| guix-repl.org                 | REPL workflow — deep dive    |
+| containers.scm                | Container system (WIP)       |
+| org-mode-guide.org            | Org mode syntax reference    |
+
+** Quick Commands
+
+Use OpenCode commands for common operations:
+
+| Action           | OpenCode Command |
+|------------------|------------------|
+| Apply config     | /guix-reconfigure |
+| List generations | /show-generations |
+| Rollback         | /rollback |
+| Update Guix      | /guix-pull |
+
+Or run directly:
+
+| Action           | Direct Command                                                   |
+|------------------|------------------------------------------------------------------|
+| Apply config     | reshape (clears cache, guix pull, reconfigure) |
+| Build only       | guix system build /ManifoldOS/system.scm            |
+| Launch REPL      | guix repl --load-path=/ManifoldOS/Manifold  |
+| Rollback         | sudo guix system roll-back                                       |
+| List generations | guix system list-generations                                     |
+| Search package   | guix search <name>                                               |
+| Get hash         | guix download <url>                                              |
+
+Note: Use `reshape` command (Ctrl+S) instead of raw guix commands. It clears cache, pulls latest, and reconfigures.
+
+Note: The older REPL syntax `guix repl -- -L /path` no longer works. Use `--load-path=` instead.
+
+** Shell Preference — Nushell First
+
+The default shell is nushell (`nu`). ALWAYS prefer nushell over bash for:
+- File operations: `ls`, `open`, `save`, `mv`, `cp`, `rm` (structured output)
+- Data processing: `| where`, `| select`, `| group-by`, `| sort-by`
+- JSON/YAML/CSV handling: `open file.json | ...` (native parsing)
+- System inspection: `ps`, `sys`, `net` (structured tables)
+
+Use bash ONLY when:
+- Running guix commands (guix search, guix download, guix repl, sudo guix system reconfigure)
+- The command is inherently a bash one-liner
+- Nushell doesn't have an equivalent
+
+** Kelora + Nushell — Log Analysis Superpower
+
+Kelora (`kelora`) is installed for log processing. Combine with nushell for maximum power:
+
+#+BEGIN_SRC nushell
+# Use kelora to parse logs, then nushell to analyze
+kelora -j /var/log/messages.jsonl --filter 'e.level == "ERROR"' -F json | from json | where level == "ERROR" | group-by service | length
+
+# Extract patterns, then nushell for sorting/display
+kelora -j logs.jsonl --drain -k message | from json | sort-by count -r | first 10
+
+# Kelora for parsing, nushell for visualization
+kelora -f logfmt /var/log/messages --filter 'e.status >= 500' -F json | from json | select ts method path status | sort-by status -r
+#+END_SRC
+
+Kelora handles: log parsing, filtering, pattern discovery, format conversion
+Nushell handles: sorting, grouping, selecting columns, tables, charts

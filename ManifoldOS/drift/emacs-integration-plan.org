@@ -1,0 +1,292 @@
+* Emacs as ManifoldOS Control Center - Integration Plan
+
+** Overview
+
+Make your custom `literate-config-system` package the primary system configuration hub.
+This system will bootstrap Emacs with a literate configuration approach where .org files
+define both Emacs settings AND drive your Operating-System package composition.
+
+Your manuals.org (87K lines) represents the ultimate design vision:
+- Primitives → Mind → World → Forge → Archives
+- Covers Lisp foundations, Emacs knowledge, system design philosophy
+- Enables literate documentation-driven system configuration
+
+** Current State
+
+*** Emacs Configuration
+- =init.el= (14 lines): Bootstraps with =leaf=, loads =literate-config-system=
+- =literate-config-system.el= (288 lines): Custom loader for .org configurations
+  - Location: =/home/aoeu/.config/emacs/lisp/literate-config-system/=
+  - Purpose: Load and evaluate literate .org configs
+  - Features: Error tracking, load ordering, silent/verbose modes
+- =/home/aoeu/.config/emacs/Literative Configurations/= (current configs)
+  - avy.org, god-mode.org, modus-theme.org, multiple-cursors.org
+- =/home/aoeu/.config/emacs/future work/manuals.org= (87,698 lines)
+  - Master design document with system architecture
+  - 40+ level-1 headings: Primitives, Mind, World, Forge, Archives, etc.
+
+*** Operating-System Integration (Current)
+- Location: =Operating-System/core-system/user-space/root/editors/=
+- Structure:
+  - =emacs.scm= - wraps =(gnu packages emacs)=
+  - =emacs-packages.scm= - aggregates 12 custom Emacs packages
+  - =emacs-packages/= subdirectory with individual package definitions
+  - =loaders/editors.scm= - aggregates all editors (emacs + neovim)
+- Current packages: geiser, emacs-sops, emacs-tmr, emacs-org-repeat-by-cron, 
+  fuzzy-clock, notebook-mode, emacs-monkeytype, quick-peek, scrollable-quick-peek
+
+** Target State
+
+*** Architecture
+
+```
+~/.config/emacs/
+├── init.el                                    (unchanged)
+├── early-init.el                              (unchanged)
+├── lisp/
+│   └── literate-config-system/
+│       └── literate-config-system.el          (UPDATED: register as Guix package)
+├── Literative Configurations/
+│   ├── avy.org                                (existing)
+│   ├── god-mode.org                           (existing)
+│   ├── modus-theme.org                        (existing)
+│   ├── multiple-cursors.org                   (existing)
+│   └── [new .org files for system packages]   (TO ADD)
+└── future work/
+    └── manuals.org                            (master design doc - inspiration)
+
+Operating-System/
+├── core-system/user-space/root/
+│   ├── editors/
+│   │   ├── emacs.scm                          (unchanged)
+│   │   ├── emacs-packages.scm                 (UPDATED: include literate-config-system)
+│   │   ├── emacs-packages/                    (UPDATED: reorganize)
+│   │   │   ├── literate-config-system.scm     (NEW: custom package wrapper)
+│   │   │   ├── geiser.scm
+│   │   │   └── ...other packages...
+│   │   └── loaders/editors.scm                (unchanged)
+└── (other categories stay as-is)
+```
+
+*** Key Integration Points
+
+1. **literate-config-system as Guix Package**
+   - Wrapper module: =editors/emacs-packages/literate-config-system.scm=
+   - Defines the package for inclusion in Operating-System
+   - Ensures literate-config-system available at system level
+
+2. **Emacs Literate Configs Drive System Packages**
+   - Each major system design section (Primitives, Mind, World, Forge, Archives)
+   - Maps to literate .org configs in ~/Literative Configurations/
+   - These .org files define package requirements for system
+
+3. **Dual Registration**
+   - Emacs package: Available in =~/.config/emacs/init.el=
+   - Guix package: Available in system reconfiguration
+   - No duplication: Same source, registered in both contexts
+
+** Migration Plan
+
+### Phase 1: Register literate-config-system as Guix Package
+
+**Duration:** 30 min  
+**Files to create/modify:**
+
+1. Create =editors/emacs-packages/literate-config-system.scm=
+   - Wraps the custom Lisp package
+   - Defines it as proper Guix package for system use
+   - Pattern: Similar to existing custom packages
+
+2. Update =editors/emacs-packages.scm=
+   - Add import: =(use-module (core-system user-space root editors emacs-packages literate-config-system))=
+   - Add to exports: =literate-config-system=
+   - Add to =root-emacs-packages= list
+
+3. Update =loaders/editors.scm=
+   - Include =literate-config-system= in re-exports
+   - Add to =root-editors-packages= list
+
+**Validation:**
+- REPL test: =(use-modules (core-system user-space root editors emacs-packages literate-config-system))=
+- Verify package loads without errors
+
+### Phase 2: Expand Literative Configurations
+
+**Duration:** 1-2 hours (depends on content)  
+**Task:** Create .org config files matching manuals.org structure
+
+Create configuration files in ~/Literative Configurations/:
+
+1. **primitives.org** - Lisp foundations, basic utilities
+   - References: manuals.org § "The Primordial Layer", "Lisp History"
+   - Emacs packages: geiser (Scheme), lisp-mode settings
+
+2. **awakening.org** - Emacs startup, initialization
+   - References: manuals.org § "Awakening the Engines"
+   - Emacs packages: initialization sequence, keybindings
+
+3. **body.org** - Text editing, UI, display
+   - References: manuals.org § "Embodying the Text"
+   - Emacs packages: modus-theme, spacious-padding, tab-bar-echo-area, nano-calendar
+   - System packages: fonts, terminal, display settings
+
+4. **nerves.org** - Input handling, reflexes, keybindings
+   - References: manuals.org § "Reflexes: The Nerves"
+   - Emacs packages: god-mode, multiple-cursors, avy
+   - System packages: keyboard settings
+
+5. **mind.org** - Cognition, knowledge, utilities
+   - References: manuals.org § "Cognition: The Mind"
+   - Emacs packages: org-mode, knowledge management
+   - System packages: documentation tools
+
+6. **world.org** - Interaction, networking, external systems
+   - References: manuals.org § "Interaction: The World"
+   - System packages: git, curl, ssh, networking tools
+
+7. **forge.org** - Creation, development, programming
+   - References: manuals.org § "Creation: The Forge"
+   - System packages: programming languages, dev tools, build systems
+
+8. **shadows.org** - Resilience, error handling, recovery
+   - References: manuals.org § "Resilience: The Shadows"
+   - System packages: security, monitoring, backup tools
+
+9. **rituals.org** - Habits, automation, workflows
+   - References: manuals.org § "Habits: The Rituals"
+   - System packages: automation, scheduling, task management
+
+10. **archives.org** - Knowledge archival, documentation, persistence
+    - References: manuals.org § "Knowledge: The Archives"
+    - System packages: database, documentation tools, version control
+
+**Pattern for each .org file:**
+
+```org
+#+title: [Section Name]
+#+description: [Purpose from manuals.org]
+
+* Overview
+  [Brief description, reference to manuals.org section]
+
+* Emacs Packages
+  - package1
+  - package2
+
+* System Packages (Optional)
+  - Define which system-level packages are needed
+  - Examples: fonts, shells, terminal emulators, etc.
+
+* Configuration
+  #+begin_src emacs-lisp
+  (leaf ... :ensure t)
+  #+end_src
+```
+
+**How literate-config-system uses these:**
+- Loads each .org file at Emacs startup
+- Extracts code blocks and evaluates them
+- Builds configuration layer-by-layer from primitives to archives
+- Each layer builds on previous layers
+
+### Phase 3: Update literate-config-system.el (if needed)
+
+**Duration:** 30 min - 2 hours (depends on changes)  
+**Current features (288 lines):**
+- Load Guix EMACSLOADPATH automatically
+- Load and evaluate .org code blocks
+- Silent mode (suppress messages)
+- Error tracking and reporting
+
+**Potential updates:**
+1. **Add system awareness** (optional)
+   - Read system configuration from Guix
+   - Make system packages available to literate configs
+   
+2. **Add layer ordering** (optional)
+   - Load configs in specific order (primitives → mind → world → forge → archives)
+   - Skip optional layers if needed
+   
+3. **Add error recovery** (optional)
+   - Better error messages with file:line references
+   - Option to continue on errors vs. fail-fast
+
+**Decision point:** Only update if needed for integration requirements
+
+### Phase 4: System Reconfiguration
+
+**Duration:** 30-60 min (system build time)  
+**Tasks:**
+
+1. Update guixos.scm (if using new dependencies/ structure from previous plan)
+   - Add dependencies/ to load path
+
+2. Run reconfigure:
+   ```bash
+   sudo guix system reconfigure /home/aoeu/.config/guix/guixos.scm
+   ```
+
+3. Verify:
+   - Emacs starts and loads literate configs
+   - System packages available
+   - Both Emacs and Guix recognize literate-config-system
+
+### Phase 5: Iterative Refinement
+
+**Duration:** Ongoing  
+**Approach:** Gradually fill in Literative Configurations/ as you develop system
+
+- Start with 2-3 key layers (e.g., primitives, world, forge)
+- Add more as you expand system design
+- Reference manuals.org § sections for guidance
+- Use Emacs to test configs before system reconfigure
+
+## Integration with Previous Guix Refactoring Plan
+
+Your two projects work together:
+
+1. **Guix Refactoring Plan** (previous)
+   - Creates dependencies/ directory
+   - Migrates packages from gnu packages to custom definitions
+   - Extracts 1336 packages by category
+
+2. **Emacs Integration Plan** (this)
+   - Registers literate-config-system as Guix package
+   - Uses literate .org configs to drive package selection
+   - Makes Emacs the configuration hub
+
+**Sequence:**
+1. Complete Guix Phase 1-3 (setup dependencies/, update guixos.scm load path)
+2. Execute Emacs Phase 1 (register literate-config-system)
+3. Complete Emacs Phase 2 (create Literative Configurations/.org files)
+4. Complete Guix Phase 4-5 (update package imports, testing)
+5. Execute Emacs Phase 3-4 (refine literate-config-system, reconfigure)
+
+Both can progress independently but reconfigure should wait until both are ready.
+
+## Success Criteria
+
+- [ ] literate-config-system registered as Guix package
+- [ ] Emacs loads literate configs at startup without errors
+- [ ] At least 3 Literative Configurations/*.org files created (primitives, world, forge)
+- [ ] System reconfigure completes without errors
+- [ ] Emacs is primary configuration interface
+- [ ] manuals.org serves as reference for system design
+- [ ] All custom Emacs packages still available
+
+## Timeline
+
+| Phase | Duration | Effort |
+|-------|----------|--------|
+| Phase 1: Register package | 30 min | Low |
+| Phase 2: Create configs | 1-2 hours | Medium |
+| Phase 3: Update loader | 30 min - 2 hours | Low-Medium |
+| Phase 4: Reconfigure | 30-60 min | System-dependent |
+| Phase 5: Refinement | Ongoing | Low (iterative) |
+
+**Total: 3-5 hours upfront, then iterative refinement**
+
+---
+
+*Created: 2026-04-07*
+*Status: PLAN READY FOR REVIEW*

@@ -1,9 +1,0 @@
-(channel
-  (version 0)
-  (directory "ManifoldOS/Manifold")
-  (location "/home/aoeu/ManifoldOS/Manifold")
-  (dependencies
-    (channel
-      (name guix)
-      (url "https://git.guix.gnu.org/guix.git")
-      (branch "master"))))

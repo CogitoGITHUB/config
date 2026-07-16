@@ -1,0 +1,119 @@
+* Module Templates — npm FOD Pattern
+
+** npm FOD pattern (for large npm packages with many dependencies)
+
+For npm packages with hundreds/thousands of dependencies (like n8n with 2443
+packages), use a two-phase fixed-output derivation (FOD) pattern:
+
+Phase 1: FOD for node_modules — downloads the npm tarball and runs
+`npm install --ignore-scripts` to produce a reproducible node_modules snapshot.
+
+Phase 2: Main package — unpacks the npm tarball (contains bin/, dist/, templates/)
+and symlinks the FOD's node_modules into it.
+
+#+BEGIN_SRC scheme
+(define-module (substrate user-space root <CATEGORY> <NAME>)
+  #:use-module (guix packages)
+  #:use-module (guix download)
+  #:use-module (guix build-system trivial)
+  #:use-module (guix gexp)
+  #:use-module (gnu packages node)
+  #:use-module (gnu packages base)
+  #:use-module (gnu packages compression)
+  #:use-module ((guix licenses) #:prefix license:)
+  #:export (<NAME>))
+
+;; Phase 1: FOD for node_modules
+(define <NAME>-node-modules
+  (package
+    (name "<NAME>-node-modules")
+    (version "<VERSION>")
+    (source (origin
+              (method url-fetch)
+              (uri "https://registry.npmjs.org/<NAME>/-/<NAME>-<VERSION>.tgz")
+              (sha256 (base32 "<TARBALL-HASH>"))))
+    (build-system trivial-build-system)
+    (arguments
+     (list
+      #:modules '((guix build utils))
+      #:builder
+      #~(begin
+          (use-modules (guix build utils))
+          (let* ((node (assoc-ref %build-inputs "node"))
+                 (npm  (string-append node "/bin/npm"))
+                 (tar  (string-append (assoc-ref %build-inputs "tar") "/bin/tar"))
+                 (gzip (string-append (assoc-ref %build-inputs "gzip") "/bin/gzip"))
+                 (src  (assoc-ref %build-inputs "source"))
+                 (out  (assoc-ref %outputs "out"))
+                 (tmp  (string-append out "/.npm-tmp"))
+                 (work "/tmp/work"))
+            (setenv "HOME" out)
+            (setenv "npm_config_cache" tmp)
+            (setenv "npm_config_tmp" tmp)
+            (mkdir-p out)
+            (mkdir-p tmp)
+            (mkdir-p work)
+            (invoke tar "--use-compress-program" gzip "-xf" src "-C" work)
+            (with-directory-excursion (string-append work "/package")
+              (invoke npm "install"
+                      "--ignore-scripts"
+                      "--no-audit"
+                      "--no-fund"
+                      "--prefix" out))))))
+    (inputs (list node tar gzip))
+    (outputs '("out"))
+    (home-page "<URL>")
+    (synopsis "node_modules for <NAME>")
+    (description "FOD npm dependency snapshot for <NAME>.")
+    (license license:expat)))
+
+;; Phase 2: Main package
+(define-public <NAME>
+  (package
+    (name "<NAME>")
+    (version "<VERSION>")
+    (source (origin
+              (method url-fetch)
+              (uri "https://registry.npmjs.org/<NAME>/-/<NAME>-<VERSION>.tgz")
+              (sha256 (base32 "<TARBALL-HASH>"))))
+    (build-system trivial-build-system)
+    (arguments
+     (list
+      #:modules '((guix build utils))
+      #:builder
+      #~(begin
+          (use-modules (guix build utils))
+          (let* ((out   #$output)
+                 (bin   (string-append out "/bin"))
+                 (lib   (string-append out "/lib/node_modules/<NAME>"))
+                 (tar   (string-append #$tar "/bin/tar"))
+                 (gzip  (string-append #$gzip "/bin/gzip"))
+                 (nm-src (string-append #$(package-file <NAME>-node-modules) "/lib/node_modules/<NAME>/node_modules"))
+                 (node  (string-append #$node "/bin/node")))
+            (mkdir-p lib)
+            (mkdir-p bin)
+            (invoke tar "--use-compress-program" gzip "-xf" #$source "--strip-components=1" "-C" lib)
+            (symlink nm-src (string-append lib "/node_modules"))
+            (call-with-output-file (string-append bin "/NAME>")
+              (lambda (p)
+                (format p "#!/bin/sh\nexec ~a ~a/bin/<NAME> \"$@\"\n"
+                        node lib)))
+            (chmod (string-append bin "/NAME>") #o755)))))
+    (inputs (list node tar gzip <NAME>-node-modules))
+    (outputs '("out"))
+    (home-page "<URL>")
+    (synopsis "<SHORT DESCRIPTION>")
+    (description "<LONGER DESCRIPTION>")
+    (license license:expat)))
+#+END_SRC
+
+Key points:
+- Get tarball hash: `guix download https://registry.npmjs.org/<NAME>/-/<NAME>-<VERSION>.tgz`
+- The FOD's hash is derived from the npm tarball hash — same source, same hash
+- `--ignore-scripts` prevents arbitrary code execution during npm install (required for Guix reproducibility)
+- `--no-audit --no-fund` speeds up install
+- Set HOME and npm_config_cache/tmp to avoid /homeless-shelter errors
+- Use `tar --use-compress-program gzip` because tar needs gzip in PATH
+- Wrapper script must point to the bin/<NAME> entry point, not dist/index.js
+
+See also: [[./basic.org][Basic Templates]], [[./specialized.org][Specialized Templates]], [[./infrastructure.org][Infrastructure Templates]]

@@ -1,0 +1,58 @@
+#+title:      Home row mods
+#+date:       [2025-02-09 Sun 06:10]
+#+filetags:   :keyboard:
+#+identifier: 20250209T061048
+
+
+Switch to DVORACK !!!!!!
+
+* Introduction
+Home row mods are a powerful technique for improving keyboard efficiency by assigning modifier keys (Ctrl, Alt, Shift, etc.) to the home row instead of using pinky-intensive keypresses. This improves ergonomics, reduces finger strain, and increases typing speed.
+
+This document also explores whether switching to the Dvorak layout is worth it over QWERTY.
+
+* Why Home Row Mods Matter
+**1. Reduced Finger Strain**
+   - Standard keyboards require frequent pinky movement for modifiers.
+   - Home row mods keep modifiers under stronger fingers, reducing fatigue.
+
+**2. Faster Key Combinations**
+   - Pressing =Ctrl=, =Alt=, and =Shift= with thumbs or stronger fingers speeds up Emacs workflows.
+   - Combos like =C-x C-f= become effortless.
+
+**3. Better Ergonomics**
+   - Reduces ulnar deviation (pinky strain).
+   - Minimizes wrist movement.
+
+**4. Works Well with Layered Keyboards**
+   - Home row mods can be combined with layer switching.
+   - Example: Holding =A= as =Ctrl= while pressing =S= for =C-s= search.
+
+* Home Row Mods Implementation
+- **Kanata (Linux, Windows, macOS)**
+- **KMonad (Cross-platform, simple)**
+- **QMK/VIA (For mechanical keyboards with firmware support)**
+
+* Should You Use Dvorak Instead of QWERTY?
+**Pros of Dvorak**
+   - Optimized for English typing efficiency.
+   - Keeps most common letters on the home row.
+   - Reduces finger travel compared to QWERTY.
+
+**Cons of Dvorak**
+   - Requires retraining muscle memory.
+   - QWERTY is standard in software development and security.
+   - Emacs keybindings are designed for QWERTY.
+
+**Alternative: Colemak**
+   - Similar efficiency to Dvorak but retains many QWERTY shortcuts.
+   - Easier transition for programmers.
+
+* Final Recommendation
+1. **Use home row mods, regardless of layout.**
+2. **Stick to QWERTY if you work with multiple systems.**
+3. **Try Colemak if you want an optimized layout with minimal retraining.**
+4. **Only switch to Dvorak if you type a lot in English and can afford to retrain.**
+
+* Conclusion
+Home row mods provide immediate ergonomic benefits and should be implemented first. Keyboard layout changes are secondary and should only be considered if you have the time to adapt.

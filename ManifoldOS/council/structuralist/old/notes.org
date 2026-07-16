@@ -1,0 +1,42 @@
+* ManifoldOS — Architecture: Notes & Gotchas
+
+** !! CRITICAL RULE: Custom Modules for EVERY external package !!
+
+If any package (like gzip, zlib, libxml2, etc.) is used as an input in a custom package definition, you MUST create a dedicated module for it:
+  - Path: Manifold/substrate/user-space/root/<category>/<name>.scm
+  - Template: Full define-public with origin, uri, sha256 hash from `guix download`
+  - THEN import that module in the package that needs it
+
+NEVER import directly from (gnu packages ...) for these. Self-contained always.
+This rule exists because Guix will be cut from the system.
+
+** Notes
+
+- guixos.scm is at /ManifoldOS/guixos.scm (repo root), NOT under Manifold/
+- Kernel uses standard nonguix `linux`, NOT corrupt-linux
+- audio/music/ subdirectory contains mpd, rmpc, cava (not flat under audio/)
+- security/password-store.scm and password-manager/password-store.scm both exist (duplicate)
+- kernel-space/kmod.scm and core/kmod.scm both exist (duplicate)
+- n8n is defined in ai/ but commented out in ai loader
+- ollama service is commented out in ollama.scm
+- kilo.scm does NOT exist (was referenced in old docs)
+- openclaw-node-modules.scm exists as FOD helper for openclaw
+- wiremix.scm is a new audio package
+- textual-fastdatatable.scm exists but is NOT in the data loader
+- monitoring/self.scm, monitoring/build/oci-containers.scm, monitoring/build/utils.scm exist but are NOT in the monitoring loader
+- networking/version-control/git.scm exists but git is imported directly from (gnu packages version-control) in the loader
+
+** PipeWire/WirePlumber Must Live In Home Shepherd
+- System shepherd (PID 1) cannot create proper user sessions
+- WirePlumber needs elogind session context to detect ALSA/Bluetooth
+- home-pipewire-service-type handles this correctly via home shepherd
+- guix-home-service-type embeds home config in system reconfigure:
+  (service guix-home-service-type (list (list "username" home-environment)))
+- Module: (gnu services guix)
+- After this, sudo guix system reconfigure deploys both system AND home
+
+** Home vs System Audio Split
+System shepherd: alsa-service (unmute), mpd-service
+Home shepherd:   pipewire, wireplumber, pipewire-pulseaudio, dbus
+
+See also: [[./overview.org][Overview & Directory Structure]], [[./categories.org][Categories & Kernel Space]]

@@ -1,0 +1,287 @@
+* Module Reference — Submodules
+
+** Submodules — core
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root core sudo)           | core/sudo.scm       | sudo       |
+
+Note: coreutils, findutils, grep, inetutils, kmod, util-linux are defined as custom packages in core/ but imported directly from their individual modules in the loader.
+
+** Submodules — networking
+
+| Module path                                                | File                            | Re-exports |
+|------------------------------------------------------------|--------------------------------|------------|
+| (substrate user-space root networking yt-dlp)             | networking/yt-dlp.scm          | yt-dlp     |
+| (substrate user-space root networking tailscale)          | networking/tailscale.scm        | tailscale, config-tailscaled-service-type |
+| (substrate user-space root networking network-manager)    | networking/network-manager.scm  | network-manager |
+| (substrate user-space root networking gazelle-tui)        | networking/gazelle-tui.scm      | gazelle-tui |
+| (substrate user-space root networking bluetooth)          | networking/bluetooth.scm        | bluez      |
+| (substrate user-space root networking bluetuith)          | networking/bluetuith.scm        | bluetuith  |
+| (substrate user-space root networking tools)              | networking/tools.scm            | nmap, wireshark, bind-dns, iperf, iproute |
+| (substrate user-space root networking version-control git) | networking/version-control/git.scm | git |
+| (substrate user-space root networking version-control github-cli) | networking/version-control/github-cli.scm | github-cli |
+| (substrate user-space root networking version-control lazygit) | networking/version-control/lazygit.scm | lazygit |
+
+Note: curl, openssh, git, nss-certs, wpa-supplicant, iwd, blueman are imported directly from (gnu packages ...) in the loader, not via submodule files. Files exist for curl.scm, openssh.scm, nss-certs.scm but are not used by loader. version-control/git.scm exists but git is also imported directly from (gnu packages version-control) in the loader.
+
+** Submodules — shell
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root shell nushell)       | shell/nushell.scm   | nushell    |
+| (substrate user-space root shell television)     | shell/television.scm | television |
+| (substrate user-space root shell fzf)            | shell/fzf.scm       | fzf        |
+| (substrate user-space root shell starship)       | shell/starship.scm  | starship   |
+| (substrate user-space root shell bash)           | shell/bash.scm      | bash       |
+| (substrate user-space root shell zoxide)         | shell/zoxide.scm    | zoxide     |
+| (substrate user-space root shell zellij)         | shell/zellij.scm    | zellij     |
+| (substrate user-space root shell carapace)       | shell/carapace.scm  | carapace   |
+| (substrate user-space root shell atuin)          | shell/atuin.scm     | atuin      |
+| (substrate user-space root shell superfile)      | shell/superfile.scm | superfile  |
+| (substrate user-space root shell rip)            | shell/rip.scm       | rip-cli    |
+| (substrate user-space root shell system-monitor) | shell/system-monitor.scm | btop, htop, ncdu, glances |
+| (substrate user-space root shell power)          | shell/power.scm     | upower, tlp, acpi |
+| (substrate user-space root shell archive)        | shell/archive.scm   | zip, unzip, 7zip, unrar-free, zstd, xz |
+| (substrate user-space root shell fetch neofetch) | shell/fetch/neofetch.scm | neofetch |
+| (substrate user-space root shell fetch fastfetch)| shell/fetch/fastfetch.scm | fastfetch |
+
+** Submodules — editors
+
+| Module path                                            | File                       | Re-exports          |
+|--------------------------------------------------------|----------------------------|---------------------|
+| (substrate user-space root editors emacs)             | editors/emacs.scm         | emacs               |
+| (substrate user-space root editors neovim)            | editors/neovim.scm        | neovim              |
+| (substrate user-space root editors emacs-packages)    | editors/emacs-packages.scm | root-emacs-packages |
+
+emacs-packages/ submodules (all imported via emacs-packages.scm aggregator):
+- emacs-monkeytype, emacs-org-repeat-by-cron, emacs-sops, emacs-tmr
+- fuzzy-clock, geiser, notebook-mode, quick-peek, scrollable-quick-peek
+
+** Submodules — desktop
+
+| Module path                                           | File                     | Re-exports  |
+|-------------------------------------------------------|--------------------------|-------------|
+| (substrate user-space root desktop hyprland)         | desktop/hyprland.scm    | hyprland    |
+| (substrate user-space root desktop hypridle)         | desktop/hypridle.scm    | hypridle    |
+| (substrate user-space root desktop qutebrowser)      | desktop/qutebrowser.scm  | qutebrowser |
+| (substrate user-space root desktop quickshell)       | desktop/quickshell.scm   | quickshell  |
+| (substrate user-space root desktop mako)             | desktop/mako.scm        | mako        |
+| (substrate user-space root desktop wallpaper mpvpaper)| desktop/wallpaper/mpvpaper.scm | mpvpaper |
+| (substrate user-space root desktop wallpaper swww)   | desktop/wallpaper/swww.scm | swww     |
+
+Note: imagemagick, jq imported directly from (gnu packages ...) in loader.
+
+** Submodules — desktop/wayland
+
+| Module path                                                      | File                          | Re-exports |
+|------------------------------------------------------------------|-------------------------------|------------|
+| (substrate user-space root desktop wayland wl-clipboard)        | desktop/wayland/wl-clipboard.scm | wl-clipboard |
+| (substrate user-space root desktop wayland cliphist)            | desktop/wayland/cliphist.scm  | cliphist   |
+| (substrate user-space root desktop wayland grim)                | desktop/wayland/grim.scm      | grim       |
+| (substrate user-space root desktop wayland grimblast)           | desktop/wayland/grimblast.scm | grimblast  |
+| (substrate user-space root desktop wayland slurp)               | desktop/wayland/slurp.scm     | slurp      |
+| (substrate user-space root desktop wayland swappy)              | desktop/wayland/swappy.scm    | swappy     |
+| (substrate user-space root desktop wayland swaylock)            | desktop/wayland/swaylock.scm  | swaylock   |
+| (substrate user-space root desktop wayland wlogout)             | desktop/wayland/wlogout.scm   | wlogout    |
+
+** Submodules — desktop/video
+
+| Module path                                                      | File                          | Re-exports        |
+|------------------------------------------------------------------|-------------------------------|-------------------|
+| (substrate user-space root desktop video ffmpeg)                | desktop/video/ffmpeg.scm      | ffmpeg            |
+| (substrate user-space root desktop video kdenlive)              | desktop/video/kdenlive.scm    | kdenlive          |
+| (substrate user-space root desktop video mlt)                   | desktop/video/mlt.scm         | mlt               |
+| (substrate user-space root desktop video opentimelineio)        | desktop/video/opentimelineio.scm | opentimelineio |
+| (substrate user-space root desktop video gst-editing-services)  | desktop/video/gst-editing-services.scm | gst-editing-services |
+| (substrate user-space root desktop video mpv)                   | desktop/video/mpv.scm         | mpv               |
+| (substrate user-space root desktop video obs)                   | desktop/video/obs.scm         | obs               |
+| (substrate user-space root desktop video xytz)                  | desktop/video/xytz.scm        | xytz              |
+| (substrate user-space root desktop video kino)                  | desktop/video/kino.scm        | go-github-com-mmcdole-kino |
+
+** Submodules — desktop/image
+
+| Module path                                           | File                  | Re-exports |
+|-------------------------------------------------------|-----------------------|------------|
+| (substrate user-space root desktop image krita)      | desktop/image/krita.scm | krita    |
+
+** Submodules — desktop/3d
+
+| Module path                                          | File                 | Re-exports |
+|------------------------------------------------------|----------------------|------------|
+| (substrate user-space root desktop 3d blender)      | desktop/3d/blender.scm | blender   |
+
+** Submodules — terminal
+
+| Module path                                        | File                  | Re-exports |
+|----------------------------------------------------|-----------------------|------------|
+| (substrate user-space root terminal wezterm)      | terminal/wezterm.scm  | wezterm    |
+
+** Submodules — ai
+
+| Module path                                   | File            | Re-exports |
+|-----------------------------------------------|-----------------|------------|
+| (substrate user-space root ai openclaw)       | ai/openclaw.scm | openclaw   |
+| (substrate user-space root ai opencode)       | ai/opencode.scm | opencode   |
+| (substrate user-space root ai ollama)         | ai/ollama.scm   | ollama     |
+| (substrate user-space root ai openclaw-node-modules) | ai/openclaw-node-modules.scm | openclaw-node-modules |
+
+Note: kilo.scm does NOT exist. n8n exists in ai/ but is commented out in the loader. openclaw-node-modules.scm is an FOD helper for openclaw.
+
+** Submodules — audio
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root audio alsa)           | audio/alsa.scm      | alsa-utils, alsa-service |
+| (substrate user-space root audio pipewire)       | audio/pipewire.scm  | pipewire, wireplumber, pipewire-service, wireplumber-service |
+| (substrate user-space root audio wiremix)        | audio/wiremix.scm   | wiremix |
+| (substrate user-space root audio music mpd)      | audio/music/mpd.scm | mpd-service |
+| (substrate user-space root audio music rmpc)     | audio/music/rmpc.scm | rmpc      |
+| (substrate user-space root audio music cava)     | audio/music/cava.scm | cava      |
+
+Note: pulseaudio does NOT have a dedicated submodule file. start-audio.sh is a helper script, not a module.
+
+** Submodules — containers
+
+| Module path                                              | File                      | Re-exports |
+|----------------------------------------------------------|---------------------------|------------|
+| (substrate user-space root containers docker)            | containers/docker.scm     | docker     |
+| (substrate user-space root containers lazydocker)        | containers/lazydocker.scm | lazydocker |
+
+** Submodules — keyboard
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root keyboard keyd)         | keyboard/keyd.scm    | keyd       |
+| (substrate user-space root keyboard kanata)       | keyboard/kanata.scm  | kanata, kanata-service |
+
+** Submodules — programming-languages
+
+| Module path                                                          | File                                  | Re-exports |
+|----------------------------------------------------------------------|--------------------------------------|------------|
+| (substrate user-space root programming-languages lisp)               | programming-languages/lisp.scm       | guile      |
+| (substrate user-space root programming-languages lisp guile)         | programming-languages/lisp/guile.scm | guile (= guile-3.0) |
+
+** Submodules — security
+
+| Module path                                                    | File                                 | Re-exports |
+|----------------------------------------------------------------|--------------------------------------|------------|
+| (substrate user-space root security sops packages)           | security/sops/packages.scm          | sops       |
+| (substrate user-space root security sops services)          | security/sops/services.scm          | sops-secrets-service-type, sops-service-configuration |
+| (substrate user-space root security age)                     | security/age.scm                     | age        |
+| (substrate user-space root security gnupg)                   | security/gnupg.scm                   | gnupg      |
+| (substrate user-space root security fail2ban)                | security/fail2ban.scm                | fail2ban   |
+| (substrate user-space root security opensnitch)              | security/opensnitch.scm              | opensnitch-daemon, opensnitch-ui |
+| (substrate user-space root security sshguard)                | security/sshguard.scm                | sshguard   |
+| (substrate user-space root security password-store)          | security/password-store.scm          | password-store |
+
+Note: ufw does NOT have a dedicated submodule file.
+
+** Submodules — sandbox
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root sandbox sandbox)      | sandbox/sandbox.scm  | sandbox-packages (firejail, distrobox) |
+
+** Submodules — fonts
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root fonts nerd-fonts)     | fonts/nerd-fonts.scm | font-packages (font-terminus, font-termsyn) |
+
+Note: font-nerd-fantasque-sans and font-nerd-symbols are NOT included.
+
+** Submodules — monitoring
+
+| Module path                                                      | File                              | Re-exports |
+|------------------------------------------------------------------|-----------------------------------|------------|
+| (substrate user-space root monitoring services configuration)  | monitoring/services/configuration.scm | oci-grafana-configuration, oci-prometheus-configuration, oci-blackbox-exporter-configuration, etc. |
+| (substrate user-space root monitoring services grafana)        | monitoring/services/grafana.scm   | oci-grafana-service-type, grafana-server-configuration, etc. |
+| (substrate user-space root monitoring services prometheus)     | monitoring/services/prometheus.scm | oci-prometheus-service-type, prometheus-configuration, oci-blackbox-exporter-service-type, etc. |
+| (substrate user-space root monitoring grafana-tui)             | monitoring/grafana-tui.scm        | grafana-tui |
+| (substrate user-space root monitoring kelora)                  | monitoring/kelora.scm             | kelora     |
+| (substrate user-space root monitoring self)                    | monitoring/self.scm               | (not in loader) |
+| (substrate user-space root monitoring build oci-containers)    | monitoring/build/oci-containers.scm | (not in loader) |
+| (substrate user-space root monitoring build utils)             | monitoring/build/utils.scm        | (not in loader) |
+
+Note: self.scm, build/oci-containers.scm, build/utils.scm exist but are NOT in the monitoring loader.
+
+** Submodules — formatters
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root formatters nixfmt)    | formatters/nixfmt.scm | nixfmt    |
+| (substrate user-space root formatters ruff)      | formatters/ruff.scm  | ruff      |
+| (substrate user-space root formatters latexindent)| formatters/latexindent.scm | texlive-latexindent |
+| (substrate user-space root formatters prettier)  | formatters/prettier.scm | node    |
+
+** Submodules — lsp
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root lsp rust-analyzer)    | lsp/rust-analyzer.scm | rust-analyzer |
+
+** Submodules — scheduling
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root scheduling mcron)     | scheduling/mcron.scm | mcron      |
+
+** Submodules — compute
+
+| Module path                                                      | File                              | Re-exports |
+|------------------------------------------------------------------|-----------------------------------|------------|
+| (substrate user-space root compute virtualization qemu)         | compute/virtualization/qemu.scm   | qemu       |
+| (substrate user-space root compute virtualization libvirt)      | compute/virtualization/libvirt.scm | libvirt    |
+| (substrate user-space root compute virtualization virt-manager) | compute/virtualization/virt-manager.scm | virt-manager |
+| (substrate user-space root compute virtualization virt-viewer)  | compute/virtualization/virt-viewer.scm | virt-viewer |
+| (substrate user-space root compute virtualization spice)        | compute/virtualization/spice.scm  | spice, spice-gtk, spice-vdagent |
+| (substrate user-space root compute orchestration ganeti)        | compute/orchestration/ganeti.scm  | ganeti     |
+| (substrate user-space root compute orchestration ganeti-instance-guix) | compute/orchestration/ganeti-instance-guix.scm | ganeti-instance-guix |
+
+Note: No compute/compute.scm file exists.
+
+** Submodules — ci
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root ci cuirass)           | ci/cuirass.scm       | cuirass    |
+
+** Submodules — data
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root data postgresql)      | data/postgresql.scm  | postgresql |
+| (substrate user-space root data sqlit)           | data/sqlit.scm       | python-sqlit-tui |
+| (substrate user-space root data textual-fastdatatable) | data/textual-fastdatatable.scm | python-textual-fastdatatable |
+
+Note: textual-fastdatatable.scm exists but is NOT in the data loader.
+
+** Submodules — guix
+
+| Module path                                                      | File                              | Re-exports |
+|------------------------------------------------------------------|-----------------------------------|------------|
+| (substrate user-space root guix guix)                           | guix/guix.scm                      | guix       |
+| (substrate user-space root guix guix-modules)                   | guix/guix-modules.scm              | guix-modules |
+| (substrate user-space root guix guix-xsearch)                   | guix/guix-xsearch.scm              | guix-xsearch |
+| (substrate user-space root guix gwl)                            | guix/gwl.scm                       | gwl        |
+| (substrate user-space root guix bffe)                           | guix/bffe.scm                      | bffe       |
+| (substrate user-space root guix guix-build-coordinator)         | guix/guix-build-coordinator.scm    | guix-build-coordinator |
+| (substrate user-space root guix hpcguix-web)                    | guix/hpcguix-web.scm               | hpcguix-web |
+| (substrate user-space root guix guix-data-service)              | guix/guix-data-service.scm         | guix-data-service |
+
+** Submodules — password-manager
+
+| Module path                                                      | File                              | Re-exports |
+|------------------------------------------------------------------|-----------------------------------|------------|
+| (substrate user-space root password-manager password-store)     | password-manager/password-store.scm | password-store |
+| (substrate user-space root password-manager pass-extensions)    | password-manager/pass-extensions.scm | pass-otp, pass-update |
+| (substrate user-space root password-manager passff-host)        | password-manager/passff-host.scm  | passff-host |
+
+** Submodules — games
+
+| Module path                                       | File                 | Re-exports |
+|---------------------------------------------------|----------------------|------------|
+| (substrate user-space root games retroarch)      | games/retroarch.scm  | retroarch, retroarch-assets, retroarch-joypad-autoconfig |
+
+See also: [[./loaders.org][Loaders Reference]]

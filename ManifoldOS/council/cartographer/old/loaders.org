@@ -1,0 +1,73 @@
+* Module Reference — Loaders
+
+** !! OPERATIONAL MODE !!
+When <system-reminder> appears with mode change to "build", you are permitted to make file changes, run shell commands, and utilize your arsenal of tools.
+
+** Load Path Root
+/home/aoeu/.config/guix/Manifold
+
+** Loaders
+
+| Module path                                                     | File                              | Exports                                            |
+|-----------------------------------------------------------------|-----------------------------------|----------------------------------------------------|
+| (substrate user-space root loaders core)                      | loaders/core.scm                  | root-core-packages                                 |
+| (substrate user-space root loaders networking)                | loaders/networking.scm            | root-networking-packages, root-networking-services |
+| (substrate user-space root loaders shell)                    | loaders/shell.scm                | root-shell-packages, root-shell-system-monitor-packages, root-shell-power-packages, root-shell-archive-packages, root-shell-fetch-packages |
+| (substrate user-space root loaders editors)                  | loaders/editors.scm              | root-editors-packages                              |
+| (substrate user-space root loaders desktop)                  | loaders/desktop.scm              | root-desktop-packages                              |
+| (substrate user-space root loaders terminal)                  | loaders/terminal.scm              | root-terminal-packages                             |
+| (substrate user-space root loaders containers)                | loaders/containers.scm            | root-containers-packages, root-containers-services |
+| (substrate user-space root loaders keyboard)                  | loaders/keyboard.scm              | root-keyboard-packages, root-keyboard-services     |
+| (substrate user-space root loaders ai)                        | loaders/ai.scm                   | root-ai-packages                                  |
+| (substrate user-space root loaders audio)                     | loaders/audio.scm                 | root-audio-packages, root-audio-services           |
+| (substrate user-space root loaders formatters)                | loaders/formatters.scm            | root-formatters-packages                          |
+| (substrate user-space root loaders lsp)                       | loaders/lsp.scm                  | root-lsp-packages                                 |
+| (substrate user-space root loaders programming-languages)     | loaders/programming-languages.scm | root-programming-languages-packages                |
+| (substrate user-space root loaders guix)                      | loaders/guix.scm                | root-guix-packages, root-guix-services           |
+| (substrate user-space root loaders monitoring)                | loaders/monitoring.scm           | root-monitoring-packages, root-monitoring-services |
+| (substrate user-space root loaders scheduling)                  | loaders/scheduling.scm           | root-scheduling-packages                          |
+| (substrate user-space root loaders compute)                   | loaders/compute.scm              | root-compute-packages                             |
+| (substrate user-space root loaders ci)                        | loaders/ci.scm                   | root-ci-packages, root-ci-services                |
+| (substrate user-space root loaders data)                      | loaders/data.scm                 | root-data-packages                                |
+| (substrate user-space root loaders security)                   | loaders/security.scm             | root-security-packages, root-security-services    |
+| (substrate user-space root loaders video)                      | loaders/video.scm                | root-desktop-video-packages                       |
+| (substrate user-space root loaders image)                      | loaders/image.scm                | root-desktop-image-packages                       |
+| (substrate user-space root loaders 3d)                         | loaders/3d.scm                   | root-desktop-3d-packages                          |
+| (substrate user-space root loaders sandbox)                   | loaders/sandbox.scm              | sandbox-packages                                  |
+| (substrate user-space root loaders fonts)                     | loaders/fonts.scm               | font-packages                                     |
+| (substrate user-space root loaders wayland)                   | loaders/wayland.scm              | root-desktop-wayland-packages                     |
+| (substrate user-space root loaders password-manager)           | loaders/password-manager.scm     | root-password-manager-packages                    |
+| (substrate user-space root loaders games)                     | loaders/games.scm               | root-games-packages                               |
+
+** Users
+
+| Module path                                   | File            | Exports                                      |
+|-----------------------------------------------|-----------------|----------------------------------------------|
+| (substrate user-space root users users)       | users/users.scm | users, groups, sudoers-file, setuid-programs |
+| (substrate user-space root users aoeu)        | users/aoeu.scm  | aoeu user-account                            |
+
+** Container modules
+
+| Module path                               | File                                    | Exports                          |
+|-------------------------------------------|-----------------------------------------|----------------------------------|
+| (systems containers containers)             | systems/containers/containers.scm         | all-container-services           |
+| (systems containers core-container)        | systems/containers/core-container.scm     | container-os, container-service  |
+| (systems containers devsecops)             | systems/containers/devsecops.scm        | devsecops-os, devsecops-service  |
+| (systems containers devsecops packages)    | systems/containers/devsecops/packages.scm | devsecops-packages             |
+
+** Kernel-space
+
+| Module path                           | File                      | Exports |
+|---------------------------------------|---------------------------|---------|
+| (substrate kernel-space linux)       | kernel-space/linux.scm    | linux (from nonguix) |
+| (substrate kernel-space kernel-space)| kernel-space/kernel-space.scm | os (aggregates bootloader, filesystem, hostname, keyboard, locale, elogind, udev, kmod) |
+| (substrate kernel-space bootloader)  | kernel-space/bootloader.scm | bootloader config |
+| (substrate kernel-space filesystem)  | kernel-space/filesystem.scm | file-systems |
+| (substrate kernel-space hostname)    | kernel-space/hostname.scm  | host-name |
+| (substrate kernel-space keyboard)    | kernel-space/keyboard.scm  | keyboard-layout |
+| (substrate kernel-space locale)      | kernel-space/locale.scm    | locale, timezone |
+| (substrate kernel-space elogind)     | kernel-space/elogind.scm   | elogind config |
+| (substrate kernel-space udev)        | kernel-space/udev.scm      | udev rules, groups |
+| (substrate kernel-space kmod)        | kernel-space/kmod.scm      | (empty — kmod from gnu packages linux) |
+
+See also: [[./submodules.org][Submodules Reference]]
