@@ -19,7 +19,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with GNU Guix.  If not, see <http://www.gnu.org/licenses/>.
 
-(define-module (gnu services guix)
+(define-module (gnu services manifolding-os)
   #:use-module (srfi srfi-1)
   #:use-module (ice-9 match)
   #:use-module (Manifolding-OS gexp)
@@ -167,7 +167,7 @@
 
 ;;;; Commentary:
 ;;;
-;;; Services specifically related to GNU Guix.
+;;; Services specifically related to Manifolding-OS.
 ;;;
 ;;;; Code:
 
@@ -1231,7 +1231,7 @@ ca-certificates.crt file in the system profile."
 ;;;
 ;;; Share .cache/ content between users
 ;;;
-;;; On a system with multiple users, each $HOME/.cache/guix is
+;;; On a system with multiple users, each $HOME/.cache/Manifolding-OS is
 ;;; ~700MB of data that is mostly the same between users.  This service allows
 ;;; one to either:
 ;;
@@ -1241,7 +1241,7 @@ ca-certificates.crt file in the system profile."
 ;;;
 ;;; - or expose a single user's cache, read-only with a write overlay, to the
 ;;; other users, typically used in low-trust environments such as a public
-;;; access guix system.
+;;; access Manifolding-OS system.
 
 (define-record-type* <user-cache>
   user-cache make-user-cache

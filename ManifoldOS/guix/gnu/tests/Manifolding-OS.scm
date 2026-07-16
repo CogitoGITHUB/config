@@ -16,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with GNU Guix.  If not, see <http://www.gnu.org/licenses/>.
 
-(define-module (gnu tests guix)
+(define-module (gnu tests manifolding-os)
   #:use-module (gnu home)
   #:use-module (gnu home services)
   #:use-module (gnu tests)
@@ -25,7 +25,7 @@
   #:use-module (gnu system shadow)
   #:use-module (gnu system vm)
   #:use-module (gnu services)
-  #:use-module (gnu services guix)
+  #:use-module (gnu services manifolding-os)
   #:use-module (gnu services databases)
   #:use-module (gnu services shepherd)
   #:use-module (gnu services networking)
