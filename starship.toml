@@ -2,23 +2,14 @@ add_newline = false
 command_timeout = 800
 
 format = """
-[](#8B0000)🌹 \
-$username\
-[](#8B0000) @ \
-$hostname\
- [](#8B0000)\
-$directory\
- [](#8B0000)\
-$git_branch\
- [](#8B0000)\
-$git_status\
-[](#8B0000)\
-$fill\
-[](#8B0000)\
-$time\
+[](#8B0000)🌹  [](bold #D4A574)$username\
+[](#8B0000) at [](bold #C49A6C)$hostname\
+[](#8B0000) in [](bold #9C6644)$directory\
+[](#8B0000) on [](bold #7F4F24)$git_branch\
+[](#8B0000)$git_status
+[](fg:#8B0000)🕊️ [](fg:#D4A574)$time\
 [](#8B0000)
-[](#8B0000)\
-$character\
+[](bold #8B0000)$character\
 """
 
 [username]
@@ -28,44 +19,44 @@ format = "[$user]($style)"
 show_always = true
 
 [hostname]
-style = "#8B0000"
+style = "#D4A574"
 format = "[$hostname]($style)"
 ssh_only = false
 
 [directory]
-style = "#8B0000"
+style = "#C49A6C"
 format = "[$path]($style)"
 truncation_length = 3
 truncation_symbol = "…/"
 
 [git_branch]
-style = "#8B0000"
+style = "#9C6644"
 format = "[\\($branch\\)]($style)"
 
 [git_status]
-style = "#8B0000"
+style = "#7F4F24"
 format = " [$all_status$ahead_behind]($style)"
-conflicted = "✗$count"
-ahead = "↑$count"
-behind = "↓$count"
-diverged = "↕$count"
-untracked = "?$count"
-stashed = "⚑$count"
-modified = "~$count"
-staged = "+$count"
-renamed = "»$count"
-deleted = "✗$count"
+conflicted = "⚔️$count"
+ahead = "🌱$count"
+behind = "🌙$count"
+diverged = "🌀$count"
+untracked = "🌫️$count"
+stashed = "📦$count"
+modified = "🖋️$count"
+staged = "✨$count"
+renamed = "🔄$count"
+deleted = "💔$count"
 
 [time]
 disabled = false
-style = "#8B0000"
+style = "#D4A574"
 time_format = "%Y-%m-%d %H:%M"
 format = "[ $time]($style)"
 
 [character]
 format = "$symbol"
-success_symbol = "[❯](bold #8B0000)"
-error_symbol = "[❯](bold #8B0000)"
+success_symbol = "[🌹](bold #8B0000)"
+error_symbol = "[🥀](bold #8B0000)"
 
 [cmd_duration]
 disabled = true
