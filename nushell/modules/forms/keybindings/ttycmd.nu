@@ -40,6 +40,16 @@ let keybindings = [
     }
   }
   {
+    name: emacs
+    modifier: control
+    keycode: char_e
+    mode: [emacs, vi_insert, vi_normal]
+    event: {
+      send: executehostcommand
+      cmd: "emacsclient -nw ."
+    }
+  }
+  {
     name: superfile
     modifier: control
     keycode: char_s
@@ -56,7 +66,7 @@ let keybindings = [
     mode: vi_normal
     event: {
       send: executehostcommand
-      cmd: "emacs -nw ."
+      cmd: "emacsclient -nw ."
     }
   }
 ];

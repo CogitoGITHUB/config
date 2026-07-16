@@ -4,7 +4,7 @@
 def fzf-open [path?: string] {
     let root = ($path | default ".")
     let file = (^bash -c $"fd --type f . '($root)' | fzf --preview 'bat --color=always --style=numbers {}' --preview-window 'right:60%:wrap' --prompt '  File> ' --header 'ENTER to open in emacs'" | str trim)
-    if not ($file | is-empty) { ^emacs $file }
+    if not ($file | is-empty) { ^emacsclient $file }
 }
 
 def fzf-bat [path?: string] {
