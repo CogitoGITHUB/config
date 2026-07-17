@@ -26,6 +26,11 @@
       "type": "local",
       "command": ["socat", "-", "UNIX-CONNECT:~/.emacs.d/.local/cache/emacs-mcp-server.sock"],
       "enabled": true
+    },
+    "herdr": {
+      "type": "local",
+      "command": ["node", "/home/aoeu/.local/share/herdr-mcp/dist/index.js"],
+      "enabled": true
     }
   },
   "instructions": ["~/.config/opencode/instructions/emacs.md"]

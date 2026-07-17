@@ -2,4 +2,4 @@
   #:use-module (substrate user-space root programming-languages lisp)
   #:export (root-programming-languages-packages))
 
-(define root-programming-languages-packages (list guile))
+(define root-programming-languages-packages (list guile guile-ares-rs))

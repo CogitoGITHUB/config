@@ -8,14 +8,14 @@
 (define-public herdr
   (package
     (name "herdr")
-    (version "0.7.1")
+    (version "0.7.4")
     (source
       (origin
         (method url-fetch)
         (uri (string-append
               "https://github.com/ogulcancelik/herdr/releases/download/v" version
               "/herdr-linux-x86_64"))
-        (sha256 (base32 "0m56v2ws8rwwb6h309k2q953z2p9z1yayr3cdr5za8iczjpsqrdr"))))
+        (sha256 (base32 "0n9h20yaq3q5iqvmbsx6rig7hdp0gzk46fimqb5gj0559cnw03xw"))))
     (build-system trivial-build-system)
     (arguments
       '(#:modules ((guix build utils))

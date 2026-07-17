@@ -6,30 +6,53 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu",
       "public_pane_numbers": {
-        "10": 1
+        "1": 1,
+        "2": 2
       },
-      "next_public_pane_number": 2,
+      "next_public_pane_number": 3,
       "public_tab_numbers": [
-        1
+        1,
+        2
       ],
-      "next_public_tab_number": 2,
+      "next_public_tab_number": 3,
       "tabs": [
         {
-          "custom_name": null,
+          "custom_name": "opencode",
           "layout": {
-            "Pane": 10
+            "Pane": 1
           },
           "panes": {
-            "10": {
-              "cwd": "/home/aoeu"
+            "1": {
+              "cwd": "/home/aoeu",
+              "label": "opencode",
+              "agent_session": {
+                "source": "herdr:opencode",
+                "agent": "opencode",
+                "kind": "id",
+                "value": "ses_090170a36ffe1SWo7oOo6UJCHx"
+              }
             }
           },
           "zoomed": false,
-          "focused": 10,
-          "root_pane": 10
+          "focused": 1,
+          "root_pane": 1
+        },
+        {
+          "custom_name": "emacs",
+          "layout": {
+            "Pane": 2
+          },
+          "panes": {
+            "2": {
+              "cwd": "/home/aoeu/test"
+            }
+          },
+          "zoomed": false,
+          "focused": 2,
+          "root_pane": 2
         }
       ],
-      "active_tab": 0
+      "active_tab": 1
     }
   ],
   "active": 0,
