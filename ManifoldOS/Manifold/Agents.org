@@ -1,0 +1,89 @@
+# ManifoldOS — Agent Instructions
+
+## Architecture
+
+ManifoldOS is a declarative OS composition model built on GNU Guix.
+
+```
+constitution.scm → substrate/ → shapes/ → forms/ → system
+```
+
+- **constitution.scm** — entry point, wires substrate + shapes + forms
+- **substrate/** — base OS reality (kernel, packages, services, home)
+- **shapes/** — system type taxonomy (containers, VMs, ISOs)
+- **forms/** — construction rules (planned)
+
+## Adding a system package
+
+### If the package exists in upstream Guix
+
+1. Find it under `gnu/packages/` (e.g., `(gnu packages networking)` has `socat`)
+2. Open the matching **loader** at `substrate/user-space/root/loaders/<category>.scm`
+3. Add the package name to that loader's:
+   - `#:re-export` list
+   - `root-<category>-packages` list
+
+Example — adding `socat`:
+```scheme
+;; In loaders/networking.scm:
+  #:re-export (socat ...existing...)
+  
+(define-public root-networking-packages
+  (list ...existing... socat))
+```
+
+### If the package does NOT exist in upstream Guix
+
+1. Create a new `.scm` file in `substrate/user-space/root/<category>/` (e.g., `socat.scm`)
+2. Follow the standard package definition pattern with `define-public`:
+   ```scheme
+   (define-module (substrate user-space root networking socat)
+     #:use-module (guix packages)
+     #:use-module (guix download)
+     #:use-modulation (guix build-system gnu)
+     #:use-module ((guix licenses) #:prefix license:)
+     #:export (socat))
+   
+   (define-public socat
+     (package
+       (name "socat")
+       (version "1.7.4.4")
+       (source (origin
+                 (method url-fetch)
+                 (uri (string-append ...))
+                 (sha256 (base32 "..."))))
+       (build-system gnu-build-system)
+       (home-page "http://www.dest-unreach.org/socat/")
+       (synopsis "Open bidirectional communication channels")
+       (description "...")
+       (license license:gpl2)))
+   ```
+3. Import and add it in the matching loader (same as above, but use the local module path instead of `gnu packages ...`)
+
+### Reconfiguring
+
+After any change, reconfigure:
+```bash
+guix system reconfigure ~/.config/ManifoldOS/system.scm
+```
+
+Or for home-only changes:
+```bash
+guix home reconfigure ~/guix-home-config.scm
+```
+
+### Checking if a package exists
+
+```bash
+guix search <name>        # search upstream
+ls gnu/packages/          # browse category files
+grep "define-public socat" gnu/packages/*.scm   # find where it's defined
+```
+
+## How the loaders work
+
+Each domain (networking, editors, shell, etc.) has:
+- A **package directory** at `substrate/user-space/root/<domain>/` — individual `.scm` files defining packages
+- A **loader** at `substrate/user-space/root/loaders/<domain>.scm` — imports all packages and exports a consolidated list
+
+The loader's exported list (`root-<domain>-packages`) gets collected into `root-system-packages` in `substrate/user-space/root/root.scm`, then into `constitution.scm`.

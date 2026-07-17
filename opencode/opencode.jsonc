@@ -1,0 +1,32 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": "allow",
+  "mcp": {
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@github/mcp-server"],
+      "enabled": true
+    },
+    "context7": {
+      "type": "local",
+      "command": ["npx", "-y", "@upstash/context7-mcp"],
+      "enabled": true
+    },
+    "filesystem": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/"],
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "enabled": true
+    },
+    "emacs": {
+      "type": "local",
+      "command": ["socat", "-", "UNIX-CONNECT:~/.emacs.d/.local/cache/emacs-mcp-server.sock"],
+      "enabled": true
+    }
+  },
+  "instructions": ["~/.config/opencode/instructions/emacs.md"]
+}

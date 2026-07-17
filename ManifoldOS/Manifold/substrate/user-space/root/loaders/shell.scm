@@ -33,7 +33,8 @@
   #:use-module (substrate user-space root shell nur)
   #:use-module (substrate user-space root shell tailspin)
   #:use-module (substrate user-space root shell cpx)
-  #:re-export (nushell television fzf starship bash zoxide zellij carapace atuin superfile rip-cli eza herdr psleep splashboard twatch broot nur tailspin cpx
+  #:use-module (substrate user-space root shell csakura)
+  #:re-export (nushell television fzf starship bash zoxide zellij carapace atuin superfile rip-cli eza herdr psleep splashboard twatch broot nur tailspin cpx csakura
 htop ncdu glances diskwatch syswatch
                upower tlp acpi
                unzip zstd xz
@@ -45,7 +46,7 @@ htop ncdu glances diskwatch syswatch
             root-shell-fetch-packages))
 
 (define root-shell-packages
-  (list nushell television fzf starship bash zoxide zellij carapace atuin superfile rip-cli eza herdr psleep splashboard twatch broot nur tailspin cpx))
+  (list nushell television fzf starship bash zoxide zellij carapace atuin superfile rip-cli eza herdr psleep splashboard twatch broot nur tailspin cpx csakura))
 
 (define-public root-shell-system-monitor-packages
   (list btop htop ncdu glances diskwatch syswatch))

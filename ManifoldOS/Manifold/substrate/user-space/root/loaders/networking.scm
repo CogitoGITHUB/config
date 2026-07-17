@@ -29,12 +29,12 @@
   #:use-module (gnu services base)
   #:use-module (gnu services desktop)
   #:use-module (guix gexp)
-  #:re-export (yt-dlp gazelle-tui bluez bluetuith config-tailscaled-service-type
+  #:re-export (socat yt-dlp gazelle-tui bluez bluetuith config-tailscaled-service-type
                 nmap wireshark bind-dns iperf iproute iwd netwatch ttl gitpane surge kyanos lazyssh ligolo-agent ligolo-proxy noodle)
   #:export (root-networking-packages root-networking-services))
 
 (define-public root-networking-packages
-  (list git github-cli lazygit gitpane openssh curl yt-dlp tailscale nss-certs network-manager gazelle-tui bluez bluetuith nmap wireshark bind-dns iperf iproute iwd netwatch ttl surge kyanos lazyssh ligolo-agent ligolo-proxy noodle))
+  (list git github-cli lazygit gitpane openssh curl yt-dlp tailscale nss-certs network-manager gazelle-tui bluez bluetuith nmap wireshark bind-dns iperf iproute iwd netwatch ttl surge kyanos lazyssh ligolo-agent ligolo-proxy noodle socat))
 
 (define-public root-networking-services
   (list (service network-manager-service-type
