@@ -6,15 +6,17 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu",
       "public_pane_numbers": {
-        "1": 1,
-        "2": 2
+        "3": 3,
+        "2": 2,
+        "1": 1
       },
-      "next_public_pane_number": 3,
+      "next_public_pane_number": 4,
       "public_tab_numbers": [
         1,
-        2
+        2,
+        3
       ],
-      "next_public_tab_number": 3,
+      "next_public_tab_number": 4,
       "tabs": [
         {
           "custom_name": "opencode",
@@ -50,9 +52,23 @@
           "zoomed": false,
           "focused": 2,
           "root_pane": 2
+        },
+        {
+          "custom_name": "ManifoldOS",
+          "layout": {
+            "Pane": 3
+          },
+          "panes": {
+            "3": {
+              "cwd": "/home/aoeu/.config/ManifoldOS"
+            }
+          },
+          "zoomed": false,
+          "focused": 3,
+          "root_pane": 3
         }
       ],
-      "active_tab": 1
+      "active_tab": 2
     }
   ],
   "active": 0,
