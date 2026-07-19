@@ -43,6 +43,7 @@
   #:use-module (substrate user-space root nix)
   #:use-module (substrate user-space root loaders containers)
   #:use-module (substrate user-space root loaders hardware)
+  #:use-module (substrate user-space root loaders tex)
   #:re-export (users groups sudoers-file setuid-programs manifoldos-image seatd-service)
   #:export (root-system-packages root-system-services))
 
@@ -79,7 +80,8 @@
           sandbox-packages
           font-packages
           podman-packages
-          root-hardware-packages))
+          root-hardware-packages
+          root-tex-packages))
 
 (define-public root-system-services
   (append
