@@ -567,6 +567,8 @@
     ("m" my/vulpea-protocols-mark-as-step "mark step" :exit t)
     ("M" my/vulpea-protocols-goto-routed-file "protocol file" :exit t)
     ("i" my/vulpea-find-protocols "find protocols" :exit t))
+   "Vocab"
+   (("w" my/vulpea-vocab-menu "vocab" :exit t))
    "Transclude"
    (("y" my/transclusion-hydra/body "transclude" :exit t))
    "Back"

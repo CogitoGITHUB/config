@@ -7465,3 +7465,12 @@
 2026-07-24T09:35:09.249499Z  INFO herdr::server::headless: client resize client_id=14 cols=106 rows=78 cell_width_px=0 cell_height_px=0
 2026-07-24T09:35:45.528599Z  WARN herdr::logging: api output wait timed out event="api.wait.timeout" subsystem="api" outcome="timeout" request_id="req_1" pane_id="w1H:pC"
 2026-07-24T09:35:45.528679Z  INFO herdr::logging: api request completed event="api.request.complete" subsystem="api" outcome="timeout" request_id="req_1" method="pane.wait_for_output"
+2026-07-24T09:40:55.716265Z  INFO herdr::server::headless: client resize client_id=14 cols=106 rows=104 cell_width_px=0 cell_height_px=0
+2026-07-24T09:40:55.916443Z  INFO herdr::server::headless: client resize client_id=14 cols=106 rows=78 cell_width_px=0 cell_height_px=0
+2026-07-24T09:40:59.458354Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t2"
+2026-07-24T09:41:04.480116Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-07-24T09:41:05.356071Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t1"
+2026-07-24T09:41:10.369081Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-07-24T09:41:31.711661Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t9"
+2026-07-24T09:41:33.567351Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:tC"
+2026-07-24T09:41:35.828117Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t9"
