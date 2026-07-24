@@ -6,6 +6,7 @@ elpa/
 eln-cache/
 eln/
 cache/
+.cache/
 network-security.data
 places
 recentf
@@ -19,5 +20,17 @@ projectile.cache
 straight/
 /manifolding-emacs/
 vulpea.db
+vulpea.db.corrupted
+.org-id-locations
+elfeed/
+eww-bookmarks
+hackernews/
+projects
+request/
+tramp
+transient/
+latex-template/*.pdf
+latex-template/images/
+:memory:
 
 manifolding-emacs-errors.log.el
