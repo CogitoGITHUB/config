@@ -1,0 +1,25 @@
+#+title:      mcp-server
+#+identifier: 7e8b9c0d-1a2b-3c4d-5e6f-7a8b9c0d1e2f
+#+filetags:   :emacs-package:ai:
+
+* MCP Server for Emacs — LLM access to buffers, elisp, org
+:PROPERTIES:
+:ID:      7e8b9c0d-1a2b-3c4d-5e6f-7a8b9c0d1e2f
+:PACKAGE: mcp-server
+:STRAIGHT: (mcp-server :type git :host github :repo "rhblind/emacs-mcp-server" :files ("*.el" "tools/*.el"))
+:CATEGORY: ai
+:END:
+
+Exposes Emacs buffers, elisp eval, diagnostics, and org-mode as MCP tools.
+OpenCode connects via socat to the Unix socket.
+
+** Socket dir :init:
+#+begin_src emacs-lisp
+  (setq mcp-server-socket-directory
+        (expand-file-name ".local/cache/" user-emacs-directory))
+#+end_src
+
+** Hook :config:
+#+begin_src emacs-lisp
+  (add-hook 'emacs-startup-hook #'mcp-server-start-unix)
+#+end_src

@@ -1,0 +1,120 @@
+19:40:41.500: Platform: Wayland
+19:40:41.501: CPU Name: Intel(R) Core(TM) i3-10110U CPU @ 2.10GHz
+19:40:41.501: CPU Speed: 3300.084MHz
+19:40:41.501: Physical Cores: 2, Logical Cores: 4
+19:40:41.501: Physical Memory: 7809MB Total, 653MB Free
+19:40:41.501: Kernel Version: Linux 6.18.37
+19:40:41.501: Distribution: "Guix System" Unknown
+19:40:41.501: Desktop Environment: Hyprland
+19:40:41.501: Session Type: wayland
+19:40:41.504: Current Date/Time: 2026-07-21, 07:40:41 PM
+19:40:41.504: Browser Hardware Acceleration: true
+19:40:41.504: Qt Version: 6.9.2 (runtime), 6.9.2 (compiled)
+19:40:41.504: Portable mode: false
+19:40:41.583: OBS 32.0.4 (linux)
+19:40:41.583: ---------------------------------
+19:40:41.588: ---------------------------------
+19:40:41.588: audio settings reset:
+19:40:41.588: 	samples per sec: 48000
+19:40:41.588: 	speakers:        2
+19:40:41.588: 	max buffering:   960 milliseconds
+19:40:41.588: 	buffering type:  dynamically increasing
+19:40:41.592: ---------------------------------
+19:40:41.592: Initializing OpenGL...
+19:40:41.592: Using EGL/Wayland
+19:40:41.601: Initialized EGL 1.5
+19:40:41.619: Loading up OpenGL on adapter Intel Mesa Intel(R) UHD Graphics (CML GT2)
+19:40:41.619: OpenGL loaded successfully, version 4.6 (Core Profile) Mesa 26.0.2, shading language 4.60
+19:40:41.810: ---------------------------------
+19:40:41.810: video settings reset:
+19:40:41.810: 	base resolution:   1920x1080
+19:40:41.810: 	output resolution: 1920x1080
+19:40:41.810: 	downscale filter:  Bicubic
+19:40:41.810: 	fps:               30/1
+19:40:41.810: 	format:            NV12
+19:40:41.810: 	YUV mode:          Rec. 709/Partial
+19:40:41.810: NV12 texture support enabled
+19:40:41.810: P010 texture support not available
+19:40:41.821: Audio monitoring device:
+19:40:41.821: 	name: Default
+19:40:41.821: 	id: default
+19:40:41.826: ---------------------------------
+19:40:41.830: Failed to load 'en-US' text for module: 'decklink-captions.so'
+19:40:41.833: Failed to load 'en-US' text for module: 'decklink-output-ui.so'
+19:40:41.836: A DeckLink iterator could not be created.  The DeckLink drivers may not be installed
+19:40:41.836: Failed to initialize module 'decklink.so'
+19:40:42.049: [pipewire] No capture sources available
+19:40:42.061: v4l2loopback not installed, virtual camera not registered
+19:40:42.125: VAAPI: Failed to initialize display in vaapi_device_h264_supported
+19:40:42.125: FFmpeg VAAPI H264 encoding not supported
+19:40:42.125: VAAPI: Failed to initialize display in vaapi_device_av1_supported
+19:40:42.125: FFmpeg VAAPI AV1 encoding not supported
+19:40:42.125: VAAPI: Failed to initialize display in vaapi_device_hevc_supported
+19:40:42.125: FFmpeg VAAPI HEVC encoding not supported
+19:40:42.197: [obs-websocket] [obs_module_load] you can haz websockets (Version: 5.6.3 | RPC Version: 1)
+19:40:42.197: [obs-websocket] [obs_module_load] Qt version (compile-time): 6.9.2 | Qt version (run-time): 6.9.2
+19:40:42.197: [obs-websocket] [obs_module_load] Linked ASIO Version: 103600
+19:40:42.216: [obs-websocket] [obs_module_load] Module loaded.
+19:40:42.235: [vlc-video]: VLC 3.0.23 Vetinari found, VLC video source enabled
+19:40:42.235: ---------------------------------
+19:40:42.235:   Loaded Modules:
+19:40:42.235:     vlc-video.so
+19:40:42.235:     text-freetype2.so
+19:40:42.235:     rtmp-services.so
+19:40:42.235:     obs-x264.so
+19:40:42.235:     obs-websocket.so
+19:40:42.235:     obs-webrtc.so
+19:40:42.235:     obs-vst.so
+19:40:42.235:     obs-transitions.so
+19:40:42.235:     obs-outputs.so
+19:40:42.235:     obs-filters.so
+19:40:42.235:     obs-ffmpeg.so
+19:40:42.235:     linux-v4l2.so
+19:40:42.235:     linux-pulseaudio.so
+19:40:42.235:     linux-pipewire.so
+19:40:42.235:     linux-capture.so
+19:40:42.235:     linux-alsa.so
+19:40:42.235:     image-source.so
+19:40:42.235:     frontend-tools.so
+19:40:42.235:     decklink-output-ui.so
+19:40:42.235:     decklink-captions.so
+19:40:42.235: ---------------------------------
+19:40:42.235: [obs-websocket] [obs_module_post_load] WebSocket server is enabled, starting...
+19:40:42.236: [obs-websocket] [WebSocketServer::Start] Not locked to IPv4 bindings
+19:40:42.237: [obs-websocket] [WebSocketServer::ServerRunner] IO thread started.
+19:40:42.239: [obs-websocket] [WebSocketServer::Start] Server started successfully on port 4455. Possible connect address: 192.168.1.184
+19:40:42.240: ---------------------------------
+19:40:42.240: Available Encoders:
+19:40:42.240:   Video Encoders:
+19:40:42.240: 	- ffmpeg_svt_av1 (SVT-AV1)
+19:40:42.240: 	- ffmpeg_aom_av1 (AOM AV1)
+19:40:42.240: 	- obs_x264 (x264)
+19:40:42.240:   Audio Encoders:
+19:40:42.240: 	- ffmpeg_aac (FFmpeg AAC)
+19:40:42.240: 	- ffmpeg_opus (FFmpeg Opus)
+19:40:42.240: 	- ffmpeg_pcm_s16le (FFmpeg PCM (16-bit))
+19:40:42.240: 	- ffmpeg_pcm_s24le (FFmpeg PCM (24-bit))
+19:40:42.240: 	- ffmpeg_pcm_f32le (FFmpeg PCM (32-bit float))
+19:40:42.240: 	- ffmpeg_alac (FFmpeg ALAC (24-bit))
+19:40:42.240: 	- ffmpeg_flac (FFmpeg FLAC (16-bit))
+19:40:42.240: ==== Startup complete ===============================================
+19:40:42.295: All scene data cleared
+19:40:42.295: ------------------------------------------------
+19:40:42.307: Device for 'Audio Output Capture' source Desktop Audio is also used for audio monitoring.
+19:40:42.307: Deduplication logic is being applied to all monitored sources.
+19:40:42.307: pulse-input: Unable to get server info !
+19:40:42.307: [Loaded global audio device]: 'Desktop Audio'
+19:40:42.307: pulse-input: Unable to get server info !
+19:40:42.307: [Loaded global audio device]: 'Mic/Aux'
+19:40:42.307: Source ID 'pipewire-desktop-capture-source' not found
+19:40:42.307: Failed to create source 'Display Capture'!
+19:40:42.309: Switched to scene 'Scene'
+19:40:42.309: ------------------------------------------------
+19:40:42.309: Loaded scenes:
+19:40:42.309: - scene 'Scene':
+19:40:42.309:     - source: 'Display Capture' (pipewire-desktop-capture-source)
+19:40:42.309: ------------------------------------------------
+19:40:42.321: Device for 'Audio Output Capture' source Desktop Audio is also used for audio monitoring.
+19:40:42.321: Deduplication logic is being applied to all monitored sources.
+19:40:42.515: [rtmp-services plugin] Successfully updated file 'services.json' (version 286)
+19:40:42.515: [rtmp-services plugin] Successfully updated package (version 286)

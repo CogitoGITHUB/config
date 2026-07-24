@@ -1,0 +1,42 @@
+#+title:      State Validation Prompt
+#+priority:   5
+
+* State Validation
+Why: Tracks the Prime Constraint review lifecycle. Default is DRAFT.
+
+** Default (default DRAFT)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-state-validation ()
+  "Prompt for STATE_VALIDATION. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "STATE_VALIDATION: "
+              '("⚠ WARNING" "DRAFT" "REVIEWED" "VALIDATED" "FAILED" "SUPERSEDED")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-state-validation-initial (initial)
+  "Prompt for STATE_VALIDATION with INITIAL pre-selected."
+  (completing-read
+   "STATE_VALIDATION: "
+   '("DRAFT" "REVIEWED" "VALIDATED" "FAILED" "SUPERSEDED")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'state-validation
+  :name 'state-validation
+  :label "State: Validation"
+  :prompt-fn #'my/vulpea-prompt-state-validation
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "STATE_VALIDATION"))
+  :merge-strategy 'replace
+   :to-plist (lambda (val _ctx)
+               (when val
+                 `(:properties (("STATE_VALIDATION" . ,val))
+                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_VALIDATION" val))))))
+#+end_src

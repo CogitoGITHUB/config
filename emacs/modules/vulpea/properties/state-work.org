@@ -1,0 +1,42 @@
+#+title:      State Work Prompt
+#+priority:   5
+
+* State Work
+Why: Tracks the current work status of the note. Default is ACTIVE.
+
+** Default (default ACTIVE)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-state-work ()
+  "Prompt for STATE_WORK. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "STATE_WORK: "
+              '("⚠ WARNING" "ACTIVE" "PAUSED" "BLOCKED" "WAITING" "ABANDONED" "COMPLETE")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-state-work-initial (initial)
+  "Prompt for STATE_WORK with INITIAL pre-selected."
+  (completing-read
+   "STATE_WORK: "
+   '("ACTIVE" "PAUSED" "BLOCKED" "WAITING" "ABANDONED" "COMPLETE")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'state-work
+  :name 'state-work
+  :label "State: Work"
+  :prompt-fn #'my/vulpea-prompt-state-work
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "STATE_WORK"))
+  :merge-strategy 'replace
+   :to-plist (lambda (val _ctx)
+               (when val
+                 `(:properties (("STATE_WORK" . ,val))
+                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_WORK" val))))))
+#+end_src

@@ -1,0 +1,16 @@
+#+title:      ytdl
+#+identifier: 68b39ed3-5250-4c3b-8c5d-d4050c6db710
+#+filetags:   :emacs-package:multimedia:
+
+* ytdl
+:PROPERTIES:
+:ID:       68b39ed3-5250-4c3b-8c5d-d4050c6db710
+:PACKAGE:  ytdl
+:CATEGORY: multimedia
+:STRAIGHT: (ytdl :type git :host gitlab :repo "tuedachu/ytdl")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

@@ -1,0 +1,21 @@
+#+title:      cdlatex
+#+identifier: 5b1c9e3f-2d7a-4f8b-ce34-9a2d5e8b1c4f
+#+filetags:   :emacs-package:latex:
+
+* CDLATEX — Fast LaTeX Input #emacs-package
+:PROPERTIES:
+:ID:       5b1c9e3f-2d7a-4f8b-ce34-9a2d5e8b1c4f
+:PACKAGE:  cdlatex
+:STRAIGHT: (cdlatex :type git :host github :repo "cdominik/cdlatex")
+:CATEGORY: latex
+:END:
+
+** Guix
+#+begin_src scheme :tangle ~/.config/guix/Operating-System/user-space/root/editors/emacs-packages/latex/cdlatex.scm
+#+end_src
+
+** Config
+#+begin_src emacs-lisp
+(add-hook 'org-mode-hook #'turn-on-org-cdlatex)
+(add-hook 'LaTeX-mode-hook #'turn-on-cdlatex)
+#+end_src

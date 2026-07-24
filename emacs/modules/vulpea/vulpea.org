@@ -1,0 +1,57 @@
+#+TITLE:      Vulpea
+#+NOTE: The manifolding-mind-map vulpea plugin and mind map web package need work
+
+* Notes Directory
+:PROPERTIES:
+:CATEGORY: config
+:END:
+#+begin_src emacs-lisp
+(defun my/notes-directory ()
+  "Return the root notes directory.
+Both vulpea reads from this single function.
+Change only this path to relocate the entire vault."
+  "/home/aoeu/test/")
+
+(setq org-agenda-files
+      (directory-files-recursively (my/notes-directory) "\\.org$"))
+#+end_src
+* Vulpea Bootstrap
+#+begin_src emacs-lisp
+(setq vulpea-db-location             (expand-file-name "vulpea.db" (my/notes-directory)))
+(setq vulpea-db-sync-directories     (list (my/notes-directory)))
+(setq vulpea-default-notes-directory (my/notes-directory))
+(setq vulpea-db-sync-external-method 'fswatch)
+(setq vulpea-db-sync-verbose          nil)
+(require 'vulpea)
+(defun my/vulpea-db-sync--fswatch-sentinel (proc event)
+  (unless (or (string-match-p "hangup\\|finished" event)
+              (process-live-p proc))
+    (message "Vulpea: fswatch process died (%s), restarting..." (string-trim event))))
+(advice-add 'vulpea-db-sync--fswatch-sentinel :override
+            #'my/vulpea-db-sync--fswatch-sentinel)
+(vulpea-db-autosync-mode +1)
+#+end_src
+* Vulpea Core
+:PROPERTIES:
+:PACKAGE:  vulpea
+:STRAIGHT: (vulpea :type git :host github :repo "d12frosted/vulpea")
+:CATEGORY: notes
+:END:
+** Buffer Functions
+#+begin_src emacs-lisp
+;; Example API calls - evaluate manually, not on load:
+;; (vulpea-buffer-title-get)              ; Get title
+;; (vulpea-buffer-title-set "New Title")  ; Set title
+#+end_src
+** Navigation
+:PROPERTIES:
+:CATEGORY: editing
+:END:
+#+begin_src emacs-lisp
+;; vulpea-find         - find and open a note (creates if missing)
+;; vulpea-insert       - insert an id: link to a note at point
+;; vulpea-find-backlink - completion over notes that link TO the current note;
+;;                        useful for discovering connections and refactoring.
+;; Bind these to keys in your bindings file.
+#+end_src
+

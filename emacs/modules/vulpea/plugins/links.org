@@ -1,0 +1,430 @@
+#+title: Vulpea Links Plugin
+#+priority: 15
+
+Guards file and heading deletion when incoming or outgoing =id:= links exist.
+Guards deletion of untracked files and broken-links.org.
+Provides restore command via Git history.
+Uses native =vulpea-db-query-links-to= and =vulpea-db-query-links-from= API (v2.1+).
+*** Broken Links File
+#+begin_src emacs-lisp
+(defvar my/vulpea-links--broken-links-file "broken-links.org"
+  "Filename for the broken links repair queue.
+Lives in `my/notes-directory'. Auto-created if missing.")
+
+(defun my/vulpea-links--broken-links-path ()
+  "Return full path to broken-links.org in the vault root."
+  (expand-file-name my/vulpea-links--broken-links-file
+                    (my/notes-directory)))
+
+(defun my/vulpea-links--ensure-broken-links-file ()
+  "Create broken-links.org if it does not exist.
+Creates the file and commits to Git."
+  (let ((path (my/vulpea-links--broken-links-path)))
+    (unless (file-exists-p path)
+      (with-temp-file path
+        (insert "#+TITLE: Broken Links\n")
+        (insert "#+AUTHOR: Shape\n")
+        (insert "#+DESCRIPTION: Auto-generated repair queue.")
+        (insert " Broken id: links after deletion.\n")
+        (insert "#+STARTUP: overview\n\n")))
+    path))
+#+end_src
+*** Deleted Files File
+#+begin_src emacs-lisp
+(defvar my/vulpea-links--deleted-files-file "deleted-files.org"
+  "Filename for tracking all deleted .org files.
+Lives in `my/notes-directory'. Auto-created if missing.")
+
+(defun my/vulpea-links--deleted-files-path ()
+  "Return full path to deleted-files.org in the vault root."
+  (expand-file-name my/vulpea-links--deleted-files-file
+                    (my/notes-directory)))
+
+(defun my/vulpea-links--ensure-deleted-files-file ()
+  "Create deleted-files.org if it does not exist."
+  (let ((path (my/vulpea-links--deleted-files-path)))
+    (unless (file-exists-p path)
+      (with-temp-file path
+        (insert "#+TITLE: Deleted Files\n")
+        (insert "#+AUTHOR: Shape\n")
+        (insert "#+DESCRIPTION: Auto-generated log of deleted .org files.\n")
+        (insert "#+STARTUP: overview\n\n")))
+    path))
+#+end_src
+*** File Cleanup Helper
+#+begin_src emacs-lisp
+(defun my/vulpea-links--delete-if-empty (path)
+  "Delete PATH if it contains no org headings."
+  (when (and path (file-exists-p path))
+    (with-temp-buffer
+      (insert-file-contents path)
+      (goto-char (point-min))
+      (unless (re-search-forward "^\\*+ " nil t)
+        (when (file-exists-p path)
+          (delete-file path))))))
+#+end_src
+*** Jump to First Heading on Open
+#+begin_src emacs-lisp
+(defun my/vulpea-links--cleanup-empty-admin-files ()
+  "Delete all admin files that have no headings."
+  (dolist (f (list my/vulpea-links--broken-links-file
+                   my/vulpea-links--deleted-files-file
+                   my/vulpea-missing--file))
+    (my/vulpea-links--delete-if-empty
+     (expand-file-name f (my/notes-directory)))))
+
+(defun my/vulpea-links--cleanup-on-save ()
+  "After saving an admin file, delete ALL empty admin files."
+  (when (and buffer-file-name
+             (member (buffer-file-name)
+                     (mapcar (lambda (f) (expand-file-name f (my/notes-directory)))
+                             (list my/vulpea-links--broken-links-file
+                                   my/vulpea-links--deleted-files-file
+                                   my/vulpea-missing--file))))
+    (my/vulpea-links--cleanup-empty-admin-files)))
+
+(defun my/vulpea-links--setup-admin-buffer ()
+  "Configure admin files: jump to first heading, RET follows link."
+  (when (member (buffer-file-name)
+                (mapcar (lambda (f) (expand-file-name f (my/notes-directory)))
+                        (list my/vulpea-links--broken-links-file
+                              my/vulpea-links--deleted-files-file
+                              my/vulpea-missing--file)))
+    (setq-local org-return-follows-link t)
+    (add-hook 'after-save-hook #'my/vulpea-links--cleanup-on-save nil t)
+    (when (string= (buffer-name) "MISSING PROMPTS.org")
+      (setq-local my/vulpea-missing--active t))
+    (goto-char (point-min))
+    (when (re-search-forward "^\\*+ " nil t)
+      (goto-char (match-end 0))
+      (when (re-search-forward "\\[\\[" (line-end-position) t)
+        (goto-char (match-beginning 0))))))
+(add-hook 'find-file-hook #'my/vulpea-links--setup-admin-buffer)
+
+(require 'cl-lib)
+
+(defun my/vulpea-missing--around-open (orig-fun &rest args)
+  "Wrap org-open-at-point: from MISSING PROMPTS.org, open link then show update menu."
+  (let ((active (bound-and-true-p my/vulpea-missing--active)))
+    (if active
+        (progn
+          (delete-other-windows)
+          (apply orig-fun args)
+          (delete-other-windows)
+          (my/vulpea-update-properties))
+      (apply orig-fun args))))
+(advice-add 'org-open-at-point :around #'my/vulpea-missing--around-open)
+#+end_src
+*** Deleted Entry Writer
+#+begin_src emacs-lisp
+(defun my/vulpea-links--write-deleted-entry (file)
+  "Append a heading for deleted FILE to deleted-files.org."
+  (let ((path (my/vulpea-links--ensure-deleted-files-file))
+        root rel deleted-id deleted-title heading)
+    (setq root (expand-file-name (or (vc-root-dir) "")
+                                 (my/notes-directory)))
+    (setq rel (file-relative-name (expand-file-name file) root))
+    (setq deleted-id (org-entry-get (point-min) "ID"))
+    (setq deleted-title (cadr (assoc "TITLE"
+                                     (org-collect-keywords (list "TITLE")))))
+    (setq heading (or deleted-title (file-name-base file)))
+    (with-current-buffer (find-file-noselect path)
+      (goto-char (point-max))
+      (insert (format "\n* TODO [[restore:][%s]]\n" heading))
+      (insert "  :PROPERTIES:\n")
+      (insert (format "  :CREATED:       %s\n"
+                      (format-time-string "<%Y-%m-%d %a>")))
+      (insert (format "  :DELETED_FILE:  %s\n" rel))
+      (when deleted-id
+        (insert (format "  :DELETED_ID:    %s\n" deleted-id)))
+      (insert "  :END:\n")
+      (save-buffer)
+      (kill-buffer (current-buffer)))))
+#+end_src
+*** Internal State
+#+begin_src emacs-lisp
+(defvar my/vulpea-links--deleted-id nil
+  "ID of the note being deleted. Captured before deletion.")
+
+(defvar my/vulpea-links--deleted-title nil
+  "Title of the note being deleted. Captured before deletion.")
+#+end_src
+*** TODO Entry Writer
+#+begin_src emacs-lisp
+(defun my/vulpea-links--write-todo (source-id
+                                    source-title
+                                    deleted-title
+                                    deleted-id
+                                    direction)
+  "Append a TODO entry to broken-links.org.
+DIRECTION is either incoming or outgoing — recorded in the entry."
+  (let* ((path (my/vulpea-links--ensure-broken-links-file))
+         (src-path (when-let ((note (vulpea-db-get-by-id source-id)))
+                     (vulpea-note-path note)))
+         (link (if src-path
+                   (format "[[file:%s::*%s][%s]]" src-path source-title source-title)
+                 (format "[[id:%s][%s]]" source-id source-title))))
+    (with-current-buffer (find-file-noselect path)
+      (goto-char (point-max))
+      (insert (format "\n* TODO Fix broken link in %s\n" link))
+      (insert "  :PROPERTIES:\n")
+      (insert (format "  :CREATED:       %s\n"
+                      (format-time-string "<%Y-%m-%d %a>")))
+      (insert (format "  :DIRECTION:     %s\n" direction))
+      (insert (format "  :DELETED_NOTE:  %s\n" deleted-title))
+      (insert (format "  :DELETED_ID:    %s\n" deleted-id))
+      (insert "  :END:\n")
+      (insert "  [[elisp:(my/vulpea-links-restore)][Restore from Git]]\n")
+      (save-buffer)
+      (kill-buffer (current-buffer))))))
+#+end_src
+
+*** Broken-Links.org Guard
+#+begin_src emacs-lisp
+(defun my/vulpea-links--broken-links-open-count ()
+  "Return count of open TODO entries in broken-links.org.
+Returns 0 if the file does not exist."
+  (let ((path (my/vulpea-links--broken-links-path)))
+    (if (not (file-exists-p path))
+        0
+      (with-temp-buffer
+        (insert-file-contents path)
+        (org-mode)
+        (let ((count 0))
+          (org-element-map (org-element-parse-buffer) 'headline
+            (lambda (h)
+              (when (equal (org-element-property :todo-keyword h) "TODO")
+                (setq count (1+ count)))))
+          count)))))
+
+(defun my/vulpea-links--guard-broken-links-file (file &rest _)
+  "Before broken-links.org is deleted: check for open TODO entries.
+Warns and asks for confirmation if any remain unresolved."
+  (let ((expanded (expand-file-name file)))
+    (when (string= expanded (my/vulpea-links--broken-links-path))
+      (let ((count (my/vulpea-links--broken-links-open-count)))
+        (when (> count 0)
+          (unless (y-or-n-p
+                   (format "broken-links.org has %d unresolved TODO%s. Delete anyway? "
+                           count
+                           (if (= count 1) "" "s")))
+            (user-error "Deletion cancelled: %d unresolved broken link%s remain"
+                        count
+                        (if (= count 1) "" "s"))))))))
+#+end_src
+*** Core: Guard Before Deletion
+#+begin_src emacs-lisp
+(defun my/vulpea-links--guard-deletion (deleted-id deleted-title)
+  "Guard deletion of DELETED-ID / DELETED-TITLE.
+Runs two checks:
+1. Incoming: notes that link TO this note.
+2. Outgoing: notes that this note links TO.
+Each check prompts separately with y-or-n-p.
+y — proceeds, records TODO entries for broken links.
+n — cancels deletion via user-error."
+  (when (and deleted-id deleted-title)
+
+    ;; ── Check 1: Incoming links (incl. transclusions) ────────────────
+    (let (incoming count-in transclude-ids)
+      (setq incoming (vulpea-db-query-links-to deleted-id))
+      (setq transclude-ids
+            (delete-dups
+             (append
+              (when (fboundp 'my/vulpea-db-query-transclude-links-to)
+                (my/vulpea-db-query-transclude-links-to deleted-id))
+              (my/vulpea-links--find-transclude-refs deleted-id))))
+      (dolist (id transclude-ids)
+        (push (list :source id) incoming))
+      (setq count-in (length incoming))
+      (when (> count-in 0)
+        (let ((names-in (mapcar
+                     (lambda (link)
+                            (let (src-id src-note)
+                              (setq src-id (plist-get link :source))
+                              (setq src-note (vulpea-db-get-by-id src-id))
+                              (if src-note
+                                  (vulpea-note-title src-note)
+                                src-id)))
+                         incoming)))
+          (if (y-or-n-p
+               (format "%s is linked from %d note%s: %s. Delete anyway? "
+                       deleted-title
+                       count-in
+                       (if (= count-in 1) "" "s")
+                       (string-join names-in ", ")))
+              (dolist (link incoming)
+                (let (src-id src-note src-title)
+                  (setq src-id    (plist-get link :source))
+                  (setq src-note  (vulpea-db-get-by-id src-id))
+                  (setq src-title (if src-note
+                                      (vulpea-note-title src-note)
+                                    src-id))
+                  (my/vulpea-links--write-todo
+                   src-id
+                   src-title
+                   deleted-title
+                   deleted-id
+                   "incoming")))
+            (user-error "Deletion cancelled: %s is linked from %d note%s"
+                        deleted-title
+                        count-in
+                        (if (= count-in 1) "" "s"))))))
+
+    ;; ── Check 2: Outgoing links ──────────────────────────────────────
+    (let (outgoing count-out)
+      (setq outgoing  (vulpea-db-query-links-from deleted-id))
+      (setq count-out (length outgoing))
+      (when (> count-out 0)
+        (let ((names-out (mapcar
+                          (lambda (link)
+                            (let (dest-id dest-note)
+                              (setq dest-id (plist-get link :dest))
+                              (setq dest-note (vulpea-db-get-by-id dest-id))
+                              (if dest-note
+                                  (vulpea-note-title dest-note)
+                                dest-id)))
+                          outgoing)))
+          (if (y-or-n-p
+               (format "%s links to %d note%s: %s. Delete anyway? "
+                       deleted-title
+                       count-out
+                       (if (= count-out 1) "" "s")
+                       (string-join names-out ", ")))
+              (dolist (link outgoing)
+                (let (dest-id dest-note dest-title)
+                  (setq dest-id    (plist-get link :dest))
+                  (setq dest-note  (vulpea-db-get-by-id dest-id))
+                  (setq dest-title (if dest-note
+                                       (vulpea-note-title dest-note)
+                                     dest-id))
+                  (my/vulpea-links--write-todo
+                   deleted-id
+                   deleted-title
+                   dest-title
+                   dest-id
+                    "outgoing")))
+             (user-error "Deletion cancelled: %s links to %d note%s"
+                         deleted-title
+                         count-out
+                         (if (= count-out 1) "" "s"))))))))
+#+end_src
+
+*** Pre-Delete Capture: File
+#+begin_src emacs-lisp
+(defun my/vulpea-links--before-file-delete (file &rest _)
+  "Before FILE is deleted:
+1. Guard broken-links.org if that is the file.
+2. Read ID and title from file buffer.
+3. Run link guard. Skips non-org files silently.
+4. Record entry in deleted-files.org."
+   (let ((expanded (expand-file-name file)))
+      ;; Skip admin files and non-org files
+      (when (and (file-exists-p expanded)
+                 (string-suffix-p ".org" expanded)
+                 (not (member (file-name-nondirectory expanded)
+                               (list my/vulpea-links--broken-links-file
+                                     my/vulpea-links--deleted-files-file
+                                     my/vulpea-missing--file))))
+       ;; Guard broken-links.org specifically
+       (my/vulpea-links--guard-broken-links-file expanded)
+       ;; Read ID and title then run link guard
+      (with-temp-buffer
+        (insert-file-contents expanded)
+        (org-mode)
+        (let (id title)
+          (setq id    (org-entry-get (point-min) "ID"))
+          (setq title (cadr (assoc "TITLE"
+                                    (org-collect-keywords
+                                     (list "TITLE")))))
+           (when id
+             (setq my/vulpea-links--deleted-id    id
+                   my/vulpea-links--deleted-title
+                   (or title (file-name-base expanded)))
+             (my/vulpea-links--guard-deletion
+               id
+               my/vulpea-links--deleted-title))
+          ;; Record in deleted-files.org even without ID
+          (my/vulpea-links--write-deleted-entry expanded))))))
+
+(defun my/vulpea-links--after-file-delete (&rest _)
+  "After file deletion: clear captured state."
+  (setq my/vulpea-links--deleted-id    nil
+        my/vulpea-links--deleted-title nil))
+#+end_src
+*** Pre-Delete Capture: Heading
+#+begin_src emacs-lisp
+(defun my/vulpea-links--before-heading-delete ()
+  "Before a heading is cut or archived: capture ID and title,
+then run the guard. Only fires for headings with an :ID: property."
+  (when (org-at-heading-p)
+    (when-let* ((id    (org-id-get))
+                (title (nth 4 (org-heading-components))))
+      (setq my/vulpea-links--deleted-id    id
+            my/vulpea-links--deleted-title
+            (or title "untitled heading"))
+      (my/vulpea-links--guard-deletion
+       id
+       my/vulpea-links--deleted-title))))
+
+(defun my/vulpea-links--after-heading-delete (&rest _)
+  "After heading cut/archive: clear captured state."
+  (setq my/vulpea-links--deleted-id    nil
+        my/vulpea-links--deleted-title nil))
+#+end_src
+*** Hook Registration
+#+begin_src emacs-lisp
+(defun my/vulpea-links-setup ()
+  "Register all advice hooks for the links guard.
+Call once after vulpea has loaded."
+  ;; File deletion
+  (advice-add 'delete-file
+              :before #'my/vulpea-links--before-file-delete)
+  (advice-add 'delete-file
+              :after  #'my/vulpea-links--after-file-delete)
+  ;; Dired delete — dired-delete-file calls delete-file internally,
+  ;; so the delete-file advice covers dired deletions too.
+  ;; Skipping dired-delete-file advice to avoid double-firing.
+  ;; Heading cut
+  (advice-add 'org-cut-subtree
+              :before #'my/vulpea-links--before-heading-delete)
+  (advice-add 'org-cut-subtree
+              :after  #'my/vulpea-links--after-heading-delete)
+  ;; Heading archive
+  (advice-add 'org-archive-subtree
+              :before #'my/vulpea-links--before-heading-delete)
+  (advice-add 'org-archive-subtree
+              :after  #'my/vulpea-links--after-heading-delete))
+
+(my/vulpea-links-setup)
+#+end_src
+*** Startup Cleanup
+#+begin_src emacs-lisp
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (dolist (buf (buffer-list))
+              (with-current-buffer buf
+                (when (string-match-p
+                       "\\`CAPTURE-\\|\\`PREVIEW ::"
+                       (buffer-name))
+                  (kill-buffer buf))))))
+#+end_src
+
+*** Manual Audit Command
+#+begin_src emacs-lisp
+(defun my/vulpea-links-audit ()
+  "Scan entire vault for dead id: links using vulpea native API.
+Produces *vulpea-dead-links* buffer. Run after bulk operations."
+  (interactive)
+  (let ((dead (vulpea-db-query-dead-links)))
+    (if (not dead)
+        (message "No dead links found in vault.")
+      (with-current-buffer (get-buffer-create "*vulpea-dead-links*")
+        (erase-buffer)
+        (insert (format "Dead links: %d\n\n" (length dead)))
+        (pcase-dolist (`(,note . ,dest-id) dead)
+          (insert (format "  [%s]  %s  ->  missing id: %s\n"
+                          (vulpea-note-id note)
+                          (vulpea-note-title note)
+                          dest-id)))
+        (display-buffer (current-buffer))))))
+#+end_src

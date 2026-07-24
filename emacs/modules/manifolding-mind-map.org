@@ -1,0 +1,33 @@
+#+TITLE:      Manifolding Mind Map
+#+begin_comment
+Web-based mind map / graph UI for vulpea notes.
+Forked from org-roam-ui, ported to use vulpea DB.
+#+end_comment
+
+* Manifolding Mind Map
+:PROPERTIES:
+:CATEGORY: notes
+:END:
+
+** Load Path
+#+begin_src emacs-lisp
+(add-to-list 'load-path
+             (expand-file-name "lisp/manifolding-mind-map"
+                               user-emacs-directory))
+#+end_src
+
+** Package
+:PROPERTIES:
+:PACKAGE:  manifolding-mind-map
+:END:
+
+#+begin_src emacs-lisp
+(with-eval-after-load 'vulpea
+  (require 'manifolding-mind-map)
+  (setq manifolding-mind-map-follow           t
+        manifolding-mind-map-update-on-save   t
+        manifolding-mind-map-open-on-start    nil
+        httpd-host                            "0.0.0.0"))
+#+end_src
+
+

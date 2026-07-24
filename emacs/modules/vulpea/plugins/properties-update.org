@@ -1,0 +1,338 @@
+#+title: Properties Update Plugin
+#+priority: 15
+
+*** Require
+#+begin_src emacs-lisp
+(require 'transient)
+#+end_src
+*** State
+#+begin_src emacs-lisp
+(defvar my/vulpea--current-note nil
+  "The vulpea note being updated.")
+
+(defvar my/vulpea--current-context nil
+  "'file or 'heading — derived from note level.")
+
+(defvar my/vulpea--selected-keys nil
+  "List of :key symbols toggled for update.")
+#+end_src
+*** Prompt Lookup
+#+begin_src emacs-lisp
+(defun my/vulpea--update-prompt-spec (key)
+  "Find prompt spec with KEY matching the current note context."
+  (seq-find (lambda (s)
+              (and (eq (plist-get s :key) key)
+                   (memq my/vulpea--current-context (plist-get s :contexts))))
+            my/vulpea-prompt-registry))
+
+(defun my/vulpea--update-format-prompt (key)
+  "Return description string for prompt KEY: toggle state, label, current value."
+  (let (spec label current val-str mark)
+    (setq spec (my/vulpea--update-prompt-spec key))
+    (setq label (plist-get spec :label))
+    (setq current (when-let ((fn (plist-get spec :read-current-fn)))
+                    (condition-case nil
+                        (funcall fn)
+                      (error nil))))
+    (setq val-str (cond ((null current) "—")
+                         ((listp current) (string-join current ", "))
+                         ((stringp current)
+                          (if (string-empty-p current) "—" current))
+                         (t "—")))
+    (setq mark (if (memq key my/vulpea--selected-keys) "✓" " "))
+    (format "[%s] %s: %s" mark label val-str)))
+#+end_src
+*** Toggle Suffix Generator
+#+begin_src emacs-lisp
+(defmacro my/vulpea--define-toggle (key name)
+  "Define a Transient toggle suffix for prompt KEY with function NAME."
+  (let ((fname (intern (format "my/vulpea--toggle-%s" name))))
+    `(transient-define-suffix ,fname ()
+       :description (lambda () (my/vulpea--update-format-prompt ',key))
+       (interactive)
+       (if (memq ',key my/vulpea--selected-keys)
+           (setq my/vulpea--selected-keys (delq ',key my/vulpea--selected-keys))
+         (push ',key my/vulpea--selected-keys))
+       (transient-setup 'my/vulpea--update-properties-menu))))
+#+end_src
+*** Suffix Definitions
+#+begin_src emacs-lisp
+(my/vulpea--define-toggle tags tags)
+(my/vulpea--define-toggle aliases aliases)
+(my/vulpea--define-toggle priority priority)
+(my/vulpea--define-toggle scheduled scheduled)
+(my/vulpea--define-toggle deadline deadline)
+(my/vulpea--define-toggle todo todo)
+(my/vulpea--define-toggle state-general state-general)
+(my/vulpea--define-toggle state-work state-work)
+(my/vulpea--define-toggle state-intelligence state-intelligence)
+(my/vulpea--define-toggle state-operational state-operational)
+(my/vulpea--define-toggle state-validation state-validation)
+(my/vulpea--define-toggle state-dependency state-dependency)
+(my/vulpea--define-toggle state-source state-source)
+(my/vulpea--define-toggle state-checklist state-checklist)
+#+end_src
+*** Confirm / Cancel
+#+begin_src emacs-lisp
+(transient-define-suffix my/vulpea--update-confirm ()
+  "Run all selected prompts and apply changes."
+  (interactive)
+  (let ((keys my/vulpea--selected-keys))
+    (setq my/vulpea--selected-keys nil)
+    (dolist (key keys)
+      (let (spec val frag)
+        (setq spec (my/vulpea--update-prompt-spec key))
+        (setq val (condition-case nil
+                     (funcall (plist-get spec :prompt-fn))
+                   (quit nil)))
+        ;; skip the WARNING sentinel — user didn't change anything
+        (when (and (stringp val) (string-equal val "WARNING"))
+          (setq val nil))
+        (setq frag (funcall (plist-get spec :to-plist) val
+                            my/vulpea--current-context))
+        (when frag
+          (my/vulpea--apply-fragment frag spec))))
+    (save-buffer)
+    (message "Updated properties on %s" (vulpea-note-title my/vulpea--current-note))
+    (when (called-interactively-p 'any)
+      (my/vulpea--update-properties-menu))))
+
+(transient-define-suffix my/vulpea--update-cancel ()
+  "Cancel the update."
+  (interactive)
+  (setq my/vulpea--selected-keys nil)
+  (message "Update cancelled."))
+#+end_src
+*** Buffer Note Helper
+#+begin_src emacs-lisp
+(defun my/vulpea--buffer-note ()
+  "Return the vulpea note for the current buffer, or nil."
+  (when-let ((file (buffer-file-name))
+             (notes (vulpea-db-query-by-file-path (file-truename file))))
+    (car notes)))
+#+end_src
+*** Property Drawer Fallback
+Schema validation reads from the description list (meta), but we store
+state values in the property drawer.  This advice makes validation fall
+back to the property drawer when no description list value exists.
+
+#+begin_src emacs-lisp
+(defun my/vulpea--meta-get-fallback (orig-fun note prop &optional type)
+  "Fall back to the property drawer when the description list has no value for PROP.
+Skips non-string types to avoid interfering with note/link resolution."
+  (or (funcall orig-fun note prop type)
+      (when (memq type '(nil string))
+        (when-let* ((file (vulpea-note-path note))
+                    (key (if (symbolp prop) (symbol-name prop) prop))
+                    (val (if (and (buffer-file-name)
+                                 (equal (file-truename (buffer-file-name))
+                                        (file-truename file)))
+                             ;; current buffer is already the note's file
+                             (save-excursion
+                               (when-let ((pos (vulpea-note-pos note)))
+                                 (ignore-errors (goto-char pos)))
+                               (org-entry-get nil key))
+                           ;; visit the note's file
+                           (with-current-buffer (find-file-noselect file)
+                             (save-excursion
+                               (when-let ((pos (vulpea-note-pos note)))
+                                 (ignore-errors (goto-char pos)))
+                               (org-entry-get nil key))))))
+          (unless (string-empty-p val)
+            (list val))))))
+
+(advice-add 'vulpea-note-meta-get-list :around #'my/vulpea--meta-get-fallback)
+#+end_src
+*** Fix Violations Suffix
+
+#+begin_src emacs-lisp :lexical t
+(defun my/vulpea--fix-violations ()
+  "Prompt for each missing or WARNING-valued schema field.
+Writes the value to the property drawer only; the
+`vulpea-note-meta-get-list' advice makes schema validation fall back
+to the property drawer when no description-list value exists."
+  (interactive)
+  (let* ((prompted 0)
+         (note (my/vulpea--buffer-note))
+         all-fields schema-keys field-lookup)
+    (unless note
+      (user-error "Not in a vulpea note buffer"))
+    ;; Collect all schema fields and build a key→field lookup
+    (setq all-fields
+          (cl-loop for name in (vulpea-schema-applicable note)
+                   append (vulpea-schema-fields (vulpea-schema-get name))))
+    (setq field-lookup (make-hash-table :test 'equal))
+    (dolist (f all-fields)
+      (puthash (plist-get f :key) f field-lookup))
+    (setq schema-keys (hash-table-keys field-lookup))
+    ;; Fix schema fields (missing or WARNING)
+    (dolist (key schema-keys)
+      (let* ((val (org-entry-get nil key))
+             (field (gethash key field-lookup)))
+        (when (or (null val) (and (stringp val) (string-match-p "WARNING" val)))
+          (condition-case nil
+              (let* ((one-of (plist-get field :one-of))
+                     (new-val (if one-of
+                                  (completing-read
+                                   (format "%s: " key) one-of nil t nil nil)
+                                (read-string (format "%s: " key)))))
+                (unless (string-empty-p new-val)
+                  (org-entry-put nil key new-val)
+                  (setq prompted (1+ prompted))))
+            (quit nil)))))
+    ;; Fix any remaining property-drawer entries with WARNING
+    ;; (non-schema properties left from the old sentinel system)
+    (dolist (pair (org-entry-properties nil 'standard))
+      (let* ((key (car pair))
+             (val (cdr pair)))
+        (when (and (stringp val) (string-match-p "WARNING" val)
+                   (not (member key schema-keys))
+                   (not (member key '("ID"))))
+          (condition-case nil
+              (let ((new-val (read-string (format "%s: " key))))
+                (unless (string-empty-p new-val)
+                  (org-entry-put nil key new-val)
+                  (setq prompted (1+ prompted))))
+            (quit nil)))))
+    (save-buffer)
+    (message "Updated %d properties in drawer." prompted)))
+;; Clear stale transient property from old transient-define-suffix;
+;; this symbol is called from a hydra, not transient's own machinery.
+(put 'my/vulpea--fix-violations 'transient--suffix nil)
+#+end_src
+*** Transient Prefix
+#+begin_src emacs-lisp
+(transient-define-prefix my/vulpea--update-properties-menu ()
+  "Select properties to update on the current note.
+Toggle each property with its key letter, then confirm with C-c C-c."
+  [["Metadata"
+    ("t" my/vulpea--toggle-tags)
+    ("a" my/vulpea--toggle-aliases)
+    ("p" my/vulpea--toggle-priority)]
+   ["Scheduling"
+    ("d" my/vulpea--toggle-scheduled)
+    ("l" my/vulpea--toggle-deadline)]
+   ["State"
+    ("o" my/vulpea--toggle-todo)
+    ("g" my/vulpea--toggle-state-general)
+    ("w" my/vulpea--toggle-state-work)
+    ("i" my/vulpea--toggle-state-intelligence)
+    ("e" my/vulpea--toggle-state-operational)
+    ("v" my/vulpea--toggle-state-validation)
+    ("y" my/vulpea--toggle-state-dependency)
+    ("r" my/vulpea--toggle-state-source)
+    ("c" my/vulpea--toggle-state-checklist)]]
+  [["Actions"
+    ("C-c C-c" "Confirm" my/vulpea--update-confirm)
+    ("C-c C-k" "Cancel"  my/vulpea--update-cancel)]])
+#+end_src
+*** Fragment Applier
+#+begin_src emacs-lisp
+(defun my/vulpea--set-file-property (key value strategy)
+  "Set KEY to VALUE in the file-level property drawer using STRATEGY."
+  (save-excursion
+    (goto-char (point-min))
+    (if (re-search-forward "^:PROPERTIES:$" nil t)
+        (let ((end (save-excursion
+                     (or (re-search-forward "^:END:$" nil t) (point-max)))))
+          (goto-char (match-end 0))
+          (if (re-search-forward (format "^:%s: ?" (regexp-quote key)) end t)
+              (if (string-empty-p value)
+                  (delete-region (line-beginning-position) (1+ (line-end-position)))
+                (when (eq strategy 'replace)
+                  (replace-match (format ":%s: %s" key value) t t)))
+            (unless (string-empty-p value)
+              (re-search-forward "^:END:$" nil t)
+              (beginning-of-line)
+              (insert (format ":%s: %s\n" key value)))))
+      (unless (string-empty-p value)
+        (insert ":PROPERTIES:\n")
+        (insert (format ":%s: %s\n" key value))
+        (insert ":END:\n")))))
+
+(defun my/vulpea--apply-fragment (frag spec)
+  "Apply FRAG plist from SPEC to the current buffer."
+  (let ((strategy (or (plist-get spec :merge-strategy) 'replace))
+        (at-heading (org-at-heading-p)))
+    (unless at-heading
+      (setq at-heading (ignore-errors (org-back-to-heading t) t))
+      (unless at-heading
+        (setq at-heading (ignore-errors (org-next-visible-heading 1) t))))
+    (when (plist-member frag :todo)
+      (let ((todo (plist-get frag :todo)))
+        (if (and (stringp todo) (not (string-empty-p todo)))
+            (progn
+              (org-todo todo)
+              (org-entry-delete nil "TODO"))
+          (save-excursion
+            (org-back-to-heading t)
+            (org-entry-delete nil "TODO")
+            (let ((case-fold-search nil))
+              (looking-at org-complex-heading-regexp)
+              (replace-match
+               (concat (match-string 1) " " (match-string 4)
+                       (when (match-string 5)
+                         (concat " " (match-string 5))))
+               t t))))))
+    (when-let ((tags (plist-get frag :tags)))
+      (if at-heading
+          (pcase strategy
+            ('merge (org-set-tags (cl-union (org-get-tags nil t) tags :test #'string=)))
+            ('replace (org-set-tags tags)))
+        (user-error "Tags on file-level notes not supported yet")))
+    (when-let ((props (plist-get frag :properties)))
+      (dolist (pair props)
+        (if at-heading
+            (let ((v (cdr pair)))
+              (if (string-empty-p v)
+                  (org-entry-delete nil (car pair))
+                (pcase strategy
+                  ('merge (unless (org-entry-get nil (car pair))
+                            (org-entry-put nil (car pair) v)))
+                  ('replace (org-entry-put nil (car pair) v)))))
+          (my/vulpea--set-file-property (car pair) (cdr pair) strategy))))
+    (when-let ((body (plist-get frag :body)))
+      (save-excursion
+        (goto-char (point-max))
+        (insert "\n" body)))
+    (when-let ((fns (plist-get frag :post-apply)))
+      (let ((file (buffer-file-name)))
+        (dolist (fn fns)
+          (funcall fn my/vulpea--current-note))
+        (unless (and file (eq (current-buffer) (get-file-buffer file)))
+          (when file (find-file file)))))))
+#+end_src
+*** Main Command
+#+begin_src emacs-lisp
+(defun my/vulpea-update-properties ()
+  "Update properties on an existing vulpea note.
+When called interactively, check for schema violations first and offer
+to open the update menu.  When called from MISSING PROMPTS.org advice,
+skip the prompt and open the menu directly."
+  (interactive)
+  (let (buffer-note note file pos level)
+    (setq buffer-note (my/vulpea--buffer-note))
+    (setq note (or buffer-note
+                   (vulpea-select "Update properties for: ")))
+    (setq file (vulpea-note-path note))
+    (setq pos (vulpea-note-pos note))
+    (setq level (vulpea-note-level note))
+    (unless file
+      (user-error "Note has no file path"))
+    (setq my/vulpea--current-note note
+          my/vulpea--current-context (if (and level (> level 0)) 'heading 'file)
+          my/vulpea--selected-keys nil)
+    (find-file file)
+    (goto-char (or (and pos (> pos 0) pos) (point-min)))
+    (unless (org-at-heading-p)
+      (ignore-errors (org-back-to-heading t))
+      (unless (org-at-heading-p)
+        (ignore-errors (org-next-visible-heading 1))))
+    (when (and (called-interactively-p 'interactive)
+               (vulpea-schema-note-violations note))
+      (unless (y-or-n-p "Schema violations found. Open update menu? ")
+        (user-error "Cancelled")))
+    (my/vulpea--update-properties-menu)))
+#+end_src
+
+

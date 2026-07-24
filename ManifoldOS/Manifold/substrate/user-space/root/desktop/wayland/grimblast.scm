@@ -3,4 +3,4 @@
   #:use-module (guix packages)
   #:re-export (grimblast))
 
-;; Re-export of grimblast from gnu/packages/wm
+;; Re-export of grimblast

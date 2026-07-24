@@ -1,0 +1,16 @@
+#+title:      auto-sudoedit
+#+identifier: af98bc1e-36e7-46ef-85e1-d2f98550c382
+#+filetags:   :emacs-package:files:
+
+* auto-sudoedit
+:PROPERTIES:
+:ID:       af98bc1e-36e7-46ef-85e1-d2f98550c382
+:PACKAGE:  auto-sudoedit
+:CATEGORY: files
+:STRAIGHT: (auto-sudoedit :type git :host github :repo "ncaq/auto-sudoedit")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

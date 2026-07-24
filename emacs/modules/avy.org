@@ -1,0 +1,27 @@
+#+title:      avy
+#+identifier: 2f4a8c1e-3b5d-4e9f-ad67-8c1e2f4a6b3d
+#+filetags:   :emacs-package:navigation:
+
+* AVY — Jump Navigation
+:PROPERTIES:
+:ID:       2f4a8c1e-3b5d-4e9f-ad67-8c1e2f4a6b3d
+:PACKAGE:  avy
+:STRAIGHT: (avy :type git :host github :repo "abo-abo/avy")
+:CATEGORY: navigation
+:END:
+
+** Config
+#+begin_src emacs-lisp
+  (with-eval-after-load 'avy
+    ;; Dvorak home row only
+    (setq avy-keys '(?a ?o ?e ?u ?i ?d ?h ?t ?n ?s))
+
+    ;; Always visible purple highlights
+    (setq avy-background nil)
+    (custom-set-faces
+     '(avy-lead-face   ((t (:foreground "#ffffff" :background "#8b00ff" :weight bold))))
+     '(avy-lead-face-0 ((t (:foreground "#ffffff" :background "#9933ff" :weight bold))))
+     '(avy-lead-face-1 ((t (:foreground "#ffffff" :background "#aa44ff" :weight bold))))
+     '(avy-lead-face-2 ((t (:foreground "#ffffff" :background "#bb55ff" :weight bold))))))
+  
+#+end_src

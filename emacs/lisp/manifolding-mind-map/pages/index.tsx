@@ -1,0 +1,1436 @@
+import {
+  Box,
+  Flex,
+  IconButton,
+  Input,
+  Tooltip,
+  useDisclosure,
+  useOutsideClick,
+  useTheme,
+} from '@chakra-ui/react'
+import { useAnimation } from '@lilib/hooks'
+import { useWindowSize, useWindowWidth } from '@react-hook/window-size'
+import * as d3int from 'd3-interpolate'
+import { GraphData, LinkObject, NodeObject } from 'force-graph'
+import Head from 'next/head'
+import React, {
+  ComponentPropsWithoutRef,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+//@ts-expect-error
+import jLouvain from 'jlouvain.js'
+import type {
+  ForceGraph2D as TForceGraph2D,
+  ForceGraph3D as TForceGraph3D,
+} from 'react-force-graph'
+import { BiNetworkChart } from 'react-icons/bi'
+
+import ReconnectingWebSocket from 'reconnecting-websocket'
+import SpriteText from 'three-spritetext'
+import { OrgRoamGraphReponse, OrgRoamLink, OrgRoamNode } from '../api'
+import {
+  algos,
+  TagColors,
+  PhysicsSettings,
+  FilterSettings,
+  VisualsSettings,
+  ColoringSettings,
+  BehaviorSettings,
+  MouseSettings,
+  LocalSettings,
+} from '../components/config'
+import { ContextMenu } from '../components/contextmenu'
+import { usePersistantState } from '../util/persistant-state'
+import { ThemeContext, ThemeContextProps } from '../util/themecontext'
+import { openNodeInEmacs } from '../util/webSocketFunctions'
+import { drawLabels } from '../components/Graph/drawLabels'
+import { VariablesContext } from '../util/variablesContext'
+import { findNthNeighbors } from '../util/findNthNeighbour'
+import { getThemeColor } from '../util/getThemeColor'
+import { normalizeLinkEnds } from '../util/normalizeLinkEnds'
+import { nodeSize } from '../util/nodeSize'
+import { getNodeColor } from '../util/getNodeColor'
+import { isLinkRelatedToNode } from '../util/isLinkRelatedToNode'
+import { getLinkColor } from '../util/getLinkColor'
+
+const d3promise = import('d3-force-3d')
+
+// react-force-graph fails on import when server-rendered
+// https://github.com/vasturiano/react-force-graph/issues/155
+const ForceGraph2D = (
+  !!global.window ? require('react-force-graph').ForceGraph2D : null
+) as typeof TForceGraph2D
+
+const ForceGraph3D = (
+  !!global.window ? require('react-force-graph').ForceGraph3D : null
+) as typeof TForceGraph3D
+
+export type NodeById = { [nodeId: string]: OrgRoamNode | undefined }
+export type LinksByNodeId = { [nodeId: string]: OrgRoamLink[] | undefined }
+export type NodesByFile = { [file: string]: OrgRoamNode[] | undefined }
+export type NodeByCite = { [key: string]: OrgRoamNode | undefined }
+export interface EmacsVariables {
+  roamDir?: string
+  dailyDir?: string
+  katexMacros?: { [key: string]: string }
+  attachDir?: string
+  useInheritance?: boolean
+  subDirs: string[]
+}
+export type Tags = string[]
+export type Scope = {
+  nodeIds: string[]
+  excludedNodeIds: string[]
+}
+
+const defaultPhysics: PhysicsSettings = {
+  enabled: true,
+  charge: -700,
+  collision: true,
+  collisionStrength: 20,
+  centering: true,
+  centeringStrength: 0.2,
+  linkStrength: 0.3,
+  linkIts: 1,
+  alphaDecay: 0.05,
+  alphaTarget: 0,
+  alphaMin: 0,
+  velocityDecay: 0.25,
+  gravity: 0.3,
+  gravityOn: true,
+  gravityLocal: false,
+}
+
+const defaultFilter: FilterSettings = {
+  orphans: false,
+  dailies: false,
+  parent: 'heading',
+  filelessCites: false,
+  textFilter: '',
+  tagsBlacklist: [],
+  tagsWhitelist: [],
+  dirsBlocklist: [],
+  dirsAllowlist: [],
+  bad: true,
+  nodes: [],
+  links: [],
+  date: [],
+  noter: true,
+}
+
+const defaultVisuals: VisualsSettings = {
+  particles: false,
+  particlesNumber: 0,
+  particlesWidth: 4,
+  arrows: false,
+  arrowsLength: 1,
+  arrowsPos: 0.5,
+  arrowsColor: '',
+  linkOpacity: 0.8,
+  linkWidth: 1,
+  nodeRel: 3,
+  nodeOpacity: 1,
+  nodeResolution: 12,
+  labels: 2,
+  labelScale: 1.5,
+  labelFontSize: 10,
+  labelLength: 40,
+  labelWordWrap: 25,
+  labelLineSpace: 1,
+  labelDynamicDegree: 8,
+  labelDynamicStrength: 0.5,
+  highlight: true,
+  highlightNodeSize: 1.1,
+  highlightLinkSize: 0.7,
+  highlightFade: 0.8,
+  highlightAnim: true,
+  animationSpeed: 360,
+  algorithmName: 'CircularOut',
+  linkColorScheme: 'red',
+  nodeColorScheme: [
+    'red', 'base5', 'yellow', 'green', 'cyan', 'blue', 'magenta', 'violet', 'orange',
+  ],
+  nodeHighlight: 'blue',
+  linkHighlight: 'red',
+  backgroundColor: 'bg',
+  emacsNodeColor: 'fg',
+  labelTextColor: 'fg',
+  labelBackgroundColor: '',
+  labelBackgroundOpacity: 0.7,
+  citeDashes: true,
+  citeDashLength: 35,
+  citeGapLength: 15,
+  citeLinkColor: 'red',
+  citeLinkHighlightColor: '',
+  citeNodeColor: 'fg',
+  refDashes: true,
+  refDashLength: 35,
+  refGapLength: 15,
+  refLinkColor: 'red',
+  refLinkHighlightColor: '',
+  refNodeColor: 'fg',
+  nodeSizeLinks: 0.5,
+  nodeZoomSize: 1.2,
+}
+
+const defaultColoring: ColoringSettings = { method: 'degree' }
+
+const defaultBehavior: BehaviorSettings = {
+  follow: 'zoom',
+  localSame: 'add',
+  zoomPadding: 200,
+  zoomSpeed: 2000,
+}
+
+const defaultMouse: MouseSettings = {
+  highlight: 'hover',
+  local: 'double',
+  follow: 'never',
+  context: 'right',
+  preview: 'click',
+  backgroundExitsLocal: false,
+}
+
+const defaultLocal: LocalSettings = { neighbors: 1 }
+
+export default function Home() {
+  // only render on the client
+  const [showPage, setShowPage] = useState(false)
+  useEffect(() => {
+    setShowPage(true)
+  }, [])
+
+  if (!showPage) {
+    return null
+  }
+  return (
+    <>
+      <Head>
+        <title>ORUI</title>
+      </Head>
+      <GraphPage />
+    </>
+  )
+}
+
+export function GraphPage() {
+  const [threeDim, setThreeDim] = usePersistantState('3d', false)
+  const [tagColors, setTagColors] = usePersistantState<TagColors>('tagCols', {})
+  const [scope, setScope] = useState<Scope>({ nodeIds: [], excludedNodeIds: [] })
+
+  const [physics, setPhysics] = useState<PhysicsSettings>(defaultPhysics)
+  const [filter, setFilter] = useState<FilterSettings>(defaultFilter)
+  const [visuals, setVisuals] = useState<VisualsSettings>(defaultVisuals)
+  const [graphData, setGraphData] = useState<GraphData | null>(null)
+  const [emacsNodeId, setEmacsNodeId] = useState<string | null>(null)
+  const [behavior, setBehavior] = useState<BehaviorSettings>(defaultBehavior)
+  const [mouse, setMouse] = useState<MouseSettings>(defaultMouse)
+  const [coloring, setColoring] = useState<ColoringSettings>(defaultColoring)
+  const [local, setLocal] = useState<LocalSettings>(defaultLocal)
+  const [wsError, setWsError] = useState<string | null>(null)
+
+  const [previewNode, setPreviewNode] = useState<NodeObject>({})
+
+
+  const nodeByIdRef = useRef<NodeById>({})
+  const linksByNodeIdRef = useRef<LinksByNodeId>({})
+  const nodeByCiteRef = useRef<NodeByCite>({})
+  const tagsRef = useRef<Tags>([])
+  const graphRef = useRef<any>(null)
+  const [emacsVariables, setEmacsVariables] = useState<EmacsVariables>({} as EmacsVariables)
+  const clusterRef = useRef<{ [id: string]: number }>({})
+
+  const currentGraphDataRef = useRef<GraphData>({ nodes: [], links: [] })
+
+  const updateGraphData = (orgRoamGraphData: OrgRoamGraphReponse) => {
+    const oldNodeById = nodeByIdRef.current
+    tagsRef.current = orgRoamGraphData.tags ?? []
+    const importNodes = orgRoamGraphData.nodes ?? []
+    const importLinks = orgRoamGraphData.links ?? []
+    const nodesByFile = importNodes.reduce<NodesByFile>((acc, node) => {
+      return {
+        ...acc,
+        [node.file]: [...(acc[node.file] ?? []), node],
+      }
+    }, {})
+
+    // generate links between level 2 nodes and the level 1 node above it
+    // org-roam does not generate such links, so we have to put them in ourselves
+    const headingLinks: OrgRoamLink[] = Object.keys(nodesByFile).flatMap((file) => {
+      const nodesInFile = nodesByFile[file] ?? []
+      // "file node" as opposed to "heading node"
+      const fileNode = nodesInFile.find((node) => node.level === 0)
+      const headingNodes = nodesInFile.filter((node) => node.level !== 0)
+
+      if (!fileNode) {
+        return []
+      }
+      return headingNodes.map((headingNode) => {
+        const smallerHeadings = nodesInFile.filter((node) => {
+          if (
+            node.level >= headingNode.level ||
+            node.pos >= headingNode.pos ||
+            !headingNode.olp?.includes((node.title as string)?.replace(/ *\[\d*\/\d*\] */g, ''))
+          ) {
+            return false
+          }
+          return true
+        })
+
+        // get the nearest heading
+        const target = smallerHeadings.reduce((acc, node) => {
+          if (node.level > acc.level) {
+            acc = node
+          }
+          return acc
+        }, fileNode)
+
+        return {
+          source: headingNode.id,
+          target: target?.id || fileNode.id,
+          type: 'heading',
+        }
+      })
+    })
+
+    // we want to support both linking to only the file node and to the next heading
+    // to do this we need both links, as we can't really toggle between them without
+    // recalculating the entire graph otherwise
+    const fileLinks: OrgRoamLink[] = Object.keys(nodesByFile).flatMap((file) => {
+      const nodesInFile = nodesByFile[file] ?? []
+      // "file node" as opposed to "heading node"
+      const fileNode = nodesInFile.find((node) => node.level === 0)
+      const headingNodes = nodesInFile.filter((node) => node.level !== 0)
+
+      if (!fileNode) {
+        return []
+      }
+      return headingNodes.map((headingNode) => {
+        return {
+          source: headingNode.id,
+          target: fileNode.id,
+          type: 'parent',
+        }
+      })
+    })
+
+    nodeByIdRef.current = Object.fromEntries(importNodes.map((node) => [node.id, node]))
+    const dirtyLinks = [...importLinks, ...headingLinks, ...fileLinks]
+    const nonExistantNodes: OrgRoamNode[] = []
+    const links = dirtyLinks.map((link) => {
+      const sourceId = link.source as string
+      const targetId = link.target as string
+      if (!nodeByIdRef.current[sourceId]) {
+        nonExistantNodes.push({
+          id: sourceId,
+          tags: ['bad'],
+          properties: { FILELESS: 'yes', bad: 'yes' },
+          file: '',
+          title: sourceId,
+          level: 0,
+          pos: 0,
+          olp: null,
+        })
+        return { ...link, type: 'bad' }
+      }
+      if (!nodeByIdRef.current[targetId]) {
+        nonExistantNodes.push({
+          id: targetId,
+          tags: ['bad'],
+          properties: { FILELESS: 'yes', bad: 'yes' },
+          file: '',
+          title: targetId,
+          level: 0,
+          pos: 0,
+          olp: null,
+        })
+        return { ...link, type: 'bad' }
+      }
+      return link
+    })
+
+    nodeByIdRef.current = {
+      ...nodeByIdRef.current,
+      ...Object.fromEntries(nonExistantNodes.map((node) => [node.id, node])),
+    }
+
+    linksByNodeIdRef.current = links.reduce<LinksByNodeId>((acc, link) => {
+      return {
+        ...acc,
+        [link.source]: [...(acc[link.source] ?? []), link],
+        [link.target]: [...(acc[link.target] ?? []), link],
+      }
+    }, {})
+
+    const nodes = [...importNodes, ...nonExistantNodes]
+
+    nodeByCiteRef.current = nodes.reduce<NodeByCite>((acc, node) => {
+      const ref = node.properties?.ROAM_REFS as string
+      if (!ref?.includes('cite')) {
+        return acc
+      }
+      const key = ref.replaceAll(/cite:(.*)/g, '$1')
+      if (!key) {
+        return acc
+      }
+      return {
+        ...acc,
+        [key]: node,
+      }
+    }, {})
+
+    const orgRoamGraphDataProcessed = {
+      nodes,
+      links,
+    }
+
+    const currentGraphData = currentGraphDataRef.current
+    if (currentGraphData.nodes.length === 0) {
+      // react-force-graph modifies the graph data implicitly,
+      // so we make sure there's no overlap between the objects we pass it and
+      // nodeByIdRef, linksByNodeIdRef
+      const orgRoamGraphDataClone = JSON.parse(JSON.stringify(orgRoamGraphDataProcessed))
+      currentGraphDataRef.current = orgRoamGraphDataClone
+      setGraphData(orgRoamGraphDataClone)
+      return
+    }
+
+    const newNodes = [
+      ...currentGraphData.nodes.flatMap((node: NodeObject) => {
+        const newNode = nodeByIdRef.current[node?.id!] || false
+        if (!newNode) {
+          return []
+        }
+        return [{ ...node, ...newNode }]
+      }),
+      ...Object.keys(nodeByIdRef.current)
+        .filter((id) => !oldNodeById[id])
+        .map((id) => {
+          return nodeByIdRef.current[id] as NodeObject
+        }),
+    ]
+
+    const nodeIndex = newNodes.reduce<{ [id: string]: number }>((acc, node, index) => {
+      const id = node?.id as string
+      return {
+        ...acc,
+        [id]: index,
+      }
+    }, {})
+
+    const newerLinks = links.map((link) => {
+      const [source, target] = normalizeLinkEnds(link)
+      return {
+        ...link,
+        source: newNodes[nodeIndex![source]],
+        target: newNodes[nodeIndex![target]],
+      }
+    })
+
+    setGraphData({ nodes: newNodes as NodeObject[], links: newerLinks })
+  }
+  useEffect(() => {
+    if (!graphData) {
+      return
+    }
+    currentGraphDataRef.current = graphData
+  }, [graphData])
+
+  const { setEmacsTheme } = useContext(ThemeContext)
+
+  const scopeRef = useRef<Scope>({ nodeIds: [], excludedNodeIds: [] })
+  const behaviorRef = useRef(defaultBehavior)
+  behaviorRef.current = behavior
+  const WebSocketRef = useRef<ReconnectingWebSocket | null>(null)
+
+  scopeRef.current = scope
+  const followBehavior = (
+    command: string,
+    emacsNode: string,
+    speed: number = 2000,
+    padding: number = 200,
+  ) => {
+    if (command === 'color') {
+      return
+    }
+    const fg = graphRef.current
+    const sr = scopeRef.current
+    const bh = behaviorRef.current
+    const links = linksByNodeIdRef.current[emacsNode] ?? []
+    const nodes = Object.fromEntries(
+      [emacsNode as string, ...links.flatMap((link) => [link.source, link.target])].map(
+        (nodeId) => [nodeId, {}],
+      ),
+    )
+    if (command === 'zoom') {
+      if (sr.nodeIds.length) {
+        setScope({ nodeIds: [], excludedNodeIds: [] })
+      }
+      setTimeout(
+        () => fg.zoomToFit(speed, padding, (node: NodeObject) => nodes[node.id as string]),
+        50,
+      )
+      return
+    }
+    if (!sr.nodeIds.length) {
+      setScope((current: Scope) => ({ ...current, nodeIds: [emacsNode] }))
+      setTimeout(() => {
+        fg.centerAt(0, 0, 10)
+        fg.zoomToFit(1, padding)
+      }, 50)
+      return
+    }
+    if (bh.localSame !== 'add') {
+      setScope((current: Scope) => ({ ...current, nodeIds: [emacsNode] }))
+      setTimeout(() => {
+        fg.centerAt(0, 0, 10)
+        fg.zoomToFit(1, padding)
+      }, 50)
+      return
+    }
+
+    // if the node is in the scoped nodes, add it to scope instead of replacing it
+    if (
+      !sr.nodeIds.includes(emacsNode) ||
+      !sr.nodeIds.some((scopeId: string) => {
+        return nodes[scopeId]
+      })
+    ) {
+      setScope((current: Scope) => ({ ...current, nodeIds: [emacsNode] }))
+      setTimeout(() => {
+        fg.centerAt(0, 0, 10)
+        fg.zoomToFit(1, padding)
+      }, 50)
+      return
+    }
+    setScope((currentScope: Scope) => ({
+      ...currentScope,
+      nodeIds: [...currentScope.nodeIds, emacsNode as string],
+    }))
+    setTimeout(() => {
+      fg.centerAt(0, 0, 10)
+      fg.zoomToFit(1, padding)
+    }, 50)
+  }
+
+  useEffect(() => {
+    // initialize websocket
+    WebSocketRef.current = new ReconnectingWebSocket(`ws://${window.location.hostname}:35903`)
+    WebSocketRef.current.addEventListener('open', () => {
+      console.log('Connection with Emacs established')
+    })
+    WebSocketRef.current.addEventListener('message', (event: any) => {
+      try {
+        const bh = behaviorRef.current
+        const message = JSON.parse(event.data)
+        switch (message.type) {
+          case 'graphdata':
+            return updateGraphData(message.data)
+          case 'variables':
+            setEmacsVariables(message.data)
+            console.log(message)
+            return
+          case 'theme':
+            return setEmacsTheme(message.data)
+          case 'visuals':
+            if (message.data.theme) {
+              setEmacsTheme(message.data.theme)
+            }
+            if (message.data.physics) setPhysics(message.data.physics)
+            if (message.data.filter) setFilter(message.data.filter)
+            if (message.data.visuals) setVisuals(message.data.visuals)
+            if (message.data.coloring) setColoring(message.data.coloring)
+            if (message.data.behavior) setBehavior(message.data.behavior)
+            if (message.data.mouse) setMouse(message.data.mouse)
+            if (message.data.local) setLocal(message.data.local)
+            console.log('Visuals received from Emacs', message.data)
+            return
+          case 'command':
+            switch (message.data.commandName) {
+              case 'local':
+                const speed = behavior.zoomSpeed
+                const padding = behavior.zoomPadding
+                followBehavior('local', message.data.id, speed, padding)
+                setEmacsNodeId(message.data.id)
+                break
+              case 'zoom': {
+                const speed = message?.data?.speed || bh.zoomSpeed
+                const padding = message?.data?.padding || bh.zoomPadding
+                followBehavior('zoom', message.data.id, speed, padding)
+                setEmacsNodeId(message.data.id)
+                break
+              }
+              case 'follow': {
+                followBehavior(bh.follow, message.data.id, bh.zoomSpeed, bh.zoomPadding)
+                setEmacsNodeId(message.data.id)
+                break
+              }
+              case 'change-local-graph': {
+                const node = nodeByIdRef.current[message.data.id as string]
+                if (!node) break
+                console.log(message)
+                handleLocal(node, message.data.manipulation)
+                break
+              }
+              default:
+                return console.error('unknown message type', message.type)
+            }
+        }
+      } catch (e: any) {
+        console.error('WS message error', e)
+        setWsError(e.toString())
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    const fg = graphRef.current
+    if (!fg || scope.nodeIds.length > 1) {
+      return
+    }
+    if (!scope.nodeIds.length && physics.gravityOn) {
+      fg.zoomToFit()
+      return
+    }
+    setTimeout(() => {
+      fg.zoomToFit(5, 200)
+    }, 50)
+  }, [scope.nodeIds])
+
+  const [windowWidth, windowHeight] = useWindowSize()
+
+  const contextMenuRef = useRef<any>()
+  const [contextMenuTarget, setContextMenuTarget] = useState<OrgRoamNode | string | null>(null)
+  type ContextPos = {
+    left: number | undefined
+    right: number | undefined
+    top: number | undefined
+    bottom: number | undefined
+  }
+  const [contextPos, setContextPos] = useState<ContextPos>({
+    left: 0,
+    top: 0,
+    right: undefined,
+    bottom: undefined,
+  })
+
+  const contextMenu = useDisclosure()
+  useOutsideClick({
+    ref: contextMenuRef,
+    handler: () => {
+      contextMenu.onClose()
+    },
+  })
+
+  const openContextMenu = (target: OrgRoamNode | string, event: any, coords?: ContextPos) => {
+    coords
+      ? setContextPos(coords)
+      : setContextPos({ left: event.pageX, top: event.pageY, right: undefined, bottom: undefined })
+    setContextMenuTarget(target)
+    contextMenu.onOpen()
+  }
+
+  const handleLocal = (node: OrgRoamNode, command: string) => {
+    if (command === 'remove') {
+      setScope((currentScope: Scope) => ({
+        nodeIds: currentScope.nodeIds.filter((id: string) => id !== node.id),
+        excludedNodeIds: [...currentScope.excludedNodeIds, node.id as string],
+      }))
+      return
+    }
+    if (command === 'replace') {
+      setScope({ nodeIds: [node.id], excludedNodeIds: [] })
+      return
+    }
+    if (scope.nodeIds.includes(node.id as string)) {
+      return
+    }
+    setScope((currentScope: Scope) => ({
+      excludedNodeIds: currentScope.excludedNodeIds.filter((id: string) => id !== node.id),
+      nodeIds: [...currentScope.nodeIds, node.id as string],
+    }))
+    return
+  }
+
+  const [mainWindowWidth, setMainWindowWidth] = usePersistantState<number>(
+    'mainWindowWidth',
+    windowWidth,
+  )
+
+  const nodeCount = nodeByIdRef.current ? Object.keys(nodeByIdRef.current).length : 0
+  const linkCount = graphData?.links?.length ?? 0
+  const wsConnected = WebSocketRef.current ? 'connected' : 'connecting'
+  console.log('render', { wsConnected, nodeCount, graphData: graphData ? {n: graphData.nodes.length, l: graphData.links.length} : null })
+
+  return (
+    <VariablesContext.Provider value={{ ...emacsVariables }}>
+      <div style={{ position: 'fixed', bottom: 8, left: 8, zIndex: 9999, background: 'rgba(0,0,0,0.7)', color: '#0f0', padding: '4px 10px', borderRadius: 4, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+        WS: {wsConnected} | nodes: {nodeCount} | links: {linkCount}
+        {wsError && <div style={{ color: '#f00' }}>ERR: {wsError}</div>}
+      </div>
+      <Box
+        display="flex"
+        alignItems="flex-start"
+        flexDirection="row"
+        height="100vh"
+        overflow="clip"
+      >
+        <Box position="absolute">
+          {graphData && (
+            <Graph
+              nodeById={nodeByIdRef.current!}
+              linksByNodeId={linksByNodeIdRef.current!}
+              webSocket={WebSocketRef.current}
+              variables={emacsVariables}
+              {...{
+                physics,
+                graphData,
+                threeDim,
+                emacsNodeId,
+                filter,
+                visuals,
+                behavior,
+                mouse,
+                scope,
+                setScope,
+                tagColors,
+                setPreviewNode,
+                windowWidth,
+                windowHeight,
+                openContextMenu,
+                contextMenu,
+                handleLocal,
+                mainWindowWidth,
+                setMainWindowWidth,
+                setContextMenuTarget,
+                graphRef,
+                clusterRef,
+                coloring,
+                local,
+              }}
+            />
+          )}
+        </Box>
+        <Box position="relative" zIndex={4} width="100%">
+          <Flex className="headerBar" h={10} flexDir="column">
+            <Flex alignItems="center" h={10} justifyContent="flex-end">
+              <Flex height="100%" flexDirection="row" alignItems="center">
+                <Input
+                  placeholder="Search nodes (name, tag, dir)..."
+                  size="sm"
+                  mx={2}
+                  width="300px"
+                  variant="filled"
+                  value={filter.textFilter}
+                  onChange={(e) =>
+                    setFilter((f: FilterSettings) => ({ ...f, textFilter: e.target.value }))
+                  }
+                />
+                {scope.nodeIds.length > 0 && (
+                  <Tooltip label="Return to main graph">
+                    <IconButton
+                      m={1}
+                      icon={<BiNetworkChart />}
+                      aria-label="Exit local mode"
+                      onClick={() =>
+                        setScope((currentScope: Scope) => ({
+                          ...currentScope,
+                          nodeIds: [],
+                        }))
+                      }
+                      variant="subtle"
+                    />
+                  </Tooltip>
+                )}
+              </Flex>
+            </Flex>
+          </Flex>
+        </Box>
+
+
+        {contextMenu.isOpen && (
+          <div ref={contextMenuRef}>
+            <ContextMenu
+              scope={scope}
+              target={contextMenuTarget}
+              background={false}
+              coordinates={contextPos}
+              handleLocal={handleLocal}
+              menuClose={contextMenu.onClose.bind(contextMenu)}
+              webSocket={WebSocketRef.current}
+              setPreviewNode={setPreviewNode}
+              setFilter={setFilter}
+              filter={filter}
+              setTagColors={setTagColors}
+              tagColors={tagColors}
+            />
+          </div>
+        )}
+      </Box>
+    </VariablesContext.Provider>
+  )
+}
+
+export interface GraphProps {
+  nodeById: NodeById
+  linksByNodeId: LinksByNodeId
+  graphData: GraphData
+  physics: PhysicsSettings
+  threeDim: boolean
+  filter: FilterSettings
+  emacsNodeId: string | null
+  visuals: VisualsSettings
+  behavior: BehaviorSettings
+  mouse: MouseSettings
+  local: LocalSettings
+  scope: Scope
+  setScope: any
+  webSocket: any
+  tagColors: { [tag: string]: string }
+  setPreviewNode: any
+  windowWidth: number
+  windowHeight: number
+  setContextMenuTarget: any
+  openContextMenu: any
+  contextMenu: any
+  handleLocal: any
+  mainWindowWidth: number
+  setMainWindowWidth: any
+  variables: EmacsVariables
+  graphRef: any
+  clusterRef: any
+  coloring: ColoringSettings
+}
+
+export const Graph = function (props: GraphProps) {
+  const {
+    graphRef,
+    physics,
+    graphData,
+    threeDim,
+    linksByNodeId,
+    filter,
+    emacsNodeId,
+    nodeById,
+    visuals,
+    behavior,
+    mouse,
+    scope,
+    local,
+    setScope,
+    webSocket,
+    tagColors,
+    setPreviewNode,
+    windowWidth,
+    windowHeight,
+    setContextMenuTarget,
+    openContextMenu,
+    contextMenu,
+    handleLocal,
+    variables,
+    clusterRef,
+    coloring,
+  } = props
+
+  const { dailyDir, roamDir } = variables
+
+  const [hoverNode, setHoverNode] = useState<NodeObject | null>(null)
+
+  const theme = useTheme()
+
+  const { emacsTheme } = useContext<ThemeContextProps>(ThemeContext)
+
+  const handleClick = (click: string, node: OrgRoamNode, event: any) => {
+    switch (click) {
+      case mouse.preview: {
+        setPreviewNode(node)
+        break
+      }
+      case mouse.local: {
+        handleLocal(node, behavior.localSame)
+        break
+      }
+      case mouse.follow: {
+        openNodeInEmacs(node, webSocket)
+        break
+      }
+      case mouse.context: {
+        openContextMenu(node, event)
+      }
+      default:
+        break
+    }
+  }
+
+  const centralHighlightedNode = useRef<NodeObject | null>(null)
+
+  useEffect(() => {
+    if (!emacsNodeId) {
+      return
+    }
+    setHoverNode(nodeById[emacsNodeId] as NodeObject)
+  }, [emacsNodeId])
+
+  const filteredLinksByNodeIdRef = useRef<LinksByNodeId>({})
+
+  const hiddenNodeIdsRef = useRef<NodeById>({})
+  const filteredGraphData = useMemo(() => {
+    hiddenNodeIdsRef.current = {}
+    const filteredNodes = graphData?.nodes
+      ?.filter((nodeArg) => {
+        const node = nodeArg as OrgRoamNode
+        //dirs
+        if (
+          filter.dirsBlocklist.length &&
+          filter.dirsBlocklist.some((dir) => node?.file?.includes(dir))
+        ) {
+          hiddenNodeIdsRef.current = { ...hiddenNodeIdsRef.current, [node.id]: node }
+          return false
+        }
+        if (
+          filter.dirsAllowlist.length > 0 &&
+          !filter.dirsAllowlist.some((dir) => node?.file?.includes(dir))
+        ) {
+          hiddenNodeIdsRef.current = { ...hiddenNodeIdsRef.current, [node.id]: node }
+          return false
+        }
+
+        if (
+          filter.tagsBlacklist.length &&
+          filter.tagsBlacklist.some((tag) => node?.tags?.indexOf(tag) > -1)
+        ) {
+          hiddenNodeIdsRef.current = { ...hiddenNodeIdsRef.current, [node.id]: node }
+          return false
+        }
+        if (
+          filter.tagsWhitelist.length > 0 &&
+          !filter.tagsWhitelist.some((tag) => node?.tags?.indexOf(tag) > -1)
+        ) {
+          hiddenNodeIdsRef.current = { ...hiddenNodeIdsRef.current, [node.id]: node }
+          return false
+        }
+        if (filter.filelessCites && node?.properties?.FILELESS) {
+          hiddenNodeIdsRef.current = { ...hiddenNodeIdsRef.current, [node.id]: node }
+          return false
+        }
+        if (filter?.bad && node?.properties?.bad) {
+          hiddenNodeIdsRef.current = { ...hiddenNodeIdsRef.current, [node.id]: node }
+          return false
+        }
+
+        if (filter.dailies && dailyDir && node.file?.includes(dailyDir)) {
+          hiddenNodeIdsRef.current = { ...hiddenNodeIdsRef.current, [node.id]: node }
+          return false
+        }
+        if (filter.noter && node.properties?.NOTER_PAGE) {
+          hiddenNodeIdsRef.current = { ...hiddenNodeIdsRef.current, [node.id]: node }
+          return false
+        }
+        if (filter.textFilter) {
+          const q = filter.textFilter.toLowerCase()
+          const titleMatch = (node.title as string)?.toLowerCase().includes(q)
+          const tagMatch = node.tags?.some((t: string) => t.toLowerCase().includes(q))
+          const fileMatch = node.file?.toLowerCase().includes(q)
+          if (!titleMatch && !tagMatch && !fileMatch) {
+            hiddenNodeIdsRef.current = { ...hiddenNodeIdsRef.current, [node.id]: node }
+            return false
+          }
+        }
+        return true
+      })
+      .filter((node) => {
+        const links = linksByNodeId[node?.id as string] ?? []
+        const unhiddenLinks = links.filter(
+          (link) =>
+            !hiddenNodeIdsRef.current[link.source] && !hiddenNodeIdsRef.current[link.target],
+        )
+
+        if (!filter.orphans) {
+          return true
+        }
+
+        if (filter.parent) {
+          return unhiddenLinks.length !== 0
+        }
+
+        if (unhiddenLinks.length === 0) {
+          return false
+        }
+
+        return unhiddenLinks.some((link) => !['parent', 'heading'].includes(link.type))
+      })
+
+    const filteredNodeIds = filteredNodes.map((node) => node.id as string)
+    const filteredLinks = graphData.links.filter((link) => {
+      const [sourceId, targetId] = normalizeLinkEnds(link)
+      if (
+        !filteredNodeIds.includes(sourceId as string) ||
+        !filteredNodeIds.includes(targetId as string)
+      ) {
+        return false
+      }
+      const linkRoam = link as OrgRoamLink
+      if (!filter.parent) {
+        return !['parent', 'heading'].includes(linkRoam.type)
+      }
+      if (filter.parent === 'heading') {
+        return linkRoam.type !== 'parent'
+      }
+      return linkRoam.type !== 'heading'
+    })
+
+    filteredLinksByNodeIdRef.current = filteredLinks.reduce<LinksByNodeId>((acc, linkArg) => {
+      const link = linkArg as OrgRoamLink
+      const [sourceId, targetId] = normalizeLinkEnds(link)
+      return {
+        ...acc,
+        [sourceId]: [...(acc[sourceId] ?? []), link],
+        [targetId]: [...(acc[targetId] ?? []), link],
+      }
+    }, {})
+
+    const weightedLinks = filteredLinks.map((l) => {
+      const [target, source] = normalizeLinkEnds(l)
+      const link = l as OrgRoamLink
+      return { target, source, weight: link.type === 'cite' ? 1 : 2 }
+    })
+
+    if (coloring.method === 'community') {
+      const community = jLouvain().nodes(filteredNodeIds).edges(weightedLinks)
+      clusterRef.current = community()
+    }
+    return { nodes: filteredNodes, links: filteredLinks }
+  }, [filter, graphData, coloring.method])
+
+  const [scopedGraphData, setScopedGraphData] = useState<GraphData>({ nodes: [], links: [] })
+
+  useEffect(() => {
+    if (!scope.nodeIds.length) {
+      return
+    }
+    const oldScopedNodes =
+      scope.nodeIds.length > 1
+        ? scopedGraphData.nodes.filter((n) => !scope.excludedNodeIds.includes(n.id as string))
+        : []
+    const oldScopedNodeIds = oldScopedNodes.map((node) => node.id as string)
+    const neighbs = findNthNeighbors({
+      ids: scope.nodeIds,
+      excludedIds: scope.excludedNodeIds,
+      n: local.neighbors,
+      linksByNodeId: filteredLinksByNodeIdRef.current,
+    })
+    const newScopedNodes = filteredGraphData.nodes
+      .filter((node) => {
+        if (oldScopedNodes.length) {
+          if (oldScopedNodeIds.includes(node.id as string)) {
+            return false
+          }
+          const links = filteredLinksByNodeIdRef.current[node.id as string] ?? []
+          return links.some((link) => {
+            const [source, target] = normalizeLinkEnds(link)
+            return (
+              !scope.excludedNodeIds.includes(source) &&
+              !scope.excludedNodeIds.includes(target) &&
+              (scope.nodeIds.includes(source) || scope.nodeIds.includes(target))
+            )
+          })
+        }
+        return neighbs.includes(node.id as string)
+        // this creates new nodes, to separate them from the nodes in the global graph
+        // and positions them in the center, so that the camera is not so jumpy
+      })
+      .map((node) => {
+        return { ...node, x: 0, y: 0, vy: 0, vx: 0 }
+      })
+    const scopedNodes = [...oldScopedNodes, ...newScopedNodes]
+    const scopedNodeIds = scopedNodes.map((node) => node.id as string)
+
+    const oldRawScopedLinks = scope.nodeIds.length > 1 ? scopedGraphData.links : []
+    const oldScopedLinks = oldRawScopedLinks.filter((l) => {
+      !scope.excludedNodeIds.some((e) => normalizeLinkEnds(l).includes(e))
+    })
+    const newScopedLinks = filteredGraphData.links
+      .filter((link) => {
+        // we need to cover both because force-graph modifies the original data
+        // but if we supply the original data on each render, the graph will re-render sporadically
+        const [sourceId, targetId] = normalizeLinkEnds(link)
+        if (
+          oldScopedLinks.length &&
+          oldScopedNodeIds.includes(targetId) &&
+          oldScopedNodeIds.includes(sourceId)
+        ) {
+          return false
+        }
+        return (
+          scopedNodeIds.includes(sourceId as string) && scopedNodeIds.includes(targetId as string)
+        )
+      })
+      .map((link) => {
+        const [sourceId, targetId] = normalizeLinkEnds(link)
+        return { source: sourceId, target: targetId }
+      })
+
+    const scopedLinks = [...oldScopedLinks, ...newScopedLinks]
+
+    setScopedGraphData({ nodes: scopedNodes, links: scopedLinks })
+  }, [
+    local.neighbors,
+    filter,
+    scope,
+    scope.excludedNodeIds,
+    scope.nodeIds,
+    graphData,
+    filteredGraphData.links,
+    filteredGraphData.nodes,
+  ])
+
+  useEffect(() => {
+    ;(async () => {
+      const fg = graphRef.current
+      const d3 = await d3promise
+      if (physics.gravityOn && !(scope.nodeIds.length && !physics.gravityLocal)) {
+        fg.d3Force('x', d3.forceX().strength(physics.gravity))
+        fg.d3Force('y', d3.forceY().strength(physics.gravity))
+        threeDim && fg.d3Force('z', d3.forceZ().strength(physics.gravity))
+      } else {
+        fg.d3Force('x', null)
+        fg.d3Force('y', null)
+        threeDim && fg.d3Force('z', null)
+      }
+      physics.centering
+        ? fg.d3Force('center', d3.forceCenter().strength(physics.centeringStrength))
+        : fg.d3Force('center', null)
+      physics.linkStrength && fg.d3Force('link').strength(physics.linkStrength)
+      physics.linkIts && fg.d3Force('link').iterations(physics.linkIts)
+      physics.charge && fg.d3Force('charge').strength(physics.charge)
+      fg.d3Force(
+        'collide',
+        physics.collision ? d3.forceCollide().radius(physics.collisionStrength) : null,
+      )
+    })()
+  }, [physics, threeDim, scope])
+
+  // Normally the graph doesn't update when you just change the physics parameters
+  // This forces the graph to make a small update when you do
+  useEffect(() => {
+    graphRef.current?.d3ReheatSimulation()
+  }, [physics, scope.nodeIds.length])
+
+  // shitty handler to check for doubleClicks
+  const lastNodeClickRef = useRef(0)
+
+  // this is for animations, it's a bit hacky and can definitely be optimized
+  const [opacity, setOpacity] = useState(1)
+  const [fadeIn, cancel] = useAnimation((x) => setOpacity(x), {
+    duration: visuals.animationSpeed,
+    algorithm: algos[visuals.algorithmName],
+  })
+  const [fadeOut, fadeOutCancel] = useAnimation(
+    (x) => setOpacity(Math.min(opacity, -1 * (x - 1))),
+    {
+      duration: visuals.animationSpeed,
+      algorithm: algos[visuals.algorithmName],
+    },
+  )
+
+  const highlightedNodes = useMemo(() => {
+    if (!centralHighlightedNode.current) {
+      return {}
+    }
+
+    const links = filteredLinksByNodeIdRef.current[centralHighlightedNode.current.id!]
+    if (!links) {
+      return {}
+    }
+    return Object.fromEntries(
+      [
+        centralHighlightedNode.current?.id! as string,
+        ...links.flatMap((link) => [link.source, link.target]),
+      ].map((nodeId) => [nodeId, {}]),
+    )
+  }, [centralHighlightedNode.current, filteredLinksByNodeIdRef.current])
+
+  const lastHoverNode = useRef<OrgRoamNode | null>(null)
+
+  useEffect(() => {
+    centralHighlightedNode.current = hoverNode
+    if (hoverNode) {
+      lastHoverNode.current = hoverNode as OrgRoamNode
+    }
+    if (!visuals.highlightAnim) {
+      return hoverNode ? setOpacity(1) : setOpacity(0)
+    }
+    if (hoverNode) {
+      fadeIn()
+    } else {
+      // to prevent fadeout animation from starting at 1
+      // when quickly moving away from a hovered node
+      cancel()
+      opacity > 0.5 ? fadeOut() : setOpacity(0)
+    }
+  }, [hoverNode])
+
+  const highlightColors = useMemo(() => {
+    const keys = Object.keys(emacsTheme)
+    if (keys.length === 0) return {}
+    return Object.fromEntries(
+      keys.map((color) => {
+        const color1 = emacsTheme[color]
+        const crisscross = keys.map((color2) => [
+          color2,
+          d3int.interpolate(color1, emacsTheme[color2]),
+        ])
+        return [color, Object.fromEntries(crisscross)]
+      }),
+    )
+  }, [emacsTheme])
+
+  const previouslyHighlightedNodes = useMemo(() => {
+    const previouslyHighlightedLinks =
+      filteredLinksByNodeIdRef.current[lastHoverNode.current?.id!] ?? []
+    return Object.fromEntries(
+      [
+        lastHoverNode.current?.id! as string,
+        ...previouslyHighlightedLinks.flatMap((link) => normalizeLinkEnds(link)),
+      ].map((nodeId) => [nodeId, {}]),
+    )
+  }, [JSON.stringify(hoverNode), lastHoverNode.current, filteredLinksByNodeIdRef.current])
+
+  const labelTextColor = useMemo(
+    () => getThemeColor(visuals.labelTextColor, theme),
+    [visuals.labelTextColor, emacsTheme],
+  )
+
+  const labelBackgroundColor = useMemo(
+    () => getThemeColor(visuals.labelBackgroundColor, theme),
+    [visuals.labelBackgroundColor, emacsTheme],
+  )
+
+  const [dragging, setDragging] = useState(false)
+
+  const scaleRef = useRef(1)
+  const graphCommonProps: ComponentPropsWithoutRef<typeof TForceGraph2D> = {
+    graphData: scope.nodeIds.length ? scopedGraphData : filteredGraphData,
+    width: windowWidth,
+    height: windowHeight,
+    backgroundColor: getThemeColor(visuals.backgroundColor, theme),
+    warmupTicks: scope.nodeIds.length === 1 ? 100 : scope.nodeIds.length > 1 ? 20 : 0,
+    onZoom: ({ k, x, y }) => (scaleRef.current = k),
+    nodeColor: (node) => {
+      return getNodeColor({
+        node: node as OrgRoamNode,
+        theme,
+        visuals,
+        cluster: clusterRef.current,
+        coloring,
+        emacsNodeId,
+        highlightColors,
+        highlightedNodes,
+        previouslyHighlightedNodes,
+        linksByNodeId: filteredLinksByNodeIdRef.current,
+        opacity,
+        tagColors,
+      })
+    },
+    nodeRelSize: visuals.nodeRel,
+    nodeVal: (node) => {
+      return (
+        nodeSize({
+          node,
+          highlightedNodes,
+          linksByNodeId: filteredLinksByNodeIdRef.current,
+          opacity,
+          previouslyHighlightedNodes,
+          visuals,
+        }) / Math.pow(scaleRef.current, visuals.nodeZoomSize)
+      )
+    },
+    nodeCanvasObject: (node, ctx, globalScale) => {
+      drawLabels({
+        nodeRel: visuals.nodeRel,
+        filteredLinksByNodeId: filteredLinksByNodeIdRef.current,
+        lastHoverNode: lastHoverNode.current,
+        ...{
+          node,
+          ctx,
+          globalScale,
+          highlightedNodes,
+          previouslyHighlightedNodes,
+          visuals,
+          opacity,
+          labelTextColor,
+          labelBackgroundColor,
+          hoverNode,
+        },
+      })
+    },
+    nodeCanvasObjectMode: () => 'after',
+
+    linkDirectionalParticles: visuals.particles ? visuals.particlesNumber : undefined,
+    linkDirectionalArrowLength: visuals.arrows ? visuals.arrowsLength : undefined,
+    linkDirectionalArrowRelPos: visuals.arrowsPos,
+    linkDirectionalArrowColor: visuals.arrowsColor
+      ? () => getThemeColor(visuals.arrowsColor, theme)
+      : undefined,
+    linkColor: (link) => {
+      const sourceId = typeof link.source === 'object' ? link.source.id! : (link.source as string)
+      const targetId = typeof link.target === 'object' ? link.target.id! : (link.target as string)
+      const linkIsHighlighted = isLinkRelatedToNode(link, centralHighlightedNode.current)
+      const linkWasHighlighted = isLinkRelatedToNode(link, lastHoverNode.current)
+      const needsHighlighting = linkIsHighlighted || linkWasHighlighted
+      const roamLink = link as OrgRoamLink
+
+      const colorKey = roamLink.type === 'ref'
+        ? visuals.refLinkColor
+        : roamLink.type?.includes('cite')
+          ? visuals.citeLinkColor
+          : (needsHighlighting ? visuals.linkHighlight : visuals.linkColorScheme)
+      if (!colorKey || !highlightColors[colorKey]) {
+        return getThemeColor(colorKey || 'red', theme) || '#cc0000'
+      }
+
+      if (visuals.refLinkColor && roamLink.type === 'ref') {
+        return needsHighlighting && (visuals.refLinkHighlightColor || visuals.linkHighlight)
+          ? highlightColors[visuals.refLinkColor][
+              visuals.refLinkHighlightColor || visuals.linkHighlight
+            ](opacity)
+          : highlightColors[visuals.refLinkColor][visuals.backgroundColor](
+              visuals.highlightFade * opacity,
+            )
+      }
+      if (visuals.citeLinkColor && roamLink.type?.includes('cite')) {
+        return needsHighlighting && (visuals.citeLinkHighlightColor || visuals.linkHighlight)
+          ? highlightColors[visuals.citeLinkColor][
+              visuals.citeLinkHighlightColor || visuals.linkHighlight
+            ](opacity)
+          : highlightColors[visuals.citeLinkColor][visuals.backgroundColor](
+              visuals.highlightFade * opacity,
+            )
+      }
+
+      return getLinkColor({
+        sourceId: sourceId as string,
+        targetId: targetId as string,
+        needsHighlighting,
+        theme,
+        cluster: clusterRef.current,
+        coloring,
+        highlightColors,
+        linksByNodeId: filteredLinksByNodeIdRef.current,
+        opacity,
+        visuals,
+      })
+    },
+    linkWidth: (link) => {
+      if (visuals.highlightLinkSize === 1) {
+        return visuals.linkWidth
+      }
+      const linkIsHighlighted = isLinkRelatedToNode(link, centralHighlightedNode.current)
+      const linkWasHighlighted = isLinkRelatedToNode(link, lastHoverNode.current)
+
+      return linkIsHighlighted || linkWasHighlighted
+        ? visuals.linkWidth * (1 + opacity * (visuals.highlightLinkSize - 1))
+        : visuals.linkWidth
+    },
+    linkDirectionalParticleWidth: visuals.particlesWidth,
+
+    d3AlphaDecay: physics.alphaDecay,
+    d3AlphaMin: physics.alphaMin,
+    d3VelocityDecay: physics.velocityDecay,
+
+    onNodeClick: (nodeArg: NodeObject, event: any) => {
+      const node = nodeArg as OrgRoamNode
+      //contextMenu.onClose()
+      const doubleClickTimeBuffer = 200
+      const isDoubleClick = event.timeStamp - lastNodeClickRef.current < doubleClickTimeBuffer
+      lastNodeClickRef.current = event.timeStamp
+      if (isDoubleClick) {
+        return handleClick('double', node, event)
+      }
+
+      const prevNodeClickTime = lastNodeClickRef.current
+      return setTimeout(() => {
+        if (lastNodeClickRef.current !== prevNodeClickTime) {
+          return
+        }
+        return handleClick('click', node, event)
+      }, doubleClickTimeBuffer)
+    },
+    onNodeHover: (node) => {
+      if (!visuals.highlight) {
+        return
+      }
+      if (dragging) {
+        return
+      }
+
+      if (!hoverNode) {
+        fadeOutCancel()
+        setOpacity(0)
+      }
+      setHoverNode(node)
+    },
+    onNodeRightClick: (nodeArg, event) => {
+      const node = nodeArg as OrgRoamNode
+
+      handleClick('right', node, event)
+    },
+    onNodeDrag: (node) => {
+      setHoverNode(node)
+      setDragging(true)
+    },
+    onNodeDragEnd: () => {
+      setHoverNode(null)
+      setDragging(false)
+    },
+  }
+
+  return (
+    <Box overflow="hidden" onClick={contextMenu.onClose}>
+      {threeDim ? (
+        <ForceGraph3D
+          ref={graphRef}
+          {...graphCommonProps}
+          nodeThreeObjectExtend={true}
+          nodeOpacity={visuals.nodeOpacity}
+          nodeResolution={visuals.nodeResolution}
+          linkOpacity={visuals.linkOpacity}
+          nodeThreeObject={(node: OrgRoamNode) => {
+            if (!visuals.labels) {
+              return
+            }
+            if (visuals.labels < 3 && !highlightedNodes[node.id!]) {
+              return
+            }
+            const sprite = new SpriteText(node.title.substring(0, 40))
+            sprite.color = getThemeColor(visuals.labelTextColor, theme)
+            sprite.backgroundColor = getThemeColor(visuals.labelBackgroundColor, theme)
+            sprite.padding = 2
+            sprite.textHeight = 8
+
+            return sprite
+          }}
+        />
+      ) : (
+        <ForceGraph2D
+          ref={graphRef}
+          {...graphCommonProps}
+          linkLineDash={(link) => {
+            const linkArg = link as OrgRoamLink
+            if (visuals.citeDashes && linkArg.type?.includes('cite')) {
+              return [visuals.citeDashLength, visuals.citeGapLength]
+            }
+            if (visuals.refDashes && linkArg.type == 'ref') {
+              return [visuals.refDashLength, visuals.refGapLength]
+            }
+            return null
+          }}
+        />
+      )}
+    </Box>
+  )
+}

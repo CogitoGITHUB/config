@@ -1,0 +1,26 @@
+#+title:    Tidal Cycles
+#+filetags: :emacs-package:music:
+#+PRIORITY: 10
+
+* Tidal
+:PROPERTIES:
+:PACKAGE:  tidal
+:STRAIGHT: (tidal :host codeberg :repo "uzu/tidal")
+:CATEGORY: music
+:END:
+** Config :config:
+#+begin_src emacs-lisp
+(setq tidal-interpreter "ghci")
+(setq tidal-boot-script-path
+      "/gnu/store/w0mmxq4vcwp1c6j3kck0g26f63kr04di-tidal-1.10.3/share/x86_64-linux-ghc-9.2.8/tidal-1.10.3/BootTidal.hs")
+
+;; Set GHC package path so ghci can find tidal and its dependencies
+(setenv "GHC_PACKAGE_PATH"
+        (mapconcat
+         #'identity
+         (file-expand-wildcards
+          "/home/aoeu/.guix-profile/lib/ghc-9.2.8/*.conf.d")
+         ":"))
+
+(add-hook 'tidal-mode-hook #'tidal-turn-on-keybindings)
+#+end_src

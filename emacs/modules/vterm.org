@@ -1,0 +1,160 @@
+#+title:    vterm
+#+filetags: :emacs-package:terminal:
+#+DISABLED: t
+#+PRIORITY: 20
+
+* Vterm
+:PROPERTIES:
+:PACKAGE:  vterm
+:STRAIGHT: (vterm :type git :host github :repo "akermu/emacs-libvterm" :files ("CMakeLists.txt" "elisp.c" "elisp.h" "emacs-module.h" "etc" "utf8.c" "utf8.h" "vterm.el" "vterm-module.c" "vterm-module.h"))
+:CATEGORY: terminal
+:END:
+** Overview
+#+begin_src emacs-lisp :tangle no
+;; emacs-libvterm — full terminal emulator inside Emacs backed by libvterm (C).
+;; Handles interactive programs (htop, fzf, vim, etc.) that eshell/shell cannot.
+;; Requires the vterm module to be compiled on first install.
+;;
+;; vterm-toggle  — toggle a vterm popup window from any buffer
+;; multi-vterm   — manage multiple named vterm buffers
+#+end_src
+** Vterm Core
+#+begin_src emacs-lisp
+;; Use nushell as the vterm shell
+(setq vterm-shell (or (executable-find "nu") "/usr/bin/nu"))
+
+;; Large scrollback so you can scroll back through long output
+(setq vterm-max-scrollback 10000)
+
+;; Kill the buffer when the shell process exits
+(setq vterm-kill-buffer-on-exit t)
+
+;; Do not prompt on close if process is running
+(setq vterm-always-compile-module t)
+
+;; Ignore these keys — let vterm handle them natively
+;; (remove entries here if you want Emacs to intercept them instead)
+(setq vterm-keymap-exceptions
+      '("C-c" "C-x" "C-u" "C-g" "C-h" "C-l" "M-x" "M-o"))
+#+end_src
+** Copy Mode
+#+begin_src emacs-lisp
+;; Remove fake newlines when entering copy mode so isearch and
+;; avy work correctly on terminal output lines.
+(setq vterm-copy-exclude-prompt t)
+(setq vterm-copy-mode-remove-fake-newlines t)
+#+end_src
+** Shell Integration
+#+begin_src emacs-lisp :tangle no
+;; Add this to ~/.config/nushell/config.nu so vterm can track the
+;; current directory and update the buffer title.
+;;
+;; def vterm_printf [payload: string] {
+;;   if (($env.TMUX? | default "") | str length) > 0 {
+;;     ^printf $"\ePtmux;\e\e]($payload)\007\e\\"
+;;   } else if ($env.TERM | str starts-with "screen") {
+;;     ^printf $"\eP\e]($payload)\007\e\\"
+;;   } else {
+;;     ^printf $"\e]($payload)\e\\"
+;;   }
+;; }
+;;
+;; def vterm_prompt_end [] {
+;;   vterm_printf $"51;A(whoami)@(hostname):(pwd)"
+;; }
+;;
+;; # Append to your existing PROMPT_COMMAND closure in config.nu:
+;; $env.PROMPT_COMMAND = {||
+;;   vterm_prompt_end
+;;   # ... rest of your prompt
+;; }
+#+end_src
+
+* Vterm Toggle
+:PROPERTIES:
+:PACKAGE:  vterm-toggle
+:STRAIGHT: (vterm-toggle :type git :host github :repo "jixiuf/vterm-toggle")
+:CATEGORY: terminal
+:END:
+** Overview
+#+begin_src emacs-lisp :tangle no
+;; vterm-toggle-show     — show the vterm popup (Z in all states via keyboard.org)
+;; vterm-toggle-cd-show  — show and cd to the current buffer's directory (d in vterm state)
+;;
+;; Popup appears as a side window at the bottom, 30% of frame height.
+;; All vterm buffers are reused — toggling returns to the same session.
+#+end_src
+** Display
+#+begin_src emacs-lisp
+;; Show vterm as a bottom side window, 30% frame height
+(setq vterm-toggle-fullscreen-p nil)
+
+(add-to-list 'display-buffer-alist
+             '((lambda (buf _)
+                 (let ((b (if (bufferp buf) buf (get-buffer buf))))
+                   (and b (with-current-buffer b
+                            (or (derived-mode-p 'vterm-mode)
+                                (string-prefix-p vterm-buffer-name (buffer-name b)))))))
+               (display-buffer-reuse-window display-buffer-in-side-window)
+               (side . bottom)
+               (reusable-frames . visible)
+               (window-height . 0.5)))
+#+end_src
+** Toggle Command
+#+begin_src emacs-lisp
+(defun my/vterm-toggle ()
+  "Toggle the vterm popup window.
+If a vterm window is visible, hide it.  Otherwise show or create one."
+  (interactive)
+  (let* ((vterm-wins
+          (seq-filter
+           (lambda (w)
+             (with-current-buffer (window-buffer w)
+               (derived-mode-p 'vterm-mode)))
+           (window-list)))
+         (vterm-visible (car vterm-wins)))
+    (if vterm-visible
+        ;; Already visible — hide it
+        (delete-window vterm-visible)
+      ;; Not visible — get-or-create a buffer and display it
+      (let ((buf (or (seq-find (lambda (b)
+                                 (with-current-buffer b
+                                   (derived-mode-p 'vterm-mode)))
+                               (buffer-list))
+                     (generate-new-buffer vterm-buffer-name))))
+        (with-current-buffer buf
+          (unless (derived-mode-p 'vterm-mode)
+            (vterm-mode)))
+        (let ((win (display-buffer buf)))
+          (when win (select-window win)))))))
+#+end_src
+** Scope
+#+begin_src emacs-lisp
+;; Scope toggle to the current project when inside one,
+;; fall back to a global vterm otherwise.
+(setq vterm-toggle-scope 'project)
+#+end_src
+
+* Multi Vterm
+:PROPERTIES:
+:PACKAGE:  multi-vterm
+:STRAIGHT: (multi-vterm :type git :host github :repo "suonlight/multi-vterm")
+:CATEGORY: terminal
+:END:
+** Overview
+#+begin_src emacs-lisp :tangle no
+;; multi-vterm          — create a new named vterm buffer         (t in vterm state)
+;; multi-vterm-project  — vterm rooted at current project root    (T in vterm state)
+;; multi-vterm-dedicated-toggle — bottom-pane persistent terminal (D in vterm state)
+;; multi-vterm-next / multi-vterm-prev — cycle managed buffers    (n/p in vterm state)
+#+end_src
+** Dedicated Window
+#+begin_src emacs-lisp
+;; Height of the dedicated bottom-pane terminal as % of frame
+(setq multi-vterm-dedicated-window-height-percent 30)
+#+end_src
+** Buffer Naming
+#+begin_src emacs-lisp
+;; Each new vterm buffer gets an incrementing name: vterm<1>, vterm<2>, …
+(setq multi-vterm-buffer-name "vterm")
+#+end_src

@@ -1,0 +1,34 @@
+#+title:      auctex
+#+identifier: 2e4f8a1d-7c3b-4e9f-ad12-8b5c6d3e1f7a
+#+filetags:   :emacs-package:latex:
+
+* AUCTEX — LaTeX Environment #emacs-package
+:PROPERTIES:
+:ID:       2e4f8a1d-7c3b-4e9f-ad12-8b5c6d3e1f7a
+:PACKAGE:  auctex
+:STRAIGHT: (auctex :type git :host nil :repo "https://git.savannah.gnu.org/git/auctex.git")
+:CATEGORY: latex
+:END:
+
+** Guix
+#+begin_src scheme :tangle ~/.config/guix/Operating-System/user-space/root/editors/emacs-packages/latex/auctex.scm
+#+end_src
+
+** Config
+#+begin_src emacs-lisp
+(let ((gui-texmf (expand-file-name "share/texmf-dist" "/run/current-system/profile"))
+      (user-texmf (expand-file-name "share/texmf-dist" "~/.guix-profile")))
+  (setenv "GUIX_TEXMF" (concat gui-texmf ":" user-texmf))
+  (setenv "TEXINPUTS" (concat ".:" user-texmf "/tex//:" (or (getenv "TEXINPUTS") ""))))
+
+(setq TeX-engine 'xetex
+      TeX-PDF-mode t
+      TeX-auto-save t
+      TeX-parse-self t
+      TeX-save-query nil
+      org-latex-compiler "xelatex"
+      org-latex-pdf-process
+      '("xelatex -interaction nonstopmode -output-directory %o %f"
+        "xelatex -interaction nonstopmode -output-directory %o %f"
+        "xelatex -interaction nonstopmode -output-directory %o %f"))
+#+end_src

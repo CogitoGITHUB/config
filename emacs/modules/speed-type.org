@@ -1,0 +1,16 @@
+#+title:      speed-type
+#+identifier: f5666e7e-6f8f-4fdf-8eca-a8de1ef27117
+#+filetags:   :emacs-package:typing:
+
+* speed-type
+:PROPERTIES:
+:ID:       f5666e7e-6f8f-4fdf-8eca-a8de1ef27117
+:PACKAGE:  speed-type
+:CATEGORY: typing
+:STRAIGHT: (speed-type :type git :host github :repo "dakra/speed-type")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

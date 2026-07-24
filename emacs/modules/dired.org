@@ -1,0 +1,52 @@
+#+title:    dired
+#+filetags: :emacs-package:files:navigation:
+#+PRIORITY: 19
+
+* Dired
+** Commands
+#+begin_src emacs-lisp
+(defun my/dired-here ()
+  "Open dired at the current buffer's directory."
+  (interactive)
+  (dired (expand-file-name
+          (or (and buffer-file-name
+                   (file-name-directory buffer-file-name))
+              default-directory))))
+(defun my/dired-find-file ()
+  "Open file at point, guarding against nil (header lines etc.)."
+  (interactive)
+  (let ((file (ignore-errors (dired-get-filename nil t))))
+    (if file
+        (find-file file)
+      (message "No file on this line"))))
+(defun my/dired-avy-open-file ()
+  "Select a dired line with avy and open the file directly."
+  (interactive)
+  (avy-with my/dired-avy-open-file
+    (let ((r (avy--line (eq current-prefix-arg 4))))
+      (when (and (not (memq r '(t nil))) (eq avy-action #'identity))
+        (goto-char r)
+        (my/dired-find-file)))))
+#+end_src
+** Config
+#+begin_src emacs-lisp
+(setq dired-auto-revert-buffer t)
+(add-hook 'dired-mode-hook 'auto-revert-mode)
+(setq dired-movement-style 'bounded)
+(add-hook 'dired-after-readin-hook (lambda () (dired-hide-details-mode 1)))
+(advice-add 'dired-internal-noselect :after
+            (lambda (&rest _)
+              (when olivetti-mode
+                (olivetti-set-buffer-windows))))
+#+end_src
+
+* Diff HL — Git status in dired
+:PROPERTIES:
+:PACKAGE:  diff-hl
+:STRAIGHT: (diff-hl :type git :host github :repo "dgutov/diff-hl")
+:CATEGORY: git
+:END:
+** Config
+#+begin_src emacs-lisp
+(add-hook 'dired-mode-hook #'diff-hl-dired-mode)
+#+end_src

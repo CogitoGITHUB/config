@@ -24,7 +24,7 @@
     },
     "emacs": {
       "type": "local",
-      "command": ["socat", "-", "UNIX-CONNECT:~/.emacs.d/.local/cache/emacs-mcp-server.sock"],
+      "command": ["socat", "-", "UNIX-CONNECT:~/.config/emacs/.local/cache/emacs-mcp-server.sock"],
       "enabled": true
     },
     "herdr": {

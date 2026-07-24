@@ -1,0 +1,256 @@
+#+title:      dashboard
+#+identifier: 2a3c1f4e-8d5b-4a7c-be12-9f6d3e1c5b8a
+#+filetags:   :emacs-package:ui:
+
+* Dashboard
+:PROPERTIES:
+:PACKAGE:  dashboard
+:STRAIGHT: (dashboard :type git :host github :repo "emacs-dashboard/dashboard" :files (:defaults "banners"))
+:CATEGORY: ui
+:END:
+
+** Config
+#+begin_src emacs-lisp
+(setq dashboard-center-content t)
+(setq dashboard-startup-banner (expand-file-name "manifold-banner.txt" user-emacs-directory))
+(setq dashboard-banner-logo-title "🌹 𝕸𝖆𝖓𝖎𝖋𝖔𝖑𝖉 🌹")
+(setq dashboard-set-init-info nil)
+(setq dashboard-projects-backend 'projectile)
+(setq dashboard-items '((manifold-clock   . 1)
+                        (manifold-commands . 1)
+                        (recents          . 10)
+                        (bookmarks        . 10)
+                        (registers        . 10)
+                        (projects         . 10)
+                        (manifold-sartre  . 1)))
+(setq dashboard-set-heading-icons t)
+(setq dashboard-set-file-icons t)
+(setq dashboard-icon-type 'nerd-icons)
+(setq dashboard-item-names '(("Recent Files:"               . "🌹 Recently Opened:")
+                              ("Bookmarks:"                  . "🌹 Marks:")
+                              ("Registers:"                  . "🌹 Registers:")
+                              ("Projects:"                   . "🌹 Projects:")
+                              ("Agenda for the coming week:" . "🌹 Agenda:")
+                              ("Sartre:"                     . "🌹 Sartre:")))
+(setq dashboard-footer-messages '("🌹 the manifold endures 🌹"
+                                  "🌹 every module a petal 🌹"
+                                  "🌹 sovereign and self-contained 🌹"
+                                  "🌹 per aspera ad astra 🌹"
+                                  "🌹 existence precedes essence 🌹"
+                                  "🌹 man is condemned to be free 🌹"))
+(setq dashboard-navigator-buttons
+      `(((nil "  Modules" "Open modules in Dired"
+          (lambda (&rest _)
+            (dired "/home/aoeu/.emacs.d/modules")))
+         (nil "  Reload" "Reload literate config (C-c l l)"
+          (lambda (&rest _) (literate-config-load)))
+         (nil "  Status" "Show load status (C-c l s)"
+          (lambda (&rest _) (literate-config-status)))
+         (nil "  Errors" "Show load errors (C-c l e)"
+          (lambda (&rest _) (literate-config-errors)))
+         (nil "  Scratch" "Go to scratch buffer"
+          (lambda (&rest _) (switch-to-buffer "*scratch*"))))))
+(setq dashboard-startupify-list '(dashboard-insert-banner
+                                  dashboard-insert-newline
+                                  dashboard-insert-banner-title
+                                  dashboard-insert-newline
+                                  dashboard-insert-navigator
+                                  dashboard-insert-newline
+                                  dashboard-insert-items
+                                  dashboard-insert-newline
+                                  dashboard-insert-footer))
+(setq dashboard-items-default-length 20)
+
+(add-hook 'dashboard-mode-hook
+          (lambda ()
+            (setq-local mode-line-format nil)
+            ;; Let Olivetti handle centering — wide enough to not mangle the ASCII banner
+            (when (fboundp 'olivetti-mode)
+              (setq-local olivetti-body-width 120)
+              (olivetti-mode 1))
+            (local-set-key (kbd "r") #'dashboard-jump-to-recents)
+            (local-set-key (kbd "m") #'dashboard-jump-to-bookmarks)
+            (local-set-key (kbd "e") #'dashboard-jump-to-registers)
+            (local-set-key (kbd "p") #'dashboard-jump-to-projects)
+            (local-set-key (kbd "a") #'org-agenda)
+            (local-set-key (kbd "g") #'consult-register)
+            (local-set-key (kbd "c") (lambda () (interactive) (dashboard-jump-to-item 'manifold-commands)))
+            (local-set-key (kbd "q") (lambda () (interactive) (save-buffers-kill-terminal)))
+            (local-set-key (kbd "d") (lambda () (interactive) (dired "~")))))
+
+;; Ensure recentf is active so dashboard recents are always fresh
+(recentf-mode +1)
+(setq recentf-max-saved-items 100)
+;; Save recentf list every 5 minutes in case of crash
+(run-at-time nil (* 5 60) 'recentf-save-list)
+
+;; Refresh dashboard recents after every super-save
+(add-hook 'after-save-hook
+          (lambda ()
+            (when (and (fboundp 'recentf-add-file)
+                       buffer-file-name)
+              (recentf-add-file buffer-file-name))
+            (when (get-buffer "*dashboard*")
+              (with-current-buffer "*dashboard*"
+                (dashboard-refresh-buffer)))))
+#+end_src
+
+** Clock Widget
+
+#+begin_src emacs-lisp
+(defvar manifold/clock-timer nil)
+
+(defun manifold/clock-string ()
+  (let* ((time (format-time-string "%A %d %B %Y    %H:%M:%S"))
+         (width (or (and (get-buffer-window "*dashboard*")
+                         (window-width (get-buffer-window "*dashboard*")))
+                    80))
+         (pad (max 0 (/ (- width (length time)) 2))))
+    (concat (make-string pad ?\s) time)))
+
+(defun dashboard-insert-manifold-clock (_list-size)
+  (insert "\n")
+  (insert (manifold/clock-string))
+  (insert "\n\n"))
+
+(add-to-list 'dashboard-item-generators
+             '(manifold-clock . dashboard-insert-manifold-clock))
+
+;; Live update every second — only the clock line, no full refresh
+(defun manifold/clock-start ()
+  (when (get-buffer "*dashboard*")
+    (setq manifold/clock-timer
+          (run-at-time t 1
+            (lambda ()
+              (when (get-buffer-window "*dashboard*")
+                (with-current-buffer "*dashboard*"
+                  (let ((inhibit-read-only t))
+                    (save-excursion
+                      (goto-char (point-min))
+                      (when (re-search-forward
+                             (rx (or "Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")) nil t)
+                        (beginning-of-line)
+                        (delete-region (point) (line-end-position))
+                        (insert (manifold/clock-string))))))))))))
+
+(defun manifold/clock-stop ()
+  (when manifold/clock-timer
+    (cancel-timer manifold/clock-timer)
+    (setq manifold/clock-timer nil)))
+
+(add-hook 'dashboard-mode-hook #'manifold/clock-start)
+(add-hook 'kill-buffer-hook
+          (lambda ()
+            (when (string= (buffer-name) "*dashboard*")
+              (manifold/clock-stop))))
+#+end_src
+
+** Commands Widget
+
+#+begin_src emacs-lisp
+(defun dashboard-insert-manifold-commands (_list-size)
+  (insert "\n")
+  (insert "🌹 ─────────────────── Manifold ─────────────────── 🌹")
+  (insert "\n\n")
+  (insert "[S]  Status        [D]  Modules")
+  (insert "\n\n")
+  (insert "🌹 ──────────────────────────────────────────────── 🌹")
+  (insert "\n\n"))
+
+(defun manifold/dashboard-keys ()
+  (setq-local mode-line-format nil)
+  (local-set-key (kbd "S") (lambda () (interactive) (literate-config-status)))
+  (local-set-key (kbd "D") (lambda () (interactive) (dired "/home/aoeu/.emacs.d/modules"))))
+
+(add-hook 'dashboard-mode-hook #'manifold/dashboard-keys)
+
+(add-to-list 'dashboard-item-generators
+             '(manifold-commands . dashboard-insert-manifold-commands))
+#+end_src
+
+** Sartre Widget
+
+#+begin_src emacs-lisp
+(defvar manifold/sartre-quotes
+  '("Existence precedes essence."
+    "Man is condemned to be free."
+    "Hell is other people."
+    "We are our choices."
+    "Freedom is what you do with what's been done to you."
+    "Every existing thing is born without reason, prolongs itself out of weakness, and dies by chance."
+    "Life has no meaning the moment you lose the illusion of being eternal."
+    "One always dies too soon — or too late. And yet one's whole life is complete at that moment."
+    "Words are loaded pistols."
+    "To be is to do."
+    "Man is not the sum of what he has already, but rather the sum of what he does not yet have."))
+
+(defun dashboard-insert-manifold-sartre (_list-size)
+  (dashboard-insert-heading "Sartre:" nil nil)
+  (insert "\n")
+  (insert "    " (nth (random (length manifold/sartre-quotes)) manifold/sartre-quotes))
+  (insert "\n"))
+
+(add-to-list 'dashboard-item-generators
+             '(manifold-sartre . dashboard-insert-manifold-sartre))
+#+end_src
+
+** Faces — Banner & Title
+
+#+begin_src emacs-lisp
+(defun manifold/pure-red--dashboard-banner ()
+  (with-eval-after-load 'dashboard
+    (dolist (face '(dashboard-banner-logo-title dashboard-text-banner))
+      (when (facep face)
+        (set-face-attribute face nil
+                            :foreground "#8B0000" :background 'unspecified :weight 'bold :inherit nil)))))
+#+end_src
+
+** Faces — Headings
+
+#+begin_src emacs-lisp
+(defun manifold/pure-red--dashboard-headings ()
+  (with-eval-after-load 'dashboard
+    (when (facep 'dashboard-heading)
+      (set-face-attribute 'dashboard-heading nil
+                          :foreground "#8B0000" :background 'unspecified :weight 'bold :inherit nil))))
+#+end_src
+
+** Faces — Items
+
+#+begin_src emacs-lisp
+(defun manifold/pure-red--dashboard-items ()
+  (with-eval-after-load 'dashboard
+    (when (facep 'dashboard-items-face)
+      (set-face-attribute 'dashboard-items-face nil
+                          :foreground "#8B0000" :background 'unspecified :weight 'normal :inherit nil))))
+#+end_src
+
+** Faces — Footer
+
+#+begin_src emacs-lisp
+(defun manifold/pure-red--dashboard-footer ()
+  (with-eval-after-load 'dashboard
+    (dolist (face '(dashboard-footer dashboard-footer-icon-face))
+      (when (facep face)
+        (set-face-attribute face nil
+                            :foreground "#8B0000" :background 'unspecified :weight 'normal :inherit nil)))))
+#+end_src
+
+** Faces — Apply
+
+#+begin_src emacs-lisp
+(defun manifold/pure-red--dashboard ()
+  (manifold/pure-red--dashboard-banner)
+  (manifold/pure-red--dashboard-headings)
+  (manifold/pure-red--dashboard-items)
+  (manifold/pure-red--dashboard-footer))
+
+(manifold/pure-red--dashboard)
+(advice-add 'load-theme :after (lambda (&rest _) (manifold/pure-red--dashboard)))
+(add-hook 'after-make-frame-functions (lambda (_frame) (manifold/pure-red--dashboard)))
+
+;; Only show dashboard on startup when no files were passed as arguments
+(when (and (not (daemonp))
+           (= 0 (length command-line-args-left)))
+  (dashboard-setup-startup-hook))
+#+end_src

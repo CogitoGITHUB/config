@@ -33,7 +33,7 @@ description: Use when the user asks about Emacs, org-mode, Elisp, Emacs configur
 
 ## Configuration
 
-- `~/.emacs.d/init.el` or `~/.config/emacs/init.el`
+- `~/.config/emacs/init.el` (canonical location; `~/.emacs.d` → `~/.config/emacs`)
 - Use `use-package` for declarative package config
 - `M-x eval-buffer` to reload config
 - `M-x package-install` to install packages

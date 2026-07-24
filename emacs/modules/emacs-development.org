@@ -1,0 +1,49 @@
+#+title:    emacs-development
+#+filetags: :emacs-package:development:
+#+PRIORITY: 20
+
+# --- Emacs development / debugging tools ---
+
+* Helpful
+:PROPERTIES:
+:PACKAGE:  helpful
+:CATEGORY: development
+:END:
+** Config
+#+begin_src emacs-lisp
+(setq helpful-max-buffers 5)
+#+end_src
+
+* Elisp Refs
+:PROPERTIES:
+:PACKAGE:  elisp-refs
+:CATEGORY: development
+:END:
+
+* Macrostep
+:PROPERTIES:
+:PACKAGE:  macrostep
+:CATEGORY: development
+:END:
+
+* Eros
+:PROPERTIES:
+:PACKAGE:  eros
+:CATEGORY: development
+:END:
+** Config
+#+begin_src emacs-lisp
+(eros-mode 1)
+#+end_src
+
+* Bug Hunter
+:PROPERTIES:
+:PACKAGE:  bug-hunter
+:CATEGORY: development
+:END:
+
+* Esup
+:PROPERTIES:
+:PACKAGE:  esup
+:CATEGORY: development
+:END:

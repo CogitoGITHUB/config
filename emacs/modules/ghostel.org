@@ -1,0 +1,79 @@
+#+title:      ghostel
+#+filetags:   :emacs-package:terminal:
+#+PRIORITY:   20
+
+* Ghostel — Terminal emulator powered by libghostty
+:PROPERTIES:
+:PACKAGE:  ghostel
+:STRAIGHT: (ghostel :type git :host github :repo "dakra/ghostel")
+:CATEGORY: terminal
+:END:
+
+** Overview
+#+begin_src emacs-lisp :tangle no
+;; ghostel — terminal emulator for Emacs, powered by libghostty-vt
+;; Modern vterm replacement. Dynamic native module auto-downloads on
+;; first use (no toolchain required).
+;;
+;; Input modes (eat.el-style):
+;;   C-c C-j   semi-char  — most keys forwarded, exceptions for Emacs
+;;   C-c C-l   line       — type a line, send on RET
+;;   C-c C-e   emacs      — normal Emacs buffer (live output)
+;;   C-c C-t   copy       — frozen buffer for navigation/copy
+;;
+;; Extensions: ghostel-eshell, ghostel-compile, ghostel-comint
+#+end_src
+
+** Core
+#+begin_src emacs-lisp
+;; Use nushell as the default shell
+(setq ghostel-shell (or (executable-find "nu") "/usr/bin/nu"))
+;; Kill buffer when shell process exits
+(setq ghostel-kill-buffer-on-exit t)
+;; Auto-download native module (no manual build)
+(setq ghostel-module-download t)
+;; Large scrollback
+(setq ghostel-max-scrollback 10000)
+#+end_src
+
+** Semi-char mode keybindings
+#+begin_src emacs-lisp
+(define-key ghostel-semi-char-mode-map (kbd "C-s") #'consult-line)
+(define-key ghostel-semi-char-mode-map (kbd "M-p")
+  (lambda () (interactive) (ghostel-send-key "p" "ctrl")))
+(define-key ghostel-semi-char-mode-map (kbd "M-n")
+  (lambda () (interactive) (ghostel-send-key "n" "ctrl")))
+(define-key ghostel-semi-char-mode-map (kbd "C-k")
+  (defun my/ghostel-send-C-k-and-kill ()
+    "Kill to end of line and put content in kill-ring."
+    (interactive)
+    (kill-ring-save (point) (line-end-position))
+    (ghostel-send-key "k" "ctrl")))
+#+end_src
+
+** Project integration
+#+begin_src emacs-lisp
+(add-to-list 'project-switch-commands '(ghostel-project "Ghostel") t)
+(add-to-list 'project-switch-commands
+             '(ghostel-project-list-buffers "Ghostel buffers") t)
+#+end_src
+
+** Shell eval whitelist
+#+begin_src emacs-lisp
+(add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer))
+(add-to-list 'ghostel-eval-cmds '("dired" dired))
+(add-to-list 'ghostel-eval-cmds '("find-file" find-file))
+#+end_src
+
+** Eshell integration
+#+begin_src emacs-lisp
+(require 'ghostel-eshell)
+(with-eval-after-load 'eshell
+  (ghostel-eshell-visual-command-mode))
+#+end_src
+
+** Compile integration
+#+begin_src emacs-lisp
+(require 'ghostel-compile)
+(ghostel-compile-global-mode)
+#+end_src

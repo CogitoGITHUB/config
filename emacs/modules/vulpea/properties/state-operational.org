@@ -1,0 +1,47 @@
+#+title:      State Operational Prompt
+#+priority:   5
+
+
+
+* State Operational
+Why: Tracks the execution state of what the note describes. Default is PLANNED.
+
+** Default (default PLANNED)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-state-operational ()
+  "Prompt for STATE_OPERATIONAL. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "STATE_OPERATIONAL: "
+              '("⚠ WARNING" "PLANNED" "IN_PROGRESS" "DEPLOYED" "SUSPENDED" "RETIRED")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-state-operational-initial (initial)
+  "Prompt for STATE_OPERATIONAL with INITIAL pre-selected."
+  (completing-read
+   "STATE_OPERATIONAL: "
+   '("PLANNED" "IN_PROGRESS" "DEPLOYED" "SUSPENDED" "RETIRED")
+   nil t nil nil initial))
+#+end_src
+
+
+
+
+** Registration
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'state-operational
+  :name 'state-operational
+  :label "State: Operational"
+  :prompt-fn #'my/vulpea-prompt-state-operational
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "STATE_OPERATIONAL"))
+  :merge-strategy 'replace
+   :to-plist (lambda (val _ctx)
+               (when val
+                 `(:properties (("STATE_OPERATIONAL" . ,val))
+                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_OPERATIONAL" val))))))
+#+end_src

@@ -172,8 +172,8 @@
    emacs-citar
    emacs-denote
    emacs-denote-explore
-   emacs-vulpea
-   emacs-vulpea-ui
+    emacs-vulpea
+    emacs-vulpea-ui
    emacs-doct
    emacs-gnosis
    emacs-deft

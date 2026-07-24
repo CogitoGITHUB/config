@@ -1,0 +1,16 @@
+#+title:      loccur
+#+identifier: e0b86615-25ed-48d3-9ec8-cc7ad5918adc
+#+filetags:   :emacs-package:navigation:
+
+* loccur
+:PROPERTIES:
+:ID:       e0b86615-25ed-48d3-9ec8-cc7ad5918adc
+:PACKAGE:  loccur
+:CATEGORY: navigation
+:STRAIGHT: (loccur :type git :host codeberg :repo "fourier/loccur")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

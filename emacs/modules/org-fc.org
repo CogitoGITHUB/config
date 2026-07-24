@@ -1,0 +1,16 @@
+#+title:      org-fc
+#+filetags:   :emacs-package:org:
+
+* ORG-FC — Spaced Repetition for Org-mode
+:PROPERTIES:
+:PACKAGE:  org-fc
+:STRAIGHT: (org-fc :type git :host github :repo "l3kn/org-fc")
+:CATEGORY: org
+:END:
+
+** Config
+#+begin_src emacs-lisp
+(setq org-fc-algorithm 'sm-2
+      org-fc-card-types '("normal" "double" "cloze"))
+(global-set-key (kbd "C-c f") #'org-fc-dashboard)
+#+end_src

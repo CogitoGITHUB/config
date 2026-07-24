@@ -1,0 +1,16 @@
+#+title:      kanji-mode
+#+identifier: 93e2403f-2990-49a7-b640-f639a9b6b7db
+#+filetags:   :emacs-package:input:
+
+* kanji-mode
+:PROPERTIES:
+:ID:       93e2403f-2990-49a7-b640-f639a9b6b7db
+:PACKAGE:  kanji-mode
+:CATEGORY: input
+:STRAIGHT: (kanji-mode :type git :host github :repo "wsgac/kanji-mode" :files (:defaults "kanji"))
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

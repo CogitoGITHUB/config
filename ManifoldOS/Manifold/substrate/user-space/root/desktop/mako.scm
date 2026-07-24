@@ -3,4 +3,4 @@
   #:use-module (guix packages)
   #:re-export (mako))
 
-;; Re-export of mako from gnu/packages/wm
+;; Re-export of mako

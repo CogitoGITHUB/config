@@ -1,0 +1,19 @@
+#+title:      org-transclusion
+#+identifier: 0b8a0ff0-f458-45f0-8732-72146c1a416f
+#+filetags:   :emacs-package:org:
+#+PRIORITY: 0
+
+* ORG-TRANSCLUSION
+:PROPERTIES:
+:ID:       0b8a0ff0-f458-45f0-8732-72146c1a416f
+:PACKAGE:  org-transclusion
+:STRAIGHT: (org-transclusion :type git :host github :repo "nobiot/org-transclusion")
+:END:
+
+** Config
+#+begin_src emacs-lisp
+(setq org-transclusion-add-files nil
+      org-transclusion-exclude-elements nil)
+
+(global-set-key (kbd "C-c t") #'org-transclusion-add)
+#+end_src

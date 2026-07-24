@@ -1,0 +1,37 @@
+#+title:      Extra Properties Prompt
+#+priority:   1
+
+* Extra Properties
+Why: Store arbitrary key-value metadata on notes. Used by vulpea queries,
+org queries, and custom workflows. Press blank key to stop adding more.
+Properties become queryable in the vulpea DB.
+
+** Default (loop until blank key)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-properties ()
+  "Prompt for extra property key-value pairs.
+Returns an alist of (key . value).  Press blank key to finish."
+  (let (props)
+    (catch 'done
+      (while t
+        (let ((k (read-string "Property key (blank to stop): ")))
+          (if (string-empty-p k)
+              (throw 'done props)
+            (push (cons k (read-string (format "Value for %s: " k)))
+                  props)))))
+    (nreverse props)))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'properties
+  :name 'properties
+  :label "Extra Properties"
+  :prompt-fn #'my/vulpea-prompt-properties
+  :contexts '(file heading)
+  :read-current-fn nil
+  :merge-strategy 'merge
+  :to-plist (lambda (val _ctx)
+              (when val `(:properties ,val))))
+#+end_src

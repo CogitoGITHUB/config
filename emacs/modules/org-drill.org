@@ -1,0 +1,16 @@
+#+title:      org-drill
+#+identifier: e45a5117-63e7-42ce-a96e-24b0dff57bec
+#+filetags:   :emacs-package:learning:
+
+* org-drill
+:PROPERTIES:
+:ID:       e45a5117-63e7-42ce-a96e-24b0dff57bec
+:PACKAGE:  org-drill
+:CATEGORY: learning
+:STRAIGHT: (org-drill :type git :host gitlab :repo "phillord/org-drill")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

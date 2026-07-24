@@ -1,0 +1,17 @@
+#+title:      org-noter
+#+filetags:   :emacs-package:org:
+
+* ORG-NOTER — Document Annotation with Org-mode
+:PROPERTIES:
+:PACKAGE:  org-noter
+:STRAIGHT: (org-noter :type git :host github :repo "org-noter/org-noter")
+:CATEGORY: org
+:END:
+
+** Config
+#+begin_src emacs-lisp
+(setq org-noter-notes-window-location 'other-frame
+      org-noter-always-create-frame nil
+      org-noter-insert-selected-text-inside-note t)
+(global-set-key (kbd "C-c n o") #'org-noter)
+#+end_src

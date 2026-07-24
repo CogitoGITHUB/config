@@ -2,12 +2,23 @@
   #:use-module (guix packages)
   #:use-module (guix utils)
   #:use-module (guix gexp)
+  #:use-module (gnu packages haskell-crypto)
   #:use-module ((gnu packages virtualization) #:select (ganeti) #:prefix upstream:)
   #:export (ganeti))
 
+(define ghc-openssl-streams/disable-tests
+  (package
+    (inherit ghc-openssl-streams)
+    (arguments
+      (substitute-keyword-arguments (package-arguments ghc-openssl-streams)
+        ((#:tests? _ #f) #f)))))
+
 (define ganeti
   (package
-    (inherit upstream:ganeti)
+    (inherit
+      ((package-input-rewriting
+         `((,ghc-openssl-streams . ,ghc-openssl-streams/disable-tests)))
+       upstream:ganeti))
     (arguments
       (substitute-keyword-arguments (package-arguments upstream:ganeti)
         ((#:phases phases)

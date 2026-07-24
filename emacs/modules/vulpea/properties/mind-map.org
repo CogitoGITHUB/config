@@ -1,0 +1,52 @@
+#+title:      Mind Map Placement Prompt
+#+priority:   6
+
+
+* Mind Map
+
+
+Why: Place the new note in the mind map tree — parent, child, sibling, or unknown.
+
+** Prompt
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-mind-map ()
+  "Prompt for mind-map placement. Returns (:placement STR :target-id STR-or-nil)."
+  (let ((choice (read-char-choice
+                 "[p]arent  [c]hild  [s]ibling  [u]nknown: "
+                 '(?p ?c ?s ?u ?\r ?\n)))
+        target)
+    (when (memq choice '(?\r ?\n)) (setq choice ?u))
+    (unless (eq choice ?u)
+      (pcase choice
+        (?p (setq target (vulpea-select "Child to place under this note: "
+                                         :require-match t)))
+        (?c (setq target (vulpea-select "Parent for this note: "
+                                         :require-match t)))
+        (?s (setq target (vulpea-select "Place after this note: "
+                                         :require-match t)))))
+    (list :placement (pcase choice
+                       (?p "parent") (?c "child") (?s "sibling") (?u "root"))
+          :target-id (when target (vulpea-note-id target)))))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'mind-map
+  :name 'mind-map
+  :label "Mind Map"
+  :prompt-fn #'my/vulpea-prompt-mind-map
+  :contexts '(file task)
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (when val
+                (let ((placement (plist-get val :placement))
+                      (target-id (plist-get val :target-id))
+                      result)
+                  (unless (string= placement "root")
+                    (push (cons "MM_PLACEMENT" placement) result))
+                  (list :properties (nreverse result)
+                        :post-apply (list (apply-partially
+                                           #'mm/--apply-placement
+                                           placement target-id)))))))
+#+end_src

@@ -3,4 +3,4 @@
   #:use-module (guix packages)
   #:re-export (hypridle))
 
-;; Re-export of hypridle from gnu/packages/wm
+;; Re-export of hypridle

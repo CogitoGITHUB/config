@@ -4,7 +4,7 @@
 id = "greeting"
 fetcher = "basic_static"
 format = "🌹 Well, well, well.. Welcome back, Shape! 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "name"
@@ -22,20 +22,20 @@ render = { type = "text_plain", align = "center" }
 id = "title_commits"
 fetcher = "basic_static"
 format = "🌹 Recent Changes 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "recent"
 fetcher = "git_recent_commits"
 shape = "text_block"
 format = "5"
-render = { type = "animated_splitflap", align = "center" }
+render = { type = "animated_splitflap", align = "center", duration_ms = 200 }
 
 [[widget]]
 id = "status"
 fetcher = "git_status"
 shape = "entries"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
 
 # ── Layout ─────────────────────────────────────────────────────────
 

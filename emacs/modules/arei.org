@@ -1,0 +1,27 @@
+#+title:      arei
+#+identifier: 7f2d9b4e-1a3c-4e8f-bc56-9d7e2f1a3b4c
+#+filetags:   :emacs-package:guile:scheme:
+
+NEEDS : guile-ares-rs !!! 
+
+* AREI — Asynchronous Reliable Extensible IDE #emacs-package
+:PROPERTIES:
+:ID:       7f2d9b4e-1a3c-4e8f-bc56-9d7e2f1a3b4c
+:PACKAGE:  arei
+:STRAIGHT: (arei :type git :host nil :repo "https://git.sr.ht/~abcdw/emacs-arei" :files ("lisp/*.el"))
+:CATEGORY: guile
+:END:
+
+** CA cert fix for Git :init:
+#+begin_src emacs-lisp
+(when (file-exists-p "/etc/ssl/certs/ca-certificates.crt")
+  (push "GIT_SSL_CAINFO=/etc/ssl/certs/ca-certificates.crt" process-environment))
+#+end_src
+
+** Config :config:
+#+begin_src emacs-lisp
+(setq geiser-mode-auto-p nil)
+(setq arei-port 63225)
+(add-hook 'scheme-mode-hook #'arei-mode)
+(add-hook 'arei-mode-hook #'sesman-start)
+#+end_src

@@ -1,0 +1,21 @@
+#+title:      hackernews
+#+identifier: 6f2b4e1a-9c3d-4a8f-bc45-7e1d3f9a2c6b
+#+filetags:   :emacs-package:news:
+
+* HACKERNEWS — Hacker News Client for Emacs #emacs-package
+:PROPERTIES:
+:ID:       6f2b4e1a-9c3d-4a8f-bc45-7e1d3f9a2c6b
+:PACKAGE:  hackernews
+:STRAIGHT: (hackernews :type git :host github :repo "clarete/hackernews.el")
+:CATEGORY: news
+:END:
+
+** Guix
+#+begin_src scheme ~/.config/guix/Operating-System/user-space/root/editors/emacs-packages/news/hackernews.scm
+#+end_src
+
+** Config
+#+begin_src emacs-lisp
+(setq hackernews-items-per-page  30)
+(setq hackernews-internal-browser 'eww-browse-url)
+#+end_src

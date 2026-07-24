@@ -20,13 +20,13 @@ let keybindings = [
     }
   }
   {
-    name: htop
+    name: herdr
     modifier: control
     keycode: char_h
     mode: [emacs, vi_insert, vi_normal]
     event: {
       send: executehostcommand
-      cmd: "htop"
+      cmd: "herdr"
     }
   }
   {

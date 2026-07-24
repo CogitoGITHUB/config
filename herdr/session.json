@@ -4,19 +4,21 @@
     {
       "id": "w1H",
       "custom_name": null,
-      "identity_cwd": "/home/aoeu",
+      "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "3": 3,
+        "1": 1,
         "2": 2,
-        "1": 1
+        "6": 12,
+        "3": 9
       },
-      "next_public_pane_number": 4,
+      "next_public_pane_number": 13,
       "public_tab_numbers": [
         1,
         2,
-        3
+        9,
+        12
       ],
-      "next_public_tab_number": 4,
+      "next_public_tab_number": 13,
       "tabs": [
         {
           "custom_name": "opencode",
@@ -25,7 +27,7 @@
           },
           "panes": {
             "1": {
-              "cwd": "/home/aoeu",
+              "cwd": "/home/aoeu/.config/emacs",
               "label": "opencode",
               "agent_session": {
                 "source": "herdr:opencode",
@@ -54,26 +56,46 @@
           "root_pane": 2
         },
         {
-          "custom_name": "ManifoldOS",
+          "custom_name": "apps",
           "layout": {
             "Pane": 3
           },
           "panes": {
             "3": {
-              "cwd": "/home/aoeu/.config/ManifoldOS"
+              "cwd": "/home/aoeu/.config/ManifoldOS",
+              "agent_session": {
+                "source": "herdr:opencode",
+                "agent": "opencode",
+                "kind": "id",
+                "value": "ses_077d2b528ffekNx4RnCtUI0AZr"
+              }
             }
           },
           "zoomed": false,
           "focused": 3,
           "root_pane": 3
+        },
+        {
+          "custom_name": "reshape",
+          "layout": {
+            "Pane": 6
+          },
+          "panes": {
+            "6": {
+              "cwd": "/home/aoeu/.config/ManifoldOS"
+            }
+          },
+          "zoomed": false,
+          "focused": 6,
+          "root_pane": 6
         }
       ],
-      "active_tab": 2
+      "active_tab": 0
     }
   ],
   "active": 0,
   "selected": 0,
-  "sidebar_width": 27,
+  "sidebar_width": 18,
   "sidebar_section_split": 0.5,
   "collapsed_space_keys": [
     "/home/aoeu/.emacs.d/.git"

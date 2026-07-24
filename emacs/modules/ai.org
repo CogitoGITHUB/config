@@ -1,0 +1,125 @@
+#+title: ai
+#+DISABLED: t
+#+identifier: d9a66c2d-df93-4af8-8835-31c992f83510
+#+filetags: :emacs-package:ai:
+#+PRIORITY: 50
+
+* GPTEL — LLM Frontend #emacs-package #ai
+:PROPERTIES:
+:ID:       d9a66c2d-df93-4af8-8835-31c992f83510
+:PACKAGE:  gptel
+:STRAIGHT: (gptel :type git :host github :repo "karthink/gptel" :files (:defaults "*.el"))
+:CATEGORY: ai
+:END:
+
+** Purpose
+Send prompts to LLMs (OpenAI, Anthropic, Ollama, OpenRouter, etc.) from
+within Emacs. Provides native Org-mode integration — prompts and responses
+as Org documents, inline images, streaming.
+
+** Config
+#+begin_src emacs-lisp
+(setq
+ gptel-default-mode 'org-mode
+ gptel-model  "claude-sonnet-4-20250514"
+ gptel-backend (gptel-make-anthropic "Claude"
+                 :stream t
+                 :key (auth-source-pick-first-password :host "anthropic"))
+ gptel-directives
+ '((default . "You are a helpful assistant.")
+   (code . "You are an expert programmer.")))
+
+(define-key gptel-mode-map (kbd "C-c RET") #'gptel-send)
+(define-key gptel-mode-map (kbd "C-c C-d") #'gptel-org-set-directive)
+#+end_src
+
+** Keybindings
+Moved to `SPC f` hydra in keyboard.org.
+
+* GPTEL-AGENT — Tool-Use / Agent #emacs-package #ai
+:PROPERTIES:
+:ID:       d9a66c2d-df93-4af8-8835-31c992f83510
+:PACKAGE:  gptel-agent
+:STRAIGHT: (gptel-agent :type git :host github :repo "karthink/gptel-agent" :files (:defaults "*.el"))
+:CATEGORY: ai
+:END:
+
+** Purpose
+Extends gptel with tool-use (function calling) and agentic loops. Lets the
+LLM run Emacs Lisp, search files, read buffers, and chain multiple calls.
+
+** Config
+#+begin_src emacs-lisp
+(setq
+ gptel-agent-max-tool-rounds 10
+ gptel-agent-verbose nil)
+#+end_src
+
+* OPENCODE — Emacs UI for opencode CLI #emacs-package #ai
+:PROPERTIES:
+:ID:       d9a66c2d-df93-4af8-8835-31c992f83510
+:PACKAGE:  opencode
+:STRAIGHT: (opencode :type git :host codeberg :repo "sczi/opencode.el")
+:CATEGORY: ai
+:END:
+
+** Purpose
+Emacs UI for the [[https://opencode.ai][opencode]] AI coding agent. Uses opencode's own providers
+and credentials — no separate API keys needed. Provides a comint-based
+chat UI, session management, magit integration, diffs with diff-mode,
+and clickable file references.
+
+** Config
+#+begin_src emacs-lisp
+(setq
+ opencode-host "localhost"
+ opencode-port 17044
+ opencode-auto-start-server t)
+#+end_src
+
+** Keybindings
+Moved to `SPC f` hydra in keyboard.org.
+
+* MCP — Model Context Protocol Client #emacs-package #ai
+:PROPERTIES:
+:ID:       d9a66c2d-df93-4af8-8835-31c992f83510
+:PACKAGE:  mcp
+:STRAIGHT: (mcp :type git :host github :repo "lizqwerscott/mcp.el")
+:CATEGORY: ai
+:END:
+
+** Purpose
+MCP client for Emacs. Connects to MCP servers (filesystem, fetch, etc.)
+to give LLMs access to external tools. Integrates with gptel.
+
+** Config
+#+begin_src emacs-lisp
+(setq mcp-hub-servers
+      '(("filesystem" . (:command "npx"
+                         :args ("-y" "@modelcontextprotocol/server-filesystem")
+                         :roots ("/home/aoeu/")))))
+
+(mcp-hub-start-all-server)
+#+end_src
+
+* MCP Hub
+:PROPERTIES:
+:PACKAGE:  mcp-hub
+:CATEGORY: ai
+:END:
+
+* Skills — AI Agent Skill Directory
+** Purpose
+Collection of reusable skills for AI coding agents (opencode, Claude,
+etc.). Each skill is an Org-mode or Markdown file describing a task or
+workflow the agent can load. Sourced from [[https://github.com/gicrisf/skills][gicrisf/skills]].
+
+** Install
+#+begin_src sh
+git clone git@github.com:gicrisf/skills.git ~/dev/skills
+#+end_src
+
+Link into agent skill directories:
+#+begin_src sh
+ln -sfn ~/dev/skills/skills ~/.agents/skills
+#+end_src

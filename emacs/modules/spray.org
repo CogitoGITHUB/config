@@ -1,0 +1,16 @@
+#+title:      spray
+#+identifier: f2fe5350-6fcc-42d5-a2b1-65d73301e439
+#+filetags:   :emacs-package:reading:
+
+* spray
+:PROPERTIES:
+:ID:       f2fe5350-6fcc-42d5-a2b1-65d73301e439
+:PACKAGE:  spray
+:CATEGORY: reading
+:STRAIGHT: (spray :type git :host sourcehut :repo "iank/spray")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

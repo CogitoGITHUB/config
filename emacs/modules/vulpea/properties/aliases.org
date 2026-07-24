@@ -1,0 +1,33 @@
+#+title:      Aliases Prompt
+#+priority:   1
+
+* Aliases
+Why: Multiple ways to find the same note. If you refer to something by different
+names in different contexts, aliases let any of them work in ~vulpea-find~.
+Comma-separated, blank = no aliases.
+
+** Default (comma-separated string)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-aliases ()
+  "Prompt for comma-separated aliases.  Returns nil or a list of strings."
+  (let* ((raw (read-string "Aliases (comma-separated, or blank): "))
+         (parts (split-string raw "," t "[ \t]+")))
+    (unless (or (string-empty-p raw) (null parts))
+      parts)))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'aliases
+  :name 'aliases
+  :label "Aliases"
+  :prompt-fn #'my/vulpea-prompt-aliases
+  :contexts '(file heading)
+  :read-current-fn (lambda () (org-entry-get nil "ALIAS"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (when val
+                (let ((str (mapconcat #'identity val ", ")))
+                  (list :properties (list (cons "ALIAS" str)))))))
+#+end_src

@@ -5,7 +5,6 @@
   #:use-module (gnu services ssh)
   #:use-module (gnu services networking)
   #:use-module (gnu services docker)
-  #:use-module (gnu services nix)
   #:use-module (gnu services audio)
   #:use-module (gnu services virtualization)
   #:use-module (gnu services mcron)
@@ -40,8 +39,8 @@
   #:use-module (substrate user-space root loaders wayland)
   #:use-module (substrate user-space root loaders password-manager)
   #:use-module (substrate user-space root loaders games)
-  #:use-module (substrate user-space root nix)
   #:use-module (substrate user-space root loaders containers)
+
   #:use-module (substrate user-space root loaders hardware)
   #:use-module (substrate user-space root loaders tex)
   #:re-export (users groups sudoers-file setuid-programs manifoldos-image seatd-service)
@@ -76,12 +75,11 @@
           root-scheduling-packages
           root-ci-packages
           root-data-packages
-	  nix-packages
           sandbox-packages
           font-packages
           podman-packages
-          root-hardware-packages
-          root-tex-packages))
+           root-hardware-packages
+           root-tex-packages))
 
 (define-public root-system-services
   (append
@@ -89,7 +87,6 @@
           seatd-service)
     root-networking-services
     root-audio-services
-    nix-services
     (list (service libvirt-service-type)
           (service virtlog-service-type)
           (service mcron-service-type))

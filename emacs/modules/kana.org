@@ -1,0 +1,16 @@
+#+title:      kana
+#+identifier: 8e1450be-02f2-4dbf-baee-a780afcacff6
+#+filetags:   :emacs-package:input:
+
+* kana
+:PROPERTIES:
+:ID:       8e1450be-02f2-4dbf-baee-a780afcacff6
+:PACKAGE:  kana
+:CATEGORY: input
+:STRAIGHT: (kana :type git :host github :repo "chenyanming/kana")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

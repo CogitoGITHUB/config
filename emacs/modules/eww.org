@@ -1,0 +1,49 @@
+#+title:      emacs-eww
+#+identifier: 1e4a7f2d-6b3c-4d8e-af19-5c2b9e3f7a1d
+#+filetags:   :emacs-package:browser:
+
+* EMACS-EWW — Emacs Web Browser #emacs-package
+:PROPERTIES:
+:ID:       1e4a7f2d-6b3c-4d8e-af19-5c2b9e3f7a1d
+:PACKAGE:  eww
+:CATEGORY: browser
+:END:
+
+** Config
+#+begin_src emacs-lisp
+;; shr rendering
+(setq shr-use-fonts    nil)
+(setq shr-use-colors   nil)
+(setq shr-indentation  2)
+(setq shr-width        80)
+(setq shr-max-width    100)
+
+;; eww settings
+(setq eww-search-prefix          "https://duckduckgo.com/html/?q=")
+(setq eww-history-limit          50)
+(setq eww-bookmarks-directory    (expand-file-name "eww/" user-emacs-directory))
+(setq browse-url-browser-function #'eww-browse-url)
+
+(with-eval-after-load 'eww
+  (define-key eww-mode-map (kbd "=") #'text-scale-increase)
+  (define-key eww-mode-map (kbd "-") #'text-scale-decrease)
+  (define-key eww-mode-map (kbd "0") #'text-scale-adjust))
+
+* EMACS-EWW-LNUM — Conkeror-like Link Numbering for EWW #emacs-package
+:PROPERTIES:
+:ID:       8c3f1b2e-5a4d-4f7c-de34-1b6a8f3c2e9d
+:PACKAGE:  eww-lnum
+:CATEGORY: browser
+:STRAIGHT: (eww-lnum :type git :host github :repo "m00natic/eww-lnum")
+:END:
+
+** Guix
+#+begin_src scheme ~/.config/guix/Operating-System/user-space/root/editors/emacs-packages/browser/eww-lnum.scm
+#+end_src
+
+** Config
+#+begin_src emacs-lisp
+(with-eval-after-load 'eww
+  (define-key eww-mode-map (kbd "f") #'eww-lnum-follow)
+  (define-key eww-mode-map (kbd "F") #'eww-lnum-universal))
+#+end_src

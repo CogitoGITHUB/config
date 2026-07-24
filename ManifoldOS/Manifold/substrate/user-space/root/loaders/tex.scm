@@ -1,4 +1,5 @@
 (define-module (substrate user-space root loaders tex)
+  #:use-module (gnu packages emacs-xyz)
   #:use-module (substrate user-space root tex texlive-latex-bin)
   #:use-module (substrate user-space root tex texlive-amsmath)
   #:use-module (substrate user-space root tex texlive-amsfonts)
@@ -29,4 +30,5 @@
         texlive-dvipng
         texlive-preview
         texlive-xetex
-        texlive-fontspec))
+        texlive-fontspec
+        emacs-pdf-tools))

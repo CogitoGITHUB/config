@@ -1,0 +1,16 @@
+#+title:      xhair
+#+identifier: 4aafab08-a917-4440-a4c1-edd008344d2f
+#+filetags:   :emacs-package:editing:
+
+* xhair
+:PROPERTIES:
+:ID:       4aafab08-a917-4440-a4c1-edd008344d2f
+:PACKAGE:  xhair
+:CATEGORY: editing
+:STRAIGHT: (xhair :type git :host github :repo "Boruch-Baum/emacs-xhair")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

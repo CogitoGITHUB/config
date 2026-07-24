@@ -1,0 +1,43 @@
+#+title:      State General Prompt
+#+priority:   5
+
+* State General
+Why: Tracks the note's position in the five-layer operational sequence
+(CONCEPT → RULES → APPLICATION → MAP → CHECKLIST). Default is CONCEPT.
+
+** Default (default CONCEPT)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-state-general ()
+  "Prompt for STATE_GENERAL. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "STATE_GENERAL: "
+              '("⚠ WARNING" "CONCEPT" "RULES" "APPLICATION" "MAP" "CHECKLIST")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-state-general-initial (initial)
+  "Prompt for STATE_GENERAL with INITIAL pre-selected."
+  (completing-read
+   "STATE_GENERAL: "
+   '("CONCEPT" "RULES" "APPLICATION" "MAP" "CHECKLIST")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'state-general
+  :name 'state-general
+  :label "State: General"
+  :prompt-fn #'my/vulpea-prompt-state-general
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "STATE_GENERAL"))
+  :merge-strategy 'replace
+   :to-plist (lambda (val _ctx)
+               (when val
+                 `(:properties (("STATE_GENERAL" . ,val))
+                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_GENERAL" val))))))
+#+end_src

@@ -1,0 +1,55 @@
+#+title:      TODO State Prompt
+#+priority:   1
+
+* TODO State
+Why: Track task progress directly on the note without needing a separate
+task system. Blank means no TODO keyword (just a regular note).
+
+** Variants
+*** Default (blank = none)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-todo ()
+  "Prompt for a TODO state. Returns \"WARNING\" if skipped."
+  (let ((s (completing-read "TODO state: "
+                             '("⚠ WARNING" "TODO" "NEXT" "DOING" "TESTING" "WAIT"
+                               "DONE" "CANCELLED" "CANCELED")
+                            nil t nil nil "⚠ WARNING")))
+    (if (string-equal s "⚠ WARNING") "WARNING" s)))
+#+end_src
+
+*** With default (requires match)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-todo-default (default)
+  "Prompt for a TODO state, requiring a match, with DEFAULT pre-selected."
+  (let ((s (completing-read "TODO state: "
+                            '("⚠ WARNING" "TODO" "NEXT" "DOING" "TESTING" "WAIT"
+                              "DONE" "CANCELLED" "CANCELED") nil t nil nil default)))
+    (if (string-equal s "⚠ WARNING") "WARNING" s)))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'todo
+  :name 'todo
+  :label "TODO"
+  :prompt-fn #'my/vulpea-prompt-todo
+  :contexts '(file heading)
+  :read-current-fn (lambda () (org-get-todo-state))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              `(:todo ,val
+                      :post-apply (,(apply-partially #'my/vulpea--post-sync "TODO" val)))))
+
+(my/vulpea-register-prompt
+  :key 'todo
+  :name 'todo
+  :label "TODO"
+  :prompt-fn (lambda () (my/vulpea-prompt-todo-default "TODO"))
+  :contexts '(task)
+  :read-current-fn (lambda () (org-get-todo-state))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              `(:todo ,val
+                      :post-apply (,(apply-partially #'my/vulpea--post-sync "TODO" val)))))
+#+end_src

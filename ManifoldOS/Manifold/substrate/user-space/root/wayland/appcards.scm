@@ -4,7 +4,7 @@
   #:use-module (guix build-system trivial)
   #:use-module (guix gexp)
   #:use-module (gnu packages bash)
-  #:use-module (gnu packages wm)
+  #:use-module (substrate user-space root desktop quickshell)
   #:use-module ((guix licenses) #:prefix license:)
   #:export (appcards))
 

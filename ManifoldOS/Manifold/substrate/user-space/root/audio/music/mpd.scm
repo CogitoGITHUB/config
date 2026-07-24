@@ -10,7 +10,6 @@
 (define-public mpd-service
   (service mpd-service-type
            (mpd-configuration
-             (user "aoeu")
              (music-directory "/home/aoeu/Music")
              (playlist-directory "/home/aoeu/Music/playlists")
              (environment-variables

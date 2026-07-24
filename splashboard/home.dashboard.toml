@@ -5,13 +5,13 @@ id = "quote"
 fetcher = "basic_static"
 shape = "text_block"
 format = "🌹 \"L'enfer, c'est les autres\" 🌹"
-render = { type = "animated_splitflap", align = "center", color = "text_secondary" }
+render = { type = "animated_splitflap", align = "center", color = "text_secondary", duration_ms = 200 }
 
 [[widget]]
 id = "greeting"
 fetcher = "basic_static"
 format = "🌹 Well, well, well.. Welcome back, Shape! 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "hero"
@@ -23,7 +23,7 @@ render = { type = "text_ascii", style = "blocks", pixel_size = "full", color = "
 id = "date"
 fetcher = "clock"
 format = "%A  ·  %e %B %Y  ·  day %j of %Y"
-render = { type = "animated_typewriter", align = "center" }
+render = { type = "text_plain", align = "center" }
 
 
 
@@ -35,7 +35,7 @@ render = { type = "animated_typewriter", align = "center" }
 id = "weather_title"
 fetcher = "basic_static"
 format = "🌹 Weather 🌹"
-render = { type = "animated_typewriter", align = "center", color = "panel_title" }
+render = { type = "text_plain", align = "center", color = "panel_title" }
 
 [[widget]]
 id = "system_name"
@@ -47,14 +47,14 @@ render = { type = "text_plain", align = "center" }
 id = "sartre_title"
 fetcher = "basic_static"
 format = "🌹 Jean-Paul Sartre 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "world_clock"
 fetcher = "clock_timezones"
 format = "%H:%M"
 shape = "text_block"
-render = { type = "animated_splitflap", align = "center" }
+render = { type = "animated_splitflap", align = "center", duration_ms = 200 }
   [widget.options]
   timezones = [
     { tz = "Europe/Bucharest", label = "Bucharest" },
@@ -67,48 +67,48 @@ render = { type = "animated_splitflap", align = "center" }
 id = "title_world_clock"
 fetcher = "basic_static"
 format = "🌹 World Clock 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "title_home"
 fetcher = "basic_static"
 format = "🌹 Home 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "title_tokyo"
 fetcher = "basic_static"
 format = "🌹 Tokyo 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "title_seoul"
 fetcher = "basic_static"
 format = "🌹 Seoul 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "title_nyc"
 fetcher = "basic_static"
 format = "🌹 NYC 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "title_crypto"
 fetcher = "basic_static"
 format = "🌹 Crypto 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "title_stocks"
 fetcher = "basic_static"
 format = "🌹 Stocks 🌹"
-render = { type = "animated_typewriter", align = "center", color = "text_secondary" }
+render = { type = "text_plain", align = "center", color = "text_secondary" }
 
 [[widget]]
 id = "weather_home"
 fetcher = "weather"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
   [widget.options]
   latitude = 45.44
   longitude = 28.05
@@ -117,7 +117,7 @@ render = { type = "animated_splitflap", layout = "rows", column_align = ["left",
 [[widget]]
 id = "weather_tokyo"
 fetcher = "weather"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
   [widget.options]
   latitude = 35.6762
   longitude = 139.6503
@@ -126,7 +126,7 @@ render = { type = "animated_splitflap", layout = "rows", column_align = ["left",
 [[widget]]
 id = "weather_seoul"
 fetcher = "weather"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
   [widget.options]
   latitude = 37.5665
   longitude = 126.9780
@@ -135,7 +135,7 @@ render = { type = "animated_splitflap", layout = "rows", column_align = ["left",
 [[widget]]
 id = "weather_nyc"
 fetcher = "weather"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
   [widget.options]
   latitude = 40.71
   longitude = -74.01
@@ -148,7 +148,7 @@ render = { type = "animated_splitflap", layout = "rows", column_align = ["left",
 [[widget]]
 id = "crypto"
 fetcher = "crypto_watchlist"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
   [widget.options]
   coins = ["bitcoin", "monero", "ethereum", "solana"]
   vs_currency = "usd"
@@ -158,7 +158,7 @@ render = { type = "animated_splitflap", layout = "rows", column_align = ["left",
 [[widget]]
 id = "stocks"
 fetcher = "stock_watchlist"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"] }
+render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
   [widget.options]
   symbols = ["TSLA", "SPCX", "AAPL", "MSFT", "GOOG"]
 

@@ -1,0 +1,16 @@
+#+title:      org-contacts
+#+identifier: 9f65150b-01d8-4d0b-aa06-b2b9f8e73bd2
+#+filetags:   :emacs-package:org:
+
+* org-contacts
+:PROPERTIES:
+:ID:       9f65150b-01d8-4d0b-aa06-b2b9f8e73bd2
+:PACKAGE:  org-contacts
+:CATEGORY: org
+:STRAIGHT: (org-contacts :type git :host nil :repo "https://repo.or.cz/org-contacts.git")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src

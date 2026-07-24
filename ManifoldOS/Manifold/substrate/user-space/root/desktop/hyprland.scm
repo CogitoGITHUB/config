@@ -4,6 +4,7 @@
   #:use-module (guix git-download)
   #:use-module (guix build-system cmake)
   #:use-module (guix build-system gnu)
+  #:use-module (guix build-system meson)
   #:use-module (guix gexp)
   #:use-module (gnu packages base)
   #:use-module (gnu packages cmake)
@@ -12,10 +13,11 @@
   #:use-module (gnu packages elf)
   #:use-module (gnu packages engineering)
   #:use-module (gnu packages freedesktop)
-  #:use-module (gnu packages gcc)
+  #:use-module ((gnu packages gcc) #:select (gcc-15))
   #:use-module (gnu packages gl)
   #:use-module (gnu packages gtk)
   #:use-module (gnu packages image)
+  #:use-module (gnu packages libffi)
   #:use-module (gnu packages gnome)
   #:use-module (gnu packages linux)
   #:use-module (gnu packages maths)
@@ -26,15 +28,11 @@
   #:use-module (gnu packages ghostscript)
   #:use-module (gnu packages vulkan)
   #:use-module (gnu packages regex)
-  #:use-module (gnu packages wm)
+  #:use-module (gnu packages xml)
   #:use-module (gnu packages xorg)
   #:use-module (gnu packages xdisorg)
   #:use-module ((guix licenses) #:prefix license:)
-  #:export (lua-5.5 hyprutils hyprgraphics hyprland))
-
-;;; ============================================================================
-;;; Lua 5.5
-;;; ============================================================================
+  #:export (lua-5.5 hyprutils hyprgraphics wayland wayland-protocols hyprland))
 
 (define-public lua-5.5
   (package
@@ -75,10 +73,6 @@
     (description "Lua 5.5 scripting language.")
     (license license:x11)))
 
-;;; ============================================================================
-;;; Hyprutils
-;;; ============================================================================
-
 (define-public hyprutils
   (package
     (name "hyprutils")
@@ -98,10 +92,6 @@
     (synopsis "C++ library for utilities used across Hyprland ecosystem")
     (description "Hyprutils is a C++ library for utilities used across the Hyprland ecosystem.")
     (license license:bsd-3)))
-
-;;; ============================================================================
-;;; Hyprgraphics
-;;; ============================================================================
 
 (define-public hyprgraphics
   (package
@@ -131,55 +121,104 @@
     (description "Hyprgraphics is a small C++ library with graphics/resource related utilities.")
     (license license:bsd-3)))
 
-;;; ============================================================================
-;;; Hyprland 0.55.0
-;;; ============================================================================
+(define-public wayland
+  (package
+    (name "wayland")
+    (version "1.25.0")
+    (source (origin
+              (method url-fetch)
+              (uri (string-append "https://gitlab.freedesktop.org/" name
+                                  "/" name "/-/releases/" version "/downloads/"
+                                  name "-" version ".tar.xz"))
+              (sha256
+               (base32
+                "00qzm9pk1x8m5wi2gkzw4by1l6p44ybj83v0h1v1gwyzmx0g0rf0"))))
+    (build-system meson-build-system)
+    (arguments
+     (list #:configure-flags #~'("-Ddocumentation=false")
+           #:tests? #f))
+    (native-inputs (list pkg-config python))
+    (inputs (list expat libxml2))
+    (propagated-inputs (list libffi))
+    (home-page "https://wayland.freedesktop.org/")
+    (synopsis "Core Wayland window system code and protocol")
+    (description "Wayland is a project to define a protocol for a compositor to
+talk to its clients as well as a library implementation of the protocol.")
+    (license license:expat)))
+
+(define-public wayland-protocols
+  (package
+    (name "wayland-protocols")
+    (version "1.49")
+    (source (origin
+              (method url-fetch)
+              (uri (string-append
+                    "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/"
+                    version "/downloads/wayland-protocols-" version ".tar.xz"))
+              (sha256
+               (base32
+                "050b4jny5pkylx79fpcki9hzzy8f9xvf8k4brrxgyv9djis8yk7c"))))
+    (build-system meson-build-system)
+    (inputs (list wayland))
+    (native-inputs (list pkg-config python))
+    (synopsis "Wayland protocols")
+    (description "Wayland-Protocols contains Wayland protocols that add
+functionality not available in the Wayland core protocol.")
+    (home-page "https://wayland.freedesktop.org")
+    (license license:expat)))
 
 (define-public hyprland
   (package
     (name "hyprland")
-    (version "0.55.0")
+    (version "0.56.0")
     (source (origin
-              (method url-fetch)
-              (uri (string-append "https://github.com/hyprwm/Hyprland"
-                                  "/releases/download/v" version
-                                  "/source-v" version ".tar.gz"))
-              (modules '((guix build utils)))
-              (snippet
-               '(begin
-                  (substitute* "CMakeLists.txt"
-                    (("^add_subdirectory\\(hyprpm\\).*") ""))
-                  (for-each delete-file-recursively
-                            '("hyprpm" "subprojects"))))
-              (sha256
-               (base32
-                "1h6avxwz858ll133zbmqbplws2scp6hi1ig0s6bwjywyayss1q9b"))))
-    (build-system cmake-build-system)
+               (method url-fetch)
+               (uri (string-append "https://github.com/hyprwm/Hyprland"
+                                   "/releases/download/v" version
+                                   "/source-v" version ".tar.gz"))
+               (modules '((guix build utils)))
+               (snippet
+                '(begin
+                   (substitute* "CMakeLists.txt"
+                     (("^add_subdirectory\\(hyprpm\\).*") ""))
+                   (for-each delete-file-recursively
+                             '("hyprpm" "subprojects"))))
+               (sha256
+                (base32
+                 "1349s29zkj2mr8s2hq7ls2226i7fnm88mkfd46bb9jw9m6rs691y"))))
+     (build-system cmake-build-system)
     (arguments
      (list #:tests? #f
            #:configure-flags #~'("-DNO_HYPRPM=True")
            #:phases
            #~(modify-phases %standard-phases
-               (add-after 'unpack 'fix-path
-                 (lambda* (#:key inputs #:allow-other-keys)
-                   (substitute* "src/xwayland/Server.cpp"
-                     (("Xwayland( \\{\\})" _ suffix)
-                      (string-append
-                       (search-input-file inputs "bin/Xwayland")
-                       suffix)))
-                   (substitute* (find-files "src" "\\.cpp$")
-                     (("/usr/local(/bin/Hyprland)" _ path)
-                      (string-append #$output path))
-                     (("/usr") #$output)
-                     (("\\<(addr2line|cat|lspci|nm)\\>" cmd)
-                      (search-input-file
-                       inputs (string-append "bin/" cmd))))
-                   (substitute* '("src/Compositor.cpp"
-                                  "src/xwayland/XWayland.cpp"
-                                  "src/managers/VersionKeeperManager.cpp")
-                     (("!NFsUtils::executableExistsInPath.*\".") "false")
-                     (("hyprland-update-screen" cmd)
-                      (search-input-file inputs (in-vicinity "bin" cmd)))))))))
+      (add-after 'unpack 'fix-path
+                    (lambda* (#:key inputs #:allow-other-keys)
+                      (invoke "sed" "-i" "s/std::string_view/std::string/g" "hyprctl/src/main.cpp")
+                      (invoke "sed" "-E" "-i"
+                         "s/std::ranges::starts_with\\(([^,]+), ([^)]+)\\)/std::equal(\\2.begin(), \\2.end(), \\1.begin())/g"
+                        "src/helpers/MiscFunctions.cpp")
+                       (invoke "sed" "-i" "s/dynamicPointerCast<CWindow>(v)/staticPointerCast<CWindow>(v)/" "src/desktop/view/Window.cpp")
+                       (invoke "sed" "-i" "1i\\
+namespace Hyprutils::Memory { template<typename T, typename U> CSharedPointer<T> staticPointerCast(const CSharedPointer<U>& ref) { if (!ref) return nullptr; T* newPtr = static_cast<T*>(sc<U*>(ref.impl_->getData())); if (!newPtr) return nullptr; return CSharedPointer<T>(ref.impl_, newPtr); } }" "src/desktop/view/Window.cpp")
+                      (substitute* "src/xwayland/Server.cpp"
+                      (("Xwayland( \\{\\})" _ suffix)
+                       (string-append
+                        (search-input-file inputs "bin/Xwayland")
+                        suffix)))
+                    (substitute* (find-files "src" "\\.cpp$")
+                      (("/usr/local(/bin/Hyprland)" _ path)
+                       (string-append #$output path))
+                      (("/usr") #$output)
+                      (("\\<(addr2line|cat|lspci|nm)\\>" cmd)
+                       (search-input-file
+                        inputs (string-append "bin/" cmd))))
+                    (substitute* '("src/Compositor.cpp"
+                                   "src/xwayland/XWayland.cpp"
+                                   "src/managers/VersionKeeperManager.cpp")
+                      (("!NFsUtils::executableExistsInPath.*\".") "false")
+                      (("hyprland-update-screen" cmd)
+                       (search-input-file inputs (in-vicinity "bin" cmd)))))))))
     (native-inputs
      (list gcc-15
            hyprwayland-scanner
@@ -190,31 +229,33 @@
                        'ld-wrapper)
            pkg-config))
     (inputs
-     (list aquamarine
-           binutils
-           cairo
-           glslang
-           spirv-tools
-           glaze
-           hyprcursor
-           hyprland-protocols
-           hyprland-guiutils
-           hyprlang
-           hyprwire
-           libinput
-           libxcursor
-           libxkbcommon
-           mesa
-           muparser
-           pango
-           pciutils
-           re2
-           udis86
-           wayland
-           wayland-protocols
-           xcb-util-errors
-           xcb-util-wm
-           xorg-server-xwayland))
+      (list aquamarine
+            binutils
+            cairo
+            glslang
+            spirv-tools
+            glaze
+            hyprcursor
+            hyprland-protocols
+            hyprland-guiutils
+            hyprlang
+            hyprwire
+            libei
+            libinput
+            readline
+            libxcursor
+            libxkbcommon
+            mesa
+            muparser
+            pango
+            pciutils
+            re2
+            udis86
+            wayland
+            wayland-protocols
+            xcb-util-errors
+            xcb-util-wm
+            xorg-server-xwayland))
     (propagated-inputs
      (list hyprgraphics hyprutils lcms))
     (home-page "https://hypr.land/")

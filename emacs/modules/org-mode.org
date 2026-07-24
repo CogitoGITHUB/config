@@ -1,0 +1,15 @@
+#+title:      Org Mode
+#+filetags:   :emacs-package:org:core:
+
+* Org Mode — Built-in Configuration
+:PROPERTIES:
+:CATEGORY: editing
+:END:
+
+** Links
+#+begin_src emacs-lisp
+(setq org-link-descriptive t)
+
+(with-eval-after-load 'org
+  (advice-add #'org-link--reveal :override #'ignore))
+#+end_src

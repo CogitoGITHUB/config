@@ -5,7 +5,6 @@
   #:use-module (gnu bootloader grub)
   #:use-module (gnu system file-systems)
   #:use-module (gnu services containers)
-  #:use-module (substrate substrate)
   #:export (manifoldos-image))
 
 (define container-os

@@ -1,0 +1,1 @@
+((hackernews-link . #s(hash-table data (48256597 (:visited t :last-visited (27155 2218 335835 806000))))) (hackernews-comment-count . #s(hash-table data (48256475 (:visited t :last-visited (27155 2210 657540 215000))))))

@@ -1,0 +1,5 @@
+theme = "light"
+graph_style = "bars"
+graph_fade = true
+default_tab = "overview"
+tick_ms = 1000

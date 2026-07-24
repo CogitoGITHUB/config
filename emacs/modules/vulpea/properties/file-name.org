@@ -1,0 +1,22 @@
+#+title:      File Name Prompt
+#+priority:   1
+
+* File Name
+Why: Let you override the auto-generated slug. Sometimes you want a specific
+filename that doesn't match the title, or you're translating a title to a
+different language for the filename.
+
+** Default (slug from title)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-file-name (title &optional subdir)
+  "Prompt for a file name, defaulting to a slug of TITLE under SUBDIR.
+Returns the relative file path (e.g. \"subdir/my-note.org\")."
+  (let* ((raw-name (read-string
+                    (format "File name for \"%s\" (blank = slug): " title)))
+         (base (if (string-empty-p raw-name)
+                   (concat (vulpea-title-to-slug title) ".org")
+                 (if (string-suffix-p ".org" raw-name)
+                     raw-name
+                   (concat raw-name ".org")))))
+    (concat subdir base)))
+#+end_src

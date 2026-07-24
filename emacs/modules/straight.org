@@ -1,0 +1,27 @@
+#+title:      straight
+#+filetags:   :emacs-config:core:
+#+PRIORITY: 1
+
+* Straight.el Configuration
+
+** Override Recipes
+Mark built-in packages so straight doesn't try to install them.
+#+begin_src emacs-lisp
+(straight-override-recipe '(perspective :type built-in))
+#+end_src
+
+** Disable modification checking
+With 60+ repos, the default `find`-based modification check pegs CPU for
+several seconds on every start.
+#+begin_src emacs-lisp
+(setq straight-check-for-modifications nil)
+#+end_src
+
+** Stop VC scanning straight directories
+straight repos/builds are full of git repos and symlinks. Tell VC to
+ignore the entire ~/.emacs.d/straight tree so it never scans them.
+#+begin_src emacs-lisp
+(add-to-list 'vc-directory-exclusion-list "straight")
+#+end_src
+
+

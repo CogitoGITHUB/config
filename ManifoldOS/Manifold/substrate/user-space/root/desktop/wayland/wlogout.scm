@@ -3,4 +3,4 @@
   #:use-module (guix packages)
   #:re-export (wlogout))
 
-;; Re-export of wlogout from gnu/packages/wm
+;; Re-export of wlogout

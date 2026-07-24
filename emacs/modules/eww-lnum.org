@@ -1,0 +1,16 @@
+#+title:      eww-lnum
+#+identifier: 653b25d9-5f24-43b7-ac33-d5ac55fa12f9
+#+filetags:   :emacs-package:browsing:
+
+* eww-lnum
+:PROPERTIES:
+:ID:       653b25d9-5f24-43b7-ac33-d5ac55fa12f9
+:PACKAGE:  eww-lnum
+:CATEGORY: browsing
+:STRAIGHT: (eww-lnum :type git :host github :repo "m00natic/eww-lnum")
+:END:
+
+** Config :config:
+#+begin_src emacs-lisp
+
+#+end_src
