@@ -34,3 +34,4 @@ latex-template/images/
 :memory:
 
 manifolding-emacs-errors.log.el
+org-roam.db
