@@ -1,7 +1,7 @@
 #+title: Vulpea Capture Plugin
 #+priority: 15
 :PROPERTIES:
-:header-args:emacs-lisp: :tangle ../vulpea-capture.el
+:header-args:emacs-lisp: :tangle vulpea-capture.el
 :END:
 
 A literate plugin for vulpea v2 providing two workflows:

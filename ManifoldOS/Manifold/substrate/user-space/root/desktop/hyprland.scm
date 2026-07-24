@@ -194,31 +194,44 @@ functionality not available in the Wayland core protocol.")
            #~(modify-phases %standard-phases
       (add-after 'unpack 'fix-path
                     (lambda* (#:key inputs #:allow-other-keys)
+                      (call-with-output-file "src/compat.hpp"
+                        (lambda (port)
+                          (format port "#pragma once
+#include <hyprutils/memory/SharedPtr.hpp>
+namespace Hyprutils::Memory {
+template<typename T, typename U>
+CSharedPointer<T> staticPointerCast(const CSharedPointer<U>& ref) {
+    if (!ref) return nullptr;
+    T* newPtr = static_cast<T*>(sc<U*>(ref.impl_->getData()));
+    if (!newPtr) return nullptr;
+    return CSharedPointer<T>(ref.impl_, newPtr);
+}
+}
+")))
                       (invoke "sed" "-i" "s/std::string_view/std::string/g" "hyprctl/src/main.cpp")
                       (invoke "sed" "-E" "-i"
                          "s/std::ranges::starts_with\\(([^,]+), ([^)]+)\\)/std::equal(\\2.begin(), \\2.end(), \\1.begin())/g"
                         "src/helpers/MiscFunctions.cpp")
-                       (invoke "sed" "-i" "s/dynamicPointerCast<CWindow>(v)/staticPointerCast<CWindow>(v)/" "src/desktop/view/Window.cpp")
-                       (invoke "sed" "-i" "1i\\
-namespace Hyprutils::Memory { template<typename T, typename U> CSharedPointer<T> staticPointerCast(const CSharedPointer<U>& ref) { if (!ref) return nullptr; T* newPtr = static_cast<T*>(sc<U*>(ref.impl_->getData())); if (!newPtr) return nullptr; return CSharedPointer<T>(ref.impl_, newPtr); } }" "src/desktop/view/Window.cpp")
+                      (invoke "sed" "-i" "s/dynamicPointerCast<CWindow>(v)/staticPointerCast<CWindow>(v)/" "src/desktop/view/Window.cpp")
+                       (invoke "sed" "-i" "/^  VERSION ${VER})/a add_compile_options(-include src/compat.hpp)" "CMakeLists.txt")
                       (substitute* "src/xwayland/Server.cpp"
-                      (("Xwayland( \\{\\})" _ suffix)
-                       (string-append
-                        (search-input-file inputs "bin/Xwayland")
-                        suffix)))
-                    (substitute* (find-files "src" "\\.cpp$")
-                      (("/usr/local(/bin/Hyprland)" _ path)
-                       (string-append #$output path))
-                      (("/usr") #$output)
-                      (("\\<(addr2line|cat|lspci|nm)\\>" cmd)
-                       (search-input-file
-                        inputs (string-append "bin/" cmd))))
-                    (substitute* '("src/Compositor.cpp"
-                                   "src/xwayland/XWayland.cpp"
-                                   "src/managers/VersionKeeperManager.cpp")
-                      (("!NFsUtils::executableExistsInPath.*\".") "false")
-                      (("hyprland-update-screen" cmd)
-                       (search-input-file inputs (in-vicinity "bin" cmd)))))))))
+                        (("Xwayland( \\{\\})" _ suffix)
+                         (string-append
+                          (search-input-file inputs "bin/Xwayland")
+                          suffix)))
+                      (substitute* (find-files "src" "\\.cpp$")
+                        (("/usr/local(/bin/Hyprland)" _ path)
+                         (string-append #$output path))
+                        (("/usr") #$output)
+                        (("\\<(addr2line|cat|lspci|nm)\\>" cmd)
+                         (search-input-file
+                          inputs (string-append "bin/" cmd))))
+                      (substitute* '("src/Compositor.cpp"
+                                     "src/xwayland/XWayland.cpp"
+                                     "src/managers/VersionKeeperManager.cpp")
+                        (("!NFsUtils::executableExistsInPath.*\".") "false")
+                        (("hyprland-update-screen" cmd)
+                         (search-input-file inputs (in-vicinity "bin" cmd)))))))))
     (native-inputs
      (list gcc-15
            hyprwayland-scanner

@@ -299,7 +299,7 @@ manifolding-emacs (source: manifolding-emacs.el lines 172-205):
 | #+lexical_binding:          | no       | t       | Set to 'nil' if code needs dynamic scope |
 | #+header-args:emacs-lisp:  | no       | nil     | Set babel header defaults for all blocks  |
 
-The =capture-plugin.org= file uses =#+header-args:emacs-lisp: :tangle ../vulpea-capture.el=
+The =capture-plugin.org= file uses =#+header-args:emacs-lisp: :tangle vulpea-capture.el=
 to tangle its code into a standalone =.el= file. Normally you don't need
 this — manifolding-emacs evaluates source blocks directly.
 
@@ -1976,7 +1976,7 @@ Every plugin file should have:
 | ~/.emacs.d/modules/vulpea/properties/*.org                | Prompt definitions                 |
 | ~/.emacs.d/modules/vulpea/templates/full-file-templates/*.org  | Full-body capture templates (schema gen) |
 | ~/.emacs.d/modules/vulpea/templates/full-file-templates/vulpea.el | doct capture template declarations      |
-| ~/.emacs.d/modules/vulpea/vulpea-templates-system.org     | Template infrastructure (doct, yasnippet) |
+| ~/.config/emacs/modules/vulpea/templates/vulpea-templates-system.org | Template infrastructure (doct, yasnippet) |
 | ~/.emacs.d/modules/keyboard.org                           | Key bindings                      |
 | ~/.emacs.d/lisp/manifolding-emacs.el                      | Config loader                     |
 
