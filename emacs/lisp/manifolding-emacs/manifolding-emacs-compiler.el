@@ -12,6 +12,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'org)
+(require 'org-element)
 (require 'ob-core)
 (require 'manifolding-emacs-vars)
 (require 'manifolding-emacs-errors)
