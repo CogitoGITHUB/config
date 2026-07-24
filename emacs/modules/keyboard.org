@@ -682,8 +682,7 @@
     ("k" my/org-clock-hydra/body   "clock"    :exit t)
     ("e" my/org-edit-hydra/body    "edit"     :exit t)
     ("c" my/org-capture-hydra/body "capture"  :exit t)
-    ("v" my/org-vulpea-hydra/body  "vulpea"   :exit t)
-    ("d" my/org-dailies-hydra/body "dailies"  :exit t))
+    ("v" my/org-vulpea-hydra/body  "vulpea"   :exit t))
    "Back"
    (("SPC" my/main-hydra/body "main menu" :exit t))))
 (pretty-hydra-define my/org-agenda-hydra
@@ -749,14 +748,6 @@
      ("u" vulpea-ui-sidebar-toggle "sidebar"      :exit t))
     "Back"
     (("SPC" my/org-hydra/body "org" :exit t))))
-(pretty-hydra-define my/org-dailies-hydra
-  (:title "Org › Dailies" :quit-key "q" :separator "─")
-  ("Dailies"
-   (("j" org-roam-dailies-goto-today     "today"         :exit t)
-    ("z" org-roam-dailies-capture-today  "capture today" :exit t)
-    ("y" org-roam-dailies-goto-yesterday "yesterday"     :exit t))
-   "Back"
-   (("SPC" my/org-hydra/body "org" :exit t))))
 #+end_src
 ** SPC g — Git
 #+begin_src emacs-lisp

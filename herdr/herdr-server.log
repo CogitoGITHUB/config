@@ -7417,3 +7417,13 @@
 2026-07-24T09:23:32.030551Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t9"
 2026-07-24T09:23:37.055544Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
 2026-07-24T09:23:40.596920Z  INFO herdr::logging: api request completed event="api.request.complete" subsystem="api" outcome="error" request_id="req_1" method="pane.send_keys"
+2026-07-24T09:23:52.149174Z  INFO herdr::logging: api request completed event="api.request.complete" subsystem="api" outcome="error" request_id="req_1" method="pane.send_keys"
+2026-07-24T09:24:04.873868Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:tC"
+2026-07-24T09:24:06.329521Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t9"
+2026-07-24T09:24:08.244399Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t1"
+2026-07-24T09:24:13.255095Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-07-24T09:25:11.194984Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t9"
+2026-07-24T09:25:14.910962Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-07-24T09:25:15.240550Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-07-24T09:25:15.549540Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-07-24T09:25:16.215630Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
