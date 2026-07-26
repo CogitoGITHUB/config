@@ -53,6 +53,19 @@
 - After save: removes and re-adds all transclusions in all org buffers
 - Database table `transclude_links` with `source`, `dest` columns (foreign keys to `notes`, `ON DELETE CASCADE`)
 
+## Root Dir (vulpea-functions/root-dir.org)
+- `my/vulpea-root-dir` — centralized directory prompt, kwargs `:root` (base), `:prompt`, `:default` (start dir)
+- Each capture type passes its own root:
+  - **New file/task/extract:** default root = `(my/notes-directory)`
+  - **Dictionary word:** root = `dictionary/` subdir of notes dir
+- Returns relative path from root (with trailing slash) or `""` for root itself
+
+## Fast Mode (0-3)
+- `a` = **0 normal** — all prompts fire, body template opens
+- `o` = **1 skip general** — specialized prompts (dictionary/rules/note) fire, general (file) prompts skip, body opens
+- `e` = **2 skip all** — all prompts return defaults (WARNING), body template still opens
+- `u` = **3 quick** — all prompts default to WARNING, **no** body template, just "Open file?" after creation
+
 ## Note Creation
 - **Heading format:** notes use `* Title` instead of `#+title: Title` — `my/vulpea--headingify-note-content` advice transforms `vulpea--format-note-content` output. The heading is created by headingification BEFORE the template body is inserted.
 - **Default parameters:** `vulpea-create-default-function` prompts for subdir, file-level prompts, file name
@@ -62,6 +75,7 @@
 - **Template content:** body-only — NO `*` heading or `#+title:` metadata (heading is already created by headingification). Templates use `**` sub-headings and `%?` cursor placeholder.
 - **Template preview:** when selecting a template, the preview pane shows the rendered output in `org-mode` (outline expanded, `org-indent-mode` on) with `%?` replaced by the note's title — you see exactly what will land in the file
 - **All state prompts required** at create time (skipping sets `"WARNING"` → tracked via MISSING PROMPTS.org)
+- **Dictionary prompts always store `"WARNING"`** as property value when skipped (accepted default or fast mode), never nil
 
 ## Key Bindings (from keyboard.org)
 - `SPC v` — opens Vulpea hydra with all vulpea commands

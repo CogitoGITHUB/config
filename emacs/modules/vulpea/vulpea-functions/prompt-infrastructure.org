@@ -141,12 +141,12 @@ Temporarily overrides `read-string', `completing-read' and
 
 (defun my/vulpea-collect-prompts-with-fast (specialized-contexts general-contexts &optional fast-level)
   "Collect prompts using fast mode levels.
-SPECIALIZED-CONTEXTS fire at level 0 and 1, skip at level 2.
-GENERAL-CONTEXTS fire only at level 0, skip at level 1 and 2.
+SPECIALIZED-CONTEXTS fire at level 0 and 1, skip at level >= 2.
+GENERAL-CONTEXTS fire only at level 0, skip at level >= 1.
 Returns merged plist with :tags, :properties, :body, :post-apply.
 When FAST-LEVEL is nil, prompts the user via `my/vulpea--fast-level'."
   (let* ((fast (or fast-level (my/vulpea--fast-level)))
-         (spec (if (= fast 2)
+         (spec (if (>= fast 2)
                    (my/vulpea--collect-default-prompts specialized-contexts)
                  (my/vulpea-collect-prompts specialized-contexts)))
          (gen  (if (= fast 0)

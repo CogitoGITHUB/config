@@ -9,11 +9,12 @@
   :label "Etymology"
   :contexts '(dictionary)
   :prompt-fn (lambda ()
-               (completing-read "Etymology: "
-                                '("⚠ WARNING" "Latin" "Greek" "Old English" "French"
-                                  "German" "Arabic" "Hindi" "Japanese" "Other")
-                                nil t nil nil "⚠ WARNING"))
+               (let ((val (completing-read "Etymology: "
+                                          '("⚠ WARNING" "Latin" "Greek" "Old English" "French"
+                                            "German" "Arabic" "Hindi" "Japanese" "Other")
+                                          nil t nil nil "⚠ WARNING")))
+                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when (and val (not (string-equal val "⚠ WARNING")))
+              (when val
                 `(:properties (("ETYMOLOGY" . ,val))))))
 #+end_src

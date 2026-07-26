@@ -78,11 +78,12 @@
     (name "hyprutils")
     (version "0.13.1")
     (source (origin
-              (method url-fetch)
-              (uri (string-append
-                    "https://github.com/hyprwm/hyprutils/archive/refs/tags/v"
-                    version ".tar.gz"))
-              (sha256 (base32 "1pmfd5n25si1q02wndnfjiskajz5mc6di5pb4i5advjx20kf03j8"))))
+              (method git-fetch)
+              (uri (git-reference
+                     (url "https://github.com/hyprwm/hyprutils")
+                     (commit "41fb809557abd29a57151b6e1aaeabd05f9437e1")))
+              (file-name (git-file-name name version))
+              (sha256 (base32 "0ckl7f8nws44q98bjmmzwccaxvmwf2lk38mlbdl8dh5l88hqfsn4"))))
     (build-system cmake-build-system)
     (arguments (list #:tests? #f))
     (native-inputs (list pkg-config))
@@ -176,13 +177,23 @@ functionality not available in the Wayland core protocol.")
                (uri (string-append "https://github.com/hyprwm/Hyprland"
                                    "/releases/download/v" version
                                    "/source-v" version ".tar.gz"))
-               (modules '((guix build utils)))
-               (snippet
-                '(begin
-                   (substitute* "CMakeLists.txt"
-                     (("^add_subdirectory\\(hyprpm\\).*") ""))
-                   (for-each delete-file-recursively
-                             '("hyprpm" "subprojects"))))
+                (modules '((guix build utils)))
+                (snippet
+                 '(begin
+                    (substitute* "CMakeLists.txt"
+                      (("^add_subdirectory\\(hyprpm\\).*") ""))
+                    (for-each delete-file-recursively
+                              '("hyprpm" "subprojects"))
+                    (substitute* "src/desktop/view/SessionLock.hpp"
+                      (("class CSessionLock : public IView")
+                       "class CSessionLock : public virtual IView"))
+                    (substitute* "src/desktop/view/Subsurface.hpp"
+                      (("class CSubsurface : public IView")
+                       "class CSubsurface : public virtual IView"))
+                    (substitute* "src/event/EventBus.hpp"
+                      (("uintptr_t address = 0;") ""))
+                    (substitute* "src/desktop/view/View.cpp"
+                      ((", \\.address = m_address") ""))))
                (sha256
                 (base32
                  "1349s29zkj2mr8s2hq7ls2226i7fnm88mkfd46bb9jw9m6rs691y"))))
@@ -194,26 +205,10 @@ functionality not available in the Wayland core protocol.")
            #~(modify-phases %standard-phases
       (add-after 'unpack 'fix-path
                     (lambda* (#:key inputs #:allow-other-keys)
-                      (call-with-output-file "src/compat.hpp"
-                        (lambda (port)
-                          (format port "#pragma once
-#include <hyprutils/memory/SharedPtr.hpp>
-namespace Hyprutils::Memory {
-template<typename T, typename U>
-CSharedPointer<T> staticPointerCast(const CSharedPointer<U>& ref) {
-    if (!ref) return nullptr;
-    T* newPtr = static_cast<T*>(sc<U*>(ref.impl_->getData()));
-    if (!newPtr) return nullptr;
-    return CSharedPointer<T>(ref.impl_, newPtr);
-}
-}
-")))
                       (invoke "sed" "-i" "s/std::string_view/std::string/g" "hyprctl/src/main.cpp")
                       (invoke "sed" "-E" "-i"
                          "s/std::ranges::starts_with\\(([^,]+), ([^)]+)\\)/std::equal(\\2.begin(), \\2.end(), \\1.begin())/g"
                         "src/helpers/MiscFunctions.cpp")
-                      (invoke "sed" "-i" "s/dynamicPointerCast<CWindow>(v)/staticPointerCast<CWindow>(v)/" "src/desktop/view/Window.cpp")
-                       (invoke "sed" "-i" "/^  VERSION ${VER})/a add_compile_options(-include src/compat.hpp)" "CMakeLists.txt")
                       (substitute* "src/xwayland/Server.cpp"
                         (("Xwayland( \\{\\})" _ suffix)
                          (string-append
@@ -231,7 +226,18 @@ CSharedPointer<T> staticPointerCast(const CSharedPointer<U>& ref) {
                                      "src/managers/VersionKeeperManager.cpp")
                         (("!NFsUtils::executableExistsInPath.*\".") "false")
                         (("hyprland-update-screen" cmd)
-                         (search-input-file inputs (in-vicinity "bin" cmd)))))))))
+                         (search-input-file inputs (in-vicinity "bin" cmd))))
+                      (substitute* "src/desktop/state/LayerState.cpp"
+                        (("return !x \\|\\| rc<uintptr_t>\\(x.get\\(\\)\\) == event.address;")
+                         "return !x || event.view == dynamicPointerCast<View::IView>(x->m_self);"))
+                      (substitute* "src/desktop/state/WindowState.cpp"
+                        (("return !x \\|\\| rc<uintptr_t>\\(x.get\\(\\)\\) == event.address;")
+                         "return !x || event.view == dynamicPointerCast<View::IView>(x->m_self);"))
+                      (substitute* "src/desktop/state/OtherViewState.cpp"
+                        (("const auto VIEW = view.lock\\(\\);")
+                         "")
+                        (("return !VIEW \\|\\| rc<uintptr_t>\\(VIEW.get\\(\\)\\) == event.address;")
+                         "return !view || event.view == view;")))))))
     (native-inputs
      (list gcc-15
            hyprwayland-scanner

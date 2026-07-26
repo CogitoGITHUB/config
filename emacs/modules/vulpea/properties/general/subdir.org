@@ -53,12 +53,9 @@ Defaults to current buffer's location.  Never auto-selects last-used dir."
          (default (if default-dir
                       (expand-file-name default-dir root)
                     root))
-         (raw (read-directory-name "Subdirectory: " default default))
-         (dir (file-name-as-directory (directory-file-name raw))))
-    (if (string-equal dir (file-name-as-directory root))
+         (raw (my/vulpea-root-dir :root root :default default)))
+    (if (string-empty-p raw)
         ""
-      (let ((rel (directory-file-name
-                  (file-relative-name dir root))))
-        (make-directory dir t)
-        (file-name-as-directory rel)))))
+      (make-directory (expand-file-name raw root) t)
+      (file-name-as-directory raw))))
 #+end_src

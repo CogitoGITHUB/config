@@ -9,8 +9,9 @@
   :label "Pronunciation"
   :contexts '(dictionary)
   :prompt-fn (lambda ()
-               (read-string "Pronunciation (IPA): "))
+               (let ((val (completing-read "Pronunciation (IPA): " '("⚠ WARNING") nil nil nil nil "⚠ WARNING")))
+                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when (and val (not (string-equal val "")))
+              (when val
                 `(:properties (("PRONUNCIATION" . ,val))))))
 #+end_src

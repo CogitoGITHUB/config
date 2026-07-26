@@ -1,0 +1,26 @@
+#+title: Vulpea — Root Dir
+#+priority: 11
+
+* Root Dir
+:PROPERTIES:
+:CATEGORY: editing
+:END:
+
+Centralized directory prompt shared by all capture paths.
+Each caller passes its own root; the function returns the relative path.
+
+#+begin_src emacs-lisp
+(defun my/vulpea-root-dir (&key root prompt default)
+  "Prompt for a directory under ROOT.
+ROOT defaults to `(my/notes-directory)'.  PROMPT defaults to \"Subdirectory: \".
+DEFAULT is the initial directory to show (defaults to ROOT).
+Returns the relative path from ROOT as a directory name (with trailing slash),
+or \"\" if the user selects ROOT itself."
+  (let* ((root (expand-file-name (or root (my/notes-directory))))
+         (start (or default root))
+         (raw (read-directory-name (or prompt "Subdirectory: ") start root)))
+    (if (string-equal (file-name-as-directory (directory-file-name raw))
+                      (file-name-as-directory root))
+        ""
+      (file-relative-name raw root))))
+#+end_src

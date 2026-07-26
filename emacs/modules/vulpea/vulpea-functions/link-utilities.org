@@ -23,7 +23,7 @@ id: link to the new note."
                    (let ((beg (line-beginning-position 2))
                          (end (progn (org-end-of-subtree t t) (point))))
                      (buffer-substring-no-properties beg end))))
-         (subdir (my/vulpea-prompt-subdir))
+         (subdir (my/vulpea-root-dir))
          (note   (vulpea-create
                   title
                   (concat subdir (vulpea-title-to-slug title) ".org")

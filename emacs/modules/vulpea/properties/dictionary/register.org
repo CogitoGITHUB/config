@@ -9,11 +9,12 @@
   :label "Register"
   :contexts '(dictionary)
   :prompt-fn (lambda ()
-               (completing-read "Register: "
-                                '("⚠ WARNING" "formal" "informal" "slang" "technical"
-                                  "archaic" "literary" "colloquial")
-                                nil t nil nil "⚠ WARNING"))
+               (let ((val (completing-read "Register: "
+                                          '("⚠ WARNING" "formal" "informal" "slang" "technical"
+                                            "archaic" "literary" "colloquial")
+                                          nil t nil nil "⚠ WARNING")))
+                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when (and val (not (string-equal val "⚠ WARNING")))
+              (when val
                 `(:properties (("REGISTER" . ,val))))))
 #+end_src

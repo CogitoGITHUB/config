@@ -12,6 +12,7 @@
 - **No blank line after headings** at any level in `.org` files.
 - **No temp files in `/tmp/`** — use `/tmp/opencode/`.
 - **Schema violations are silent** — `vulpea-db-schema-validation-action` is `'silent`. Violations tracked via MISSING PROMPTS.org, never interactive prompts.
+- **Git commit/push:** use `git gg` (alias that adds all, commits, and pushes). Never stage/commit/push manually.
 
 ## Key Files
 | File | Purpose |

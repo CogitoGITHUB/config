@@ -19,23 +19,16 @@ that file so you fill in the body.  Put your =doct= declarations in
   "Prompt for title, subdir and tags; create the note; open capture for body."
   (let* ((my/vulpea--skip-capture t)
          (vulpea-create-default-function (lambda (_) '()))
-         (fast (my/vulpea--fast-level))
          (title  (read-string "Note title: "))
          (raw-name (read-string (format "File name for \"%s\" (blank = slug): " title)))
          (slug (if (string-empty-p raw-name)
                    (concat (vulpea-title-to-slug title) ".org")
                  (if (string-suffix-p ".org" raw-name) raw-name
                    (concat raw-name ".org"))))
-         (subdir (let* ((root (my/notes-directory))
-                        (raw (read-directory-name "Subdirectory: " root root)))
-                   (if (string-equal (file-name-as-directory
-                                      (directory-file-name raw))
-                                     (file-name-as-directory root))
-                       ""
-                     (file-relative-name raw root))))
+         (subdir (my/vulpea-root-dir))
          (fname (concat subdir slug))
-         (prompts (if (> fast 0) (my/vulpea--collect-default-prompts 'file)
-                     (my/vulpea-collect-prompts 'file)))
+         (fast (my/vulpea--fast-level))
+         (prompts (my/vulpea-collect-prompts-with-fast '(note) '(file) fast))
           (note   (my/vulpea--create-file-wrapper
                    title
                    fname
@@ -44,7 +37,10 @@ that file so you fill in the body.  Put your =doct= declarations in
                    (plist-get prompts :body))))
     (dolist (fn (plist-get prompts :post-apply))
       (funcall fn note))
-    (my/vulpea--open-capture-for-note note)))
+    (if (= fast 3)
+        (when (y-or-n-p (format "Open %s? " (file-name-nondirectory fname)))
+          (find-file (expand-file-name fname (my/notes-directory))))
+      (my/vulpea--open-capture-for-note note))))
 
 (defun my/vulpea--create-file-wrapper (title fname tags properties body)
   (let ((vulpea-create-default-function (lambda (_) '())))
@@ -52,27 +48,21 @@ that file so you fill in the body.  Put your =doct= declarations in
                    :tags tags
                    :properties properties
                    :body body)))
+
 (defun my/vulpea-capture-task-file ()
   "Prompt for task metadata; create the note tagged task; open capture for body."
   (let* ((my/vulpea--skip-capture t)
          (vulpea-create-default-function (lambda (_) '()))
-         (fast (my/vulpea--fast-level))
          (title  (read-string "Task title: "))
          (raw-name (read-string (format "File name for \"%s\" (blank = slug): " title)))
          (slug (if (string-empty-p raw-name)
                    (concat (vulpea-title-to-slug title) ".org")
                  (if (string-suffix-p ".org" raw-name) raw-name
                    (concat raw-name ".org"))))
-         (subdir (let* ((root (my/notes-directory))
-                        (raw (read-directory-name "Subdirectory: " root root)))
-                   (if (string-equal (file-name-as-directory
-                                      (directory-file-name raw))
-                                     (file-name-as-directory root))
-                       ""
-                     (file-relative-name raw root))))
+         (subdir (my/vulpea-root-dir))
          (fname (concat subdir slug))
-         (prompts (if (> fast 0) (my/vulpea--collect-default-prompts 'task)
-                     (my/vulpea-collect-prompts 'task)))
+         (fast (my/vulpea--fast-level))
+         (prompts (my/vulpea-collect-prompts-with-fast '(task) '(file) fast))
           (tags   (cons "task" (plist-get prompts :tags)))
           (note   (my/vulpea--create-file-wrapper
                    title fname tags
@@ -80,7 +70,10 @@ that file so you fill in the body.  Put your =doct= declarations in
                    (plist-get prompts :body))))
     (dolist (fn (plist-get prompts :post-apply))
       (funcall fn note))
-    (my/vulpea--open-capture-for-note note)))
+    (if (= fast 3)
+        (when (y-or-n-p (format "Open %s? " (file-name-nondirectory fname)))
+          (find-file (expand-file-name fname (my/notes-directory))))
+      (my/vulpea--open-capture-for-note note))))
 ;; -- heading helper ----------------------------------------------------
 (defun my/vulpea-capture-heading ()
   "Select a parent note, create a heading under it, then open via org-capture."
@@ -111,7 +104,10 @@ that file so you fill in the body.  Put your =doct= declarations in
       (error "vulpea-create returned %S (expected a vulpea-note)" note))
     (dolist (fn (plist-get prompts :post-apply))
       (funcall fn note))
-    (my/vulpea--open-capture-for-note note)))
+    (if (= fast 3)
+        (when (y-or-n-p (format "Open %s? " (vulpea-note-title note)))
+          (find-file (vulpea-note-path note)))
+      (my/vulpea--open-capture-for-note note))))
 ;; -- insert heading in current buffer -----------------------------------
 (defun my/vulpea-insert-heading (title)
   "Insert a vulpea heading at point in the current buffer.
@@ -133,6 +129,10 @@ at point, or a child of the file if point is at file level."
                               :after (plist-get prompts :after)))
     (dolist (fn (plist-get prompts :post-apply))
       (funcall fn note))
-    (setq my/vulpea--skip-open-prompt t)
-    (my/vulpea--open-capture-for-note note)))
+    (if (= fast 3)
+        (when (y-or-n-p (format "Open %s? " (vulpea-note-title note)))
+          (find-file (vulpea-note-path note)))
+      (progn
+        (setq my/vulpea--skip-open-prompt t)
+        (my/vulpea--open-capture-for-note note)))))
 #+end_src

@@ -9,8 +9,9 @@
   :label "Example"
   :contexts '(dictionary)
   :prompt-fn (lambda ()
-               (read-string "Example sentence: "))
+               (let ((val (completing-read "Example sentence: " '("⚠ WARNING") nil nil nil nil "⚠ WARNING")))
+                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when (and val (not (string-equal val "")))
+              (when val
                 `(:properties (("EXAMPLE" . ,val))))))
 #+end_src

@@ -9,10 +9,11 @@
   :label "Frequency"
   :contexts '(dictionary)
   :prompt-fn (lambda ()
-               (completing-read "Frequency: "
-                                '("⚠ WARNING" "common" "frequent" "rare" "obscure")
-                                nil t nil nil "⚠ WARNING"))
+               (let ((val (completing-read "Frequency: "
+                                          '("⚠ WARNING" "common" "frequent" "rare" "obscure")
+                                          nil t nil nil "⚠ WARNING")))
+                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when (and val (not (string-equal val "⚠ WARNING")))
+              (when val
                 `(:properties (("FREQUENCY" . ,val))))))
 #+end_src

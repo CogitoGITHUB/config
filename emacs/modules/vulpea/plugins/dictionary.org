@@ -115,10 +115,9 @@ under `dictionary/'."
          (_ (make-directory root t))
          (added (format-time-string "[%Y-%m-%d]"))
          (slug (my/vulpea-dictionary--slugify word))
-         (subdir-name (read-string "Subdirectory name under dictionary/ (blank=none): "))
-         (subdir (if (string-empty-p subdir-name)
-                     ""
-                   (file-name-as-directory subdir-name)))
+         (subdir (my/vulpea-root-dir
+                  :root (expand-file-name "dictionary/" (my/notes-directory))
+                  :prompt "Subdirectory under dictionary/: "))
          (file-name (concat "dictionary/" subdir slug ".org"))
          (path-tags (if (string-empty-p subdir)
                         '()
