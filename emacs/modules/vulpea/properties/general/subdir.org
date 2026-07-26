@@ -40,22 +40,7 @@ With a prefix argument, clear it."
 ** Subdirectory Prompt (Dired)
 #+begin_src emacs-lisp
 (defun my/vulpea-prompt-subdir ()
-  "Prompt for a subdirectory inside `my/notes-directory' using Dired-style browsing.
-Defaults to current buffer's location.  Never auto-selects last-used dir."
-  (let* ((root (my/notes-directory))
-         (default-dir
-          (let ((fname (buffer-file-name)))
-            (when fname
-              (let ((rel (file-relative-name fname root)))
-                (when (and (not (file-name-absolute-p rel))
-                           (string-match "\\(.+\\)/[^/]+$" rel))
-                  (match-string 1 rel))))))
-         (default (if default-dir
-                      (expand-file-name default-dir root)
-                    root))
-         (raw (my/vulpea-root-dir :root root :default default)))
-    (if (string-empty-p raw)
-        ""
-      (make-directory (expand-file-name raw root) t)
-      (file-name-as-directory raw))))
+  "Prompt for a subdirectory inside `my/notes-directory'.
+Delegates to `my/vulpea-root-dir'."
+  (my/vulpea-root-dir))
 #+end_src

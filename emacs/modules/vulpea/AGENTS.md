@@ -54,11 +54,11 @@
 - Database table `transclude_links` with `source`, `dest` columns (foreign keys to `notes`, `ON DELETE CASCADE`)
 
 ## Root Dir (vulpea-functions/root-dir.org)
-- `my/vulpea-root-dir` — centralized directory prompt, kwargs `:root` (base), `:prompt`, `:default` (start dir)
-- Each capture type passes its own root:
-  - **New file/task/extract:** default root = `(my/notes-directory)`
-  - **Dictionary word:** root = `dictionary/` subdir of notes dir
-- Returns relative path from root (with trailing slash) or `""` for root itself
+- `my/vulpea-root-dir` — centralized directory prompt, `(&optional root prompt)`
+  - root defaults to `(my/notes-directory)`, prompt defaults to `"Subdirectory: "`
+  - Type `.` or press Enter for root level
+  - Select or type a subdirectory name to nest
+  - Returns relative path from root (with trailing slash) or `""` for root itself
 
 ## Fast Mode (0-3)
 - `a` = **0 normal** — all prompts fire, body template opens
