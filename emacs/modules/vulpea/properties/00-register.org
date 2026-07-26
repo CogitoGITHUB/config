@@ -1,5 +1,5 @@
 #+title: Prompt Registry (must load first)
-#+priority:   0
+#+priority:   -1
 
 * Prompt Registry
 

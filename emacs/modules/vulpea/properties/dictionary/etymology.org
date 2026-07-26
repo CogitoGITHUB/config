@@ -1,0 +1,19 @@
+#+title:      Etymology Prompt
+#+priority:   15
+
+* Etymology Prompt
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'etymology
+  :name 'etymology
+  :label "Etymology"
+  :contexts '(dictionary)
+  :prompt-fn (lambda ()
+               (completing-read "Etymology: "
+                                '("⚠ WARNING" "Latin" "Greek" "Old English" "French"
+                                  "German" "Arabic" "Hindi" "Japanese" "Other")
+                                nil t nil nil "⚠ WARNING"))
+  :to-plist (lambda (val _ctx)
+              (when (and val (not (string-equal val "⚠ WARNING")))
+                `(:properties (("ETYMOLOGY" . ,val))))))
+#+end_src

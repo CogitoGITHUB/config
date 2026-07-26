@@ -1,0 +1,21 @@
+#+title:      Level Prompt
+#+priority:   22
+
+* Level Prompt
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'rule-level
+  :name 'rule-level
+  :label "Level"
+  :contexts '(rule)
+  :prompt-fn (lambda ()
+               (let ((level (completing-read "Level (none/L1-L10): "
+                                             '("none" "L1" "L2" "L3" "L4" "L5"
+                                               "L6" "L7" "L8" "L9" "L10")
+                                             nil t nil nil "none")))
+                 (when (and level (not (string-equal level "none")))
+                   level)))
+  :to-plist (lambda (val _ctx)
+              (when val
+                `(:tags (,val)))))
+#+end_src

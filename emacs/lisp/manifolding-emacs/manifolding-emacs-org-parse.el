@@ -77,8 +77,8 @@
       properties)))
 
 (defun manifolding-emacs-file-priority (file)
-  (let ((priority (alist-get 'priority (manifolding-emacs-file-properties file) "10")))
-    (if (string-match-p "^[0-9]+$" priority) (string-to-number priority) 10)))
+  (let ((priority (string-trim (alist-get 'priority (manifolding-emacs-file-properties file) "10"))))
+    (if (string-match-p "^-?[0-9]+$" priority) (string-to-number priority) 10)))
 
 (defun manifolding-emacs-file-remote (file)
   (when-let* ((remote (alist-get 'remote (manifolding-emacs-file-properties file))))

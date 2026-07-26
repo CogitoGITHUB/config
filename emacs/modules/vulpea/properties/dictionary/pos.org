@@ -1,0 +1,19 @@
+#+title:      POS (Part of Speech) Prompt
+#+priority:   17
+
+* POS Prompt
+
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'pos
+  :name 'pos
+  :label "POS"
+  :contexts '(dictionary)
+   :prompt-fn (lambda ()
+                (completing-read "POS: "
+                                 '("⚠ WARNING" "noun" "verb" "adjective" "adverb" "phrase" "other")
+                                 nil t nil nil "⚠ WARNING"))
+  :to-plist (lambda (val _ctx)
+              (when (and val (not (string-equal val "⚠ WARNING")))
+                `(:properties (("POS" . ,val))))))
+#+end_src

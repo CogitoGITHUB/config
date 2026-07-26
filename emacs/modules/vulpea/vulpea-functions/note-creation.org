@@ -6,30 +6,41 @@
 :END:
 ** Fast Mode
 #+begin_src emacs-lisp
-(defvar my/vulpea--fast-mode nil
-  "Non-nil when fast mode is active, skipping all state/tag prompts.")
+(defvar my/vulpea--fast-level 0
+  "Fast mode level for current creation.
+0=normal, 1=skip general prompts, 2=skip all prompts.")
 
-(defun my/vulpea--fast-mode-p ()
-  "Prompt for fast mode. Enter or y = fast, n = full.
-Return non-nil when fast mode is selected."
-  (let ((c (read-char-choice "Fast mode? [Y/n]: " '(?y ?n ?\r ?\n))))
-    (setq my/vulpea--fast-mode (memq c '(?y ?\r ?\n)))))
+(defun my/vulpea--fast-level ()
+  "Prompt for fast mode level.
+Return 0 (normal), 1 (skip general prompts), or 2 (skip all prompts)."
+  (let ((c (read-char-choice "Fast: (n)ormal (1)skip general (2)skip all " '(?n ?1 ?2))))
+    (setq my/vulpea--fast-level
+          (pcase c
+            (?n 0)
+            (?1 1)
+            (?2 2)))))
+
+(setq use-dialog-box nil)
 #+end_src
 ** Default Parameters
 #+begin_src emacs-lisp
+(defvar my/vulpea-default-subdir-root nil
+  "When non-nil, use this as the default directory for the subdirectory prompt
+instead of `my/notes-directory'.")
+
 (with-eval-after-load 'vulpea
   (setq vulpea-create-default-function
         (lambda (title)
-          (let* ((fast (my/vulpea--fast-mode-p))
+          (let* ((fast (my/vulpea--fast-level))
                  (raw-name (read-string
                             (format "File name for \"%s\" (blank = slug): " title)))
                  (slug (if (string-empty-p raw-name)
                            (concat (vulpea-title-to-slug title) ".org")
                          (if (string-suffix-p ".org" raw-name) raw-name
                            (concat raw-name ".org"))))
-                 (subdir (let* ((root (my/notes-directory))
-                                (raw (read-directory-name
-                                      "Subdirectory: " root root)))
+                  (subdir (let* ((root (or my/vulpea-default-subdir-root (my/notes-directory)))
+                                 (raw (read-directory-name
+                                       "Subdirectory: " root root)))
                            (if (string-equal
                                 (file-name-as-directory
                                  (directory-file-name raw))
@@ -37,7 +48,7 @@ Return non-nil when fast mode is selected."
                                ""
                              (file-relative-name raw root))))
                  (fname (concat subdir slug))
-                 (prompts (if fast
+                 (prompts (if (> fast 0)
                               (my/vulpea--collect-default-prompts 'file)
                             (my/vulpea-collect-prompts 'file))))
             (setq my/vulpea--pending-post-apply (plist-get prompts :post-apply))

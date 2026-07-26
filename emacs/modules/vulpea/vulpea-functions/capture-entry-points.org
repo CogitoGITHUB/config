@@ -19,7 +19,7 @@ that file so you fill in the body.  Put your =doct= declarations in
   "Prompt for title, subdir and tags; create the note; open capture for body."
   (let* ((my/vulpea--skip-capture t)
          (vulpea-create-default-function (lambda (_) '()))
-         (fast (my/vulpea--fast-mode-p))
+         (fast (my/vulpea--fast-level))
          (title  (read-string "Note title: "))
          (raw-name (read-string (format "File name for \"%s\" (blank = slug): " title)))
          (slug (if (string-empty-p raw-name)
@@ -34,7 +34,7 @@ that file so you fill in the body.  Put your =doct= declarations in
                        ""
                      (file-relative-name raw root))))
          (fname (concat subdir slug))
-         (prompts (if fast (my/vulpea--collect-default-prompts 'file)
+         (prompts (if (> fast 0) (my/vulpea--collect-default-prompts 'file)
                      (my/vulpea-collect-prompts 'file)))
           (note   (my/vulpea--create-file-wrapper
                    title
@@ -56,7 +56,7 @@ that file so you fill in the body.  Put your =doct= declarations in
   "Prompt for task metadata; create the note tagged task; open capture for body."
   (let* ((my/vulpea--skip-capture t)
          (vulpea-create-default-function (lambda (_) '()))
-         (fast (my/vulpea--fast-mode-p))
+         (fast (my/vulpea--fast-level))
          (title  (read-string "Task title: "))
          (raw-name (read-string (format "File name for \"%s\" (blank = slug): " title)))
          (slug (if (string-empty-p raw-name)
@@ -71,7 +71,7 @@ that file so you fill in the body.  Put your =doct= declarations in
                        ""
                      (file-relative-name raw root))))
          (fname (concat subdir slug))
-         (prompts (if fast (my/vulpea--collect-default-prompts 'task)
+         (prompts (if (> fast 0) (my/vulpea--collect-default-prompts 'task)
                      (my/vulpea-collect-prompts 'task)))
           (tags   (cons "task" (plist-get prompts :tags)))
           (note   (my/vulpea--create-file-wrapper
@@ -87,7 +87,7 @@ that file so you fill in the body.  Put your =doct= declarations in
   (interactive)
   (let (vulpea-create-default-function parent title prompts note fast)
     (setq vulpea-create-default-function (lambda (_) '()))
-    (setq fast (my/vulpea--fast-mode-p))
+    (setq fast (my/vulpea--fast-level))
     (setq parent (let ((buffer-note (my/vulpea--buffer-note)))
                    (if buffer-note
                        (if (member (read-char-choice
@@ -99,7 +99,7 @@ that file so you fill in the body.  Put your =doct= declarations in
                          (vulpea-select "Parent note: " :require-match t))
                      (vulpea-select "Parent note: " :require-match t))))
     (setq title (read-string "Heading title: "))
-    (setq prompts (if fast (my/vulpea--collect-default-prompts 'heading)
+    (setq prompts (if (> fast 0) (my/vulpea--collect-default-prompts 'heading)
                      (my/vulpea-collect-prompts 'heading)))
     (setq my/vulpea--pending-post-apply nil)
     (setq note (vulpea-create title nil
@@ -120,10 +120,10 @@ for body editing.  The new heading becomes a child of the heading
 at point, or a child of the file if point is at file level."
   (interactive (list (read-string "Heading title: ")))
   (let (id parent-note prompts note fast)
-    (setq fast (my/vulpea--fast-mode-p))
+    (setq fast (my/vulpea--fast-level))
     (setq id (my/vulpea-links--current-note-id))
     (setq parent-note (vulpea-db-get-by-id id))
-    (setq prompts (if fast (my/vulpea--collect-default-prompts 'heading)
+    (setq prompts (if (> fast 0) (my/vulpea--collect-default-prompts 'heading)
                      (my/vulpea-collect-prompts 'heading)))
     (setq my/vulpea--pending-post-apply nil)
     (setq note (vulpea-create title nil

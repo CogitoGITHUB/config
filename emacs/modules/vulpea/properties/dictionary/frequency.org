@@ -1,0 +1,18 @@
+#+title:      Frequency Prompt
+#+priority:   13
+
+* Frequency Prompt
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'frequency
+  :name 'frequency
+  :label "Frequency"
+  :contexts '(dictionary)
+  :prompt-fn (lambda ()
+               (completing-read "Frequency: "
+                                '("⚠ WARNING" "common" "frequent" "rare" "obscure")
+                                nil t nil nil "⚠ WARNING"))
+  :to-plist (lambda (val _ctx)
+              (when (and val (not (string-equal val "⚠ WARNING")))
+                `(:properties (("FREQUENCY" . ,val))))))
+#+end_src

@@ -29,23 +29,30 @@ Entries here override the default <name>.org.")
   (or (alist-get name my/vulpea-prompt-help-map)
       (format "%s.org" name)))
 
+(defvar my/vulpea--help-opened nil
+  "Non-nil when a help buffer was opened for the current prompt.")
+
 (defun my/vulpea--show-help (name)
-  "Open prompt NAME's help file full-screen with org-tree-slide."
-  (let (file path)
-    (setq file (my/vulpea--help-file name))
-    (setq path (expand-file-name
-                (concat "modules/vulpea/properties/" file)
-                user-emacs-directory))
-    (when (file-exists-p path)
+  "Open prompt NAME's help file full-screen with org-tree-slide.
+Search recursively under `properties/' for the file."
+  (let* ((file (my/vulpea--help-file name))
+         (properties-dir (expand-file-name "modules/vulpea/properties/"
+                                           user-emacs-directory))
+         (path (car (file-expand-wildcards
+                     (concat properties-dir "**/" file) t))))
+    (when (and path (file-exists-p path))
+      (setq my/vulpea--help-opened t)
       (delete-other-windows)
       (find-file path)
       (goto-char (point-min))
       (org-tree-slide-mode 1))))
 
 (defun my/vulpea--close-help ()
-  "Stop org-tree-slide and kill the help buffer."
-  (org-tree-slide-mode -1)
-  (kill-buffer))
+  "Stop org-tree-slide and kill the help buffer, if one was opened."
+  (when my/vulpea--help-opened
+    (setq my/vulpea--help-opened nil)
+    (org-tree-slide-mode -1)
+    (kill-buffer)))
 #+end_src
 
 ** TODO State Carrier
@@ -64,11 +71,14 @@ advice on `vulpea--format-note-content'.")
 ** Collector
 
 #+begin_src emacs-lisp
-(defun my/vulpea-collect-prompts (context)
-  "Run all registered prompts matching CONTEXT and merge results."
-  (let (result)
+(defun my/vulpea-collect-prompts (context &rest extra-contexts)
+  "Run all registered prompts matching CONTEXT (or any of EXTRA-CONTEXTS).
+When CONTEXT is a list, match prompts whose contexts overlap with it.
+Single-symbol callers (like `(my/vulpea-collect-prompts 'file)`) continue working."
+  (let* ((contexts (if (listp context) context (cons context extra-contexts)))
+         result)
     (dolist (spec my/vulpea-prompt-registry)
-      (when (memq context (plist-get spec :contexts))
+      (when (seq-intersection contexts (plist-get spec :contexts) #'eq)
         (my/vulpea--show-help (plist-get spec :name))
         (let (val frag)
           (setq val (condition-case nil
@@ -120,14 +130,32 @@ This function temporarily overrides input primitives to achieve that.
   "Return \\r or first char — maps to skip/default in all prompt functions."
   (if (memq ?\r chars) ?\r (car chars)))
 
-(defun my/vulpea--collect-default-prompts (context)
+(defun my/vulpea--collect-default-prompts (context &rest extra-contexts)
   "Like `my/vulpea-collect-prompts' but all prompts return defaults.
 Temporarily overrides `read-string', `completing-read' and
 `read-char-choice' to return their default/skip values."
   (cl-letf (((symbol-function 'read-string) #'my/vulpea--fast-read-string)
             ((symbol-function 'completing-read) #'my/vulpea--fast-completing-read)
             ((symbol-function 'read-char-choice) #'my/vulpea--fast-read-char-choice))
-    (my/vulpea-collect-prompts context)))
+    (apply #'my/vulpea-collect-prompts context extra-contexts)))
+
+(defun my/vulpea-collect-prompts-with-fast (specialized-contexts general-contexts &optional fast-level)
+  "Collect prompts using fast mode levels.
+SPECIALIZED-CONTEXTS fire at level 0 and 1, skip at level 2.
+GENERAL-CONTEXTS fire only at level 0, skip at level 1 and 2.
+Returns merged plist with :tags, :properties, :body, :post-apply.
+When FAST-LEVEL is nil, prompts the user via `my/vulpea--fast-level'."
+  (let* ((fast (or fast-level (my/vulpea--fast-level)))
+         (spec (if (= fast 2)
+                   (my/vulpea--collect-default-prompts specialized-contexts)
+                 (my/vulpea-collect-prompts specialized-contexts)))
+         (gen  (if (= fast 0)
+                   (my/vulpea-collect-prompts general-contexts)
+                 (my/vulpea--collect-default-prompts general-contexts))))
+    (list :tags (append (plist-get gen :tags) (plist-get spec :tags))
+          :properties (append (plist-get gen :properties) (plist-get spec :properties))
+          :body (concat (plist-get gen :body) (plist-get spec :body))
+          :post-apply (append (plist-get gen :post-apply) (plist-get spec :post-apply)))))
 #+end_src
 
 ** Missing Prompts Management

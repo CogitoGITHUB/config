@@ -203,65 +203,62 @@ nothing. Never duplicates, never touches the source heading.
     (let ((end (save-excursion (org-end-of-subtree t t))))
       (re-search-forward "^Condition:" end t))))
 
-(defun my/vulpea-rules--set-scope-tag (topics)
-  "Set the scope tag (universal/general/focused) on the current heading.
-TOPICS is the list already read from RULE_TOPICS."
-  (let* ((has-condition (my/vulpea-rules--body-has-condition-p))
-         (scope (cond
-                 ((null topics) (if has-condition "focused" "universal"))
-                 (has-condition "focused")
-                 (t "general")))
-         (current-tags (cl-remove-if
-                         (lambda (tag) (member tag my/vulpea-rules--valid-scopes))
-                         (org-get-tags nil t))))
-    (org-set-tags (append current-tags (list scope)))))
+(defun my/vulpea-rules--detect-scope (topics)
+  "Detect scope tag based on TOPICS list and body condition.
+Returns \"universal\", \"general\", or \"focused\"."
+  (let ((has-condition (my/vulpea-rules--body-has-condition-p)))
+    (cond
+     ((null topics) (if has-condition "focused" "universal"))
+     (has-condition "focused")
+     (t "general"))))
 #+end_src
 
 * Mark / Unmark
 ** Mark current heading as a rule (creation AND retrofit path)
 #+begin_src emacs-lisp
-(defun my/vulpea-rules--prompt-topics (&optional current)
-  "Prompt for space-separated topics, completing against known topics."
-  (let* ((known (mapcar #'car
-                 (emacsql (vulpea-db) [:select :distinct [primary-topic] :from rules])))
-         (input (completing-read-multiple
-                 "Topics (comma-separated, first = primary, blank = universal): "
-                 known nil nil current)))
-    (mapconcat #'identity input " ")))
-
-(defun my/vulpea-rules--prompt-file-override ()
-  "Prompt for an optional destination file override. Returns nil or a filename."
-  (when (yes-or-no-p "Override destination file for primary topic? ")
-    (let* ((existing (when (file-directory-p my/vulpea-rules--rules-directory)
-                        (directory-files my/vulpea-rules--rules-directory nil "\\.org$")))
-           (file (completing-read "Destination file: " existing)))
-      file)))
-
 ;;;###autoload
 (defun my/vulpea-rules-mark-as-rule ()
   "Mark the heading at point (new or existing, any vulpea note) as a Rule.
 Works as both the creation path and the retrofit path — there's no
-difference between a heading just written and one written years ago."
+difference between a heading just written and one written years ago.
+Collects rule-specific prompts (topics, scope, level, file-override)
+via the prompt registry in properties/rules/."
   (interactive)
   (unless (org-at-heading-p) (org-back-to-heading t))
   (org-id-get-create)
   (let* ((already-rule (equal (org-entry-get nil "RULE") "t"))
-         (current-topics (org-entry-get nil "RULE_TOPICS"))
-         (topics-str (my/vulpea-rules--prompt-topics current-topics))
-         (topics (split-string topics-str " " t))
-         (override (my/vulpea-rules--prompt-file-override)))
+         (prompts (my/vulpea-collect-prompts '(rule)))
+         (props (plist-get prompts :properties))
+         (prompt-tags (plist-get prompts :tags))
+         (topics-str (cdr (assoc "RULE_TOPICS" props)))
+         (topics (when (and topics-str (not (string-empty-p topics-str)))
+                   (split-string topics-str " " t)))
+         (file-override (cdr (assoc "RULE_FILE" props)))
+         (scope-tag (or (car (seq-intersection prompt-tags
+                                                my/vulpea-rules--valid-scopes
+                                                #'string=))
+                        (my/vulpea-rules--detect-scope topics)))
+         (level-tags (cl-remove-if
+                       (lambda (tag) (member tag my/vulpea-rules--valid-scopes))
+                       prompt-tags)))
     (org-entry-put nil "RULE" "t")
-    (if (string-empty-p topics-str)
+    (if (or (null topics-str) (string-empty-p topics-str))
         (org-entry-delete nil "RULE_TOPICS")
       (org-entry-put nil "RULE_TOPICS" topics-str))
-    (if override
-        (org-entry-put nil "RULE_FILE" override)
+    (if file-override
+        (org-entry-put nil "RULE_FILE" file-override)
       (org-entry-delete nil "RULE_FILE"))
     (org-entry-put nil "DRILL_CARD_TYPE" "simple")
-    (my/vulpea-rules--set-scope-tag topics)
-    (let* ((current-tags (org-get-tags nil t)))
-      (unless (member "drill" current-tags)
-        (org-set-tags (append current-tags (list "drill")))))
+    ;; Apply tags: remove old scope/level/drill tags, set new ones
+    (let ((current-tags (cl-remove-if
+                          (lambda (tag) (or (member tag my/vulpea-rules--valid-scopes)
+                                             (string-match-p "^L[0-9]+$" tag)
+                                             (equal tag "drill")))
+                          (org-get-tags nil t))))
+      (org-set-tags (append current-tags
+                            (list scope-tag)
+                            level-tags
+                            (list "drill"))))
     (save-buffer)
     (when-let ((note (my/vulpea--buffer-note)))
       (my/vulpea-rules--route-note note))
