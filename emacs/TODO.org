@@ -1,0 +1,49 @@
+* TODO Fast Todo Plugin
+** Core mechanism
+   Single command, single prompt, zero window pop.
+   my/vulpea-quick-todo reads one string from minibuffer, appends
+   "* TODO <text>" directly to a target file — no capture-buffer
+   editing, no vulpea note, no schema. Bypasses note pipeline
+   entirely: plain Org heading, not a vulpea entity.
+** Target resolution
+   - Default (no prefix arg): append under "* Inbox" in ~/Todo.org
+   - C-u prefix: completing-read over fixed vector
+     my/vulpea-quick-todo-targets (file + heading pairs)
+** Implementation shape
+   - Option A: org-capture w/ :immediate-finish t, no %? stop-point
+     (keeps undo + hooks, never opens visible buffer)
+   - Option B: raw with-current-buffer/goto-char/insert
+     (faster, loses capture template hooks)
+** Agenda integration
+   Confirm ~/Todo.org + alternate targets are in org-agenda-files
+** Open questions
+   - [ ] Inline natural-language scheduling on capture, or text-only?
+   - [ ] Fixed TODO state always, or cycle-able at capture time?
+
+* TODO Journal Plugin
+** Core mechanism
+   Implements the Journal perspective from Live Properties.
+   Reuses 'scoped ref-type mechanism from Aliases (create-if-missing,
+   no dedup, one Journal page per entity).
+   my/vulpea-journal-entry: resolves entity's Journal page, appends
+   timestamped entry under today's date heading (creates if needed).
+   Prompt for text only, no window switch.
+** File shape (per entity Journal page)
+   #+begin_example
+   * 2026-07-27
+   ** 14:32 — <entry text>
+   * 2026-07-20
+   ** 09:10 — <entry text>
+   #+end_example
+   - [ ] Decide: newest-first or oldest-first (determines insert point)
+** No-entity-context fallback
+   Default: require entity context; refuse w/ message if invoked
+   outside any entity buffer
+** Relationship to Live Properties JOURNAL badge
+   First invocation writes back to parent drawer:
+   :JOURNAL: [[id:xxx][N entries · <last-entry-date>]]
+   via same badge-sync hook used for Evidence/Blueprint
+** Open questions
+   - [ ] One-line entry per invocation, or capture buffer for
+         multi-paragraph entries?
+   - [ ] Freeform entries, or tag by type (observation vs decision)?

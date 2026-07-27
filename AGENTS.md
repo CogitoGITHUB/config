@@ -19,7 +19,9 @@ Use `:init:` tag for pre-require vars, `:config:` tag (or no tag) for main confi
 **Substrate:** `~/.config/ManifoldOS/Manifold/substrate/`
 **Packages dir:** `substrate/user-space/root/<category>/`
 **Loaders dir:** `substrate/user-space/root/loaders/<category>.scm`
-**Reconfigure:** `guix system reconfigure ~/.config/ManifoldOS/system.scm`
+**Reconfigure:** `sudo guix system reconfigure ~/.config/ManifoldOS/system.scm --allow-downgrades` (needs `sudo` for `/var/guix/profiles/` write access; `--allow-downgrades` because channel commit may diverge)
+
+**Always run reconfigure in the "reshape system" Herdr tab** — first check `herdr_get_layout` to see if a tab named `reshape system` already exists. If not, create it with `herdr_manage_tabs`. Then `herdr_herdr_rpc` with `pane.send_input` to type the command, then `herdr_send_keys` with `["enter"]` to submit, then read the pane output with `herdr_read_pane` to confirm it started building. Never run inline.
 
 ### Adding a package (chain pattern)
 

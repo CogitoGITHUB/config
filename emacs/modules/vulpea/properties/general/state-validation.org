@@ -37,6 +37,7 @@ Why: Tracks the Prime Constraint review lifecycle. Default is DRAFT.
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
                (when val
-                 `(:properties (("STATE_VALIDATION" . ,val))
-                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_VALIDATION" val))))))
+                 (let ((link (my/vulpea--ensure-ref-note 'state-validation val)))
+                   `(:properties (("STATE_VALIDATION" . ,(or link val)))
+                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_VALIDATION" (or link val)))))))))
 #+end_src

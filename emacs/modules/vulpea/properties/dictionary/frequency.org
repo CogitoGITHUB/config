@@ -15,5 +15,6 @@
                  (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
               (when val
-                `(:properties (("FREQUENCY" . ,val))))))
+                (let ((link (my/vulpea--ensure-ref-note 'frequency val)))
+                  `(:properties (("FREQUENCY" . ,(or link val))))))))
 #+end_src

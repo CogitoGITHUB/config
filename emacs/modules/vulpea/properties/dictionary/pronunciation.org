@@ -12,6 +12,13 @@
                (let ((val (completing-read "Pronunciation (IPA): " '("⚠ WARNING") nil nil nil nil "⚠ WARNING")))
                  (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when val
-                `(:properties (("PRONUNCIATION" . ,val))))))
+              (when (and val (not (string-equal val "WARNING")))
+                (let ((label val))
+                  `(:properties (("PRONUNCIATION" . ,val))
+                    :post-apply (,(lambda (note)
+                                    (let ((link (my/vulpea--create-scoped-note
+                                                  'pronunciation label
+                                                  (vulpea-note-id note))))
+                                      (when link
+                                        (my/vulpea--property-put note "PRONUNCIATION" link))))))))))
 #+end_src

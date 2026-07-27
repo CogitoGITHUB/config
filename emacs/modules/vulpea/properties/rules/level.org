@@ -17,5 +17,7 @@
                    level)))
   :to-plist (lambda (val _ctx)
               (when val
-                `(:tags (,val)))))
+                `(:tags (,val)
+                  :post-apply (,(lambda (note)
+                                  (my/vulpea--ensure-ref-note 'level val)))))))
 #+end_src

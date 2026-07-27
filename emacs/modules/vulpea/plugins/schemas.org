@@ -31,29 +31,41 @@ prompt or template file automatically keeps the schema in sync.
 
 (defun my/vulpea-schema--extract-choices (prompt-name)
   "Extract completing-read choices (excl. WARNING sentinel) from prompt file PROMPT-NAME."
-  (let ((file (expand-file-name (format "%s.org" prompt-name)
-                                (my/vulpea-schema--prompt-dir))))
-    (when (file-exists-p file)
+  (let* ((dir (my/vulpea-schema--prompt-dir))
+         (files (directory-files-recursively dir (format "^%s\\.org$" prompt-name))))
+    (when files
       (with-temp-buffer
-        (insert-file-contents file)
+        (insert-file-contents (car files))
         (goto-char (point-min))
-        (when (re-search-forward "'(\"⚠ WARNING\"" nil t)
-          (backward-char)
+        (when (re-search-forward "completing-read" nil t)
           (condition-case nil
-              (let* ((end (scan-sexps (point) 1))
-                     (items (read (buffer-substring-no-properties (point) end))))
-                (cl-remove-if (lambda (s) (string-match-p "WARNING" s)) items))
+              (when (re-search-forward "'(\"" nil t)
+                (let ((items (save-excursion
+                               (backward-char 2)
+                               (read (current-buffer)))))
+                  (cl-remove-if (lambda (s) (string-match-p "WARNING" s)) items)))
             (error nil)))))))
 
 (defun my/vulpea-schema--extract-prop-key (prompt-name)
   "Extract the property drawer key from prompt file PROMPT-NAME."
-  (let ((file (expand-file-name (format "%s.org" prompt-name)
-                                (my/vulpea-schema--prompt-dir))))
-    (when (file-exists-p file)
+  (let* ((dir (my/vulpea-schema--prompt-dir))
+         (files (directory-files-recursively dir (format "^%s\\.org$" prompt-name))))
+    (when files
       (with-temp-buffer
-        (insert-file-contents file)
+        (insert-file-contents (car files))
         (when (re-search-forward "org-entry-get nil \"\\([A-Z_]+?\\)\"" nil t)
           (match-string 1))))))
+
+(defun my/vulpea-schema--validate (choices val _note)
+  "Validate a field value against CHOICES (dynamic-binding compat).
+Extracts label from Org link format if present."
+  (if (equal val "WARNING") "missing-required"
+    (let ((label (if (string-match "\\[\\[id:\\([^]]+\\)\\]\\[\\([^]]+\\)\\]\\]" val)
+                     (match-string 2 val)
+                   val)))
+      (if (and choices (not (member label choices)))
+          (format "invalid-value: %s" label)
+        t))))
 
 (defun my/vulpea-schema--field-from-prompt (prompt-name &optional required)
   "Generate a vulpea-schema field plist from prompt file PROMPT-NAME.
@@ -64,9 +76,9 @@ When REQUIRED is non-nil, the field is mandatory."
          (choices (my/vulpea-schema--extract-choices prompt-name)))
     `(:key ,key
       :type string
-      :one-of ,(or choices '("SET-ME"))
+      ,@(when choices `(:one-of ,choices))
       ,@(when required '(:required t))
-      :validate ,(lambda (val _note) (if (equal val "WARNING") "missing-required" t)))))
+      :validate ,(apply-partially #'my/vulpea-schema--validate choices))))
 
 (defun my/vulpea-schema--template-prop-keys ()
   "Return list of property keys defined in capture template files."

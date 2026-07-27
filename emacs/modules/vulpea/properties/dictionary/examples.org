@@ -12,6 +12,13 @@
                (let ((val (completing-read "Example sentence: " '("⚠ WARNING") nil nil nil nil "⚠ WARNING")))
                  (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when val
-                `(:properties (("EXAMPLE" . ,val))))))
+              (when (and val (not (string-equal val "WARNING")))
+                (let ((label val))
+                  `(:properties (("EXAMPLE" . ,val))
+                    :post-apply (,(lambda (note)
+                                    (let ((link (my/vulpea--create-scoped-note
+                                                  'examples label
+                                                  (vulpea-note-id note))))
+                                      (when link
+                                        (my/vulpea--property-put note "EXAMPLE" link))))))))))
 #+end_src

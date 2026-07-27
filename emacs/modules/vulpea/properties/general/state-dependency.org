@@ -38,6 +38,7 @@ Default is nil (no dependency state).
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
                (when val
-                 `(:properties (("STATE_DEPENDENCY" . ,val))
-                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_DEPENDENCY" val))))))
+                 (let ((link (my/vulpea--ensure-ref-note 'state-dependency val)))
+                   `(:properties (("STATE_DEPENDENCY" . ,(or link val)))
+                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_DEPENDENCY" (or link val)))))))))
 #+end_src

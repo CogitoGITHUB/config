@@ -83,28 +83,38 @@
 
 (add-hook 'before-save-hook #'my/vulpea-git--before-save)
 
+(defvar my/vulpea-git--save-timer nil
+  "Timer for deferred git auto-commit.")
+
 (defun my/vulpea-git-auto-commit ()
-  "After save in notes dir: git add, commit, and push."
+  "After save in notes dir: defer git add, commit, and push."
   (when (and buffer-file-name
              (file-in-directory-p buffer-file-name (my/notes-directory)))
-    (let ((default-directory (my/notes-directory))
-          (file buffer-file-name))
-      (condition-case err
-          (progn
-            (magit-call-git "add" "--all")
-            (if (= 0 (magit-call-git "diff" "--cached" "--quiet"))
-                (message "Git: nothing new to commit for %s"
-                         (file-relative-name file (my/notes-directory)))
-              (if (= 0 (magit-call-git "commit" "-m"
-                                       (format "auto: %s [%s]"
-                                               (file-relative-name file (my/notes-directory))
-                                               (format-time-string "%H:%M:%S"))))
-                  (if my/vulpea-git--pushing
-                      (setq my/vulpea-git--pending t)
-                    (my/vulpea-git--push file))
-                (message "Git commit failed -- check *magit-process* for details"))))
-        (error
-         (message "Git error: %s" (error-message-string err)))))))
+    (when my/vulpea-git--save-timer
+      (cancel-timer my/vulpea-git--save-timer))
+    (setq my/vulpea-git--save-timer
+          (run-with-idle-timer 2 nil #'my/vulpea-git--do-auto-commit
+                               buffer-file-name))))
+
+(defun my/vulpea-git--do-auto-commit (file)
+  "Run git add, commit, and push for FILE."
+  (let ((default-directory (my/notes-directory))
+        (rel (file-relative-name file (my/notes-directory))))
+    (condition-case err
+        (progn
+          (magit-call-git "add" "--all")
+          (if (= 0 (magit-call-git "diff" "--cached" "--quiet"))
+              (message "Git: nothing new to commit for %s" rel)
+            (if (= 0 (magit-call-git "commit" "-m"
+                                     (format "auto: %s [%s]"
+                                             rel
+                                             (format-time-string "%H:%M:%S"))))
+                (if my/vulpea-git--pushing
+                    (setq my/vulpea-git--pending t)
+                  (my/vulpea-git--push file))
+              (message "Git commit failed -- check *magit-process* for details"))))
+      (error
+       (message "Git error: %s" (error-message-string err))))))
 
 (add-hook 'after-save-hook #'my/vulpea-git-auto-commit)
 

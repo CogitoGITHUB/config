@@ -37,6 +37,7 @@ Why: Tracks the current work status of the note. Default is ACTIVE.
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
                (when val
-                 `(:properties (("STATE_WORK" . ,val))
-                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_WORK" val))))))
+                 (let ((link (my/vulpea--ensure-ref-note 'state-work val)))
+                   `(:properties (("STATE_WORK" . ,(or link val)))
+                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_WORK" (or link val))))))))
 #+end_src

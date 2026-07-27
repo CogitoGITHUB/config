@@ -10,7 +10,9 @@
   #:use-module (gnu services mcron)
   #:use-module (gnu services databases)
   #:use-module (gnu services containers)
+  #:use-module (gnu services nix)
   #:use-module (gnu packages databases)
+  #:use-module (gnu packages package-management)
   #:use-module (substrate user-space root emacs-packages emacs-packages)
   #:use-module (substrate user-space root users users)
   #:use-module (substrate user-space root loaders core)
@@ -78,8 +80,9 @@
           sandbox-packages
           font-packages
           podman-packages
-           root-hardware-packages
-           root-tex-packages))
+            root-hardware-packages
+            root-tex-packages
+            (list nix)))
 
 (define-public root-system-services
   (append
@@ -96,6 +99,14 @@
                     (log-directory "/var/log/postgresql"))))
     root-ci-services
     root-keyboard-services
+    (list (service nix-service-type
+                   (nix-configuration
+                    (sandbox #t)
+                    (extra-config
+                     (list
+                      "experimental-features = nix-command flakes\n"
+                      "keep-outputs = true\n"
+                      "keep-derivations = true\n")))))
     (list podman-service
           (service oci-service-type
                    (oci-configuration

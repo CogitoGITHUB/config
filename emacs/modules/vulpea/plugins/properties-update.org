@@ -25,52 +25,81 @@
                    (memq my/vulpea--current-context (plist-get s :contexts))))
             my/vulpea-prompt-registry))
 
+(defun my/vulpea--clean-display-val (val)
+  "Return clean display for property value VAL.
+Strips Org link brackets, keeps WARNING visible."
+  (cond
+   ((null val) "—")
+   ((string-empty-p val) "—")
+   ((string-match "\\]\\[\\([^]]+\\)\\]" val)
+    (match-string-no-properties 1 val))
+   (t val)))
+
 (defun my/vulpea--update-format-prompt (key)
   "Return description string for prompt KEY: toggle state, label, current value."
-  (let (spec label current val-str mark)
-    (setq spec (my/vulpea--update-prompt-spec key))
-    (setq label (plist-get spec :label))
-    (setq current (when-let ((fn (plist-get spec :read-current-fn)))
-                    (condition-case nil
-                        (funcall fn)
-                      (error nil))))
-    (setq val-str (cond ((null current) "—")
-                         ((listp current) (string-join current ", "))
-                         ((stringp current)
-                          (if (string-empty-p current) "—" current))
-                         (t "—")))
-    (setq mark (if (memq key my/vulpea--selected-keys) "✓" " "))
-    (format "[%s] %s: %s" mark label val-str)))
+  (let* ((spec (my/vulpea--update-prompt-spec key))
+         (label (plist-get spec :label))
+         (short (if (string-match "^[^:]+: \\(.*\\)" label)
+                    (match-string 1 label)
+                  label))
+         (current (when-let ((fn (plist-get spec :read-current-fn)))
+                    (condition-case nil (funcall fn) (error nil))))
+         (display (my/vulpea--clean-display-val
+                   (pcase current
+                     ((pred listp) (string-join current ", "))
+                     ((pred stringp) current)
+                     (_ nil))))
+         (mark (if (memq key my/vulpea--selected-keys) "✓" " ")))
+    (format "[%s] %-15s %s" mark short display)))
 #+end_src
-*** Toggle Suffix Generator
+*** Dynamic Suffixes
 #+begin_src emacs-lisp
-(defmacro my/vulpea--define-toggle (key name)
-  "Define a Transient toggle suffix for prompt KEY with function NAME."
-  (let ((fname (intern (format "my/vulpea--toggle-%s" name))))
-    `(transient-define-suffix ,fname ()
-       :description (lambda () (my/vulpea--update-format-prompt ',key))
-       (interactive)
-       (if (memq ',key my/vulpea--selected-keys)
-           (setq my/vulpea--selected-keys (delq ',key my/vulpea--selected-keys))
-         (push ',key my/vulpea--selected-keys))
-       (transient-setup 'my/vulpea--update-properties-menu))))
-#+end_src
-*** Suffix Definitions
-#+begin_src emacs-lisp
-(my/vulpea--define-toggle tags tags)
-(my/vulpea--define-toggle aliases aliases)
-(my/vulpea--define-toggle priority priority)
-(my/vulpea--define-toggle scheduled scheduled)
-(my/vulpea--define-toggle deadline deadline)
-(my/vulpea--define-toggle todo todo)
-(my/vulpea--define-toggle state-general state-general)
-(my/vulpea--define-toggle state-work state-work)
-(my/vulpea--define-toggle state-intelligence state-intelligence)
-(my/vulpea--define-toggle state-operational state-operational)
-(my/vulpea--define-toggle state-validation state-validation)
-(my/vulpea--define-toggle state-dependency state-dependency)
-(my/vulpea--define-toggle state-source state-source)
-(my/vulpea--define-toggle state-checklist state-checklist)
+(defvar my/vulpea--update-key-map nil
+  "Alist mapping transient key chars to prompt :key symbols.")
+
+(defun my/vulpea--toggle-prompt ()
+  "Toggle the prompt identified by the key that invoked this command."
+  (interactive)
+  (condition-case err
+      (let* ((key (event-basic-type last-command-event))
+             (cell (assq key my/vulpea--update-key-map))
+             (prompt-key (cdr cell)))
+        (when prompt-key
+          (if (memq prompt-key my/vulpea--selected-keys)
+              (setq my/vulpea--selected-keys (delq prompt-key my/vulpea--selected-keys))
+            (push prompt-key my/vulpea--selected-keys))
+          (transient-setup 'my/vulpea--update-properties-menu)))
+    (error (message "Toggle error: %s" err))))
+
+(defun my/vulpea--update-children (&optional _)
+  "Build suffix entries from the prompt registry for the current context."
+  (condition-case err
+      (let* ((prompts (seq-filter
+                       (lambda (s)
+                         (let ((k (plist-get s :key)))
+                           (and (not (memq k '(position)))
+                                (plist-get s :read-current-fn)
+                                (plist-get s :prompt-fn)
+                                (memq my/vulpea--current-context (plist-get s :contexts)))))
+                       my/vulpea-prompt-registry))
+             (keys "abcdefghijklmnopqrstuvwxyz")
+             (idx 0)
+             children)
+        (setq my/vulpea--update-key-map nil)
+        (dolist (spec (reverse prompts))
+          (when (< idx (length keys))
+            (let ((k (aref keys idx)))
+              (push (cons k (plist-get spec :key)) my/vulpea--update-key-map)
+              (push (list (char-to-string k)
+                          (apply-partially #'my/vulpea--update-format-prompt
+                                           (plist-get spec :key))
+                          'my/vulpea--toggle-prompt)
+                    children)
+              (setq idx (1+ idx)))))
+        (nreverse children))
+    (error
+     (message "Update children error: %s" err)
+     nil)))
 #+end_src
 *** Confirm / Cancel
 #+begin_src emacs-lisp
@@ -205,23 +234,8 @@ to the property drawer when no description-list value exists."
 (transient-define-prefix my/vulpea--update-properties-menu ()
   "Select properties to update on the current note.
 Toggle each property with its key letter, then confirm with C-c C-c."
-  [["Metadata"
-    ("t" my/vulpea--toggle-tags)
-    ("a" my/vulpea--toggle-aliases)
-    ("p" my/vulpea--toggle-priority)]
-   ["Scheduling"
-    ("d" my/vulpea--toggle-scheduled)
-    ("l" my/vulpea--toggle-deadline)]
-   ["State"
-    ("o" my/vulpea--toggle-todo)
-    ("g" my/vulpea--toggle-state-general)
-    ("w" my/vulpea--toggle-state-work)
-    ("i" my/vulpea--toggle-state-intelligence)
-    ("e" my/vulpea--toggle-state-operational)
-    ("v" my/vulpea--toggle-state-validation)
-    ("y" my/vulpea--toggle-state-dependency)
-    ("r" my/vulpea--toggle-state-source)
-    ("c" my/vulpea--toggle-state-checklist)]]
+  ["Properties"
+   :setup-children my/vulpea--update-children]
   [["Actions"
     ("C-c C-c" "Confirm" my/vulpea--update-confirm)
     ("C-c C-k" "Cancel"  my/vulpea--update-cancel)]])
@@ -328,10 +342,6 @@ skip the prompt and open the menu directly."
       (ignore-errors (org-back-to-heading t))
       (unless (org-at-heading-p)
         (ignore-errors (org-next-visible-heading 1))))
-    (when (and (called-interactively-p 'interactive)
-               (vulpea-schema-note-violations note))
-      (unless (y-or-n-p "Schema violations found. Open update menu? ")
-        (user-error "Cancelled")))
     (my/vulpea--update-properties-menu)))
 #+end_src
 

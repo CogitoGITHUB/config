@@ -18,8 +18,9 @@ or \"\" if ROOT itself is selected (Enter at root prompt).
 Type \".\" or press Enter for root level; select or type a subdirectory name."
   (let* ((root (expand-file-name (or root (my/notes-directory))))
          (dirs (cl-loop for f in (directory-files root nil "^[^.]" t)
-                        when (file-directory-p (expand-file-name f root))
-                        collect f))
+                         when (and (file-directory-p (expand-file-name f root))
+                                   (not (member f '("refs" "dictionary"))))
+                         collect f))
          (candidates (cons "." dirs))
          (choice (completing-read (or prompt "Subdirectory: ") candidates nil nil nil nil ".")))
     (if (string-equal choice ".")

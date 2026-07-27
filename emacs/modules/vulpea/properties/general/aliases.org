@@ -28,6 +28,15 @@ Comma-separated, blank = no aliases.
   :merge-strategy 'replace
   :to-plist (lambda (val _ctx)
               (when val
-                (let ((str (mapconcat #'identity val ", ")))
-                  (list :properties (list (cons "ALIAS" str)))))))
+                (let ((labels (copy-sequence val)))
+                  `(:properties (("ALIAS" . ,(mapconcat #'identity val ", ")))
+                    :post-apply (,(lambda (note)
+                                    (let* ((id (vulpea-note-id note))
+                                           (links (delq nil (mapcar (lambda (v)
+                                                                      (my/vulpea--create-scoped-note
+                                                                        'alias v id))
+                                                                    labels)))
+                                           (str (mapconcat #'identity links ", ")))
+                                      (unless (string-empty-p str)
+                                        (my/vulpea--property-put note "ALIAS" str))))))))))
 #+end_src

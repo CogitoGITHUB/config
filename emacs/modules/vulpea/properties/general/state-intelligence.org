@@ -37,6 +37,7 @@ Why: Tracks the epistemic credibility of the information. Default is UNVERIFIED.
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
                (when val
-                 `(:properties (("STATE_INTELLIGENCE" . ,val))
-                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_INTELLIGENCE" val))))))
+                 (let ((link (my/vulpea--ensure-ref-note 'state-intelligence val)))
+                   `(:properties (("STATE_INTELLIGENCE" . ,(or link val)))
+                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_INTELLIGENCE" (or link val)))))))))
 #+end_src

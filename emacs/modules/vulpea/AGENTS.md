@@ -77,6 +77,18 @@
 - **All state prompts required** at create time (skipping sets `"WARNING"` → tracked via MISSING PROMPTS.org)
 - **Dictionary prompts always store `"WARNING"`** as property value when skipped (accepted default or fast mode), never nil
 
+## Live Properties (plugins/live-properties.org)
+
+Concept-based property values are Org links to ref notes, not raw strings.
+
+| Ref type | Behavior | Properties |
+|---|---|---|
+| `'closed` | Shared canonical note at `refs/<type>/<slug>.org`, deduped | STATE_*, POS, ETYMOLOGY, REGISTER, FREQUENCY, SCOPE, LEVEL, MM_PLACEMENT |
+| `'scoped` | Per-entity note, no dedup, created via `:post-apply` | PRONUNCIATION, SYNONYMS, EXAMPLES, ALIASES |
+| `nil` | Plain string, no link | ADDED, SCHEDULED, DEADLINE, FILE_NAME, TODO, PRIORITY, TAGS (heading-line) |
+
+Key functions: `my/vulpea--ensure-ref-note` (closed), `my/vulpea--create-scoped-note` (scoped), `my/vulpea--canonicalize` (slug). WARNING stays plain string. Tags/TODO/PRIORITY stay Org-native.
+
 ## Key Bindings (from keyboard.org)
 - `SPC v` — opens Vulpea hydra with all vulpea commands
 - In Vulpea hydra: `k` mark rule, `K` rule file, `R` find rules

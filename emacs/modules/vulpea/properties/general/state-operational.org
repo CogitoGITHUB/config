@@ -42,6 +42,7 @@ Why: Tracks the execution state of what the note describes. Default is PLANNED.
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
                (when val
-                 `(:properties (("STATE_OPERATIONAL" . ,val))
-                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_OPERATIONAL" val))))))
+                 (let ((link (my/vulpea--ensure-ref-note 'state-operational val)))
+                   `(:properties (("STATE_OPERATIONAL" . ,(or link val)))
+                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_OPERATIONAL" (or link val)))))))))
 #+end_src

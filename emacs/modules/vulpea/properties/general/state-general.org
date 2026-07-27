@@ -38,6 +38,7 @@ Why: Tracks the note's position in the five-layer operational sequence
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
                (when val
-                 `(:properties (("STATE_GENERAL" . ,val))
-                   :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_GENERAL" val))))))
+                 (let ((link (my/vulpea--ensure-ref-note 'state-general val)))
+                   `(:properties (("STATE_GENERAL" . ,(or link val)))
+                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_GENERAL" (or link val)))))))))
 #+end_src

@@ -6,19 +6,21 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "3": 9,
-        "2": 2,
+        "5": 13,
         "4": 12,
+        "2": 2,
+        "3": 9,
         "1": 1
       },
-      "next_public_pane_number": 13,
+      "next_public_pane_number": 14,
       "public_tab_numbers": [
         1,
         2,
         9,
-        12
+        12,
+        13
       ],
-      "next_public_tab_number": 13,
+      "next_public_tab_number": 14,
       "tabs": [
         {
           "custom_name": "opencode",
@@ -88,9 +90,23 @@
           "zoomed": false,
           "focused": 4,
           "root_pane": 4
+        },
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 5
+          },
+          "panes": {
+            "5": {
+              "cwd": "/home/aoeu/.config/emacs"
+            }
+          },
+          "zoomed": false,
+          "focused": 5,
+          "root_pane": 5
         }
       ],
-      "active_tab": 0
+      "active_tab": 4
     }
   ],
   "active": 0,

@@ -13,15 +13,21 @@
 (defun my/vulpea--fast-level ()
   "Prompt for fast mode level.
 Return 0 (normal), 1 (skip general), 2 (skip all), or 3 (quick, no body)."
-  (let ((c (read-char-choice "Fast: (a)ormal (o)skip general (e)skip all (u)quick, no body " '(?a ?o ?e ?u))))
+  (let ((c (read-char-choice "Fast: (a)ormal (o)skip general (e)skip all (u)quick, no body [Enter=quick] " '(?a ?o ?e ?u ?\r ?\n))))
     (setq my/vulpea--fast-level
           (pcase c
             (?a 0)
             (?o 1)
             (?e 2)
-            (?u 3)))))
+            ((or ?u ?\r ?\n) 3)))))
 
 (setq use-dialog-box nil)
+
+(defun my/vulpea-title-to-slug-spaces (orig-fun title)
+  "Replace underscores with spaces in the slug from ORIG-FUN."
+  (replace-regexp-in-string "_" " " (funcall orig-fun title)))
+
+(advice-add 'vulpea-title-to-slug :around #'my/vulpea-title-to-slug-spaces)
 #+end_src
 ** Default Parameters
 #+begin_src emacs-lisp
