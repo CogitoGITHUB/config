@@ -118,7 +118,7 @@ under `dictionary/'."
          (subdir (my/vulpea-root-dir
                   (expand-file-name "dictionary/" (my/notes-directory))
                   "Subdirectory under dictionary/: "))
-         (file-name (concat "dictionary/" subdir slug ".org"))
+          (file-name (concat "dictionary/" subdir slug))
          (path-tags (if (string-empty-p subdir)
                         '()
                       (split-string (directory-file-name subdir) "/" t)))
@@ -152,6 +152,7 @@ under `dictionary/'."
 (defun my/vulpea-dictionary-regenerate-dictionary ()
   "Rebuild the flat ispell .pws file from all notes tagged \"dictionary\"."
   (interactive)
+  (make-directory (file-name-directory my/vulpea-dictionary-pws-file) t)
   (let ((words (my/vulpea-dictionary--all-words)))
     (with-temp-file my/vulpea-dictionary-pws-file
       (insert (format "personal_ws-1.1 en %d\n" (length words)))

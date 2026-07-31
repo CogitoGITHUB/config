@@ -4,23 +4,17 @@
     {
       "id": "w1H",
       "custom_name": null,
-      "identity_cwd": "/home/aoeu/.config/emacs",
+      "identity_cwd": "/home/aoeu/.config/emacs/modules",
       "public_pane_numbers": {
-        "5": 13,
-        "4": 12,
-        "2": 2,
-        "3": 9,
-        "1": 1
+        "1": 1,
+        "2": 2
       },
-      "next_public_pane_number": 14,
+      "next_public_pane_number": 15,
       "public_tab_numbers": [
         1,
-        2,
-        9,
-        12,
-        13
+        2
       ],
-      "next_public_tab_number": 14,
+      "next_public_tab_number": 15,
       "tabs": [
         {
           "custom_name": "opencode",
@@ -29,7 +23,7 @@
           },
           "panes": {
             "1": {
-              "cwd": "/home/aoeu/.config/emacs",
+              "cwd": "/home/aoeu/.config/emacs/modules",
               "label": "opencode",
               "agent_session": {
                 "source": "herdr:opencode",
@@ -56,57 +50,9 @@
           "zoomed": false,
           "focused": 2,
           "root_pane": 2
-        },
-        {
-          "custom_name": "apps",
-          "layout": {
-            "Pane": 3
-          },
-          "panes": {
-            "3": {
-              "cwd": "/home/aoeu/.config/ManifoldOS",
-              "agent_session": {
-                "source": "herdr:opencode",
-                "agent": "opencode",
-                "kind": "id",
-                "value": "ses_077d2b528ffekNx4RnCtUI0AZr"
-              }
-            }
-          },
-          "zoomed": false,
-          "focused": 3,
-          "root_pane": 3
-        },
-        {
-          "custom_name": "reshape",
-          "layout": {
-            "Pane": 4
-          },
-          "panes": {
-            "4": {
-              "cwd": "/home/aoeu/.config/ManifoldOS"
-            }
-          },
-          "zoomed": false,
-          "focused": 4,
-          "root_pane": 4
-        },
-        {
-          "custom_name": null,
-          "layout": {
-            "Pane": 5
-          },
-          "panes": {
-            "5": {
-              "cwd": "/home/aoeu/.config/emacs"
-            }
-          },
-          "zoomed": false,
-          "focused": 5,
-          "root_pane": 5
         }
       ],
-      "active_tab": 4
+      "active_tab": 0
     }
   ],
   "active": 0,

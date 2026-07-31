@@ -14,6 +14,11 @@ Change only this path to relocate the entire vault."
 
 (setq org-agenda-files
       (directory-files-recursively (my/notes-directory) "\\.org$"))
+
+(add-to-list 'auto-mode-alist
+             `(,(concat "\\`" (regexp-quote (directory-file-name (my/notes-directory)))
+                        "/" "\\(.*/\\)?" "[^./]+\\'")
+               . org-mode))
 #+end_src
 * Vulpea Bootstrap
 #+begin_src emacs-lisp

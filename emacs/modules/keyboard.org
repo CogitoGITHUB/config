@@ -537,6 +537,7 @@
    (("o" org-open-at-point          "open link"    :exit t)
     ("v" my/vulpea-hydra/body       "vulpea"       :exit t)
     ("T" ghostel                    "terminal"     :exit t)
+    ("z" my/vulpea-quick-captures   "fast capture"  :exit t)
     ("/" evil-show-digraphs         "digraphs"     :exit t))
    "Exit"
    (("q" nil "quit" :exit t)

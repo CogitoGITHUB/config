@@ -127,7 +127,8 @@ Returns list of source note IDs. Acts as fallback for files not yet
 indexed by the vulpea DB extractor."
   (let ((results nil)
         (root (my/notes-directory)))
-    (dolist (file (directory-files-recursively root "\\.org$"))
+    (dolist (file (nconc (directory-files-recursively root "\\.org\\'")
+                         (directory-files-recursively root "/[^./]+\\'")))
       (with-temp-buffer
         (insert-file-contents file)
         (goto-char (point-min))

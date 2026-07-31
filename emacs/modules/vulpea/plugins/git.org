@@ -101,20 +101,19 @@
   (let ((default-directory (my/notes-directory))
         (rel (file-relative-name file (my/notes-directory))))
     (condition-case err
-        (progn
-          (magit-call-git "add" "--all")
-          (if (= 0 (magit-call-git "diff" "--cached" "--quiet"))
+        (let ((exit (call-process magit-git-executable nil nil nil "add" "--all")))
+          (if (= 0 (call-process magit-git-executable nil nil nil "diff" "--cached" "--quiet"))
               (message "Git: nothing new to commit for %s" rel)
-            (if (= 0 (magit-call-git "commit" "-m"
+            (if (= 0 (call-process magit-git-executable nil nil nil "commit" "-m"
                                      (format "auto: %s [%s]"
                                              rel
                                              (format-time-string "%H:%M:%S"))))
                 (if my/vulpea-git--pushing
                     (setq my/vulpea-git--pending t)
                   (my/vulpea-git--push file))
-              (message "Git commit failed -- check *magit-process* for details"))))
+              (message "Git commit failed for %s" rel)))))
       (error
-       (message "Git error: %s" (error-message-string err))))))
+       (message "Git auto-commit error: %s" (error-message-string err))))))
 
 (add-hook 'after-save-hook #'my/vulpea-git-auto-commit)
 

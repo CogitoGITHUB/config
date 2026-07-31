@@ -97,11 +97,10 @@ Straight.el HTTPS clones fail with "CAfile: none" in the Emacs daemon because th
 
 ## Emacs Daemon
 
-The Emacs daemon is started via `emacs --fg-daemon` (not managed by shepherd). To restart:
+The Emacs daemon is managed by shepherd. To restart:
 
 ```bash
-kill $(pgrep -f "emacs.*fg-daemon" | head -1)
-emacs --fg-daemon
+herd restart emacs-daemon
 ```
 
 The daemon socket is at `/run/user/1000/emacs/server`.

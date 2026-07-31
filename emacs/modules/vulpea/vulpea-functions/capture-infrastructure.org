@@ -94,34 +94,40 @@ template appended — exactly what will land on disk after capture."
 (defun my/vulpea--open-capture-for-note (note &optional template)
   "Open org-capture for NOTE with capture preview.
 When a template is chosen, stores `:TEMPLATE:' and `:TEMPLATE_HASH:'
-properties on NOTE for schema validation."
-  (let ((file (vulpea-note-path note))
-        (tmpl (or template
-                  (my/vulpea--choose-capture note))))
+properties on NOTE for schema validation.
+When TEMPLATE is \"\" (empty), skip template selection and use empty body."
+  (let* ((file (vulpea-note-path note))
+         (tmpl (cond
+                ((stringp template) template)
+                (my/vulpea--skip-capture "")
+                (t (my/vulpea--choose-capture note))))
+         (use-template (or (stringp template)
+                           my/vulpea--chosen-capture)))
     (unless file
       (user-error "Note has no file path"))
-    ;; store template metadata for schema validation
-    (when my/vulpea--chosen-capture
-      (my/vulpea--property-put note "TEMPLATE" my/vulpea--chosen-capture)
+    (when use-template
+      (my/vulpea--property-put note "TEMPLATE" use-template)
       (my/vulpea--property-put note "TEMPLATE_HASH"
-                                (or (my/vulpea--capture-file-hash
-                                     my/vulpea--chosen-capture)
+                                (or (my/vulpea--capture-file-hash use-template)
                                     "unknown")))
-    (let ((org-capture-templates
-           `(("v" "Edit note body"
-               plain
-               (file+function
-                ,file
-                (lambda ()
-                  (goto-char (point-max))
-                  (skip-chars-backward " \t\n")))
-               ,tmpl
-               :kill-buffer t)))
-          (org-capture-use-indirect-buffer nil))
-      (when-let ((buf (get-file-buffer file)))
-        (when (eq buf (current-buffer))
-          (switch-to-buffer (other-buffer))))
-      (org-capture nil "v"))))
+    (if (and my/vulpea--skip-capture (not (stringp template)))
+        (find-file file)
+      (let ((org-capture-templates
+             `(("v" "Edit note body"
+                 plain
+                 (file+function
+                  ,file
+                  (lambda ()
+                    (goto-char (point-max))
+                    (skip-chars-backward " \t\n")))
+                 ,tmpl
+                 :kill-buffer t
+                 :unnarrowed t)))
+            (org-capture-use-indirect-buffer nil))
+        (when-let ((buf (get-file-buffer file)))
+          (when (eq buf (current-buffer))
+            (switch-to-buffer (other-buffer))))
+        (org-capture nil "v")))))
 #+end_src
 ** Capture Infrastructure
 #+begin_src emacs-lisp

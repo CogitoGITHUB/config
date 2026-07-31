@@ -19,6 +19,30 @@
 (font-lock-add-keywords 'org-mode
   '((my/org--activate-property-links)))
 
+(with-eval-after-load 'org
+  (defvar my/org--property-link-map
+    (let ((map (make-sparse-keymap)))
+      (set-keymap-parent map org-mouse-map)
+      (define-key map (kbd "RET")
+        (lambda ()
+          (interactive)
+          (save-excursion
+            (goto-char (line-beginning-position))
+            (when (re-search-forward org-link-any-re (line-end-position) t)
+              (let* ((target (match-string-no-properties 2))
+                     (colon (when (string-match ":" target) (match-end 0)))
+                     (type (if colon (substring target 0 (1- colon)) ""))
+                     (path (if colon (substring target colon) target)))
+                (if (and (string= type "id")
+                         (fboundp 'vulpea-db-get-by-id))
+                    (let ((note (vulpea-db-get-by-id path)))
+                      (if note
+                          (my/vulpea--open-capture-for-note note "")
+                        (org-id-open path)))
+                  (org-id-open path)))))))
+      map)
+    "Keymap for property drawer links, inheriting `org-mouse-map' and binding RET to open the property link."))
+
 (defun my/org--activate-property-links (limit)
   "Activate Org links inside property drawer values up to LIMIT."
   (when (re-search-forward org-link-any-re limit t)
@@ -26,9 +50,12 @@
            (end   (match-end 0))
            (visible-start (or (match-beginning 3) (match-beginning 2)))
            (visible-end (or (match-end 3) (match-end 2)))
-           (type  (match-string-no-properties 1))
-           (path  (match-string-no-properties 2))
-           (desc  (match-string-no-properties 3)))
+           (target (match-string-no-properties 2))
+           (desc   (match-string-no-properties 3))
+           (colon  (when (and target (string-match ":" target))
+                     (match-end 0)))
+           (type   (if colon (substring target 0 (1- colon)) (or target "")))
+           (path   (if colon (substring target colon) (or target ""))))
       (save-excursion
         (goto-char (line-beginning-position))
         (when (looking-at ":\\([A-Z_][A-Z_0-9]*\\):")
@@ -43,7 +70,7 @@
                                    (list 'invisible 'org-link)))
             (add-text-properties prop-start end
                                  (list 'mouse-face 'highlight
-                                       'keymap org-mouse-map
+                                       'keymap my/org--property-link-map
                                        'help-echo (concat "LINK: " type ":" path)
                                        'font-lock-multiline t
                                        'rear-nonsticky t))

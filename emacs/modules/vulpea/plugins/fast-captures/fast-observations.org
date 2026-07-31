@@ -1,0 +1,21 @@
+#+title:      Vulpea — Fast Observations
+#+priority:   15
+
+Fast observation capture. Creates an observation heading in Observations.org.
+
+* Core
+#+begin_src emacs-lisp
+(defun my/vulpea-quick-observations ()
+  (interactive)
+  (let* ((subdir (my/vulpea-root-dir (my/notes-directory)
+                                      "Observations subdir (Enter=root): "))
+         (file (expand-file-name (concat subdir "Observations")
+                                  (my/notes-directory))))
+    (let ((org-capture-templates
+           `(("o" "Quick Observation" entry (file ,file)
+              "* %?"
+              :kill-buffer t :unnarrowed t))))
+      (org-capture nil "o")
+      (set-buffer-modified-p nil)
+      (modaled-set-state "insert"))))
+#+end_src

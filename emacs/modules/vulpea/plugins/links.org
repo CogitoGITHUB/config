@@ -320,7 +320,8 @@ n — cancels deletion via user-error."
    (let ((expanded (expand-file-name file)))
       ;; Skip admin files and non-org files
       (when (and (file-exists-p expanded)
-                 (string-suffix-p ".org" expanded)
+                 (or (string-suffix-p ".org" expanded)
+                     (not (string-match-p "\\." (file-name-nondirectory expanded))))
                  (not (member (file-name-nondirectory expanded)
                                (list my/vulpea-links--broken-links-file
                                      my/vulpea-links--deleted-files-file

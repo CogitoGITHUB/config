@@ -59,7 +59,13 @@ ls -d ~/.config/emacs/
 `~/.emacs.d/` should never exist (Emacs won't create it as long as
 `~/.config/emacs/` is present).
 
-The daemon is started via `emacs --fg-daemon` (NOT managed by shepherd).
+The daemon is managed by shepherd. To restart:
+
+```bash
+herd restart emacs-daemon
+```
+
+To test config changes without restarting the daemon:
 Server socket at `/run/user/1000/emacs/server`. MCP socket at
 `~/.config/emacs/.local/cache/emacs-mcp-server.sock` (separate thread,
 dies with daemon).
@@ -68,12 +74,7 @@ dies with daemon).
 
 ### Starting
 ```bash
-# Clean start (kill existing first)
-kill -KILL $(pgrep -f "emacs.*fg-daemon" | head -1) 2>/dev/null
-sleep 2
-rm -f /run/user/1000/emacs/server
-rm -f ~/.config/emacs/.local/cache/emacs-mcp-server.sock
-nohup emacs --fg-daemon > /tmp/emacs-daemon.log 2>&1 &
+herd start emacs-daemon
 ```
 
 ### Waiting for boot to finish
@@ -110,9 +111,7 @@ emacsclient --socket-name /run/user/1000/emacs/server --eval '(+ 1 2)'
 If you changed `bootstrap.org`, `tangle` it first, then restart:
 ```bash
 emacs --batch --find-file ~/.config/emacs/bootstrap.org --eval '(org-babel-tangle)'
-kill -KILL $(pgrep -f "emacs.*fg-daemon" | head -1)
-sleep 2; rm -f /run/user/1000/emacs/server
-nohup emacs --fg-daemon > /tmp/emacs-daemon.log 2>&1 &
+herd restart emacs-daemon
 ```
 
 ### Detecting why restart is needed

@@ -1,0 +1,57 @@
+#+title:      Vulpea — Fast Todo
+#+priority:   15
+
+Quickly add a TODO item using org-capture.  Simple mode finishes
+immediately; capture mode opens the buffer with cursor ready.
+
+* Core
+#+begin_src emacs-lisp
+(defun my/vulpea-quick-todo--templates-dir ()
+  "Directory with fast-capture template files."
+  (expand-file-name "templates"
+                    (expand-file-name "modules/vulpea/plugins/fast-captures/"
+                                      user-emacs-directory)))
+
+(defun my/vulpea-quick-todo--choose-template ()
+  "Return template string from a file in `templates' dir, or nil."
+  (let ((files (directory-files (my/vulpea-quick-todo--templates-dir)
+                                nil "\\.org\\'")))
+    (unless files
+      (setq files '("default.org")))
+    (when files
+      (let* ((names (mapcar (lambda (f) (file-name-sans-extension f)) files))
+             (prompt (format "Template (%s): "
+                             (mapconcat #'identity names ", ")))
+             (choice (completing-read prompt names nil t nil nil
+                                      (car names))))
+        (with-temp-buffer
+          (insert-file-contents
+           (expand-file-name (concat choice ".org")
+                             (my/vulpea-quick-todo--templates-dir)))
+          (string-trim (buffer-string)))))))
+
+(defun my/vulpea-quick-todo ()
+  (interactive)
+  (let* ((subdir (my/vulpea-root-dir (my/notes-directory)
+                                      "Todo subdir (Enter=root): "))
+         (mode (let ((c (read-char "Mode: (s)imple (c)apture [C]: ")))
+                 (if (memq c '(?\n ?\r ?\s)) ?c c)))
+         (template (my/vulpea-quick-todo--choose-template))
+         (file (expand-file-name (concat subdir "Todo")
+                                  (my/notes-directory))))
+    (if (eq mode ?s)
+        (let ((text (read-string "TODO: "))
+              (org-capture-initial text)
+              (org-capture-templates
+               `(("t" "Quick Todo" entry (file ,file)
+                  ,(or template "* TODO %i\n")
+                  :immediate-finish t :kill-buffer t))))
+          (org-capture nil "t"))
+      (let ((org-capture-templates
+             `(("t" "Quick Todo" entry (file ,file)
+                ,(or template "* TODO %?")
+                :kill-buffer t :unnarrowed t))))
+        (org-capture nil "t")
+        (set-buffer-modified-p nil)
+        (modaled-set-state "insert")))))
+#+end_src

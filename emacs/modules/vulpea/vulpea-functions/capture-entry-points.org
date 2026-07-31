@@ -22,9 +22,8 @@ that file so you fill in the body.  Put your =doct= declarations in
          (title  (read-string "Note title: "))
          (raw-name (read-string (format "File name for \"%s\" (blank = slug): " title)))
          (slug (if (string-empty-p raw-name)
-                   (concat (vulpea-title-to-slug title) ".org")
-                 (if (string-suffix-p ".org" raw-name) raw-name
-                   (concat raw-name ".org"))))
+                   (vulpea-title-to-slug title)
+                 (file-name-sans-extension raw-name)))
          (subdir (my/vulpea-root-dir))
          (fname (concat subdir slug))
          (fast (my/vulpea--fast-level))
@@ -56,9 +55,8 @@ that file so you fill in the body.  Put your =doct= declarations in
          (title  (read-string "Task title: "))
          (raw-name (read-string (format "File name for \"%s\" (blank = slug): " title)))
          (slug (if (string-empty-p raw-name)
-                   (concat (vulpea-title-to-slug title) ".org")
-                 (if (string-suffix-p ".org" raw-name) raw-name
-                   (concat raw-name ".org"))))
+                   (vulpea-title-to-slug title)
+                 (file-name-sans-extension raw-name)))
          (subdir (my/vulpea-root-dir))
          (fname (concat subdir slug))
          (fast (my/vulpea--fast-level))

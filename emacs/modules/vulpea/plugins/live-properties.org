@@ -54,7 +54,7 @@ Creates the ref note at refs/<type>/<canonical>.org if missing."
   (when (and value (not (string-equal value "WARNING")))
     (let* ((slug (my/vulpea--canonicalize value))
            (root (expand-file-name (format "refs/%s/" property-type) (my/notes-directory)))
-           (path (expand-file-name (format "%s.org" slug) root))
+           (path (expand-file-name slug root))
            (id (my/vulpea--note-id-by-path path)))
       (if id
           (my/vulpea--make-id-link id value)
@@ -127,7 +127,7 @@ PARENT-ID is the ID of the owning note (for derived path)."
     (let* ((slug (my/vulpea--canonicalize (or parent-id "orphan")))
            (val-slug (my/vulpea--canonicalize value))
            (root (expand-file-name (format "refs/%s/" property-type) (my/notes-directory)))
-           (path (expand-file-name (format "%s-%s.org" slug val-slug) root)))
+           (path (expand-file-name (format "%s-%s" slug val-slug) root)))
       (make-directory root t)
       (let ((vulpea-create-default-function (lambda (_) '())))
         (let ((note (vulpea-create value path

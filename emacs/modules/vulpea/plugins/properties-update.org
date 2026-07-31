@@ -72,7 +72,10 @@ Strips Org link brackets, keeps WARNING visible."
     (error (message "Toggle error: %s" err))))
 
 (defun my/vulpea--update-children (&optional _)
-  "Build suffix entries from the prompt registry for the current context."
+  "Build suffix entries from the prompt registry for the current context.
+Uses `transient-parse-suffixes' to convert shorthand (KEY DESC CMD)
+suffix specs to the internal format expected by `transient--init-suffix.'
+DESC is a pre-computed string (computed fresh each time the menu opens)."
   (condition-case err
       (let* ((prompts (seq-filter
                        (lambda (s)
@@ -88,15 +91,16 @@ Strips Org link brackets, keeps WARNING visible."
         (setq my/vulpea--update-key-map nil)
         (dolist (spec (reverse prompts))
           (when (< idx (length keys))
-            (let ((k (aref keys idx)))
-              (push (cons k (plist-get spec :key)) my/vulpea--update-key-map)
+            (let ((k (aref keys idx))
+                  (prompt-key (plist-get spec :key)))
+              (push (cons k prompt-key) my/vulpea--update-key-map)
               (push (list (char-to-string k)
-                          (apply-partially #'my/vulpea--update-format-prompt
-                                           (plist-get spec :key))
+                          (my/vulpea--update-format-prompt prompt-key)
                           'my/vulpea--toggle-prompt)
                     children)
               (setq idx (1+ idx)))))
-        (nreverse children))
+        (transient-parse-suffixes 'my/vulpea--update-properties-menu
+                                  (nreverse children)))
     (error
      (message "Update children error: %s" err)
      nil)))
