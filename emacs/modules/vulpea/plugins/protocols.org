@@ -110,8 +110,8 @@ Topics not present here fall back to `protocols-<topic>.org'."
 **** Resolve destination file for a topic
 #+begin_src emacs-lisp
 (defun my/vulpea-protocols--default-file-for-topic (topic)
-  "Default filename for TOPIC: protocols-<topic>.org."
-  (expand-file-name (format "protocols-%s.org" topic)
+  "Default filename for TOPIC: protocols-<topic>."
+  (expand-file-name (format "protocols-%s" topic)
                     my/vulpea-protocols--protocols-directory))
 
 (defun my/vulpea-protocols--resolve-file (topic &optional override)
@@ -158,7 +158,7 @@ Priority: OVERRIDE > topic-file-map > default."
          (note-id  (vulpea-note-id note))
          (routed   nil))
     (if (null topics)
-        (let ((file (expand-file-name "protocols-universal.org"
+        (let ((file (expand-file-name "protocols-universal"
                                       my/vulpea-protocols--protocols-directory)))
           (my/vulpea-protocols--write-pointer file note-id title level)
           (push file routed))
@@ -240,7 +240,7 @@ Only strips protocol-specific properties; preserves :RULE: t if set."
       (org-entry-delete nil key))
     (save-buffer)
     (when routed
-      (message "Unmarked. Pointers in %s are orphaned — see broken-links.org."
+      (message "Unmarked. Pointers in %s are orphaned — see broken-links."
                routed))))
 #+end_src
 
@@ -302,7 +302,7 @@ pointers for each selected step."
          (primary (car topics))
          (file (if primary
                    (my/vulpea-protocols--resolve-file primary)
-                 (expand-file-name "protocols-universal.org"
+                 (expand-file-name "protocols-universal"
                                    my/vulpea-protocols--protocols-directory))))
     (make-directory (file-name-directory file) t)
     (message "Pick headings to add to protocol.  C-g when done.")

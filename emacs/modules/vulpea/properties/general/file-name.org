@@ -10,13 +10,11 @@ different language for the filename.
 #+begin_src emacs-lisp
 (defun my/vulpea-prompt-file-name (title &optional subdir)
   "Prompt for a file name, defaulting to a slug of TITLE under SUBDIR.
-Returns the relative file path (e.g. \"subdir/my-note.org\")."
+Returns the relative file path (e.g. \"subdir/my-note\")."
   (let* ((raw-name (read-string
                     (format "File name for \"%s\" (blank = slug): " title)))
          (base (if (string-empty-p raw-name)
-                   (concat (vulpea-title-to-slug title) ".org")
-                 (if (string-suffix-p ".org" raw-name)
-                     raw-name
-                   (concat raw-name ".org")))))
+                   (vulpea-title-to-slug title)
+                 (file-name-sans-extension raw-name))))
     (concat subdir base)))
 #+end_src

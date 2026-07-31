@@ -116,8 +116,8 @@ a stray "WARNING" sentinel from a skipped prompt.
 ** Resolve destination file for a topic
 #+begin_src emacs-lisp
 (defun my/vulpea-rules--default-file-for-topic (topic)
-  "Default filename for TOPIC: rules-<topic>.org."
-  (expand-file-name (format "rules-%s.org" topic)
+  "Default filename for TOPIC: rules-<topic>."
+  (expand-file-name (format "rules-%s" topic)
                      my/vulpea-rules--rules-directory))
 
 (defun my/vulpea-rules--resolve-file (topic &optional override)
@@ -166,7 +166,7 @@ nothing. Never duplicates, never touches the source heading.
          (routed   nil))
     (if (null topics)
         ;; Universal: single reserved file, no per-topic split
-        (let ((file (expand-file-name "rules-universal.org"
+        (let ((file (expand-file-name "rules-universal"
                                        my/vulpea-rules--rules-directory)))
           (my/vulpea-rules--write-pointer file note-id title)
           (push file routed))
@@ -288,9 +288,9 @@ via the prompt registry in properties/rules/."
     ;; Pointer cleanup: leverage links.org's existing broken-link tracking
     ;; instead of writing a second orphan-detector. Deleting the id here
     ;; makes the pointers in `routed' dangling; links.org's deletion guard
-    ;; / broken-links.org already surfaces these on next scan.
+    ;; / broken-links already surfaces these on next scan.
     (when routed
-      (message "Unmarked. Pointers in %s are now orphaned — see broken-links.org."
+      (message "Unmarked. Pointers in %s are now orphaned — see broken-links."
                routed))))
 #+end_src
 
@@ -336,7 +336,7 @@ Used as fallback when the DB has no routed-files entry."
     (unless (equal rule "t")
       (user-error "Not a rule heading"))
     (if (null topics)
-        (list (expand-file-name "rules-universal.org"
+        (list (expand-file-name "rules-universal"
                                 my/vulpea-rules--rules-directory))
       (mapcar (lambda (topic)
                 (my/vulpea-rules--resolve-file

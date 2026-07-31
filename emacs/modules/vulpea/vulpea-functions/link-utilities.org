@@ -26,7 +26,7 @@ id: link to the new note."
          (subdir (my/vulpea-root-dir))
          (note   (vulpea-create
                   title
-                  (concat subdir (vulpea-title-to-slug title) ".org")
+                  (concat subdir (vulpea-title-to-slug title))
                   :body body)))
     (when (and note source-id)
       (my/vulpea--property-put note "SOURCE" source-id))

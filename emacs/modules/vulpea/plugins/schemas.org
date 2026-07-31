@@ -201,7 +201,7 @@ TODO and PRIORITY from their prompt files.
 *** Index-time Validation Action
 
 Silent — no warnings, no interactive prompts. Violations are tracked
-only via MISSING PROMPTS.org (`my/vulpea-missing--rebuild-from-health').
+only via MISSING PROMPTS (`my/vulpea-missing--rebuild-from-health').
 
 #+begin_src emacs-lisp
 (with-eval-after-load 'vulpea
@@ -225,7 +225,7 @@ leaves the note truly missing that metadata.
   "Delete all properties with value \"WARNING\" throughout the vault.
 
 Under the old prompt system, skipping a prompt stored \"WARNING\" as
-the property value to track it in MISSING PROMPTS.org.  Now schema
+the property value to track it in MISSING PROMPTS.  Now schema
 validation flags notes that are *missing* the metadata entirely as
 `missing-required` violations, so the sentinel is no longer needed.
 Deleting the WARNING sentinel lets the description-list metadata

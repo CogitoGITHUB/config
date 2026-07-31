@@ -13,7 +13,10 @@ Change only this path to relocate the entire vault."
   "/home/aoeu/test/")
 
 (setq org-agenda-files
-      (directory-files-recursively (my/notes-directory) "\\.org$"))
+      (cl-remove-if
+       (lambda (f) (string-match-p (regexp-quote "/.git/") f))
+       (nconc (directory-files-recursively (my/notes-directory) "\\.org$")
+              (directory-files-recursively (my/notes-directory) "[^./]+$"))))
 
 (add-to-list 'auto-mode-alist
              `(,(concat "\\`" (regexp-quote (directory-file-name (my/notes-directory)))

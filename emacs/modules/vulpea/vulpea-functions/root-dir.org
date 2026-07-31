@@ -19,7 +19,7 @@ Type \".\" or press Enter for root level; select or type a subdirectory name."
   (let* ((root (expand-file-name (or root (my/notes-directory))))
          (dirs (cl-loop for f in (directory-files root nil "^[^.]" t)
                          when (and (file-directory-p (expand-file-name f root))
-                                   (not (member f '("refs" "dictionary"))))
+                                   (not (member f '("refs" "dictionary" "Journal"))))
                          collect f))
          (candidates (cons "." dirs))
          (choice (completing-read (or prompt "Subdirectory: ") candidates nil nil nil nil ".")))

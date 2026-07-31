@@ -4,7 +4,7 @@
     {
       "id": "w1H",
       "custom_name": null,
-      "identity_cwd": "/home/aoeu/.config/emacs/modules",
+      "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
         "1": 1,
         "2": 2
@@ -23,13 +23,13 @@
           },
           "panes": {
             "1": {
-              "cwd": "/home/aoeu/.config/emacs/modules",
+              "cwd": "/home/aoeu/.config/emacs",
               "label": "opencode",
               "agent_session": {
                 "source": "herdr:opencode",
                 "agent": "opencode",
                 "kind": "id",
-                "value": "ses_090170a36ffe1SWo7oOo6UJCHx"
+                "value": "ses_046eeeab8ffepFqWJsBtd7YD0l"
               }
             }
           },
@@ -44,7 +44,7 @@
           },
           "panes": {
             "2": {
-              "cwd": "/home/aoeu/test"
+              "cwd": "/home/aoeu/.config"
             }
           },
           "zoomed": false,
@@ -52,7 +52,7 @@
           "root_pane": 2
         }
       ],
-      "active_tab": 0
+      "active_tab": 1
     }
   ],
   "active": 0,

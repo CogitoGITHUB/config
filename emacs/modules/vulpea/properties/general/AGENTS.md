@@ -27,7 +27,7 @@ These prompts apply to ALL notes (context `'file`). They fire during any file-le
 
 ## Required vs Optional
 
-State prompts marked "required" by the base schema will show as violations in MISSING PROMPTS.org if set to `"⚠ WARNING"` (skipped). Optional state prompts (dependency, checklist) produce no violation.
+State prompts marked "required" by the base schema will show as violations in MISSING PROMPTS if set to `"⚠ WARNING"` (skipped). Optional state prompts (dependency, checklist) produce no violation.
 
 ## Conventions
 

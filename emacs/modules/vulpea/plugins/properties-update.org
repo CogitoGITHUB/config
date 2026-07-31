@@ -325,7 +325,7 @@ Toggle each property with its key letter, then confirm with C-c C-c."
 (defun my/vulpea-update-properties ()
   "Update properties on an existing vulpea note.
 When called interactively, check for schema violations first and offer
-to open the update menu.  When called from MISSING PROMPTS.org advice,
+to open the update menu.  When called from MISSING PROMPTS advice,
 skip the prompt and open the menu directly."
   (interactive)
   (let (buffer-note note file pos level)

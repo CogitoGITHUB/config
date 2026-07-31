@@ -17,7 +17,7 @@ Each plugin is an `.org` file under `modules/vulpea/plugins/`. They are loaded b
 | `properties-update.org` | Transient menu for updating note properties |
 | `protocols.org` | Protocol handler registration |
 | `rules.org` | Heading-based rule system with routing |
-| `schemas.org` | DB schema validation, MISSING PROMPTS.org generation |
+| `schemas.org` | DB schema validation, MISSING PROMPTS generation |
 | `transclusion.org` | Org-transclusion integration |
 | `vulpea-capture.el` | Elisp helper loaded alongside capture |
 
@@ -40,7 +40,7 @@ Each plugin is an `.org` file under `modules/vulpea/plugins/`. They are loaded b
 ### schemas.org
 - `vulpea-db-schema-validation-action` is `'silent` — no interactive warnings
 - Base schema applies to ALL notes (requires 6 state fields, optional 2)
-- Violations tracked via MISSING PROMPTS.org, rebuilt on `org-capture-after-finalize-hook`
+- Violations tracked via MISSING PROMPTS, rebuilt on `org-capture-after-finalize-hook`
 
 ### git.org
 - `before-save-hook` blocks save with `user-error` if no `.git`

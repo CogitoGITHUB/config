@@ -127,7 +127,7 @@
       (when (and (file-exists-p deleted-files-path)
                  (> (file-attribute-size (file-attributes deleted-files-path)) 0))
         (my/vulpea-links--git-commit deleted-files-path
-          (format "auto: remove restore entry from deleted-files.org [%s]"
+          (format "auto: remove restore entry from deleted-files [%s]"
                   (format-time-string "%H:%M:%S"))))
       (when id
         (let ((broken-path (my/vulpea-links--ensure-broken-links-file)))
@@ -147,10 +147,10 @@
               (when (and (file-exists-p broken-path)
                          (> (file-attribute-size (file-attributes broken-path)) 0))
                 (my/vulpea-links--git-commit broken-path
-                  (format "auto: remove broken link entry from broken-links.org [%s]"
+                  (format "auto: remove broken link entry from broken-links [%s]"
                           (format-time-string "%H:%M:%S"))))))))
       (my/vulpea-links--cleanup-empty-admin-files)
-      (message "Restored %s. Entry removed from deleted-files.org." restored-file)
+      (message "Restored %s. Entry removed from deleted-files." restored-file)
       (when (y-or-n-p (format "Open restored file %s? " restored-file))
         (find-file (expand-file-name restored-file (my/notes-directory))))))))
 #+end_src

@@ -11,7 +11,7 @@
 - **No comments in code** — don't add explanatory comments to source blocks.
 - **No blank line after headings** at any level in `.org` files.
 - **No temp files in `/tmp/`** — use `/tmp/opencode/`.
-- **Schema violations are silent** — `vulpea-db-schema-validation-action` is `'silent`. Violations tracked via MISSING PROMPTS.org, never interactive prompts.
+- **Schema violations are silent** — `vulpea-db-schema-validation-action` is `'silent`. Violations tracked via MISSING PROMPTS, never interactive prompts.
 - **Git commit/push:** use `git gg` (alias that adds all, commits, and pushes). Never stage/commit/push manually.
 
 ## Key Files

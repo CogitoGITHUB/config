@@ -1075,10 +1075,10 @@ This is the most important convention in the config:
 
 3. =vulpea-schema-collection-health= detects these violations and
    =my/vulpea-missing--rebuild-from-health= writes them to
-   =MISSING PROMPTS.org= so you can fix them later.
+   =MISSING PROMPTS= so you can fix them later.
 
 4. The =my/vulpea--fix-violations= command (bound to =SPC P= or
-   the MISSING PROMPTS.org click) prompts for each WARNING-valued
+   the MISSING PROMPTS click) prompts for each WARNING-valued
    field and lets you replace it with a real value.
 
 5. The migration function =my/vulpea-schema-migrate-warnings=
@@ -1344,7 +1344,7 @@ PROMPTS sync system.
 
 ** The update pipeline (from =properties-update.org=)
 1. User invokes =my/vulpea-update-properties= (bound to SPC P)
-   or clicks a heading in MISSING PROMPTS.org
+   or clicks a heading in MISSING PROMPTS
 2. Opens the note's file, positions at the heading
 3. Opens the Transient toggle menu
 4. User toggles which properties to update (creates =my/vulpea--selected-keys= list)
@@ -1532,7 +1532,7 @@ When a new note is created via =vulpea-create=, the following happens:
 
 - =links.org= lines 376-398: =delete-file=, =org-cut-subtree=,
   =org-archive-subtree=, and =org-open-at-point= are all advised for
-  deletion guards and MISSING PROMPTS.org click handling.
+  deletion guards and MISSING PROMPTS click handling.
 
 - =vulpea.org= lines 289-292: =vulpea-create=, =vulpea-find=, and
   =vulpea-insert= are advised to integrate the capture flow.

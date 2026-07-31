@@ -160,20 +160,21 @@ When FAST-LEVEL is nil, prompts the user via `my/vulpea--fast-level'."
 
 ** Missing Prompts Management
 
-Manages MISSING PROMPTS.org — an auto-generated file tracking notes whose
+Manages MISSING PROMPTS — an auto-generated file tracking notes whose
 state prompts were skipped (set to WARNING).
 
 #+begin_src emacs-lisp
-(defvar my/vulpea-missing--file "MISSING PROMPTS.org"
+(defvar my/vulpea-missing--file "MISSING PROMPTS"
   "Filename for tracking notes with WARNING state properties.")
+(setq my/vulpea-missing--file "MISSING PROMPTS")
 
 (defun my/vulpea-missing--path ()
-  "Return full path to MISSING PROMPTS.org."
+  "Return full path to MISSING PROMPTS."
   (expand-file-name my/vulpea-missing--file
                     (my/notes-directory)))
 
 (defun my/vulpea-missing--ensure-file ()
-  "Create MISSING PROMPTS.org if it does not exist."
+  "Create MISSING PROMPTS if it does not exist."
   (let ((path (my/vulpea-missing--path)))
     (unless (file-exists-p path)
       (with-temp-file path
@@ -184,7 +185,7 @@ state prompts were skipped (set to WARNING).
     path))
 
 (defun my/vulpea-missing--rebuild-from-health ()
-  "Rebuild MISSING PROMPTS.org from schema health data.
+  "Rebuild MISSING PROMPTS from schema health data.
 Lists all notes with schema violations, grouped by schema.
 Each entry includes violation details in the property drawer."
   (interactive)

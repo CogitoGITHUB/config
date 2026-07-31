@@ -188,8 +188,7 @@ The `:filter-return' advice on `vulpea-create' `setq's the global
 `my/vulpea--new-note' so `org-capture-after-finalize-hook' can
 access it later for the \"Open file?\" prompt."
   (setq my/vulpea--new-note nil)
-  (let* ((my/vulpea--skip-capture t)
-         (result (apply original-fn args)))
+  (let* ((result (apply original-fn args)))
     (when my/vulpea--new-note
       (my/vulpea--open-capture-for-note my/vulpea--new-note))
     result))
