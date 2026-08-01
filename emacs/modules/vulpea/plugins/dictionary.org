@@ -122,7 +122,6 @@ under `dictionary/'."
          (path-tags (if (string-empty-p subdir)
                         '()
                       (split-string (directory-file-name subdir) "/" t)))
-         (my/vulpea--skip-capture t)
          (vulpea-create-default-function (lambda (_) '()))
          (prompts (my/vulpea-collect-prompts-with-fast '(dictionary) '(file)))
          (tags (append (list "dictionary" slug) path-tags
@@ -136,7 +135,19 @@ under `dictionary/'."
                 word file-name tags properties body)))
     (dolist (fn post-apply)
       (funcall fn note))
-    (my/vulpea--open-capture-for-note note)
+    (let ((org-capture-templates
+           `(("v" "Edit note body"
+               plain
+               (file+function
+                ,(vulpea-note-path note)
+                (lambda ()
+                  (goto-char (point-max))
+                  (skip-chars-backward " \t\n")))
+               ,(or body "%?")
+               :kill-buffer t :unnarrowed t))))
+      (org-capture nil "v")
+      (set-buffer-modified-p nil)
+      (modaled-set-state "insert"))
     (my/vulpea-dictionary-regenerate-dictionary)
     note))
 #+end_src

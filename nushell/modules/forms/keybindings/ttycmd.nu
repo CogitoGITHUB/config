@@ -46,7 +46,7 @@ let keybindings = [
     mode: [emacs, vi_insert, vi_normal]
     event: {
       send: executehostcommand
-      cmd: "emacsclient -nw ."
+      cmd: "emacs -nw ."
     }
   }
   {
@@ -66,7 +66,7 @@ let keybindings = [
     mode: vi_normal
     event: {
       send: executehostcommand
-      cmd: "emacsclient -nw ."
+      cmd: "emacs -nw ."
     }
   }
 ];

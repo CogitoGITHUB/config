@@ -3,11 +3,7 @@ $env.PROMPT_INDICATOR_VI_NORMAL = $"(ansi red)〉"
 
 # /home/aoeu/.config/nushell/env.nu
 
-$env.EDITOR = "emacsclient"
-# empty string causes emacsclient to start fallback `emacs --daemon`
-# using stock emacs-minimal (no sqlite) → boot-error=(void-function sqlite-open)
-# Let it fail clearly instead; Shepherd manages the real daemon.
-# $env.ALTERNATE_EDITOR = ""
+$env.EDITOR = "emacs"
 
 
 $env.XDG_RUNTIME_DIR = $"/run/user/(id -u | str trim)"

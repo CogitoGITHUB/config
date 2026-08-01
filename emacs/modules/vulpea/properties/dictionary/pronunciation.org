@@ -13,12 +13,8 @@
                  (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
               (when (and val (not (string-equal val "WARNING")))
-                (let ((label val))
-                  `(:properties (("PRONUNCIATION" . ,val))
-                    :post-apply (,(lambda (note)
-                                    (let ((link (my/vulpea--create-scoped-note
-                                                  'pronunciation label
-                                                  (vulpea-note-id note))))
-                                      (when link
-                                        (my/vulpea--property-put note "PRONUNCIATION" link))))))))))
+                `(:properties (("PRONUNCIATION" . ,val))
+                  :post-apply (,(apply-partially
+                                 #'my/vulpea--apply-scoped-post
+                                 'pronunciation "PRONUNCIATION" val))))))
 #+end_src

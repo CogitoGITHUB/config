@@ -13,12 +13,8 @@
                  (if (string-equal val "⚠ WARNING") "WARNING" val)))
   :to-plist (lambda (val _ctx)
               (when (and val (not (string-equal val "WARNING")))
-                (let ((label val))
-                  `(:properties (("SYNONYMS" . ,val))
-                    :post-apply (,(lambda (note)
-                                    (let ((link (my/vulpea--create-scoped-note
-                                                  'synonyms label
-                                                  (vulpea-note-id note))))
-                                      (when link
-                                        (my/vulpea--property-put note "SYNONYMS" link))))))))))
+                `(:properties (("SYNONYMS" . ,val))
+                  :post-apply (,(apply-partially
+                                 #'my/vulpea--apply-scoped-post
+                                 'synonyms "SYNONYMS" val))))))
 #+end_src

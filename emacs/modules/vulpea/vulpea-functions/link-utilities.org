@@ -50,8 +50,7 @@ If a note with that title exists, use it.  Otherwise create a new one
 with all standard prompts (subdir, tags, etc.) and open an org-capture
 buffer for body editing."
   (interactive)
-  (let* ((my/vulpea--skip-capture t)
-         (title  (read-string "Note title: "))
+  (let* ((title  (read-string "Note title: "))
          (note   (or (car (vulpea-db-query
                            (lambda (n)
                              (string= (vulpea-note-title n) title))))

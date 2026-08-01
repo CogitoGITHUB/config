@@ -47,7 +47,7 @@ Creates or returns a canonical ref note at deterministic path.
 Returns link string or nil.
 
 #+begin_src emacs-lisp
-(defun my/vulpea--ensure-ref-note (property-type value)
+(defun my/vulpea--ensure-ref-note (property-type value &optional _note)
   "Return [[id:ID][VALUE]] for a canonical ref note.
 PROPERTY-TYPE is a symbol like 'state-work or 'pos.
 Creates the ref note at refs/<type>/<canonical>.org if missing."
@@ -72,20 +72,23 @@ Generates a ~:to-plist~ function for scoped properties.
 Stores raw value initially; post-apply replaces with a link.
 
 #+begin_src emacs-lisp
+(defun my/vulpea--apply-scoped-post (property-type drawer-key label note)
+  (let ((link (my/vulpea--create-scoped-note
+                property-type label
+                (vulpea-note-id note))))
+    (when link
+      (my/vulpea--property-put note drawer-key link))))
+
 (defun my/vulpea--make-scoped-to-plist (property-type drawer-key)
   "Return a :to-plist function for a scoped property.
 PROPERTY-TYPE is a symbol for the ref note type (e.g. 'pronunciation).
 DRAWER-KEY is the string stored in the property drawer (e.g. \"PRONUNCIATION\")."
   (lambda (val _ctx)
     (when (and val (not (string-equal val "WARNING")))
-      (let ((label val))
-        `(:properties ((,drawer-key . ,val))
-          :post-apply (,(lambda (note)
-                          (let ((link (my/vulpea--create-scoped-note
-                                        property-type label
-                                        (vulpea-note-id note))))
-                            (when link
-                              (my/vulpea--property-put note drawer-key link))))))))))
+      `(:properties ((,drawer-key . ,val))
+        :post-apply (,(apply-partially
+                       #'my/vulpea--apply-scoped-post
+                       property-type drawer-key val))))))
 #+end_src
 
 ** Aliases To-Plist Factory
@@ -93,6 +96,16 @@ DRAWER-KEY is the string stored in the property drawer (e.g. \"PRONUNCIATION\").
 Multi-valued scoped property. Each alias becomes a scoped ref note.
 
 #+begin_src emacs-lisp
+(defun my/vulpea--apply-aliases-post (labels note)
+  (let* ((id (vulpea-note-id note))
+         (links (delq nil (mapcar (lambda (v)
+                                    (my/vulpea--create-scoped-note
+                                      'alias v id))
+                                  labels)))
+         (str (mapconcat #'identity links ", ")))
+    (unless (string-empty-p str)
+      (my/vulpea--property-put note "ALIAS" str))))
+
 (defun my/vulpea--make-aliases-to-plist ()
   "Return a :to-plist function for the ALIAS property.
 Stores raw comma-joined labels initially; post-apply replaces each
@@ -101,15 +114,8 @@ with a scoped ref link."
     (when val
       (let ((labels (copy-sequence val)))
         `(:properties (("ALIAS" . ,(mapconcat #'identity val ", ")))
-          :post-apply (,(lambda (note)
-                          (let* ((id (vulpea-note-id note))
-                                 (links (delq nil (mapcar (lambda (v)
-                                                            (my/vulpea--create-scoped-note
-                                                              'alias v id))
-                                                          labels)))
-                                 (str (mapconcat #'identity links ", ")))
-                            (unless (string-empty-p str)
-                              (my/vulpea--property-put note "ALIAS" str))))))))))
+          :post-apply (,(apply-partially
+                         #'my/vulpea--apply-aliases-post labels)))))))
 #+end_src
 
 ** Create Scoped Note (scoped vocab)
@@ -119,7 +125,7 @@ No dedup — always creates a fresh note.
 Returns link string or nil.
 
 #+begin_src emacs-lisp
-(defun my/vulpea--create-scoped-note (property-type value parent-id)
+(defun my/vulpea--create-scoped-note (property-type value parent-id &optional _note)
   "Return [[id:ID][VALUE]] for a new scoped ref note.
 PROPERTY-TYPE is a symbol like 'alias or 'evidence.
 PARENT-ID is the ID of the owning note (for derived path)."
@@ -144,11 +150,30 @@ PARENT-ID is the ID of the owning note (for derived path)."
 Ref notes at refs/*/*.org are infrastructure, not user-facing notes.
 
 #+begin_src emacs-lisp
+(defun my/vulpea--hidden-note-p (path)
+  (or (string-prefix-p
+       (expand-file-name "refs/" (my/notes-directory))
+       path)
+      (string-prefix-p
+       (expand-file-name "Journal/" (my/notes-directory))
+       path)))
+
 (setq vulpea-find-default-filter
       (lambda (note)
-        (not (string-prefix-p
-              (expand-file-name "refs/" (my/notes-directory))
-              (vulpea-note-path note)))))
+        (not (my/vulpea--hidden-note-p (vulpea-note-path note)))))
+
+(defun my/vulpea--select-filter-advice (orig-fn prompt &rest args)
+  "Hide refs and Journal notes from `vulpea-select' candidates."
+  (let ((orig-filter (plist-get args :filter-fn)))
+    (apply orig-fn prompt
+           (plist-put args :filter-fn
+                      (lambda (note)
+                        (and (not (my/vulpea--hidden-note-p
+                                   (vulpea-note-path note)))
+                             (or (null orig-filter)
+                                 (funcall orig-filter note))))))))
+
+(advice-add 'vulpea-select :around #'my/vulpea--select-filter-advice)
 #+end_src
 
 ** Open ref notes in capture by default

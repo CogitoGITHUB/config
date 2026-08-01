@@ -49,7 +49,7 @@ on the heading until replaced with real tags."
                 `(:tags ,val
                   :post-apply (,(apply-partially #'my/vulpea--post-sync "TAGS" (car val))
                                ,@(mapcar (lambda (v)
-                                           (lambda (note)
-                                             (my/vulpea--ensure-ref-note 'tags v)))
+                                           (apply-partially
+                                            #'my/vulpea--ensure-ref-note 'tags v))
                                          val))))))
 #+end_src

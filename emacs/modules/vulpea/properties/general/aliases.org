@@ -30,13 +30,6 @@ Comma-separated, blank = no aliases.
               (when val
                 (let ((labels (copy-sequence val)))
                   `(:properties (("ALIAS" . ,(mapconcat #'identity val ", ")))
-                    :post-apply (,(lambda (note)
-                                    (let* ((id (vulpea-note-id note))
-                                           (links (delq nil (mapcar (lambda (v)
-                                                                      (my/vulpea--create-scoped-note
-                                                                        'alias v id))
-                                                                    labels)))
-                                           (str (mapconcat #'identity links ", ")))
-                                      (unless (string-empty-p str)
-                                        (my/vulpea--property-put note "ALIAS" str))))))))))
+                    :post-apply (,(apply-partially
+                                   #'my/vulpea--apply-aliases-post labels)))))))
 #+end_src

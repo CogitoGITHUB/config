@@ -15,6 +15,6 @@
   :to-plist (lambda (val _ctx)
               (when (and val (not (member val '("" "auto"))))
                 `(:tags (,val)
-                  :post-apply (,(lambda (note)
-                                  (my/vulpea--ensure-ref-note 'scope val)))))))
+                  :post-apply (,(apply-partially
+                                 #'my/vulpea--ensure-ref-note 'scope val))))))
 #+end_src
