@@ -11123,3 +11123,8 @@
 2026-08-01T09:04:30.441275Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
 2026-08-01T09:04:30.581550Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
 2026-08-01T09:04:30.731872Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-01T09:06:57.348511Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t2"
+2026-08-01T09:07:01.040910Z  INFO herdr::logging: spawning pane terminal event="pane.spawn.start" subsystem="pane" outcome="started" pane_id=4 rows=55 cols=77 scrollback_limit_bytes=10000000
+2026-08-01T09:07:01.044004Z  INFO herdr::logging: pane child spawned event="pane.spawned" subsystem="pane" outcome="ok" pane_id=4 pid=31073
+2026-08-01T09:07:01.044582Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:tG"
+2026-08-01T09:07:10.517281Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
