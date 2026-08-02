@@ -11728,3 +11728,8 @@
 2026-08-02T19:09:00.237721Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
 2026-08-02T19:09:08.431628Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
 2026-08-02T19:10:03.685598Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-02T19:10:31.873934Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=86 cell_width_px=0 cell_height_px=0
+2026-08-02T19:10:32.174728Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=63 cell_width_px=0 cell_height_px=0
+2026-08-02T19:10:51.142485Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-02T19:11:05.038813Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-02T19:11:20.266581Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
