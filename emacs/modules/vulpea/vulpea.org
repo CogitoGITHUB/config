@@ -25,7 +25,7 @@ Change only this path to relocate the entire vault."
 #+end_src
 * Vulpea Bootstrap
 #+begin_src emacs-lisp
-(setq vulpea-db-location             (expand-file-name "vulpea.db" (my/notes-directory)))
+(setq vulpea-db-location             (expand-file-name "admin/vulpea.db" (my/notes-directory)))
 (setq vulpea-db-sync-directories     (list (my/notes-directory)))
 (setq vulpea-default-notes-directory (my/notes-directory))
 (setq vulpea-db-sync-external-method 'fswatch)

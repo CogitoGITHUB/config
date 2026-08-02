@@ -16,7 +16,7 @@ the current heading:
   inside ** H      → :level 3  …"
   (interactive "P")
   (require 'org-transclusion)
-  (let ((org-transclusion-exclude-elements nil)
+  (let ((org-transclusion-exclude-elements (list 'property-drawer))
         note id title ctx target opts line directive-pos)
     (setq note   (vulpea-select "Transclude note: " :require-match t))
     (setq id     (vulpea-note-id note))
@@ -35,19 +35,19 @@ the current heading:
         (org-transclusion-mode 1)))
     (org-transclusion-add)))
 
-;; Unfold transcluded headings so property drawers are visible.
-(defun my/org-transclusion-show-subtree (beg _end)
-  (save-excursion
-    (goto-char beg)
-    (when (org-at-heading-p)
-      (org-show-subtree))))
-(add-hook 'org-transclusion-after-add-functions
-          #'my/org-transclusion-show-subtree)
+;; Transcluded ref notes show as collapsed headings — do NOT auto-unfold
+;; them, so the ref's property drawer / ID stays hidden and you just see
+;; "* Ref" closed at point.
+(remove-hook 'org-transclusion-after-add-functions
+             #'my/org-transclusion-show-subtree)
 
 ;; Auto-enable org-transclusion-mode in org files.
 ;; Safe now — org-agenda-files is scoped to notes directory only,
 ;; so org-id-find never scans straight build symlinks.
 (setq org-transclusion-add-all-on-activate t)
+;; Hide ref property drawers inside transcluded headings so a live ref
+;; (e.g. STATE WORK: ACTIVE) renders as a single closed heading.
+(setq org-transclusion-exclude-elements (list 'property-drawer))
 (add-hook 'org-mode-hook (lambda () (org-transclusion-mode 1)))
 
 ;; Re-add transclusions after revert (e.g. auto-revert triggered by git ops).

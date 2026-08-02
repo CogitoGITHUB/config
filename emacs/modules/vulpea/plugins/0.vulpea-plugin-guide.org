@@ -257,8 +257,8 @@ Existing plugins:
   - properties-update.org             SPC P transient menu + prompt infrastructure
   - schemas.org                       schema definitions + prompt <> schema bridge
   - links.org                         deletion guards, admin files
-  - git.org                           auto-commit/push
-  - backup.org                        Git history restore
+  - backup-git.org                           auto-commit/push
+  - backup-git.org                        Git history restore
   - capture-plugin.org                Avy + heading capture (tangles to .el)
   - citation.org                      DB extractor for [@citekey]
   - manifold.org                      mind map DB + UI
@@ -317,7 +317,7 @@ the same heading as a source block. Properties recognized:
 Each PROPERTIES drawer can declare ONE package. For multiple packages,
 add multiple PROPERTIES drawers after each other on the same heading.
 
-Example — two packages in one file (from =git.org=):
+Example — two packages in one file (from =backup-git.org=):
 
 #+begin_src org
 :PROPERTIES:
@@ -379,12 +379,12 @@ Define functions and variables. No side effects at load time.
 #+end_src
 
 Pure utility plugins rarely exist alone — they are usually part of a
-larger plugin file. See =git.org=, =backup.org= for examples.
+larger plugin file. See =backup-git.org=, =backup-git.org= for examples.
 
 ** Pattern 2: Hook registration
 Register functions on Emacs hooks. Examples from this config:
 
-*** After-save hook (from =git.org= lines 49-65):
+*** After-save hook (from =backup-git.org= lines 49-65):
 #+begin_src emacs-lisp
 (defun my/vulpea-git-auto-commit ()
   "After save in notes dir: git add, commit, and push."
@@ -1316,7 +1316,7 @@ Examples of complete =:to-plist= functions from real prompts:
                     (target-id (plist-get val :target-id))
                     result)
                 (unless (string= placement "root")
-                  (push (cons "MM_PLACEMENT" placement) result))
+                  (push (cons "MIND_MAP_PLACEMENT" placement) result))
                 (list :properties (nreverse result)
                       :post-apply (list (apply-partially
                                          #'mm/--apply-placement
@@ -1897,7 +1897,7 @@ org-agenda-files
 #+end_src
 
 * Git operations
-This config auto-commits vault changes via =git.org=. Plugins rarely
+This config auto-commits vault changes via =backup-git.org=. Plugins rarely
 need to interact with git directly, but when they do:
 
 #+begin_src emacs-lisp
@@ -1910,7 +1910,7 @@ need to interact with git directly, but when they do:
   (shell-command-to-string "git log --oneline -5"))
 #+end_src
 
-See =backup.org= for Git history restore patterns (searching commits
+See =backup-git.org= for Git history restore patterns (searching commits
 for a deleted note ID, restoring from a specific commit).
 
 * Error handling patterns

@@ -7,10 +7,10 @@ Provides restore command via Git history.
 Uses native =vulpea-db-query-links-to= and =vulpea-db-query-links-from= API (v2.1+).
 *** Broken Links File
 #+begin_src emacs-lisp
-(defvar my/vulpea-links--broken-links-file "broken-links"
+(defvar my/vulpea-links--broken-links-file "admin/broken-links"
   "Filename for the broken links repair queue.
 Lives in `my/notes-directory'. Auto-created if missing.")
-(setq my/vulpea-links--broken-links-file "broken-links")
+(setq my/vulpea-links--broken-links-file "admin/broken-links")
 
 (defun my/vulpea-links--broken-links-path ()
   "Return full path to broken-links in the vault root."
@@ -21,6 +21,7 @@ Lives in `my/notes-directory'. Auto-created if missing.")
   "Create broken-links if it does not exist.
 Creates the file and commits to Git."
   (let ((path (my/vulpea-links--broken-links-path)))
+    (make-directory (file-name-directory path) t)
     (unless (file-exists-p path)
       (with-temp-file path
         (insert "#+TITLE: Broken Links\n")
@@ -32,10 +33,10 @@ Creates the file and commits to Git."
 #+end_src
 *** Deleted Files File
 #+begin_src emacs-lisp
-(defvar my/vulpea-links--deleted-files-file "deleted-files"
+(defvar my/vulpea-links--deleted-files-file "admin/deleted-files"
   "Filename for tracking all deleted .org files.
 Lives in `my/notes-directory'. Auto-created if missing.")
-(setq my/vulpea-links--deleted-files-file "deleted-files")
+(setq my/vulpea-links--deleted-files-file "admin/deleted-files")
 
 (defun my/vulpea-links--deleted-files-path ()
   "Return full path to deleted-files in the vault root."
@@ -45,6 +46,7 @@ Lives in `my/notes-directory'. Auto-created if missing.")
 (defun my/vulpea-links--ensure-deleted-files-file ()
   "Create deleted-files if it does not exist."
   (let ((path (my/vulpea-links--deleted-files-path)))
+    (make-directory (file-name-directory path) t)
     (unless (file-exists-p path)
       (with-temp-file path
         (insert "#+TITLE: Deleted Files\n")

@@ -164,9 +164,9 @@ Manages MISSING PROMPTS — an auto-generated file tracking notes whose
 state prompts were skipped (set to WARNING).
 
 #+begin_src emacs-lisp
-(defvar my/vulpea-missing--file "MISSING PROMPTS"
+(defvar my/vulpea-missing--file "admin/MISSING PROMPTS"
   "Filename for tracking notes with WARNING state properties.")
-(setq my/vulpea-missing--file "MISSING PROMPTS")
+(setq my/vulpea-missing--file "admin/MISSING PROMPTS")
 
 (defun my/vulpea-missing--path ()
   "Return full path to MISSING PROMPTS."
@@ -176,6 +176,7 @@ state prompts were skipped (set to WARNING).
 (defun my/vulpea-missing--ensure-file ()
   "Create MISSING PROMPTS if it does not exist."
   (let ((path (my/vulpea-missing--path)))
+    (make-directory (file-name-directory path) t)
     (unless (file-exists-p path)
       (with-temp-file path
         (insert "#+TITLE: MISSING PROMPTS\n")
@@ -191,6 +192,7 @@ Each entry includes violation details in the property drawer."
   (interactive)
   (let ((path (my/vulpea-missing--path))
         (by-id (make-hash-table :test #'equal)))
+    (make-directory (file-name-directory path) t)
     (dolist (health (vulpea-schema-collection-health))
       (let ((schema-name (vulpea-schema-health-schema health)))
         (dolist (pair (vulpea-schema-health-invalid-notes health))

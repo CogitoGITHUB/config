@@ -7,11 +7,11 @@ Each plugin is an `.org` file under `modules/vulpea/plugins/`. They are loaded b
 | File | Purpose |
 |------|---------|
 | `0.vulpea-plugin-guide.org` | Reference documentation (not a real plugin) |
-| `backup.org` | Backup and restore notes |
+| `backup-git.org` | Backup and restore notes |
 | `capture-plugin.org` | Org-capture integration, template selection |
 | `citation.org` | Citation management (bibtex, Zotero) |
 | `dictionary.org` | Dictionary word notes — word entry, fast mode, dictionary regeneration |
-| `git.org` | Git auto-commit, push guards, save hooks |
+| `backup-git.org` | Git auto-commit, push guards, save hooks |
 | `links.org` | Broken link detection, link renaming, deleted file tracking |
 | `manifold.org` | ManifoldOS integration |
 | `properties-update.org` | Transient menu for updating note properties |
@@ -42,7 +42,7 @@ Each plugin is an `.org` file under `modules/vulpea/plugins/`. They are loaded b
 - Base schema applies to ALL notes (requires 6 state fields, optional 2)
 - Violations tracked via MISSING PROMPTS, rebuilt on `org-capture-after-finalize-hook`
 
-### git.org
+### backup-git.org
 - `before-save-hook` blocks save with `user-error` if no `.git`
 - After save: auto `git add --all && git commit -m "auto: ..."` + async push
 - Untracked files in `dired` get a confirmation prompt before delete

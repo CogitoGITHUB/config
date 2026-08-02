@@ -352,7 +352,14 @@
 (modaled-define-keys
   :states '("dired")
   :bind
-  `(("a"    . my/dired-avy-open-file)
+  `(("h"    . dired-up-directory)
+    ("t"    . dired-find-file)
+    ("n"    . next-line)
+    ("s"    . previous-line)
+    ("<return>" . dired-find-file)
+    ("RET"  . dired-find-file)
+    ("a"    . my/dired-avy-open-file)
+    ("."    . dired-omit-mode)
     ("SPC"  . my/main-hydra/body)))
 #+end_src
 ** Motion

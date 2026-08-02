@@ -33,10 +33,11 @@ from that date onward; ~DEADLINE~ appears as due.  Enter org timestamps like
   :read-current-fn (lambda () (org-entry-get nil "SCHEDULED"))
   :merge-strategy 'replace
   :to-plist (lambda (val ctx)
-              (when val
-                (if (eq ctx 'heading)
-                    `(:post-apply (,(apply-partially #'my/vulpea--heading-schedule-apply val)))
-                  `(:body ,(format "SCHEDULED: %s\n" val))))))
+              (if val
+                  (if (eq ctx 'heading)
+                      `(:post-apply (,(apply-partially #'my/vulpea--heading-schedule-apply val)))
+                    `(:properties (("SCHEDULED" . ,val))))
+                `(:properties (("SCHEDULED" . "WARNING"))))))
 
 (my/vulpea-register-prompt
   :key 'deadline
@@ -47,8 +48,9 @@ from that date onward; ~DEADLINE~ appears as due.  Enter org timestamps like
   :read-current-fn (lambda () (org-entry-get nil "DEADLINE"))
   :merge-strategy 'replace
   :to-plist (lambda (val ctx)
-              (when val
-                (if (eq ctx 'heading)
-                    `(:post-apply (,(apply-partially #'my/vulpea--heading-deadline-apply val)))
-                  `(:body ,(format "DEADLINE: %s\n" val))))))
+              (if val
+                  (if (eq ctx 'heading)
+                      `(:post-apply (,(apply-partially #'my/vulpea--heading-deadline-apply val)))
+                    `(:properties (("DEADLINE" . ,val))))
+                `(:properties (("DEADLINE" . "WARNING"))))))
 #+end_src

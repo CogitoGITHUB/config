@@ -1,0 +1,328 @@
+#+title: Vulpea Backup & Git Plugin
+#+priority: 15
+:PROPERTIES:
+:PACKAGE:  magit
+:STRAIGHT: (magit :type git :host github :repo "magit/magit" :depends (git-gutter) :files ("lisp/magit*.el" "lisp/git-*.el" "docs/magit.texi" "docs/AUTHORS.md" "LICENSE" ".dir-locals.el" ("githooks" "githooks/*") ("git-hooks" "git-hooks/*") (:exclude "lisp/magit-section.el") "magit-pkg.el"))
+:CATEGORY: git
+:PACKAGE:  git-gutter
+:END:
+#+begin_src emacs-lisp
+(require 'git-gutter)
+(global-git-gutter-mode 1)
+
+(defvar my/vulpea-git--pushing nil
+  "Non-nil while a git push is in flight.")
+
+(defvar my/vulpea-git--pending nil
+  "Non-nil when a save fired during an in-flight push.")
+
+(defun my/vulpea-git--push-log ()
+  "Return path to the push log file inside the notes git directory."
+  (expand-file-name ".git/vulpea-push.log" (my/notes-directory)))
+
+(defun my/vulpea-git--refresh (file)
+  "Refresh git-gutter for FILE after push."
+  (when-let ((buf (get-file-buffer file)))
+    (with-current-buffer buf
+      (when (and buffer-file-name (not (buffer-modified-p)))
+        (git-gutter)))))
+
+(defun my/vulpea-git--push-sentinel (proc _event)
+  "Sentinel for async push process."
+  (let ((file (process-get proc 'file))
+        (log (my/vulpea-git--push-log)))
+    (setq my/vulpea-git--pushing nil)
+    (if (= 0 (process-exit-status proc))
+        (progn
+          (my/vulpea-git--refresh file)
+          (message "✓ notes pushed"))
+      (with-temp-buffer
+        (insert (format "=== push failed at %s ===\n"
+                        (format-time-string "%Y-%m-%d %H:%M:%S")))
+        (when (buffer-live-p (process-buffer proc))
+          (insert-buffer-substring (process-buffer proc)))
+        (insert "\n")
+        (write-region (point-min) (point-max) log t 'quiet))
+      (message "✗ push failed — see %s" log))
+    (when (buffer-live-p (process-buffer proc))
+      (kill-buffer (process-buffer proc)))
+    (when my/vulpea-git--pending
+      (setq my/vulpea-git--pending nil)
+      (my/vulpea-git--push file))))
+
+(defun my/vulpea-git--push (file)
+  "Start async git push for notes directory."
+  (setq my/vulpea-git--pushing t)
+  (let ((default-directory (my/notes-directory))
+        (buf (generate-new-buffer " *vulpea-git-push*"))
+        (proc (make-process :name "vulpea-git-push"
+                            :buffer buf
+                            :command (list magit-git-executable "push")
+                            :connection-type 'pipe
+                            :noquery t)))
+    (process-put proc 'file file)
+    (set-process-sentinel proc #'my/vulpea-git--push-sentinel)))
+
+(defun my/vulpea-git--check-repo (&optional file)
+  "Block if FILE is in notes dir but no git repo exists."
+  (let ((f (or file buffer-file-name)))
+    (when (and f (file-in-directory-p f (my/notes-directory))
+               (not (file-exists-p (expand-file-name ".git" (my/notes-directory)))))
+      (user-error "No git repo in %s" (my/notes-directory)))))
+
+(add-hook 'find-file-hook
+          (lambda ()
+            (when (and buffer-file-name
+                       (file-in-directory-p buffer-file-name (my/notes-directory))
+                       (not (file-exists-p (expand-file-name ".git" (my/notes-directory)))))
+              (warn "No git repo in %s" (my/notes-directory)))))
+
+(defun my/vulpea-git--before-save ()
+  "Check repo exists before saving notes dir files."
+  (my/vulpea-git--check-repo))
+
+(add-hook 'before-save-hook (function my/vulpea-git--before-save))
+
+(defvar my/vulpea-git--save-timer nil
+  "Timer for deferred git auto-commit.")
+
+(defun my/vulpea-git-auto-commit (&optional file)
+  "After save in notes dir: defer git add, commit, and push.
+FILE defaults to `buffer-file-name'.  Called from every write/delete/
+rename path so any mutation in the notes dir is committed automatically."
+  (let ((f (or file (buffer-file-name))))
+    (when (and f (file-in-directory-p f (my/notes-directory)))
+      (when my/vulpea-git--save-timer
+        (cancel-timer my/vulpea-git--save-timer))
+      (setq my/vulpea-git--save-timer
+            (run-with-idle-timer 2 nil #'my/vulpea-git--do-auto-commit f)))))
+
+(defun my/vulpea-git--in-notes-p (path)
+  "Return non-nil when PATH is inside the notes directory (not its .git)."
+  (and (stringp path)
+       (not (string-empty-p path))
+       (let ((f (expand-file-name path)))
+         (and (file-in-directory-p f (my/notes-directory))
+              (not (file-in-directory-p f (expand-file-name ".git" (my/notes-directory))))))))
+
+(defun my/vulpea-git--after-write (_start _end file &rest _)
+  "Advice for `write-region': schedule a git commit after any notes-dir write."
+  (when (my/vulpea-git--in-notes-p file)
+    (my/vulpea-git-auto-commit file)))
+
+(defun my/vulpea-git--after-delete (file &optional _trash)
+  "Advice for `delete-file'/`delete-directory': commit notes-dir deletion."
+  (when (my/vulpea-git--in-notes-p file)
+    (my/vulpea-git-auto-commit file)))
+
+(defun my/vulpea-git--after-rename (_file _to &optional _ok-if-already-exists)
+  "Advice for `rename-file': commit renames inside the notes dir."
+  (let ((from (expand-file-name _file))
+        (to   (expand-file-name _to)))
+    (when (or (my/vulpea-git--in-notes-p from)
+              (my/vulpea-git--in-notes-p to))
+      (my/vulpea-git-auto-commit to))))
+
+(advice-add 'write-region :after (function my/vulpea-git--after-write))
+(advice-add 'delete-file :after (function my/vulpea-git--after-delete))
+(advice-add 'delete-directory :after (function my/vulpea-git--after-delete))
+(advice-add 'rename-file :after (function my/vulpea-git--after-rename))
+
+(defun my/vulpea-git--do-auto-commit (file)
+  "Run git add, commit, and push for FILE."
+  (let ((default-directory (my/notes-directory))
+        (rel (file-relative-name file (my/notes-directory))))
+    (condition-case err
+        (progn
+          (call-process magit-git-executable nil nil nil "add" "--all")
+          (if (= 0 (call-process magit-git-executable nil nil nil "diff" "--cached" "--quiet"))
+              (message "Git: nothing new to commit for %s" rel)
+            (if (= 0 (call-process magit-git-executable nil nil nil "commit" "-m"
+                                     (format "auto: %s [%s]"
+                                             rel
+                                             (format-time-string "%H:%M:%S"))))
+                (if my/vulpea-git--pushing
+                    (setq my/vulpea-git--pending t)
+                  (my/vulpea-git--push file))
+              (message "Git commit failed for %s" rel))))
+      (error
+       (message "Git auto-commit error: %s" (error-message-string err))))))
+
+(defun my/vulpea-git--tracked-p (file)
+  "Return t if FILE is tracked by git in the notes repo."
+  (= 0 (call-process magit-git-executable nil nil nil
+                     "-C" (my/notes-directory)
+                     "ls-files" "--error-unmatch" file)))
+
+(defun my/vulpea-git--check-delete (file)
+  "Warn if FILE is in notes dir and not git-tracked."
+  (when (and file
+             (file-in-directory-p file (my/notes-directory))
+             (not (my/vulpea-git--tracked-p file)))
+    (unless (y-or-n-p (format "\"%s\" is NOT tracked by git -- delete anyway? "
+                              (file-name-nondirectory file)))
+      (user-error "Delete cancelled"))))
+
+(defun my/vulpea-git--before-dired-delete ()
+  "Check each marked dired file in notes dir is git-tracked."
+  (dolist (f (dired-get-marked-files))
+    (my/vulpea-git--check-delete f)))
+
+(add-hook 'dired-before-delete-hook #'my/vulpea-git--before-dired-delete)
+#+end_src
+
+* Backup / Restore
+** Git Helpers (for restore)
+#+begin_src emacs-lisp
+(defun my/vulpea-links--git-find-commits-for-id (note-id)
+  "Search Git log for ALL commits mentioning NOTE-ID."
+  (let ((default-directory (my/notes-directory)))
+    (magit-git-lines "log" "--all" "-S" note-id "--format=%H")))
+
+(defun my/vulpea-links--git-find-commit-for-id (note-id)
+  "Search Git log for the last commit containing NOTE-ID."
+  (car (my/vulpea-links--git-find-commits-for-id note-id)))
+
+(defun my/vulpea-links--git-restore-file (commit file-path)
+  "Restore FILE-PATH from COMMIT using git checkout."
+  (let ((default-directory (my/notes-directory)))
+    (= 0 (magit-call-git "checkout" commit "--" file-path))))
+
+(defun my/vulpea-links--git-commit (path &optional msg)
+  "Git add and commit PATH with MSG for admin file changes."
+  (let ((default-directory (my/notes-directory)))
+    (when (and (stringp path)
+               (file-exists-p path)
+               (= 0 (magit-call-git "add" path)))
+      (magit-call-git "commit" "-m"
+		(or msg (format "auto: update %s [%s]"
+				(file-name-nondirectory path)
+				(format-time-string "%H:%M:%S")))))))
+#+end_src
+** Restore From Git
+#+begin_src emacs-lisp
+(defun my/vulpea-links-restore ()
+  "Restore a deleted note from Git history."
+  (interactive)
+  (let ((deleted-id (org-entry-get (point) "DELETED_ID")))
+    (unless deleted-id
+      (user-error "No DELETED_ID found at point. Place cursor on a broken link TODO entry"))
+    (let ((deleted-note (org-entry-get (point) "DELETED_NOTE")))
+      (message "Searching Git history for %s..." deleted-note)
+      (let ((default-directory (my/notes-directory))
+            (commits (my/vulpea-links--git-find-commits-for-id deleted-id))
+            (id-re (format "^:ID:[ \t]+%s" (regexp-quote deleted-id)))
+            restore-info)
+        (unless commits
+          (user-error "Could not find %s in Git history. Was it ever committed?" deleted-note))
+        (dolist (commit commits)
+          (let ((files (magit-git-lines "show" "--name-only" "--format=" commit)))
+            (catch 'found
+              (dolist (f files)
+                (let ((content (string-join
+                                (magit-git-lines "show" (format "%s:%s" commit f))
+                                "\n")))
+                  (when (string-match-p id-re content)
+                    (setq restore-info (cons f commit))
+                    (throw 'found t)))))))
+        (unless restore-info
+          (user-error "Could not identify file for %s in Git history"
+                      deleted-note))
+        (let ((target-file (car restore-info))
+              (restore-rev (cdr restore-info)))
+          (if (my/vulpea-links--git-restore-file restore-rev target-file)
+              (progn
+                (org-mark-subtree)
+                (delete-region (region-beginning) (region-end))
+                (let ((deleted-path (my/vulpea-links--deleted-files-path)))
+                  (when (file-exists-p deleted-path)
+                    (with-current-buffer (find-file-noselect deleted-path)
+                      (goto-char (point-min))
+                      (while (re-search-forward
+                              (format "^:DELETED_FILE:[ \t]+%s$"
+                                      (regexp-quote target-file))
+                              nil t)
+                        (org-back-to-heading)
+                        (org-mark-subtree)
+                        (delete-region (region-beginning) (region-end))
+                        (goto-char (point-min)))
+                      (when deleted-id
+                        (goto-char (point-min))
+                        (while (re-search-forward
+                                (format "^:DELETED_ID:[ \t]+%s$"
+                                        (regexp-quote deleted-id))
+                                nil t)
+                          (org-back-to-heading)
+                          (org-mark-subtree)
+                          (delete-region (region-beginning) (region-end))
+                          (goto-char (point-min))))
+                      (let ((after-save-hook nil))
+                        (save-buffer))
+                      (kill-buffer (current-buffer)))))
+                (let ((after-save-hook nil))
+                  (save-buffer))
+                (my/vulpea-links--cleanup-empty-admin-files)
+                (message "Restored %s from %s. Vulpea will re-index via fswatch."
+                         target-file restore-rev)
+                (when (y-or-n-p (format "Open restored file %s? " target-file))
+                  (find-file (expand-file-name target-file (my/notes-directory)))))
+            (user-error "Git restore failed for %s" target-file)))))))
+#+end_src
+*** Restore From Deleted Files
+#+begin_src emacs-lisp
+(org-link-set-parameters "restore" :follow (lambda (&rest _) (my/vulpea-links-deleted-restore)))
+
+(defun my/vulpea-links-deleted-restore ()
+  "Restore a deleted file from Git history."
+  (interactive)
+  (let ((file (org-entry-get (point) "DELETED_FILE"))
+        id commit)
+    (unless file
+      (user-error "No DELETED_FILE found at point. Place cursor on a deleted file entry"))
+    (message "Searching Git history for %s..." file)
+    (setq id (org-entry-get (point) "DELETED_ID"))
+    (let ((default-directory (my/notes-directory)))
+      (setq commit (car (magit-git-lines
+                         "log" "--all" "-1"
+                         "--format=%H" "--" file))))
+    (unless commit
+      (user-error "Could not find %s in Git history. Was it ever committed?" file))
+    (unless (or (my/vulpea-links--git-restore-file commit file)
+                (my/vulpea-links--git-restore-file (format "%s^" commit) file))
+      (user-error "Git restore failed for %s" file))
+    (let ((restored-file file)
+          (deleted-files-path (buffer-file-name)))
+      (org-mark-subtree)
+      (delete-region (region-beginning) (region-end))
+      (let ((after-save-hook nil))
+        (save-buffer))
+      (when (and (file-exists-p deleted-files-path)
+                 (> (file-attribute-size (file-attributes deleted-files-path)) 0))
+        (my/vulpea-links--git-commit deleted-files-path
+          (format "auto: remove restore entry from deleted-files [%s]"
+                  (format-time-string "%H:%M:%S"))))
+      (when id
+        (let ((broken-path (my/vulpea-links--ensure-broken-links-file)))
+          (when (file-exists-p broken-path)
+            (with-current-buffer (find-file-noselect broken-path)
+              (goto-char (point-min))
+              (while (re-search-forward
+                      (format "^\\*+ TODO.*DELETED_ID: *%s"
+                              (regexp-quote id))
+                      nil t)
+                (org-mark-subtree)
+                (delete-region (region-beginning) (region-end))
+                (goto-char (point-min)))
+              (let ((after-save-hook nil))
+                (save-buffer))
+              (kill-buffer (current-buffer))
+              (when (and (file-exists-p broken-path)
+                         (> (file-attribute-size (file-attributes broken-path)) 0))
+                (my/vulpea-links--git-commit broken-path
+                  (format "auto: remove broken link entry from broken-links [%s]"
+                          (format-time-string "%H:%M:%S"))))))))
+      (my/vulpea-links--cleanup-empty-admin-files)
+      (message "Restored %s. Entry removed from deleted-files." restored-file)
+      (when (y-or-n-p (format "Open restored file %s? " restored-file))
+        (find-file (expand-file-name restored-file (my/notes-directory))))))))
+#+end_src

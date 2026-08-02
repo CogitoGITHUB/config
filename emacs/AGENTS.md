@@ -37,7 +37,7 @@
 ## Quick Reference
 - **Notes directory:** `~/test/` (`(my/notes-directory)` → `"/home/aoeu/test/"`)
 - **Notes must be in a git repo** — `before-save-hook` blocks with `user-error` if no `.git`
-- **vulpea.db:** at `~/test/vulpea.db`, root-owned (`root:users 664`), excluded from git
+- **vulpea.db:** at `~/test/admin/vulpea.db`, root-owned (`root:users 664`), excluded from git
 
 ## LaTeX / TeX Live
 

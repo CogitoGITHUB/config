@@ -32,12 +32,10 @@ immediately; capture mode opens the buffer with cursor ready.
 
 (defun my/vulpea-quick-todo ()
   (interactive)
-  (let* ((subdir (my/vulpea-root-dir (my/notes-directory)
-                                      "Todo subdir (Enter=root): "))
-         (mode (let ((c (read-char "Mode: (s)imple (c)apture [C]: ")))
+  (let* ((mode (let ((c (read-char "Mode: (s)imple (c)apture [C]: ")))
                  (if (memq c '(?\n ?\r ?\s)) ?c c)))
          (template (my/vulpea-quick-todo--choose-template))
-         (file (expand-file-name (concat subdir "Todo")
+         (file (expand-file-name "Todo"
                                   (my/notes-directory))))
     (if (eq mode ?s)
         (let ((text (read-string "TODO: "))

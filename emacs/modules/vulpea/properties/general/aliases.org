@@ -27,9 +27,10 @@ Comma-separated, blank = no aliases.
   :read-current-fn (lambda () (org-entry-get nil "ALIAS"))
   :merge-strategy 'replace
   :to-plist (lambda (val _ctx)
-              (when val
-                (let ((labels (copy-sequence val)))
-                  `(:properties (("ALIAS" . ,(mapconcat #'identity val ", ")))
-                    :post-apply (,(apply-partially
-                                   #'my/vulpea--apply-aliases-post labels)))))))
+              (if val
+                  (let ((labels (copy-sequence val)))
+                    `(:properties (("ALIAS" . ,(mapconcat #'identity val ", ")))
+                      :post-apply (,(apply-partially
+                                     #'my/vulpea--apply-aliases-post labels))))
+                `(:properties (("ALIAS" . "WARNING"))))))
 #+end_src

@@ -125,6 +125,8 @@ DESC is a pre-computed string (computed fresh each time the menu opens)."
                             my/vulpea--current-context))
         (when frag
           (my/vulpea--apply-fragment frag spec))))
+    (when (fboundp 'my/vulpea--add-live-transcludes)
+      (my/vulpea--add-live-transcludes my/vulpea--current-note))
     (save-buffer)
     (message "Updated properties on %s" (vulpea-note-title my/vulpea--current-note))
     (when (called-interactively-p 'any)
@@ -138,11 +140,30 @@ DESC is a pre-computed string (computed fresh each time the menu opens)."
 #+end_src
 *** Buffer Note Helper
 #+begin_src emacs-lisp
+(defun my/vulpea--note-at-point ()
+  "Return the vulpea note for the heading under (or enclosing) point.
+Walks up to the enclosing heading if the cursor is in the body/drawer,
+so it targets exactly the note you are on."
+  (let (id)
+    (unless (org-at-heading-p)
+      (ignore-errors (org-back-to-heading t)))
+    (setq id (org-entry-get nil "ID"))
+    (and id (vulpea-db-get-by-id id))))
+
 (defun my/vulpea--buffer-note ()
-  "Return the vulpea note for the current buffer, or nil."
-  (when-let ((file (buffer-file-name))
-             (notes (vulpea-db-query-by-file-path (file-truename file))))
-    (car notes)))
+  "Return the vulpea note for the current buffer, or nil.
+Prefers the note under the cursor, falls back to the buffer's file."
+  (or (my/vulpea--note-at-point)
+      (when-let ((file (buffer-file-name))
+                 (notes (vulpea-db-query-by-file-path (file-truename file))))
+        (let ((pos-point (point)))
+          (or (let ((best nil))
+                (dolist (n notes best)
+                  (let ((npos (vulpea-note-pos n)))
+                    (when (and npos (<= npos pos-point)
+                               (or (null best) (> npos (vulpea-note-pos best))))
+                      (setq best n)))))
+              (car notes))))))
 #+end_src
 *** Property Drawer Fallback
 Schema validation reads from the description list (meta), but we store
@@ -322,6 +343,20 @@ Toggle each property with its key letter, then confirm with C-c C-c."
 #+end_src
 *** Main Command
 #+begin_src emacs-lisp
+(defun my/vulpea--index-ensure-note ()
+  "Return the note for the current buffer, indexing the file on demand.
+Prefers the note under the cursor; if the DB has no row for the file
+(sync lag), calls `vulpea-db-update-file' and re-queries so the menu
+always opens on the note you are actually on."
+  (or (my/vulpea--note-at-point)
+      (when-let ((file (buffer-file-name)))
+        (condition-case nil
+            (progn
+              (vulpea-db-update-file (file-truename file))
+              (or (my/vulpea--note-at-point)
+                  (car (vulpea-db-query-by-file-path (file-truename file)))))
+          (error nil)))))
+
 (defun my/vulpea-update-properties ()
   "Update properties on an existing vulpea note.
 When called interactively, check for schema violations first and offer
@@ -329,7 +364,7 @@ to open the update menu.  When called from MISSING PROMPTS advice,
 skip the prompt and open the menu directly."
   (interactive)
   (let (buffer-note note file pos level)
-    (setq buffer-note (my/vulpea--buffer-note))
+    (setq buffer-note (my/vulpea--index-ensure-note))
     (setq note (or buffer-note
                    (vulpea-select "Update properties for: ")))
     (setq file (vulpea-note-path note))

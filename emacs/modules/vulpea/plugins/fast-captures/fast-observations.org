@@ -7,10 +7,9 @@ Fast observation capture. Creates an observation heading in Observations.org.
 #+begin_src emacs-lisp
 (defun my/vulpea-quick-observations ()
   (interactive)
-  (let* ((subdir (my/vulpea-root-dir (my/notes-directory)
-                                      "Observations subdir (Enter=root): "))
-         (file (expand-file-name (concat subdir "Observations")
+  (let* ((file (expand-file-name "admin/Observations"
                                   (my/notes-directory))))
+    (make-directory (file-name-directory file) t)
     (let ((org-capture-templates
            `(("o" "Quick Observation" entry (file ,file)
               "* %?"

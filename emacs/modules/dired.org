@@ -34,6 +34,11 @@
 (add-hook 'dired-mode-hook 'auto-revert-mode)
 (setq dired-movement-style 'bounded)
 (add-hook 'dired-after-readin-hook (lambda () (dired-hide-details-mode 1)))
+(require 'dired-x)
+(unless (string-search "^\\.git\\(ignore\\)?$" dired-omit-files)
+  (setq dired-omit-files
+        (concat dired-omit-files "\\|^\\.git\\(ignore\\)?$")))
+(add-hook 'dired-mode-hook (lambda () (dired-omit-mode 1)))
 (advice-add 'dired-internal-noselect :after
             (lambda (&rest _)
               (when olivetti-mode

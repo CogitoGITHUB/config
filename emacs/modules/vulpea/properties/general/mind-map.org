@@ -43,9 +43,10 @@ Why: Place the new note in the mind map tree — parent, child, sibling, or unkn
                  (let ((placement (plist-get val :placement))
                        (target-id (plist-get val :target-id))
                        result)
-                   (unless (string= placement "root")
+                   (if (string= placement "root")
+                       (push (cons "MIND_MAP_PLACEMENT" "WARNING") result)
                      (let ((link (my/vulpea--ensure-ref-note 'mm-placement placement)))
-                       (push (cons "MM_PLACEMENT" (or link placement)) result)))
+                       (push (cons "MIND_MAP_PLACEMENT" (or link placement)) result)))
                    (list :properties (nreverse result)
                          :post-apply (list (apply-partially
                                             #'mm/--apply-placement
