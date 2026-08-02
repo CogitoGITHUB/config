@@ -2,10 +2,8 @@ $env.PROMPT_INDICATOR_VI_INSERT = $"(ansi red): "
 $env.PROMPT_INDICATOR_VI_NORMAL = $"(ansi red)〉"
 
 # /home/aoeu/.config/nushell/env.nu
-
+$env._ZO_DATA_DIR = "/home/aoeu/.config/nushell"
 $env.EDITOR = "emacs"
-
-
 $env.XDG_RUNTIME_DIR = $"/run/user/(id -u | str trim)"
 
 # --- Guix Configuration ---
