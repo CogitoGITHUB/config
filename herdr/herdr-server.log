@@ -11733,3 +11733,18 @@
 2026-08-02T19:10:51.142485Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
 2026-08-02T19:11:05.038813Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
 2026-08-02T19:11:20.266581Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-02T19:38:42.394301Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-08-02T20:08:42.395349Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-08-02T20:38:42.396326Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-08-02T21:08:42.397543Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-08-02T21:09:39.545756Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=86 cell_width_px=0 cell_height_px=0
+2026-08-02T21:09:39.846421Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=63 cell_width_px=0 cell_height_px=0
+2026-08-02T21:13:15.319648Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=86 cell_width_px=0 cell_height_px=0
+2026-08-02T21:13:15.620417Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=63 cell_width_px=0 cell_height_px=0
+2026-08-02T21:37:58.969628Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=86 cell_width_px=0 cell_height_px=0
+2026-08-02T21:37:59.470906Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=63 cell_width_px=0 cell_height_px=0
+2026-08-02T21:38:23.125344Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=86 cell_width_px=0 cell_height_px=0
+2026-08-02T21:38:23.325657Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=63 cell_width_px=0 cell_height_px=0
+2026-08-02T21:38:42.399198Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-08-02T21:38:50.787609Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=86 cell_width_px=0 cell_height_px=0
+2026-08-02T21:38:51.188470Z  INFO herdr::server::headless: client resize client_id=4 cols=96 rows=63 cell_width_px=0 cell_height_px=0
