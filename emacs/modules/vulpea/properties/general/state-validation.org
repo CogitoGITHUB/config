@@ -1,6 +1,8 @@
 #+title:      State Validation Prompt
 #+priority:   5
 
+
+
 * State Validation
 Why: Tracks the Prime Constraint review lifecycle. Default is DRAFT.
 
@@ -36,8 +38,14 @@ Why: Tracks the Prime Constraint review lifecycle. Default is DRAFT.
   :read-current-fn (lambda () (org-entry-get nil "STATE_VALIDATION"))
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
-               (when val
-                 (let ((link (my/vulpea--ensure-ref-note 'state-validation val)))
-                   `(:properties (("STATE_VALIDATION" . ,(or link val)))
-                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_VALIDATION" (or link val)))))))))
+               (if (or (null val) (string-equal val "WARNING"))
+                   `(:properties (("STATE_VALIDATION" . "WARNING"))
+                     :post-apply (,(apply-partially
+                                    #'my/vulpea--clear-state-transcribes
+                                    "state-validation")))
+                 (let* ((link (my/vulpea--ensure-ref-note 'state-validation val))
+                        (ref-id (my/vulpea--id-from-link link)))
+                   `(:post-apply (,(apply-partially
+                                    #'my/vulpea--apply-state-post
+                                    "state-validation" val ref-id)))))))
 #+end_src

@@ -1,0 +1,477 @@
+#+title: Vulpea Gnosis Plugin
+#+priority: 10
+
+Spaced-repetition review for vulpea notes. Each note is a reviewable card; its schedule state lives in org properties (`GNOSIS_*`) and is indexed into a `gnosis_schedule` table by a DB extractor for fast due-queries.
+
+*** Require
+#+begin_src emacs-lisp
+(require 'cl-lib)
+(require 'calendar)
+(require 'time-date)
+#+end_src
+
+*** Algorithm Constants
+#+begin_src emacs-lisp
+(defvar my/vulpea-gnosis--proto '(0 1 2)
+  "Proto intervals for the first successful reviews.")
+
+(defvar my/vulpea-gnosis--gnosis-value '(0.35 0.30 1.3)
+  "Starting gnosis score (plus minus synolon).")
+
+(defvar my/vulpea-gnosis--amnesia 0.5
+  "Failure interval multiplier; closer to 1 = more memory loss.")
+
+(defvar my/vulpea-gnosis--epignosis 0.1
+  "Boost to gnosis-plus on anagnosis (accuracy).")
+
+(defvar my/vulpea-gnosis--agnoia 0.2
+  "Boost to gnosis-minus on anagnosis (ignorance).")
+
+(defvar my/vulpea-gnosis--anagnosis 3
+  "Streak threshold for anagnosis events.")
+
+(defvar my/vulpea-gnosis--lethe 2
+  "Failure threshold for lethe (interval reset to 0).")
+
+(defvar my/vulpea-gnosis--synolon-max 3.0
+  "Cap on gnosis-synolon (interval multiplier).")
+
+(defvar my/vulpea-gnosis--interval-fuzz 0.1
+  "Fuzz factor (+/- %) to prevent review clustering.")
+
+(defvar my/vulpea-gnosis--day-start-hour 3
+  "Hour at which a new review day begins.")
+#+end_src
+
+*** Date Helpers
+#+begin_src emacs-lisp
+(defun my/vulpea-gnosis--round-items (list)
+  "Round all items in LIST to 2 decimal places."
+  (cl-loop for item in list
+           collect (/ (round (* item 100)) 100.0)))
+
+(defun my/vulpea-gnosis--fuzz-interval (interval)
+  "Apply random fuzz to INTERVAL based on `my/vulpea-gnosis--interval-fuzz'."
+  (if (or (<= interval 2) (zerop my/vulpea-gnosis--interval-fuzz))
+      interval
+    (let ((fuzz (- (* 2 my/vulpea-gnosis--interval-fuzz
+                      (/ (random 1001) 1000.0))
+                   my/vulpea-gnosis--interval-fuzz)))
+      (* interval (1+ fuzz)))))
+
+(defun my/vulpea-gnosis--date (&optional offset)
+  "Return current date as (year month day), respecting day-start-hour.
+OFFSET is days from today."
+  (let* ((shifted (time-subtract (current-time)
+                                 (seconds-to-time
+                                  (* my/vulpea-gnosis--day-start-hour 3600))))
+         (decoded (decode-time shifted))
+         (target (if (and offset (not (zerop offset)))
+                     (decoded-time-add decoded (make-decoded-time :day offset))
+                   decoded)))
+    (list (decoded-time-year target)
+          (decoded-time-month target)
+          (decoded-time-day target))))
+
+(defun my/vulpea-gnosis--date-diff (date &optional date2)
+  "Days from DATE to DATE2 (default today)."
+  (let* ((given (encode-time 0 0 0 (caddr date) (cadr date) (car date)))
+         (d2 (if date2
+                 (encode-time 0 0 0 (caddr date2) (cadr date2) (car date2))
+               (let ((today (my/vulpea-gnosis--date)))
+                 (encode-time 0 0 0 (caddr today) (cadr today) (car today)))))
+         (diff (- (time-to-days d2) (time-to-days given))))
+    (if (>= diff 0) diff (error "DATE2 must be higher than DATE"))))
+
+(defun my/vulpea-gnosis--date-later-p (date1 date2)
+  "Return t if DATE1 is later than DATE2."
+  (> (time-to-days (encode-time 0 0 0 (caddr date1) (cadr date1) (car date1)))
+     (time-to-days (encode-time 0 0 0 (caddr date2) (cadr date2) (car date2)))))
+
+(defun my/vulpea-gnosis--date-to-int (date)
+  "Convert DATE (year month day) to YYYYMMDD integer."
+  (+ (* (nth 0 date) 10000) (* (nth 1 date) 100) (nth 2 date)))
+
+(defun my/vulpea-gnosis--int-to-date (int)
+  "Convert YYYYMMDD integer to (year month day)."
+  (list (/ int 10000) (% (/ int 100) 100) (% int 100)))
+
+(defun my/vulpea-gnosis--today-int ()
+  "Today as YYYYMMDD integer."
+  (my/vulpea-gnosis--date-to-int (my/vulpea-gnosis--date)))
+#+end_src
+
+*** Algorithm
+#+begin_src emacs-lisp
+(cl-defun my/vulpea-gnosis--next-gnosis
+    (&key gnosis success epignosis agnoia anagnosis c-successes c-failures lethe)
+  "Return new GNOSIS value (plus minus synolon)."
+  (let* ((g-plus (nth 0 gnosis))
+         (g-minus (nth 1 gnosis))
+         (g-synolon (nth 2 gnosis))
+         (anagnosis-p (= (% (max 1 (if success c-successes c-failures))
+                            anagnosis)
+                         0))
+         (neo-synolon (if success
+                          (min (+ g-synolon g-plus) my/vulpea-gnosis--synolon-max)
+                        (max 1.3 (- g-synolon g-minus))))
+         (neo-plus (if (and success anagnosis-p)
+                       (+ g-plus epignosis)
+                     g-plus))
+         (neo-minus (if (and (not success) anagnosis-p)
+                        (+ g-minus agnoia)
+                      g-minus))
+         (neo-plus (if (and lethe (not success) (>= c-failures lethe))
+                       (max 0.1 (- neo-plus epignosis))
+                     neo-plus)))
+    (my/vulpea-gnosis--round-items (list neo-plus neo-minus neo-synolon))))
+
+(cl-defun my/vulpea-gnosis--next-interval
+    (&key last-interval gnosis-synolon success successful-reviews
+          amnesia proto c-fails lethe)
+  "Calculate next interval as (year month day)."
+  (let* ((last-interval (if (and (<= last-interval 0) success) 1 last-interval))
+         (amnesia (- 1 amnesia))
+         (interval (cond ((and (< successful-reviews (length proto)) success)
+                          (nth successful-reviews proto))
+                         ((and (< successful-reviews (length proto)) (not success))
+                          0)
+                         ((and (>= c-fails lethe) (not success))
+                          0)
+                         (t (let* ((success-interval (* gnosis-synolon last-interval))
+                                   (failure-interval (* amnesia last-interval)))
+                              (if success success-interval
+                                (max (min success-interval failure-interval 7) 0)))))))
+    (my/vulpea-gnosis--date
+     (round (my/vulpea-gnosis--fuzz-interval interval)))))
+#+end_src
+
+*** Database Table
+#+begin_src emacs-lisp
+(defun my/vulpea-gnosis--ensure-table ()
+  "Create gnosis_schedule table if it does not exist."
+  (emacsql (vulpea-db)
+    [:create :table :if :not :exists gnosis_schedule
+     ([(note-id :not-null)
+       (next-rev :not-null)
+       (last-rev :not-null)
+       (n :not-null)
+       (c-success :not-null)
+       (c-fails :not-null)
+       (t-success :not-null)
+       (t-fails :not-null)
+       (plus :not-null)
+       (minus :not-null)
+       (synolon :not-null)
+       (suspend :not-null)]
+      (:primary-key [note-id])
+      (:foreign-key [note-id] :references notes [id]
+       :on-delete :cascade))]))
+#+end_src
+
+*** DB Extractor
+#+begin_src emacs-lisp
+(defun my/vulpea-gnosis--extract (ctx note-data)
+  "Extract GNOSIS_* properties from NOTE-DATA into gnosis_schedule."
+  (let* ((note-id (plist-get note-data :id))
+         (props (plist-get note-data :properties))
+         (gnosis (cdr (assoc "GNOSIS" props)))
+         (next-rev (cdr (assoc "GNOSIS_NEXT_REV" props)))
+         (to-int (lambda (k) (string-to-number (or (cdr (assoc k props)) "0")))))
+    (emacsql (vulpea-db)
+      [:delete :from gnosis_schedule :where (= note-id $s1)]
+      note-id)
+    (when (and note-id gnosis (not (string-equal gnosis "WARNING")) next-rev)
+      (emacsql (vulpea-db)
+        [:insert :into gnosis_schedule :values $v1]
+        (vector note-id
+                (funcall to-int "GNOSIS_NEXT_REV")
+                (funcall to-int "GNOSIS_LAST_REV")
+                (funcall to-int "GNOSIS_N")
+                (funcall to-int "GNOSIS_C_SUCCESS")
+                (funcall to-int "GNOSIS_C_FAILS")
+                (funcall to-int "GNOSIS_T_SUCCESS")
+                (funcall to-int "GNOSIS_T_FAILS")
+                (if (funcall to-int "GNOSIS_PLUS") (funcall to-int "GNOSIS_PLUS") 0.35)
+                (if (funcall to-int "GNOSIS_MINUS") (funcall to-int "GNOSIS_MINUS") 0.30)
+                (if (funcall to-int "GNOSIS_SYNOLON") (funcall to-int "GNOSIS_SYNOLON") 1.3)
+                (if (string-equal gnosis "SUSPEND") 1 0))))
+    note-data))
+
+(with-eval-after-load 'vulpea
+  (my/vulpea-gnosis--ensure-table)
+  (vulpea-db-register-extractor
+   (make-vulpea-extractor
+    :name       'gnosis-schedule
+    :version    1
+    :priority   55
+    :extract-fn #'my/vulpea-gnosis--extract)))
+#+end_src
+
+*** Schedule Property Write
+#+begin_src emacs-lisp
+(defun my/vulpea-gnosis--write-schedule-props
+    (note-id next-rev-int n success c-succ c-fails t-succ t-fails score)
+  "Write schedule properties for NOTE-ID back to its org drawer."
+  (let ((note (vulpea-db-get-by-id note-id)))
+    (when note
+      (let ((file (vulpea-note-path note))
+            (level (vulpea-note-level note))
+            (pos (vulpea-note-pos note)))
+        (when file
+          (with-current-buffer (find-file-noselect file)
+            (save-excursion
+              (if (and level (> level 0) pos)
+                  (progn (goto-char pos) (org-back-to-heading t))
+                (goto-char (point-min)))
+              (my/vulpea--drawer-put "GNOSIS_NEXT_REV" (number-to-string next-rev-int))
+              (my/vulpea--drawer-put "GNOSIS_LAST_REV" (number-to-string (my/vulpea-gnosis--today-int)))
+              (my/vulpea--drawer-put "GNOSIS_N" (number-to-string n))
+              (my/vulpea--drawer-put "GNOSIS_C_SUCCESS" (number-to-string (if success (1+ c-succ) 0)))
+              (my/vulpea--drawer-put "GNOSIS_C_FAILS" (number-to-string (if success 0 (1+ c-fails))))
+              (my/vulpea--drawer-put "GNOSIS_T_SUCCESS" (number-to-string (if success (1+ t-succ) t-succ)))
+              (my/vulpea--drawer-put "GNOSIS_T_FAILS" (number-to-string (if success t-fails (1+ t-fails))))
+              (my/vulpea--drawer-put "GNOSIS_PLUS" (number-to-string (nth 0 score)))
+              (my/vulpea--drawer-put "GNOSIS_MINUS" (number-to-string (nth 1 score)))
+              (my/vulpea--drawer-put "GNOSIS_SYNOLON" (number-to-string (nth 2 score))))
+            (save-buffer)))))))
+
+(defun my/vulpea-gnosis--init-schedule (suspend note)
+  "Initialize schedule properties for fresh note participating in REVIEW."
+  (when (vulpea-note-p note)
+    (let* ((id (vulpea-note-id note))
+           (today (my/vulpea-gnosis--today-int)))
+      (my/vulpea--property-put note "GNOSIS_NEXT_REV" (number-to-string today))
+      (my/vulpea--property-put note "GNOSIS_LAST_REV" (number-to-string today))
+      (my/vulpea--property-put note "GNOSIS_N" "0")
+      (my/vulpea--property-put note "GNOSIS_C_SUCCESS" "0")
+      (my/vulpea--property-put note "GNOSIS_C_FAILS" "0")
+      (my/vulpea--property-put note "GNOSIS_T_SUCCESS" "0")
+      (my/vulpea--property-put note "GNOSIS_T_FAILS" "0")
+      (my/vulpea--property-put note "GNOSIS_PLUS" "0.35")
+      (my/vulpea--property-put note "GNOSIS_MINUS" "0.30")
+      (my/vulpea--property-put note "GNOSIS_SYNOLON" "1.3")
+      (unless (car (emacsql (vulpea-db)
+                    [:select [note-id] :from gnosis_schedule
+                     :where (= note-id $s1)] id))
+        (emacsql (vulpea-db)
+          [:insert :into gnosis_schedule :values $v1]
+          (vector id today today 0 0 0 0 0 0.35 0.30 1.3
+                  (if suspend 1 0)))))))
+#+end_src
+
+*** Algorithm Bridge
+#+begin_src emacs-lisp
+(defun my/vulpea-gnosis--review-algorithm (note-id success)
+  "Compute (NEXT-REV GNOSIS-SCORE LOG-ALIST) for reviewing NOTE-ID with SUCCESS."
+  (let* ((row (car (emacsql (vulpea-db)
+                   [:select [t-success c-success c-fails last-rev next-rev
+                             n t-fails plus minus synolon]
+                    :from gnosis_schedule :where (= note-id $s1)]
+                   note-id)))
+         (t-success (nth 0 row))
+         (c-success (nth 1 row))
+         (c-fails (nth 2 row))
+         (last-interval (my/vulpea-gnosis--date-diff
+                         (my/vulpea-gnosis--int-to-date (nth 3 row))))
+         (existing-next-rev (my/vulpea-gnosis--int-to-date (nth 4 row)))
+         (n (nth 5 row))
+         (t-fails (nth 6 row))
+         (gnosis (list (nth 7 row) (nth 8 row) (nth 9 row)))
+         (computed-next-rev (my/vulpea-gnosis--next-interval
+                             :last-interval last-interval
+                             :gnosis-synolon (nth 2 gnosis)
+                             :success success
+                             :successful-reviews t-success
+                             :c-fails c-fails
+                             :lethe my/vulpea-gnosis--lethe
+                             :amnesia my/vulpea-gnosis--amnesia
+                             :proto my/vulpea-gnosis--proto))
+         (next-rev (if (and success
+                            (my/vulpea-gnosis--date-later-p
+                             existing-next-rev computed-next-rev))
+                       existing-next-rev
+                     computed-next-rev)))
+    (list next-rev
+          (my/vulpea-gnosis--next-gnosis
+           :gnosis gnosis :success success
+           :epignosis my/vulpea-gnosis--epignosis
+           :agnoia my/vulpea-gnosis--agnoia
+           :anagnosis my/vulpea-gnosis--anagnosis
+           :c-successes (if success (1+ c-success) 0)
+           :c-failures (if success 0 (1+ c-fails))
+           :lethe my/vulpea-gnosis--lethe)
+          `((n . ,n) (c-success . ,c-success) (c-fails . ,c-fails)
+            (t-success . ,t-success) (t-fails . ,t-fails)))))
+
+(defun my/vulpea-gnosis--update (note-id success result)
+  "Update gnosis_schedule and note properties for NOTE-ID review."
+  (let* ((next-rev (nth 0 result))
+         (score (nth 1 result))
+         (log (nth 2 result))
+         (n (alist-get 'n log))
+         (c-succ (alist-get 'c-success log))
+         (c-fails (alist-get 'c-fails log))
+         (t-succ (alist-get 't-success log))
+         (t-fails (alist-get 't-fails log))
+         (today (my/vulpea-gnosis--today-int)))
+    (emacsql (vulpea-db)
+      [:update gnosis_schedule :set
+       last-rev = $s2, next-rev = $s3, n = $s4,
+       c-success = $s5, c-fails = $s6, t-success = $s7, t-fails = $s8,
+       plus = $s9, minus = $s10, synolon = $s11
+       :where (= note-id $s1)]
+      note-id today (my/vulpea-gnosis--date-to-int next-rev) (1+ n)
+      (if success (1+ c-succ) 0)
+      (if success 0 (1+ c-fails))
+      (if success (1+ t-succ) t-succ)
+      (if success t-fails (1+ t-fails))
+      (nth 0 score) (nth 1 score) (nth 2 score))
+    (my/vulpea-gnosis--write-schedule-props
+     note-id (my/vulpea-gnosis--date-to-int next-rev) (1+ n)
+     success c-succ c-fails t-succ t-fails score)
+    next-rev))
+#+end_src
+
+*** Due Queries
+#+begin_src emacs-lisp
+(defun my/vulpea-gnosis--due-note-ids ()
+  "Return note IDs due for review today."
+  (let ((today (my/vulpea-gnosis--today-int)))
+    (mapcar #'car
+            (emacsql (vulpea-db)
+              [:select [note-id] :from gnosis_schedule
+               :where (and (<= next-rev $s1) (= suspend 0))]
+              today))))
+
+(defun my/vulpea-gnosis--overdue-note-ids ()
+  "Return note IDs overdue (reviewed at least once, due before today)."
+  (let ((today (my/vulpea-gnosis--today-int)))
+    (mapcar #'car
+            (emacsql (vulpea-db)
+              [:select [note-id] :from gnosis_schedule
+               :where (and (> n 0) (= suspend 0) (< next-rev $s1))]
+              today))))
+
+(defun my/vulpea-gnosis--due-count ()
+  "Number of due notes."
+  (length (my/vulpea-gnosis--due-note-ids)))
+#+end_src
+
+*** Review Session
+#+begin_src emacs-lisp
+(defun my/vulpea-gnosis--display-note (id)
+  "Display note ID in review buffer."
+  (let ((note (vulpea-db-get-by-id id)))
+    (with-current-buffer "*vulpea-gnosis-review*"
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (format "%s\n\n"
+                        (if note (vulpea-note-title note) id)))
+        (when note
+          (insert (format "[[id:%s][open]]\n" id)))))))
+
+(defun my/vulpea-gnosis--review-session (ids)
+  "Review NOTE-IDS in sequence, grading with algorithm."
+  (let ((buf (get-buffer-create "*vulpea-gnosis-review*"))
+        (total (length ids))
+        (reviewed 0))
+    (with-current-buffer buf
+      (special-mode)
+      (setq buffer-read-only t))
+    (pop-to-buffer-same-window buf)
+    (catch 'gnosis-quit
+      (dolist (id ids)
+        (let* ((note (vulpea-db-get-by-id id))
+               (title (if note (vulpea-note-title note) id)))
+          (my/vulpea-gnosis--display-note id)
+          (message "[%d/%d] %s" (1+ reviewed) total title)
+          (let ((choice (read-char-choice
+                         "n=next f=fail s=suspend o=open q=quit: "
+                         '(?n ?f ?s ?o ?q))))
+            (pcase choice
+              (?n (my/vulpea-gnosis--update id t
+                   (my/vulpea-gnosis--review-algorithm id t)))
+              (?f (my/vulpea-gnosis--update id nil
+                   (my/vulpea-gnosis--review-algorithm id nil)))
+              (?s (my/vulpea-gnosis--set-suspend id 1))
+              (?o (when note
+                    (find-file (vulpea-note-path note))
+                    (let ((inhibit-read-only t))
+                      (with-current-buffer buf (erase-buffer)))
+                    (when (y-or-n-p "Grade this note? ")
+                      (let ((g (read-char-choice "n=next f=fail s=suspend q=quit: "
+                                                 '(?n ?f ?s ?q))))
+                        (pcase g
+                          (?n (my/vulpea-gnosis--update id t
+                               (my/vulpea-gnosis--review-algorithm id t)))
+                          (?f (my/vulpea-gnosis--update id nil
+                               (my/vulpea-gnosis--review-algorithm id nil)))
+                          (?s (my/vulpea-gnosis--set-suspend id 1))
+                          (?q nil))))))
+              (?q (throw 'gnosis-quit nil)))))
+        (cl-incf reviewed)))
+    (kill-buffer buf)))
+
+(defun my/vulpea-gnosis--set-suspend (note-id &optional value)
+  "Toggle suspend on NOTE-ID."
+  (let ((v (if value 1 0)))
+    (emacsql (vulpea-db)
+      [:update gnosis_schedule :set suspend = $s2 :where (= note-id $s1)]
+      note-id v)
+    (let ((note (vulpea-db-get-by-id note-id)))
+      (when note
+        (my/vulpea--property-put note "GNOSIS" (if value "SUSPEND" "REVIEW"))))
+    (message "Suspended")))
+#+end_src
+
+*** Commands
+#+begin_src emacs-lisp
+(defun my/vulpea-gnosis-review ()
+  "Start gnosis review session for due notes."
+  (interactive)
+  (let ((ids (my/vulpea-gnosis--due-note-ids)))
+    (if (null ids)
+        (message "No due notes.")
+      (my/vulpea-gnosis--review-session ids))))
+
+(defun my/vulpea-gnosis-review-overdue ()
+  "Start gnosis review session for overdue notes."
+  (interactive)
+  (let ((ids (my/vulpea-gnosis--overdue-note-ids)))
+    (if (null ids)
+        (message "No overdue notes.")
+      (my/vulpea-gnosis--review-session ids))))
+
+(defun my/vulpea-gnosis-mark-review (arg)
+  "Mark current note reviewed; with prefix, mark as failed."
+  (interactive "P")
+  (let ((note (my/vulpea--buffer-note)))
+    (unless note (user-error "No note at point"))
+    (let ((id (vulpea-note-id note)))
+      (unless (car (emacsql (vulpea-db)
+                    [:select [note-id] :from gnosis_schedule
+                     :where (= note-id $s1)] id))
+        (my/vulpea-gnosis--init-schedule nil note))
+      (my/vulpea-gnosis--update id (not arg)
+       (my/vulpea-gnosis--review-algorithm id (not arg)))
+      (message "Note marked %s." (if arg "failed" "reviewed")))))
+
+(defun my/vulpea-gnosis-toggle-participation ()
+  "Toggle current note's participation in gnosis review pool."
+  (interactive)
+  (let ((note (my/vulpea--buffer-note)))
+    (unless note (user-error "No note at point"))
+    (let* ((id (vulpea-note-id note))
+           (gnosis (vulpea-note-meta-get note "GNOSIS" 'string))
+           (active (and gnosis (not (string-equal gnosis "WARNING")))))
+      (if active
+          (progn
+            (my/vulpea--property-put note "GNOSIS" "WARNING")
+            (emacsql (vulpea-db)
+              [:delete :from gnosis_schedule :where (= note-id $s1)] id)
+            (message "Removed from review pool."))
+        (my/vulpea--property-put note "GNOSIS" "REVIEW")
+        (my/vulpea-gnosis--init-schedule nil note)
+        (message "Added to review pool.")))))
+#+end_src

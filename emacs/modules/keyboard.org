@@ -577,6 +577,11 @@
     ("i" my/vulpea-find-protocols "find protocols" :exit t))
    "Vocab"
    (("w" my/vulpea-dictionary-menu "dictionary" :exit t))
+   "Gnosis"
+   (("g" my/vulpea-gnosis-review "review due" :exit t)
+    ("G" my/vulpea-gnosis-review-overdue "review overdue" :exit t)
+    ("M" my/vulpea-gnosis-mark-review "mark reviewed" :exit t)
+    ("t" my/vulpea-gnosis-toggle-participation "toggle pool" :exit t))
    "Transclude"
    (("y" my/transclusion-hydra/body "transclude" :exit t))
    "Back"

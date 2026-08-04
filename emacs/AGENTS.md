@@ -67,7 +67,11 @@ The emacs-mcp-server runs inside the Emacs daemon and exposes these tools to ope
 | `org-archive` | Archive a node |
 | `org-clock` | Clock in/out of Org tasks |
 
-**emacsclient** can also be used directly: `emacsclient --eval '(elisp-expr)'` — preferred for quick one-off expressions. Use the MCP tools above for structured operations.
+**emacsclient** can also be used directly. ⚠️ Its socket
+`/run/user/1000/emacs/server` is frequently a **stale file** → "Connection
+refused" even though the file exists. The **MCP socket is the reliable path**
+(§below). Try `emacsclient --eval '(+ 1 2)'`; if it gives Connection refused,
+use socat→MCP.
 
 **Vulpea** (v2.5.0) is loaded and accessible via `eval-elisp`. Useful for querying org-roam notes programmatically (e.g., `(vulpea-db-query ...)`).
 
@@ -75,17 +79,39 @@ The emacs-mcp-server runs inside the Emacs daemon and exposes these tools to ope
 
 **emacsclient socket:** always use explicit path → `emacsclient --socket-name /run/user/1000/emacs/server --eval '...'`
 
-Daemon socket: `/run/user/1000/emacs/server`
-MCP socket: `~/.config/emacs/.local/cache/emacs-mcp-server.sock`
+Daemon socket (emacsclient): `/run/user/1000/emacs/server` — may be stale/refused.
+
+**MCP socket (RELIABLE):** `/home/aoeu/.config/emacs/.local/cache/emacs-mcp-server.sock` — talk to it with socat using the ABSOLUTE path (socat does NOT expand `~`). JSON-RPC 2.0, newline-delimited, `id` unique:
+```bash
+SOCK=/home/aoeu/.config/emacs/.local/cache/emacs-mcp-server.sock
+socat - UNIX-CONNECT:$SOCK <<'EOF'
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(+ 1 2)"}}}
+EOF
+```
+
+If opencode doesn't surface the MCP tools (they're callable via `tools/call`),
+use socat directly as above.
 
 ## Reloading config (no daemon restart)
 
-`manifolding-emacs-boot` recompiles and reloads all modules. Run via emacsclient:
+`manifolding-emacs-boot` recompiles and reloads all modules. Run via the MCP
+socket (reliable) — it takes 10-30s so send it and then poll for idle:
 ```bash
-emacsclient --socket-name /run/user/1000/emacs/server --eval '(manifolding-emacs-boot)'
+SOCK=/home/aoeu/.config/emacs/.local/cache/emacs-mcp-server.sock
+# kick off (non-blocking; wrap in `timeout 30 socat` since it can hang while compiling)
+socat - UNIX-CONNECT:$SOCK <<'EOF'
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(manifolding-emacs-reload)"}}}
+EOF
+# poll until idle
+socat - UNIX-CONNECT:$SOCK <<'EOF'
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(float-time (current-idle-time))"}}}
+EOF
+# check errors
+socat - UNIX-CONNECT:$SOCK <<'EOF'
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(manifolding-emacs-errors-list)"}}}
+EOF
 ```
-
-If running from opencode MCP, use `eval-elisp` tool instead. Note: this can take time if `straight` needs to install new packages.
+Note: this can take time if `straight` needs to install new packages.
 
 ## Git SSL cert fix
 
@@ -102,6 +128,12 @@ The Emacs daemon is managed by shepherd. To restart:
 ```bash
 herd restart emacs-daemon
 ```
+
+> ⚠️ The actual shepherd service name is NOT `emacs-daemon`
+> (`herd restart emacs-daemon` → "service could not be found"). Confirm the
+> real name with `herd status | grep emacs` (it's defined in
+> `~/.config/ManifoldOS/system.scm`). For `modules/*.org` edits you usually
+> don't need a restart at all — use the MCP reload (§Reloading config above).
 
 The daemon socket is at `/run/user/1000/emacs/server`.
 

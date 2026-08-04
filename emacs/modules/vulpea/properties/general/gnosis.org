@@ -1,0 +1,50 @@
+#+title:      Gnosis Review Prompt
+#+priority:   5
+
+* Gnosis
+Why: Controls whether the note participates in the gnosis spaced-repetition review pool. Default is WARNING (not in pool).
+
+** Default (default WARNING)
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-gnosis ()
+  "Prompt for GNOSIS. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "GNOSIS: "
+              '("⚠ WARNING" "REVIEW" "SUSPEND")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/vulpea-prompt-gnosis-initial (initial)
+  "Prompt for GNOSIS with INITIAL pre-selected."
+  (completing-read
+   "GNOSIS: "
+   '("REVIEW" "SUSPEND")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/vulpea-register-prompt
+  :key 'gnosis
+  :name 'gnosis
+  :label "Gnosis: Review"
+  :prompt-fn #'my/vulpea-prompt-gnosis
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "GNOSIS"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (cond
+               ((or (null val) (string-equal val "WARNING"))
+                `(:properties (("GNOSIS" . "WARNING"))))
+               ((string-equal val "SUSPEND")
+                `(:properties (("GNOSIS" . "SUSPEND"))
+                  :post-apply (,(apply-partially
+                                 #'my/vulpea-gnosis--init-schedule t))))
+               (t
+                `(:properties (("GNOSIS" . "REVIEW"))
+                  :post-apply (,(apply-partially
+                                 #'my/vulpea-gnosis--init-schedule nil)))))))
+#+end_src

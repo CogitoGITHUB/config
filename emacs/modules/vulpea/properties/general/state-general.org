@@ -37,8 +37,14 @@ Why: Tracks the note's position in the five-layer operational sequence
   :read-current-fn (lambda () (org-entry-get nil "STATE_GENERAL"))
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
-               (when val
-                 (let ((link (my/vulpea--ensure-ref-note 'state-general val)))
-                   `(:properties (("STATE_GENERAL" . ,(or link val)))
-                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_GENERAL" (or link val)))))))))
+               (if (or (null val) (string-equal val "WARNING"))
+                   `(:properties (("STATE_GENERAL" . "WARNING"))
+                     :post-apply (,(apply-partially
+                                    #'my/vulpea--clear-state-transcribes
+                                    "state-general")))
+                 (let* ((link (my/vulpea--ensure-ref-note 'state-general val))
+                        (ref-id (my/vulpea--id-from-link link)))
+                   `(:post-apply (,(apply-partially
+                                    #'my/vulpea--apply-state-post
+                                    "state-general" val ref-id)))))))
 #+end_src

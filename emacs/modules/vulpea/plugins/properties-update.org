@@ -343,13 +343,21 @@ Toggle each property with its key letter, then confirm with C-c C-c."
 #+end_src
 *** Main Command
 #+begin_src emacs-lisp
+(defun my/vulpea--context-file ()
+  "Return the note file for the current context, or nil.
+Works from a note buffer and from dired (file under the cursor)."
+  (or (buffer-file-name)
+      (and (derived-mode-p 'dired-mode)
+           (ignore-errors (dired-get-file-for-visit)))))
+
 (defun my/vulpea--index-ensure-note ()
   "Return the note for the current buffer, indexing the file on demand.
 Prefers the note under the cursor; if the DB has no row for the file
 (sync lag), calls `vulpea-db-update-file' and re-queries so the menu
-always opens on the note you are actually on."
+always opens on the note you are actually on.  From dired, resolves
+the file under the cursor first."
   (or (my/vulpea--note-at-point)
-      (when-let ((file (buffer-file-name)))
+      (when-let ((file (my/vulpea--context-file)))
         (condition-case nil
             (progn
               (vulpea-db-update-file (file-truename file))
@@ -366,7 +374,13 @@ skip the prompt and open the menu directly."
   (let (buffer-note note file pos level)
     (setq buffer-note (my/vulpea--index-ensure-note))
     (setq note (or buffer-note
-                   (vulpea-select "Update properties for: ")))
+                   (when (vulpea-db-query)
+                     (vulpea-select "Update properties for: "))))
+    (unless note
+      (user-error "No vulpea note here%s"
+                  (if-let ((file (my/vulpea--context-file)))
+                      (format " (%s not indexed)" file)
+                    "")))
     (setq file (vulpea-note-path note))
     (setq pos (vulpea-note-pos note))
     (setq level (vulpea-note-level note))

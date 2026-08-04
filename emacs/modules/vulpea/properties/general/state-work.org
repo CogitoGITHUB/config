@@ -45,5 +45,5 @@ Why: Tracks the current work status of the note. Default is ACTIVE.
                        (ref-id (my/vulpea--id-from-link link)))
                   `(:post-apply (,(apply-partially
                                    #'my/vulpea--apply-state-post
-                                   "state-work" "STATE_WORK" val ref-id)))))))
+                                   "state-work" val ref-id)))))))
 #+end_src

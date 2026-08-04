@@ -110,7 +110,7 @@ rename path so any mutation in the notes dir is committed automatically."
   (when (my/vulpea-git--in-notes-p file)
     (my/vulpea-git-auto-commit file)))
 
-(defun my/vulpea-git--after-delete (file &optional _trash)
+(defun my/vulpea-git--after-delete (file &rest _)
   "Advice for `delete-file'/`delete-directory': commit notes-dir deletion."
   (when (my/vulpea-git--in-notes-p file)
     (my/vulpea-git-auto-commit file)))
@@ -188,6 +188,36 @@ rename path so any mutation in the notes dir is committed automatically."
   (let ((default-directory (my/notes-directory)))
     (= 0 (magit-call-git "checkout" commit "--" file-path))))
 
+(defun my/vulpea-links--restore-refs (refs commit)
+  "Restore each relative path in REFS from COMMIT using git checkout.
+REFS is a space-separated string of relative paths (as stored in the
+:DELETED_REFS: property) or a list. Returns count of refs restored.
+Falls back to COMMIT's parent if the file is absent at COMMIT."
+  (let ((rel-list (if (listp refs) refs
+                    (when (and refs (not (string-empty-p refs)))
+                      (split-string refs "[ \t]+" t))))
+        (count 0))
+    (dolist (rel rel-list count)
+      (let ((revs (list commit (format "%s^" commit))))
+        (when (or (my/vulpea-links--git-restore-file (car revs) rel)
+                  (my/vulpea-links--git-restore-file (cadr revs) rel))
+          (setq count (1+ count)))))))
+
+(defun my/vulpea-links--deleted-refs-for-id (deleted-id)
+  "Return the DELETED_REFS property from the deleted-files entry for
+DELETED-ID, or nil."
+  (let ((path (my/vulpea-links--deleted-files-path)))
+    (when (file-exists-p path)
+      (with-temp-buffer
+        (insert-file-contents path)
+        (org-mode)
+        (goto-char (point-min))
+        (when (re-search-forward
+               (format "^[ \t]*:DELETED_ID:[ \t]+%s$" (regexp-quote deleted-id))
+               nil t)
+          (org-back-to-heading)
+          (org-entry-get (point) "DELETED_REFS"))))))
+
 (defun my/vulpea-links--git-commit (path &optional msg)
   "Git add and commit PATH with MSG for admin file changes."
   (let ((default-directory (my/notes-directory)))
@@ -232,6 +262,9 @@ rename path so any mutation in the notes dir is committed automatically."
               (restore-rev (cdr restore-info)))
           (if (my/vulpea-links--git-restore-file restore-rev target-file)
               (progn
+                (let ((refs (my/vulpea-links--deleted-refs-for-id deleted-id)))
+                  (when refs
+                    (my/vulpea-links--restore-refs refs restore-rev)))
                 (org-mark-subtree)
                 (delete-region (region-beginning) (region-end))
                 (let ((deleted-path (my/vulpea-links--deleted-files-path)))
@@ -290,6 +323,9 @@ rename path so any mutation in the notes dir is committed automatically."
     (unless (or (my/vulpea-links--git-restore-file commit file)
                 (my/vulpea-links--git-restore-file (format "%s^" commit) file))
       (user-error "Git restore failed for %s" file))
+    (let ((refs (org-entry-get (point) "DELETED_REFS")))
+      (when refs
+        (my/vulpea-links--restore-refs refs commit)))
     (let ((restored-file file)
           (deleted-files-path (buffer-file-name)))
       (org-mark-subtree)

@@ -41,8 +41,14 @@ Why: Tracks the execution state of what the note describes. Default is PLANNED.
   :read-current-fn (lambda () (org-entry-get nil "STATE_OPERATIONAL"))
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
-               (when val
-                 (let ((link (my/vulpea--ensure-ref-note 'state-operational val)))
-                   `(:properties (("STATE_OPERATIONAL" . ,(or link val)))
-                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_OPERATIONAL" (or link val)))))))))
+               (if (or (null val) (string-equal val "WARNING"))
+                   `(:properties (("STATE_OPERATIONAL" . "WARNING"))
+                     :post-apply (,(apply-partially
+                                    #'my/vulpea--clear-state-transcribes
+                                    "state-operational")))
+                 (let* ((link (my/vulpea--ensure-ref-note 'state-operational val))
+                        (ref-id (my/vulpea--id-from-link link)))
+                   `(:post-apply (,(apply-partially
+                                    #'my/vulpea--apply-state-post
+                                    "state-operational" val ref-id)))))))
 #+end_src

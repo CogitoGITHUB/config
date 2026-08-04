@@ -6,7 +6,7 @@ When the user asks to add, modify, or reconfigure something:
 
 **Reference:** `~/.config/emacs/modules/AGENTS.md`
 **Location:** `~/.config/emacs/modules/<name>.org`
-**Daemon control:** `herd restart emacs-daemon`
+**Daemon control:** prefer MCP reload (`socat → eval-elisp (manifolding-emacs-reload)`, §2 below) — `herd restart emacs-daemon` doesn't exist; confirm real service name with `herd status | grep emacs`
 **Test:** `emacs --batch --load ~/.config/emacs/init.el --eval '(message "ok")'`
 
 Each module is an `.org` file. `:STRAIGHT:` must be a single line.
@@ -62,19 +62,24 @@ ls -d ~/.config/emacs/
 The daemon is managed by shepherd. To restart:
 
 ```bash
-herd restart emacs-daemon
+herd restart emacs-emacs  # NOTE: see below — the service name is NOT emacs-daemon
 ```
 
+> **This is a known weak point.** The AGENTS doc historically said `emacs-daemon`,
+> but `herd restart emacs-daemon` → "service could not be found". The actual
+> shepherd service name lives in `~/.config/ManifoldOS/system.scm`. Before
+> relying on a daemon restart, prefer the MCP reload (§2) — it needs no restart
+> for `modules/*.org` edits. Confirm the real service name with
+> `herd status | grep emacs` if you truly need to restart.
+
 To test config changes without restarting the daemon:
-Server socket at `/run/user/1000/emacs/server`. MCP socket at
-`~/.config/emacs/.local/cache/emacs-mcp-server.sock` (separate thread,
-dies with daemon).
+**MCP socket:** `/home/aoeu/.config/emacs/.local/cache/emacs-mcp-server.sock` — use socat with the ABSOLUTE path (socat does NOT expand `~`). This is the reliable way to talk to the live daemon and reload config. The daemon socket `/run/user/1000/emacs/server` (for `emacsclient`) is a separate thing and often gives "Connection refused" even when a stale socket FILE exists — don't trust its mere existence. There is NO `herd` service called `emacs-daemon` (`herd restart emacs-daemon` → "service could not be found"). Prefer socat→MCP (below §2) over emacsclient.
 
 ## Daemon lifecycle
 
 ### Starting
 ```bash
-herd start emacs-daemon
+herd start emacs-daemon   # NOTE: confirm real service name with `herd status | grep emacs`
 ```
 
 ### Waiting for boot to finish
@@ -111,7 +116,7 @@ emacsclient --socket-name /run/user/1000/emacs/server --eval '(+ 1 2)'
 If you changed `bootstrap.org`, `tangle` it first, then restart:
 ```bash
 emacs --batch --find-file ~/.config/emacs/bootstrap.org --eval '(org-babel-tangle)'
-herd restart emacs-daemon
+herd restart emacs-daemon  # NOTE: confirm real service name — see §above
 ```
 
 ### Detecting why restart is needed
@@ -138,10 +143,16 @@ Use them in this order of preference depending on what you need.
 
 ---
 
-## 1. emacsclient (fastest, simplest elisp)
+## 1. emacsclient (fastest, simplest elisp — when it works)
 
 Best for one-liners, state checks, calling custom functions, vulpea queries.
 No JSON, no encoding issues, just elisp.
+
+⚠️ **Often fails with "Connection refused".** The socket file
+`/run/user/1000/emacs/server` frequently persists as a stale file after the
+daemon restarts, and emacsclient then refuses to connect. If emacsclient
+fails, fall back to the MCP socket (§2). Sanity-check which socket is live
+first:
 
 ```bash
 # Quick eval — result printed to stdout
@@ -158,7 +169,7 @@ emacsclient --socket-name /run/user/1000/emacs/server --eval '(expand-file-name 
 emacsclient --socket-name /run/user/1000/emacs/server --eval '(manifolding-emacs-reload)'
 ```
 
-**Socket path:** `/run/user/1000/emacs/server` (always use the full `--socket-name`).
+**Socket path:** `/run/user/1000/emacs/server` (always use the full `--socket-name`). If this gives "Connection refused" but the MCP socket connects, the daemon socket is stale — use §2 instead.
 
 ### emacsclient patterns
 
@@ -230,16 +241,22 @@ emacsclient --socket-name $SOCK --eval "`cat /tmp/script.el`"
 
 The `emacs-mcp-server` runs as a thread inside the Emacs daemon. It is **always available**
 when the daemon is running, listening on a Unix socket. The protocol is JSON-RPC 2.0 with
-newline-delimited JSON — use `socat` to talk to it.
+newline-delimited JSON — use `socat` to talk to it. **This is the primary way to interact
+with the live daemon** (see §1 note: emacsclient's `/run/user/1000/emacs/server` socket
+often gives "Connection refused" despite a stale socket file existing; the MCP socket
+works reliably).
 
-**Socket:** `~/.config/emacs/.local/cache/emacs-mcp-server.sock`
+**Socket:** `/home/aoeu/.config/emacs/.local/cache/emacs-mcp-server.sock`
+
+⚠️ **socat does NOT expand `~`.** Always use the full path above. A bare
+`UNIX-CONNECT:~/.config/...` fails with "No such file or directory".
 
 ### Protocol basics
 
 ```bash
 # Send a JSON-RPC request
 printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"TOOL","arguments":{...}}}\n' \
-  | socat - UNIX-CONNECT:~/.config/emacs/.local/cache/emacs-mcp-server.sock
+  | socat - UNIX-CONNECT:/home/aoeu/.config/emacs/.local/cache/emacs-mcp-server.sock
 ```
 
 Every response looks like:
@@ -256,6 +273,46 @@ Every response looks like:
 6. **MCP dies when daemon dies.** No daemon = no MCP socket. Always check connectivity first.
 7. All tools return JSON in `result.content[0].text`. For string results, the text IS the result value. For structured results (org-agenda, org-search, etc.), the text is a JSON string you must parse.
 
+### Reloading config + checking errors via MCP (the critical workflow)
+
+After editing any `modules/*.org` file, reload through the MCP socket (no daemon restart needed):
+
+```bash
+SOCK=/home/aoeu/.config/emacs/.local/cache/emacs-mcp-server.sock
+
+# 1. Kick off the reload (non-blocking — it takes 10-30s, compiles all modules)
+socat - UNIX-CONNECT:$SOCK <<'EOF'
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(manifolding-emacs-reload)"}}}
+EOF
+
+# 2. Poll until the daemon is idle (reload finished)
+for i in $(seq 1 30); do
+  R=$(socat - UNIX-CONNECT:$SOCK <<'EOF'
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(float-time (current-idle-time))"}}}
+EOF
+  )
+  IDLE=$(echo "$R" | sed -n 's/.*"text":"\([0-9.]*\)".*/\1/p')
+  if [ -n "$IDLE" ] && [ "$(echo "$IDLE" | cut -d. -f1)" -ge 3 ]; then break; fi
+  sleep 5
+done
+
+# 3. Check for load errors/warnings
+socat - UNIX-CONNECT:$SOCK <<'EOF'
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(manifolding-emacs-errors-list)"}}}
+EOF
+socat - UNIX-CONNECT:$SOCK <<'EOF'
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(manifolding-emacs-warnings-list)"}}}
+EOF
+
+# 4. Confirm your new vars/functions are defined
+socat - UNIX-CONNECT:$SOCK <<'EOF'
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(fboundp 'my/vulpea-gnosis-review)"}}}
+EOF
+```
+
+Gotcha: the first `eval-elisp` call after a reload can hang until compilation
+completes (rule 4) — use `timeout 30 socat ...` around step 1's request.
+
 ### Handling JSON escaping in bash
 
 This is the #1 pain point. For simple expressions, no escaping needed:
@@ -269,7 +326,7 @@ For expressions with inner quotes, use printf with octal escapes or heredocs:
 printf '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(message \"hello from mcp\")"}}}\n' | socat - UNIX-CONNECT:$SOCK
 
 # Better way — use a heredoc to avoid quote confusion
-SOCK=~/.config/emacs/.local/cache/emacs-mcp-server.sock
+SOCK=/home/aoeu/.config/emacs/.local/cache/emacs-mcp-server.sock
 socat - UNIX-CONNECT:$SOCK <<'EOF'
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(format \"feature %s: %s\" 'manifolding-emacs-vars (featurep 'manifolding-emacs-vars))"}}}
 EOF

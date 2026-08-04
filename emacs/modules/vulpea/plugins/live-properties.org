@@ -41,23 +41,125 @@ Three ref types: ~'closed~ (shared, deduped), ~'scoped~ (per-entity), ~nil~ (pla
         (match-string-no-properties 1)))))
 #+end_src
 
-** Ensure Ref Note (closed vocab)
+** Tolerant Drawer Access
 
-Creates or returns a canonical ref note at deterministic path.
-Returns link string or nil.
+#+begin_src emacs-lisp
+(defun my/vulpea--drawer-region ()
+  (save-excursion
+    (when (condition-case nil (org-back-to-heading t) (error nil))
+      (let* ((beg (line-beginning-position))
+             (hend (save-excursion
+                     (goto-char beg)
+                     (forward-line 1)
+                     (if (re-search-forward "^\\*+[ \t]" (point-max) t)
+                         (line-beginning-position)
+                       (point-max)))))
+        (goto-char beg)
+        (when (re-search-forward "^:PROPERTIES:[ \t]*$" hend t)
+          (let ((a (line-beginning-position 2)))
+            (when (re-search-forward "^:END:[ \t]*$" hend t)
+              (cons a (line-beginning-position)))))))))
+
+(defun my/vulpea--drawer-get (key)
+  (save-excursion
+    (when-let ((r (my/vulpea--drawer-region)))
+      (goto-char (car r))
+      (or (when (re-search-forward
+                 (format "^:%s:[[:blank:]]+\\(.*\\)$" (regexp-quote key))
+                 (cdr r) t)
+            (match-string-no-properties 1))
+          (progn
+            (goto-char (car r))
+            (when (re-search-forward
+                   "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
+                   (cdr r) t)
+              (let ((label (match-string-no-properties 2)))
+                (when (string-equal key (my/vulpea--key-from-label label))
+                  (format "[[id:%s][%s]]"
+                          (match-string-no-properties 1) label)))))))))
+
+(defun my/vulpea--drawer-put (key value)
+  (save-excursion
+    (let ((r (my/vulpea--drawer-region)))
+      (if r
+          (progn
+            (goto-char (car r))
+            (if (re-search-forward
+                 (format "^:%s:[[:blank:]]*\\(.*\\)$" (regexp-quote key))
+                 (cdr r) t)
+                (progn (beginning-of-line)
+                       (delete-region (line-beginning-position)
+                                      (line-end-position))
+                       (insert (format ":%s: %s" key value)))
+              (goto-char (cdr r))
+              (beginning-of-line)
+              (insert (format ":%s: %s\n" key value))))
+        (org-back-to-heading t)
+        (end-of-line)
+        (forward-line 1)
+        (unless (bolp) (insert "\n"))
+        (insert (format ":PROPERTIES:\n:%s: %s\n:END:\n" key value))))))
+
+(defun my/vulpea--drawer-delete (key)
+  (save-excursion
+    (when-let ((r (my/vulpea--drawer-region)))
+      (goto-char (car r))
+      (when (re-search-forward
+             (format "^:%s:[[:blank:]]*\\(.*\\)$" (regexp-quote key))
+             (cdr r) t)
+        (beginning-of-line)
+        (delete-region (line-beginning-position)
+                       (1+ (line-end-position)))))))
+
+(defun my/vulpea--property-key-from-type (property-type)
+  (upcase (string-replace "-" "_"
+                          (if (symbolp property-type)
+                              (symbol-name property-type)
+                            property-type))))
+
+(defun my/vulpea--key-from-label (label)
+  (when (string-match "^\\([A-Z][A-Z ]*\\): " label)
+    (upcase (string-replace " " "_" (match-string-no-properties 1 label)))))
+
+(defun my/vulpea--drawer-insert-point ()
+  (when-let ((r (my/vulpea--drawer-region)))
+    (cdr r)))
+
+(defun my/vulpea--org-entry-get-fallback (orig-fn pom property &optional inherit literal-nil)
+  (or (funcall orig-fn pom property inherit literal-nil)
+      (when (and property
+                 (or (null pom)
+                     (and (integerp pom)
+                          (<= (point-min) pom) (<= pom (point-max)))))
+        (save-excursion
+          (when (integerp pom) (goto-char pom))
+          (my/vulpea--drawer-get
+           (if (symbolp property) (symbol-name property) property))))))
+
+(defun my/vulpea--org-entry-put-fallback (orig-fn pom property value)
+  (if (and (or (null pom)
+               (and (integerp pom)
+                    (<= (point-min) pom) (<= pom (point-max))))
+           (my/vulpea--drawer-region))
+      (my/vulpea--drawer-put
+       (if (symbolp property) (symbol-name property) property)
+       value)
+    (funcall orig-fn pom property value)))
+
+(advice-add 'org-entry-get :around #'my/vulpea--org-entry-get-fallback)
+(advice-add 'org-entry-put :around #'my/vulpea--org-entry-put-fallback)
+#+end_src
+
+** Ensure Ref Note (closed vocab)
 
 #+begin_src emacs-lisp
 (defun my/vulpea--property-display-name (property-type)
-  "Human-readable full name for a property-type symbol.
-e.g. 'state-work -> \"STATE WORK\"."
-  (upcase (string-replace "-" " " (symbol-name property-type))))
+  (upcase (string-replace "-" " "
+                          (if (symbolp property-type)
+                              (symbol-name property-type)
+                            property-type))))
 
 (defun my/vulpea--ensure-ref-note (property-type value &optional _note)
-  "Return [[id:ID][VALUE]] for a canonical ref note.
-PROPERTY-TYPE is a symbol like 'state-work or 'pos.
-Creates the ref note at admin/refs/<type>/<canonical>.org if missing.
-The note is titled \"<PROPERTY NAME> <VALUE>\" so its transclude
-shows the full property name it belongs to."
   (when (and value (not (string-equal value "WARNING")))
     (let* ((slug (my/vulpea--canonicalize value))
            (root (expand-file-name (format "admin/refs/%s/" property-type) (my/notes-directory)))
@@ -76,11 +178,26 @@ shows the full property name it belongs to."
 
 ** Scoped To-Plist Factory
 
-Generates a ~:to-plist~ function for scoped properties.
-Stores raw value initially; post-apply replaces with a link.
-
 #+begin_src emacs-lisp
 (require 'cl)
+
+(defun my/vulpea--property-put (note key value)
+  "Set property KEY to VALUE in NOTE's file on disk, then save.
+Like `my/vulpea--drawer-put', but NOTE may live in a different buffer
+than the one currently being edited: locate its heading by file,
+level, and pos before delegating to the drawer primitive."
+  (let* ((file (vulpea-note-path note))
+         (level (vulpea-note-level note))
+         (pos   (vulpea-note-pos note)))
+    (when file
+      (with-current-buffer (find-file-noselect file)
+        (save-excursion
+          (if (and level (> level 0) pos)
+              (progn (goto-char pos) (org-back-to-heading t))
+            (goto-char (point-min)))
+          (my/vulpea--drawer-put key value))
+        (save-buffer)))))
+
 (defun my/vulpea--apply-scoped-post (property-type drawer-key label note)
   (let ((link (my/vulpea--create-scoped-note
                 property-type label
@@ -89,9 +206,6 @@ Stores raw value initially; post-apply replaces with a link.
       (my/vulpea--property-put note drawer-key link))))
 
 (defun my/vulpea--make-scoped-to-plist (property-type drawer-key)
-  "Return a :to-plist function for a scoped property.
-PROPERTY-TYPE is a symbol for the ref note type (e.g. 'pronunciation).
-DRAWER-KEY is the string stored in the property drawer (e.g. \"PRONUNCIATION\")."
   (let ((pt property-type) (dk drawer-key))
     (lambda (val _ctx)
       (when (and val (not (string-equal val "WARNING")))
@@ -102,8 +216,6 @@ DRAWER-KEY is the string stored in the property drawer (e.g. \"PRONUNCIATION\").
 #+end_src
 
 ** Aliases To-Plist Factory
-
-Multi-valued scoped property. Each alias becomes a scoped ref note.
 
 #+begin_src emacs-lisp
 (defun my/vulpea--apply-aliases-post (labels note)
@@ -117,9 +229,6 @@ Multi-valued scoped property. Each alias becomes a scoped ref note.
       (my/vulpea--property-put note "ALIAS" str))))
 
 (defun my/vulpea--make-aliases-to-plist ()
-  "Return a :to-plist function for the ALIAS property.
-Stores raw comma-joined labels initially; post-apply replaces each
-with a scoped ref link."
   (lambda (val _ctx)
     (when val
       (let ((labels (copy-sequence val)))
@@ -130,21 +239,14 @@ with a scoped ref link."
 
 ** Transclude live refs into the owning file
 
-After a note is created, append a ~#+transclude:~ directive right under
-its own heading for every property value that is a live ref link, so the
-ref content shows inline (org-transclusion renders it). Re-runs are safe:
-existing directives the same ID are not duplicated.
-
 #+begin_src emacs-lisp
 (defun my/vulpea--ref-link-value (value)
-  "Return (id . label) if VALUE is an [[id:ID][LABEL]] ref link."
   (when (and (stringp value)
              (string-match "\\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]" value))
     (cons (match-string-no-properties 1 value)
           (match-string-no-properties 2 value))))
 
 (defun my/vulpea--live-transclude-p (id)
-  "Non-nil when the current buffer already transcludes ID."
   (save-excursion
     (goto-char (point-min))
     (re-search-forward (format "#\\+transclude:.*\\[\\[id:%s\\]\\["
@@ -152,8 +254,6 @@ existing directives the same ID are not duplicated.
                        nil t)))
 
 (defun my/vulpea--body-anchor ()
-  "Return the point where transclude directives start: after the heading
-and any property drawer, at the top of the body."
   (org-back-to-heading t)
   (end-of-line)
   (forward-line 1)
@@ -164,15 +264,17 @@ and any property drawer, at the top of the body."
   (point))
 
 (defun my/vulpea--heading-properties ()
-  "Return property-drawer (KEY . value) pairs for the current heading.
-Reads the buffer's own drawer (not the vulpea DB) so live ref links are
-seen even when the DB cache is stale."
   (let (props)
     (org-back-to-heading t)
     (save-excursion
-      (let ((beg (progn (org-back-to-heading t)
-                        (line-beginning-position)))
-            (end (progn (org-end-of-subtree t) (point))))
+      (let* ((beg (progn (org-back-to-heading t)
+                         (line-beginning-position)))
+             (end (save-excursion
+                    (goto-char beg)
+                    (forward-line 1)
+                    (if (re-search-forward "^\\*+[ \t]" (point-max) t)
+                        (line-beginning-position)
+                      (point-max)))))
         (goto-char beg)
         (when (re-search-forward "^:PROPERTIES:" end t)
           (let ((dr-beg (line-beginning-position 2)))
@@ -184,11 +286,22 @@ seen even when the DB cache is stale."
                         dr-end t)
                   (push (cons (match-string-no-properties 1)
                               (match-string-no-properties 2))
-                        props))))))))
-    props))
+                        props))
+                (goto-char dr-beg)
+                (while (re-search-forward
+                        "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
+                        dr-end t)
+                  (let ((key (my/vulpea--key-from-label
+                              (match-string-no-properties 2))))
+                    (when key
+                      (push (cons key
+                                  (format "[[id:%s][%s]]"
+                                          (match-string-no-properties 1)
+                                          (match-string-no-properties 2)))
+                            props))))))))))
+      props))
 
 (defun my/vulpea--add-live-transcludes (note)
-  "Insert a #+transclude: under NOTE's heading for each live ref property."
   (let* ((file (vulpea-note-path note))
          (level (vulpea-note-level note))
          (pos   (vulpea-note-pos note)))
@@ -200,45 +313,40 @@ seen even when the DB cache is stale."
                  (org-back-to-heading t))
                 (t (goto-char (point-min))))
           (let ((props (my/vulpea--heading-properties))
-                (anchor (my/vulpea--body-anchor)))
+                (anchor (or (my/vulpea--drawer-insert-point)
+                            (my/vulpea--body-anchor))))
             (dolist (pair props)
               (when-let ((m (my/vulpea--ref-link-value (cdr pair))))
                 (let ((id (car m)) (label (cdr m)))
                   (unless (my/vulpea--live-transclude-p id)
                     (goto-char anchor)
+                    (beginning-of-line)
                     (unless (bolp) (insert "\n"))
                     (insert (format "#+transclude: [[id:%s][%s]]\n" id label))))))))
         (save-buffer)))))
 
 (defun my/vulpea--live-transcludes-after-create (note)
   (when (vulpea-note-p note)
-    (my/vulpea--add-live-transcludes note)))
-(advice-add 'vulpea-create :after #'my/vulpea--live-transcludes-after-create)
+    (my/vulpea--add-live-transcludes note))
+  note)
+(advice-add 'vulpea-create :filter-return #'my/vulpea--live-transcludes-after-create)
 #+end_src
 
 ** State Property Factory (plain value + transclude)
 
-Undo the "store a link in the drawer" behaviour for live states.  The
-drawer keeps the PLAIN value (e.g. ~STATE_WORK: WAITING~) so the change
-is visible, and a ~#+transclude:~ up to the canonical ref note is
-inserted/updated under the heading so the ref still renders inline.
-
 #+begin_src emacs-lisp :lexical t
 (defun my/vulpea--id-from-link (link)
-  "Return the ID from a string [[id:ID][LABEL]], or nil."
   (when-let ((m (my/vulpea--ref-link-value link)))
     (car m)))
 
 (defun my/vulpea--ref-of-type-p (property-type id)
-  "Non-nil when ID's ref file lives under admin/refs/PROPERTY-TYPE/."
-  (when-let ((file (org-id-find-file id)))
+  (when-let ((file (org-id-find-id-file id)))
     (string-prefix-p
      (expand-file-name (format "admin/refs/%s/" property-type)
                        (my/notes-directory))
-     file)))
+     (expand-file-name file))))
 
 (defun my/vulpea--transclude-exists-p (id)
-  "Non-nil when the current buffer has a #+transclude for ID."
   (save-excursion
     (goto-char (point-min))
     (re-search-forward
@@ -246,48 +354,112 @@ inserted/updated under the heading so the ref still renders inline.
      nil t)))
 
 (defun my/vulpea--refresh-property-transclude (property-type drawer-value ref-id)
-  "Refresh the transclude for PROPERTY-TYPE in the current buffer.
-Deletes every stale transclude that references a ref under
-admin/refs/PROPERTY-TYPE/, then, if REF-ID is given, inserts
-#transcribe: [[id:REF-ID][DRAWER-VALUE]] right after the property
-drawer."
-  (when ref-id
+  (let (removed)
     (save-excursion
-      (goto-char (point-min))
-      (while (re-search-forward
-              "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\[" nil t)
-        (let ((lid (match-string-no-properties 1)))
-          (when (and (my/vulpea--ref-of-type-p property-type lid)
-                     (not (string-equal lid ref-id)))
-            (delete-region (line-beginning-position)
-                           (1+ (line-end-position))))))
-      (unless (my/vulpea--transclude-exists-p ref-id)
+      (org-back-to-heading t)
+      (my/vulpea--drawer-delete (my/vulpea--property-key-from-type property-type))
+      (let ((marker (let ((pt (my/vulpea--drawer-insert-point)))
+                      (when pt (copy-marker pt)))))
         (goto-char (point-min))
-        (when (re-search-forward "^:END:$" nil t)
-          (beginning-of-line))
-        (unless (bolp) (insert "\n"))
-        (insert (format "#+transclude: [[id:%s][%s]]\n" ref-id drawer-value)))
-      (save-buffer))))
+        (while (re-search-forward
+                "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[" nil t)
+          (let ((lid (match-string-no-properties 1)))
+            (when (and (my/vulpea--ref-of-type-p property-type lid)
+                       (not (string-equal lid ref-id)))
+              (push lid removed)
+              (delete-region (line-beginning-position)
+                             (1+ (line-end-position))))))
+        (unless (my/vulpea--transclude-exists-p ref-id)
+          (goto-char (or (and (marker-position marker) marker)
+                         (save-excursion
+                           (org-back-to-heading t)
+                           (end-of-line)
+                           (forward-line 1)
+                           (point))))
+          (beginning-of-line)
+          (unless (bolp) (insert "\n"))
+          (insert (format "#+transclude: [[id:%s][%s: %s]]\n"
+                          ref-id
+                          (my/vulpea--property-display-name property-type)
+                          drawer-value))
+          (when marker (set-marker marker nil)))
+        (save-buffer)))
+    removed))
 
-(defun my/vulpea--apply-state-post (property-type drawer-type drawer-value ref-id _note)
-  "Post-apply wrapper: drop the old plain DRAWER-TYPE entry, then
-refresh ONLY the transcribe for PROPERTY-TYPE.  Takes the note as
-the last arg, matching the :post-apply convention."
-  (save-excursion
-    (org-back-to-heading t)
-    (when (org-entry-delete nil drawer-type)
-      (save-buffer)))
-  (my/vulpea--refresh-property-transclude
-   property-type drawer-value ref-id))
+(defun my/vulpea--ref-in-use-p (id)
+  (let* ((root (my/notes-directory))
+         (refs-dir (expand-file-name "admin/refs/" root))
+         (files (nconc (directory-files-recursively root "\\.org\\'")
+                       (directory-files-recursively root "[^./]+\\'")))
+         (in-use nil))
+    (dolist (f files)
+      (unless in-use
+        (let ((exp (expand-file-name f)))
+          (when (and (not (file-in-directory-p exp refs-dir))
+                     (my/vulpea-links--ref-id-in-file-p id exp))
+            (setq in-use t)))))
+    in-use))
+
+(defun my/vulpea--cleanup-unused-ref (id)
+  (when (and id (not (my/vulpea--ref-in-use-p id)))
+    (let ((path (ignore-errors (org-id-find-id-file id))))
+      (when (and path
+                 (file-exists-p path)
+                 (file-in-directory-p
+                  path
+                  (expand-file-name "admin/refs/" (my/notes-directory))))
+        (message "my/vulpea: deleting unused ref %s" path)
+        (delete-file path)))))
+
+(defun my/vulpea--sweep-orphaned-refs ()
+  (interactive)
+  (let* ((root (my/notes-directory))
+         (refs-dir (expand-file-name "admin/refs/" root))
+         (files (directory-files-recursively refs-dir "[^./]+\\'" t))
+         count)
+    (dolist (f files)
+      (when (file-regular-p f)
+        (with-temp-buffer
+          (insert-file-contents f)
+          (goto-char (point-min))
+          (when (re-search-forward "^:ID:[[:blank:]]+\\(.+\\)" nil t)
+            (let ((id (string-trim (match-string-no-properties 1))))
+              (unless (my/vulpea--ref-in-use-p id)
+                (message "my/vulpea: deleting unused ref %s" f)
+                (delete-file f)
+                (setq count (1+ (or count 0)))))))))
+    (message "my/vulpea: swept %d orphaned ref%s"
+             (or count 0) (if (and count (= count 1)) "" "s"))))
+
+(defun my/vulpea--apply-state-post (property-type drawer-value ref-id note)
+  "Post-apply wrapper for a live state property.
+The state is represented ONLY by an in-drawer #+transclude: line, so
+this drops the plain drawer entry and refreshes that transcribe.
+Navigates by NOTE's own path, so it works from any buffer.
+Transclusion rendering is stripped first so the drawer edits see raw
+#+transclude: directives; after-save-hook re-renders them."
+  (when-let ((file (vulpea-note-path note)))
+    (with-current-buffer (find-file-noselect file)
+      (let ((re-render (bound-and-true-p org-transclusion-mode))
+            removed)
+        (when re-render (org-transclusion-remove-all))
+        (unwind-protect
+            (save-excursion
+              (let ((pos (vulpea-note-pos note)))
+                (when (and pos (> pos 0)) (goto-char pos)))
+              (setq removed
+                    (my/vulpea--refresh-property-transclude
+                     property-type drawer-value ref-id)))
+          (when re-render
+            (ignore-errors (org-transclusion-add-all))))
+        (dolist (old-id removed)
+          (my/vulpea--cleanup-unused-ref old-id))))))
 
 (defun my/vulpea--clear-state-transcribes (property-type _note)
-  "Delete every stale transcribe referencing PROPERTY-TYPE's refs.
-Used when the property is reset to WARNING, so the placeholder
-reverts to a plain value with no live transclude."
   (save-excursion
     (goto-char (point-min))
     (while (re-search-forward
-            "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\[" nil t)
+            "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[" nil t)
       (let ((lid (match-string-no-properties 1)))
         (when (my/vulpea--ref-of-type-p property-type lid)
           (delete-region (line-beginning-position)
@@ -295,29 +467,18 @@ reverts to a plain value with no live transclude."
     (save-buffer)))
 
 (defun my/vulpea--make-live-state-to-plist (property-type drawer-key)
-  "Return a :to-plist fn for a live state property.
-NOTE: only safe when the module eval is lexical; otherwise inline the
-literal :properties/:post-apply directly in the prompt file instead."
   (let ((pt property-type) (dk drawer-key))
     (lambda (val _ctx)
       (when (and val (not (string-equal val "WARNING")))
         (let* ((link (my/vulpea--ensure-ref-note pt val))
                (ref-id (my/vulpea--id-from-link link)))
-          `(:properties ((,dk . ,val))
-            :post-apply (,(apply-partially
-                           #'my/vulpea--refresh-property-transclude
+          `(:post-apply (,(apply-partially
+                           #'my/vulpea--apply-state-post
                            pt val ref-id))))))))
 #+end_src
 
-Creates a new per-entity note for perspective properties.
-No dedup — always creates a fresh note.
-Returns link string or nil.
-
 #+begin_src emacs-lisp
 (defun my/vulpea--create-scoped-note (property-type value parent-id &optional _note)
-  "Return [[id:ID][VALUE]] for a new scoped ref note.
-PROPERTY-TYPE is a symbol like 'alias or 'evidence.
-PARENT-ID is the ID of the owning note (for derived path)."
   (when (and value (not (string-equal value "WARNING")))
     (let* ((slug (my/vulpea--canonicalize (or parent-id "orphan")))
            (val-slug (my/vulpea--canonicalize value))
@@ -336,8 +497,6 @@ PARENT-ID is the ID of the owning note (for derived path)."
 
 ** Default Filter — Hide ref notes from vulpea-find
 
-Ref notes at admin/refs/*/*.org are infrastructure, not user-facing notes.
-
 #+begin_src emacs-lisp
 (defun my/vulpea--hidden-note-p (path)
   (or (string-prefix-p
@@ -352,7 +511,6 @@ Ref notes at admin/refs/*/*.org are infrastructure, not user-facing notes.
         (not (my/vulpea--hidden-note-p (vulpea-note-path note)))))
 
 (defun my/vulpea--select-filter-advice (orig-fn prompt &rest args)
-  "Hide refs and Journal notes from `vulpea-select' candidates."
   (let ((orig-filter (plist-get args :filter-fn)))
     (apply orig-fn prompt
            (plist-put args :filter-fn
@@ -367,13 +525,26 @@ Ref notes at admin/refs/*/*.org are infrastructure, not user-facing notes.
 
 ** Open ref notes in capture by default
 
-When pressing Enter on a property drawer link, open the ref note
-for editing directly (no prompt).
-
 #+begin_src emacs-lisp
+(defun my/vulpea--edit-file-in-capture (file)
+  (let* ((org-capture-templates
+          `(("v" "Edit note body"
+             plain
+             (file+function
+              ,file
+              (lambda ()
+                (goto-char (point-max))
+                (skip-chars-backward " \t\n")))
+             "%?"
+             :kill-buffer t
+             :unnarrowed t)))
+         (org-capture-use-indirect-buffer nil))
+    (when-let ((buf (get-file-buffer file)))
+      (when (eq buf (current-buffer))
+        (switch-to-buffer (other-buffer))))
+    (org-capture nil "v")))
+
 (defun my/vulpea--open-ref-link (orig-fun id &optional path)
-  "Around advice for `org-id-open' on property-drawer links.
-Opens the ref note for editing instead of just visiting it."
   (if-let* ((_ (org-in-regexp org-link-any-re))
             (start (match-beginning 0))
             (_ (save-excursion
@@ -381,8 +552,68 @@ Opens the ref note for editing instead of just visiting it."
                  (beginning-of-line)
                  (looking-at ":\\([A-Z_][A-Z_0-9]*\\):")))
             (file (org-id-find-id-file id)))
-      (find-file file)
+      (my/vulpea--edit-file-in-capture file)
     (funcall orig-fun id path)))
 
 (advice-add 'org-id-open :around #'my/vulpea--open-ref-link)
+#+end_src
+
+** Index transclude-in-drawer notes
+
+#+begin_src emacs-lisp
+(defvar my/vulpea--db-parse nil)
+
+(defun my/vulpea--parse-file-with-tolerance (orig-fn &rest args)
+  (let ((my/vulpea--db-parse t))
+    (apply orig-fn args)))
+
+(defun my/vulpea--strip-in-drawer-keywords (orig-fn &rest args)
+  (if (not my/vulpea--db-parse)
+      (apply orig-fn args)
+    (save-excursion
+      (save-restriction
+        (widen)
+        (let (restore)
+          (goto-char (point-min))
+          (while (re-search-forward "^:PROPERTIES:[ \t]*$" nil t)
+            (let* ((pbeg (line-beginning-position 2))
+                   (pm (save-excursion
+                         (if (re-search-forward "^:END:[ \t]*$" nil t)
+                             (copy-marker (line-beginning-position))
+                           nil))))
+              (when pm
+                (goto-char pbeg)
+                (while (re-search-forward "^[^:].*$" pm t)
+                  (let* ((text (match-string 0))
+                         (m (when (string-match
+                                   "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
+                                   text)
+                              (let* ((label (match-string-no-properties 2 text))
+                                     (key (my/vulpea--key-from-label label)))
+                                (when key
+                                  (list key
+                                        (match-string-no-properties 1 text)
+                                        label)))))
+                         (syn (when m
+                                (format ":%s: [[id:%s][%s]]"
+                                        (nth 0 m) (nth 1 m) (nth 2 m)))))
+                    (push (cons (point-marker) (cons text syn)) restore)
+                    (delete-region (line-beginning-position)
+                                   (1+ (line-end-position)))
+                    (when syn
+                      (insert syn "\n"))))
+                (goto-char pm)
+                (set-marker pm nil))))
+          (let ((result (apply orig-fn args)))
+            (dolist (cell (nreverse restore))
+              (goto-char (car cell))
+              (when (cddr cell)
+                (delete-region (line-beginning-position)
+                               (1+ (line-end-position))))
+              (insert (cadr cell) "\n")
+              (set-marker (car cell) nil))
+            result))))))
+
+(advice-add 'vulpea-db--parse-file :around #'my/vulpea--parse-file-with-tolerance)
+(advice-add 'org-element-parse-buffer :around #'my/vulpea--strip-in-drawer-keywords)
 #+end_src

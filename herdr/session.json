@@ -6,8 +6,8 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "2": 2,
-        "1": 1
+        "1": 1,
+        "2": 2
       },
       "next_public_pane_number": 17,
       "public_tab_numbers": [
@@ -29,7 +29,7 @@
                 "source": "herdr:opencode",
                 "agent": "opencode",
                 "kind": "id",
-                "value": "ses_046eeeab8ffepFqWJsBtd7YD0l"
+                "value": "ses_039826fc8ffeZlUz3ABtE4YEDM"
               }
             }
           },
@@ -44,7 +44,7 @@
           },
           "panes": {
             "2": {
-              "cwd": "/home/aoeu/.config/emacs/modules"
+              "cwd": "/home/aoeu/test"
             }
           },
           "zoomed": false,
@@ -52,7 +52,7 @@
           "root_pane": 2
         }
       ],
-      "active_tab": 1
+      "active_tab": 0
     }
   ],
   "active": 0,

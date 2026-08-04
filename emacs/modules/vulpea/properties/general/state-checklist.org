@@ -37,8 +37,14 @@ Default is nil (not in checklist system).
   :read-current-fn (lambda () (org-entry-get nil "STATE_CHECKLIST"))
   :merge-strategy 'replace
    :to-plist (lambda (val _ctx)
-               (when val
-                 (let ((link (my/vulpea--ensure-ref-note 'state-checklist val)))
-                   `(:properties (("STATE_CHECKLIST" . ,(or link val)))
-                     :post-apply (,(apply-partially #'my/vulpea--post-sync "STATE_CHECKLIST" (or link val)))))))))
+               (if (or (null val) (string-equal val "WARNING"))
+                   `(:properties (("STATE_CHECKLIST" . "WARNING"))
+                     :post-apply (,(apply-partially
+                                    #'my/vulpea--clear-state-transcribes
+                                    "state-checklist")))
+                 (let* ((link (my/vulpea--ensure-ref-note 'state-checklist val))
+                        (ref-id (my/vulpea--id-from-link link)))
+                   `(:post-apply (,(apply-partially
+                                    #'my/vulpea--apply-state-post
+                                    "state-checklist" val ref-id)))))))
 #+end_src

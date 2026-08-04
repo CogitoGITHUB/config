@@ -37,6 +37,28 @@ Change only this path to relocate the entire vault."
     (message "Vulpea: fswatch process died (%s), restarting..." (string-trim event))))
 (advice-add 'vulpea-db-sync--fswatch-sentinel :override
             #'my/vulpea-db-sync--fswatch-sentinel)
+(defun my/vulpea-db-sync--org-file-p (path)
+  "Track `.org' files AND extensionless vault files."
+  (and path
+       (not (string-match-p "/\\." path))
+       (or (seq-some (lambda (ext) (string-suffix-p ext path))
+                     (vulpea-db--all-extensions))
+           (not (string-match-p "\\." (file-name-nondirectory path))))))
+(advice-add 'vulpea-db-sync--org-file-p :override
+            #'my/vulpea-db-sync--org-file-p)
+(defun my/vulpea-db-sync--list-org-files (dir)
+  "List all tracked files in DIR, extensionless included."
+  (seq-filter #'vulpea-db-sync--org-file-p
+              (directory-files-recursively (expand-file-name dir) ".*")))
+(advice-add 'vulpea-db-sync--list-org-files :override
+            #'my/vulpea-db-sync--list-org-files)
+(defun my/vulpea-db-sync--scan-files-async (dirs callback)
+  "List tracked files in DIRS (extensionless included), call CALLBACK."
+  (let ((files (mapcan (lambda (d) (my/vulpea-db-sync--list-org-files d))
+                       dirs)))
+    (run-at-time 0 nil callback files)))
+(advice-add 'vulpea-db-sync--scan-files-async :override
+            #'my/vulpea-db-sync--scan-files-async)
 (vulpea-db-autosync-mode +1)
 #+end_src
 * Vulpea Core

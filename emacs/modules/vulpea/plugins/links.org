@@ -121,8 +121,10 @@ Lives in `my/notes-directory'. Auto-created if missing.")
 #+end_src
 *** Deleted Entry Writer
 #+begin_src emacs-lisp
-(defun my/vulpea-links--write-deleted-entry (file)
-  "Append a heading for deleted FILE to deleted-files."
+(defun my/vulpea-links--write-deleted-entry (file &optional refs)
+  "Append a heading for deleted FILE to deleted-files.
+REFS is a list of relative paths of ref notes deleted alongside FILE,
+recorded in the :DELETED_REFS: property for later restore."
   (let ((path (my/vulpea-links--ensure-deleted-files-file))
         root rel deleted-id deleted-title heading)
     (setq root (expand-file-name (or (vc-root-dir) "")
@@ -141,6 +143,9 @@ Lives in `my/notes-directory'. Auto-created if missing.")
       (insert (format "  :DELETED_FILE:  %s\n" rel))
       (when deleted-id
         (insert (format "  :DELETED_ID:    %s\n" deleted-id)))
+      (when refs
+        (insert (format "  :DELETED_REFS:  %s\n"
+                        (mapconcat #'identity refs " "))))
       (insert "  :END:\n")
       (save-buffer)
       (kill-buffer (current-buffer)))))
@@ -152,6 +157,83 @@ Lives in `my/notes-directory'. Auto-created if missing.")
 
 (defvar my/vulpea-links--deleted-title nil
   "Title of the note being deleted. Captured before deletion.")
+
+(defvar my/vulpea-links--deleted-refs nil
+  "Relative paths of ref notes deleted alongside the current note.
+Captured before deletion so the file can be scanned while it still exists.")
+#+end_src
+*** Ref Cleanup on Delete
+#+begin_src emacs-lisp
+(defun my/vulpea-links--ref-id-in-file-p (id file)
+  "Non-nil when FILE contains an [[id:ID][...]] link."
+  (let ((re (format "\\[\\[id:%s\\]\\[" (regexp-quote id))))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (goto-char (point-min))
+      (re-search-forward re nil t))))
+
+(defun my/vulpea-links--note-ref-ids (file)
+  "Return list of ref note IDs referenced by FILE.
+Scans FILE for [[id:ID][...]] links that resolve to a note under
+admin/refs/. Returns the list of matching IDs."
+  (let ((root (my/notes-directory))
+        ref-ids)
+    (when (file-exists-p file)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (goto-char (point-min))
+        (while (re-search-forward "\\[\\[id:\\([^]]+\\)\\]\\[" nil t)
+          (let ((id (match-string-no-properties 1)))
+            (when (my/vulpea-links--ref-id-p id)
+              (push id ref-ids))))))
+    (delete-dups ref-ids)))
+
+(defun my/vulpea-links--ref-id-p (id)
+  "Non-nil when ID names a ref note under admin/refs/."
+  (when-let ((note (vulpea-db-get-by-id id)))
+    (let ((path (vulpea-note-path note)))
+      (and path
+           (file-in-directory-p path
+                                (expand-file-name "admin/refs/"
+                                                  (my/notes-directory)))))))
+
+(defun my/vulpea-links--ref-orphaned-p (ref-id deleted-file)
+  "Non-nil when REF-ID is referenced only by DELETED-FILE.
+Scans every file in the vault; returns nil when any OTHER file links
+to REF-ID. Skipped files: DELETED-FILE itself and files under admin/refs/."
+  (let* ((root (my/notes-directory))
+        (deleted-exp (expand-file-name deleted-file))
+        (refs-dir (expand-file-name "admin/refs/" (my/notes-directory)))
+        (files (nconc (directory-files-recursively root "\\.org\\'")
+                      (directory-files-recursively root "[^./]+\\'")))
+        (orphaned t))
+    (dolist (f files)
+      (let ((exp (expand-file-name f)))
+        (when (and (not (string-equal exp deleted-exp))
+                   (not (file-in-directory-p exp refs-dir)))
+          (when (my/vulpea-links--ref-id-in-file-p ref-id exp)
+            (setq orphaned nil)))))
+    orphaned))
+
+(defun my/vulpea-links--ref-rel-path (ref-id)
+  "Return relative path (from vault root) of the ref note REF-ID."
+  (when-let ((note (vulpea-db-get-by-id ref-id)))
+    (let ((path (vulpea-note-path note)))
+      (and path
+           (file-relative-name path (my/notes-directory))))))
+
+(defun my/vulpea-links--orphaned-refs-for (file)
+  "Return relative paths of refs that only FILE references.
+Used to delete refs alongside a deleted note without breaking other
+notes that share the same closed-vocab ref."
+  (let ((deleted-file (expand-file-name file))
+        (refs (my/vulpea-links--note-ref-ids file))
+        orphans)
+    (dolist (ref-id refs)
+      (when (my/vulpea-links--ref-orphaned-p ref-id deleted-file)
+        (when-let ((rel (my/vulpea-links--ref-rel-path ref-id)))
+          (push rel orphans))))
+    (delete-dups orphans)))
 #+end_src
 *** TODO Entry Writer
 #+begin_src emacs-lisp
@@ -320,10 +402,14 @@ n — cancels deletion via user-error."
 1. Guard broken-links if that is the file.
 2. Read ID and title from file buffer.
 3. Run link guard. Skips non-org files silently.
-4. Record entry in deleted-files."
+4. Compute refs only this file references (orphans).
+5. Record entry in deleted-files."
    (let ((expanded (expand-file-name file)))
-      ;; Skip admin files and non-org files
+      ;; Skip admin files, ref files, and non-org files
       (when (and (file-exists-p expanded)
+                 (not (file-in-directory-p
+                       expanded
+                       (expand-file-name "admin/refs/" (my/notes-directory))))
                  (or (string-suffix-p ".org" expanded)
                      (not (string-match-p "\\." (file-name-nondirectory expanded))))
                  (not (member (file-name-nondirectory expanded)
@@ -348,17 +434,29 @@ n — cancels deletion via user-error."
              (my/vulpea-links--guard-deletion
                id
                my/vulpea-links--deleted-title))
+          ;; Capture refs orphaned by this deletion while the file exists
+          (setq my/vulpea-links--deleted-refs
+                (my/vulpea-links--orphaned-refs-for expanded))
           ;; Record in deleted-files even without ID
-          (my/vulpea-links--write-deleted-entry expanded))))))
+          (my/vulpea-links--write-deleted-entry
+           expanded my/vulpea-links--deleted-refs))))))
 
 (defun my/vulpea-links--after-file-delete (&rest _)
-  "After file deletion: clear captured state."
-  (setq my/vulpea-links--deleted-id    nil
-        my/vulpea-links--deleted-title nil))
+  "After file deletion: delete orphaned refs and clear captured state.
+Refs are captured into a local first so the delete-file advice firing
+again for each ref cannot re-enter with stale state."
+  (let ((refs my/vulpea-links--deleted-refs))
+    (setq my/vulpea-links--deleted-id    nil
+          my/vulpea-links--deleted-title nil
+          my/vulpea-links--deleted-refs  nil)
+    (dolist (rel refs)
+      (let ((path (expand-file-name rel (my/notes-directory))))
+        (when (file-exists-p path)
+          (delete-file path))))))
 #+end_src
 *** Pre-Delete Capture: Heading
 #+begin_src emacs-lisp
-(defun my/vulpea-links--before-heading-delete ()
+(defun my/vulpea-links--before-heading-delete (&rest _)
   "Before a heading is cut or archived: capture ID and title,
 then run the guard. Only fires for headings with an :ID: property."
   (when (org-at-heading-p)
