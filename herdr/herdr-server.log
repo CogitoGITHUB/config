@@ -12783,3 +12783,26 @@
 2026-08-05T08:04:24.044308Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
 2026-08-05T08:04:27.113948Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t1"
 2026-08-05T08:04:32.123780Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-05T08:10:39.564053Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T08:10:39.865879Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T08:11:56.380954Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t2"
+2026-08-05T08:12:01.394508Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-05T08:12:02.537334Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t1"
+2026-08-05T08:12:07.565123Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-05T08:12:59.945429Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T08:13:00.247261Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T08:17:46.628354Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T08:17:46.928711Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T08:22:31.613043Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T08:22:32.213727Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T08:22:37.819663Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T08:22:37.999554Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T08:22:38.149752Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T08:22:38.331353Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T08:22:38.486010Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T08:23:41.791051Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T08:23:42.191781Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T08:23:44.533268Z  INFO herdr::logging: spawning pane terminal event="pane.spawn.start" subsystem="pane" outcome="started" pane_id=3 rows=55 cols=77 scrollback_limit_bytes=10000000
+2026-08-05T08:23:44.534714Z  INFO herdr::logging: pane child spawned event="pane.spawned" subsystem="pane" outcome="ok" pane_id=3 pid=26878
+2026-08-05T08:23:44.535012Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:tH"
+2026-08-05T08:23:49.538711Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1

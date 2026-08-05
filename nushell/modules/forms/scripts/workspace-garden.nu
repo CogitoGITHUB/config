@@ -183,12 +183,12 @@ def repo-status-line [] {
 # =============================================================================
 # WORKSPACE DRAW
 # =============================================================================
-def ensure-workspace-files [] {
-    for entry in $WORKSPACE {
-        let fpath = ($env.PWD | path join $entry.file)
-        if not ($fpath | path exists) { touch $fpath }
-    }
-}
+# def ensure-workspace-files [] {
+#     for entry in $WORKSPACE {
+#         let fpath = ($env.PWD | path join $entry.file)
+#         if not ($fpath | path exists) { touch $fpath }
+#     }
+# }
 
 def draw-workspace [] {
     let dir_name = ($env.PWD | path basename)
@@ -460,7 +460,7 @@ export def maybe-open-todo [] {
         $env.__skip_workspace = false
         return
     }
-    ensure-workspace-files
+    # ensure-workspace-files
     workspace-loop
 }
 

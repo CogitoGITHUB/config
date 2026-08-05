@@ -67,9 +67,9 @@ Why it exists / architecture decisions:
 | `manifolding-atlas.org` | 116 | Main entry module. Notes Directory (defines `my/notes-directory`, org-agenda-files, auto-mode-alist), Bootstrap (DB/db-sync/fswatch setup, `(require 'manifolding-atlas)`, `(manifolding-atlas-db-autosync-mode +1)`, parse-method overrides), plus documented API (`manifolding-atlas-find/insert/find-backlink`, buffer title get/set). |
 | `manifolding-atlas-ui.org` | 22 | UI config only (the engine is =core/-14=). Sets sidebar position/size, outline depth, backlink preview, widget collapsed, fast-parse, auto-refresh via `with-eval-after-load`. |
 | `consult-manifolding-atlas.org` | 18 | Config only (engine is =core/-13=). `(require 'consult-manifolding-atlas)` + `(consult-manifolding-atlas-mode 1)`. Provides `consult-manifolding-atlas-find` / `-insert` as drop-ins with live preview. |
-| `AGENTS.md` | 113 | Agent reference: quick facts, git guards, schema validation, prompt registry, rules system, property updates, transclusion, root dir, fast mode, live properties, key bindings, bootstrap order. |
+| `AGENTS.md` | 115 | Agent reference: quick facts, git guards, schema validation, prompt registry, rules system, property updates, transclusion, root dir, fast mode, live properties, key bindings, bootstrap order. |
 
-There are also ~29 **empty placeholder** `.org` stubs at the top level
+There are also 27 **empty placeholder** `.org` stubs at the top level
 (`Advantages.org`, `Agents.org`, `Blueprint.org`, `Context.org`,
 `Counters.org`, `Decisions.org`, `Evidence.org`, `Experiments.org`,
 `Failures.org`, `Hypotheses.org`, `Journal.org`, `Laws.org`, `Leverage.org`,
