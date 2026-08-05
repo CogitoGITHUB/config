@@ -1,0 +1,55 @@
+#+title:      Tags Prompt
+#+priority:   1
+
+* Tags
+Why: Categorize notes across folder boundaries. Tags are queryable via
+~manifolding-atlas-db-query-by-tags-some/every/none~ and shown in the manifolding-atlas-ui sidebar.
+Completion comes from all existing tags in the vault DB.
+
+** Variants
+*** Default (completion from DB, no pre-selection)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-tags ()
+  "Prompt for tags with completion from existing tags in the vault.
+Returns a list of tag strings.  \"⚠ tag-warning\" default shows as \`:tag-warning:\`
+on the heading until replaced with real tags."
+  (let* ((tags (manifolding-atlas-db-query-tags))
+         (candidates (cons "⚠ tag-warning" tags))
+         (input (completing-read "Tags (comma-separated, ⚠ tag-warning to skip): "
+                                 candidates nil nil nil nil "⚠ tag-warning")))
+    (if (or (string-empty-p input) (string= input "⚠ tag-warning"))
+        '("tag-warning")
+      (cl-remove-if #'string-empty-p
+                     (split-string input "[ \t]*,[ \t]*" t)))))
+#+end_src
+
+*** With pre-filled initial tags
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-tags-initial (initial)
+  "Prompt for tags with INITIAL string pre-filled as comma-separated default."
+  (let* ((input (completing-read "Tags (comma-separated): "
+                                 (manifolding-atlas-db-query-tags) nil nil initial)))
+    (unless (string-empty-p input)
+      (cl-remove-if #'string-empty-p
+                     (split-string input "[ \t]*,[ \t]*" t)))))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'tags
+  :name 'tags
+  :label "Tags"
+  :prompt-fn #'my/manifolding-atlas-prompt-tags
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-get-tags nil t))
+  :merge-strategy 'merge
+  :to-plist (lambda (val _ctx)
+              (when val
+                `(:tags ,val
+                  :post-apply (,(apply-partially #'my/manifolding-atlas--post-sync "TAGS" (car val))
+                               ,@(mapcar (lambda (v)
+                                           (apply-partially
+                                            #'my/manifolding-atlas--ensure-ref-note 'tags v))
+                                         val))))))
+#+end_src

@@ -1,0 +1,116 @@
+#+TITLE:      Manifolding Atlas
+#+NOTE: The manifolding-mind-map manifolding-atlas plugin and mind map web package need work
+
+* Notes Directory
+:PROPERTIES:
+:CATEGORY: config
+:END:
+#+begin_src emacs-lisp
+(defun my/notes-directory ()
+  "Return the root notes directory.
+Both manifolding-atlas reads from this single function.
+Change only this path to relocate the entire vault."
+  "/home/aoeu/test/")
+
+(setq org-agenda-files
+      (cl-remove-if
+       (lambda (f) (string-match-p (regexp-quote "/.git/") f))
+       (nconc (directory-files-recursively (my/notes-directory) "\\.org$")
+              (directory-files-recursively (my/notes-directory) "[^./]+$"))))
+
+(add-to-list 'auto-mode-alist
+             `(,(concat "\\`" (regexp-quote (directory-file-name (my/notes-directory)))
+                        "/" "\\(.*/\\)?" "[^./]+\\'")
+               . org-mode))
+#+end_src
+* Manifolding Atlas Bootstrap
+#+begin_src emacs-lisp
+(setq manifolding-atlas-db-location             (expand-file-name "admin/manifolding-atlas.db" (my/notes-directory)))
+(setq manifolding-atlas-db-sync-directories     (list (my/notes-directory)))
+(setq manifolding-atlas-default-notes-directory (my/notes-directory))
+(setq manifolding-atlas-db-sync-external-method 'fswatch)
+(setq manifolding-atlas-db-sync-verbose          nil)
+(require 'manifolding-atlas)
+(defun my/manifolding-atlas-db-sync--fswatch-sentinel (proc event)
+  (unless (or (string-match-p "hangup\\|finished" event)
+              (process-live-p proc))
+    (message "Manifolding Atlas: fswatch process died (%s), restarting..." (string-trim event))))
+(advice-add 'manifolding-atlas-db-sync--fswatch-sentinel :override
+            #'my/manifolding-atlas-db-sync--fswatch-sentinel)
+(defun my/manifolding-atlas-db-sync--org-file-p (path)
+  "Track `.org' files AND extensionless vault files."
+  (and path
+       (not (string-match-p "/\\." path))
+       (or (seq-some (lambda (ext) (string-suffix-p ext path))
+                     (manifolding-atlas-db--all-extensions))
+           (not (string-match-p "\\." (file-name-nondirectory path))))))
+(advice-add 'manifolding-atlas-db-sync--org-file-p :override
+            #'my/manifolding-atlas-db-sync--org-file-p)
+(defun my/manifolding-atlas-db-sync--list-org-files (dir)
+  "List all tracked files in DIR, extensionless included."
+  (seq-filter #'manifolding-atlas-db-sync--org-file-p
+              (directory-files-recursively (expand-file-name dir) ".*")))
+(advice-add 'manifolding-atlas-db-sync--list-org-files :override
+            #'my/manifolding-atlas-db-sync--list-org-files)
+(defun my/manifolding-atlas-db-sync--scan-files-async (dirs callback)
+  "List tracked files in DIRS (extensionless included), call CALLBACK."
+  (let ((files (mapcan (lambda (d) (my/manifolding-atlas-db-sync--list-org-files d))
+                       dirs)))
+    (run-at-time 0 nil callback files)))
+(advice-add 'manifolding-atlas-db-sync--scan-files-async :override
+            #'my/manifolding-atlas-db-sync--scan-files-async)
+(defun my/manifolding-atlas-db--parse-file (path)
+  "Parse PATH honoring `manifolding-atlas-db-parse-method'.
+Manifolding Atlas forces non-'.org' files (extensionless vault notes) through
+`find-file', which trips over org-transclusion's read-only buffers.
+Always use the configured method instead."
+  (let* ((manifolding-atlas-db--active-parse-method manifolding-atlas-db-parse-method)
+         (method manifolding-atlas-db-parse-method))
+    (pcase method
+      ('single-temp-buffer (manifolding-atlas-db--parse-with-temp-buffer path nil))
+      ('temp-buffer (manifolding-atlas-db--parse-with-temp-buffer path t))
+      (_ (let ((buffer (find-file-noselect path)))
+           (unwind-protect
+               (with-current-buffer buffer
+                 (let* ((ast (org-element-parse-buffer (manifolding-atlas-db--effective-granularity)))
+                        (attrs (file-attributes path))
+                        (mtime (float-time (file-attribute-modification-time attrs)))
+                        (size (file-attribute-size attrs))
+                        (hash (secure-hash 'sha256 (current-buffer)))
+                        (file-title (manifolding-atlas-db--extract-file-title ast path)))
+                   (make-manifolding-atlas-parse-ctx
+                    :path path
+                    :ast ast
+                    :file-node (manifolding-atlas-db--extract-file-node ast path (current-buffer) file-title)
+                    :heading-nodes (manifolding-atlas-db--extract-heading-nodes ast path (current-buffer) file-title)
+                    :hash hash
+                    :mtime mtime
+                    :size size)))
+             (when (buffer-live-p buffer)
+               (kill-buffer buffer))))))))
+(advice-add 'manifolding-atlas-db--parse-file :override
+            #'my/manifolding-atlas-db--parse-file)
+(manifolding-atlas-db-autosync-mode +1)
+#+end_src
+* Manifolding Atlas Core
+:PROPERTIES:
+:CATEGORY: notes
+:END:
+** Buffer Functions
+#+begin_src emacs-lisp
+;; Example API calls - evaluate manually, not on load:
+;; (manifolding-atlas-buffer-title-get)              ; Get title
+;; (manifolding-atlas-buffer-title-set "New Title")  ; Set title
+#+end_src
+** Navigation
+:PROPERTIES:
+:CATEGORY: editing
+:END:
+#+begin_src emacs-lisp
+;; manifolding-atlas-find         - find and open a note (creates if missing)
+;; manifolding-atlas-insert       - insert an id: link to a note at point
+;; manifolding-atlas-find-backlink - completion over notes that link TO the current note;
+;;                        useful for discovering connections and refactoring.
+;; Bind these to keys in your bindings file.
+#+end_src
+

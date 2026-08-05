@@ -1,0 +1,85 @@
+#+title: Manifolding Atlas — Link Utilities
+#+priority: 12
+* Link Utilities
+:PROPERTIES:
+:CATEGORY: editing
+:END:
+#+begin_src emacs-lisp
+;; manifolding-atlas-utils-link-make-string builds an org id: link from any manifolding-atlas-note.
+;; (manifolding-atlas-utils-link-make-string note "Custom Description")
+;; => "[[id:abc123][Custom Description]]"
+;; Passing nil as description falls back to the note title.
+(defun my/manifolding-atlas-extract-subtree ()
+  "Extract the heading at point into a new manifolding-atlas note.
+Prompts for a subdirectory, creates the note with the subtree
+content as its body, then replaces the original subtree with an
+id: link to the new note."
+  (interactive)
+  (let* ((my/manifolding-atlas--skip-capture t)
+         (title  (org-get-heading t t t t))
+         (source-id (org-id-get))
+         (body   (save-excursion
+                   (org-back-to-heading t)
+                   (let ((beg (line-beginning-position 2))
+                         (end (progn (org-end-of-subtree t t) (point))))
+                     (buffer-substring-no-properties beg end))))
+         (subdir (my/manifolding-atlas-root-dir))
+         (note   (manifolding-atlas-create
+                  title
+                  (concat subdir (manifolding-atlas-title-to-slug title))
+                  :body body)))
+    (when (and note source-id)
+      (my/manifolding-atlas--property-put note "SOURCE" source-id))
+    (org-back-to-heading t)
+    (let ((beg (point))
+          (end (progn (org-end-of-subtree t t) (point))))
+      (delete-region beg end))
+    (insert (manifolding-atlas-utils-link-make-string note) "\n")))
+(defun my/manifolding-atlas-copy-link ()
+  "Select a note and copy an id: link to it to the kill ring."
+  (interactive)
+  (let* ((note (manifolding-atlas-select "Note: " :require-match t))
+         (raw  (read-string "Description (blank = title): "))
+         (link (manifolding-atlas-utils-link-make-string
+                note (unless (string-empty-p raw) raw))))
+    (kill-new link)
+    (message "Copied: %s" link)))
+(defun my/manifolding-atlas-insert-link ()
+  "Prompt for title, look up or create a note, then insert an id: link.
+If a note with that title exists, use it.  Otherwise create a new one
+with all standard prompts (subdir, tags, etc.) and open an org-capture
+buffer for body editing."
+  (interactive)
+  (let* ((title  (read-string "Note title: "))
+         (note   (or (car (manifolding-atlas-db-query
+                           (lambda (n)
+                             (string= (manifolding-atlas-note-title n) title))))
+                     (manifolding-atlas-create title)))
+         (raw    (read-string "Description (blank = title): "))
+         (link   (manifolding-atlas-utils-link-make-string
+                  note (unless (string-empty-p raw) raw))))
+    (insert link)
+    (when my/manifolding-atlas--new-note
+      (my/manifolding-atlas--open-capture-for-note note))))
+(defun my/manifolding-atlas-rename-link ()
+  "Rename the description of an id: link at point."
+  (interactive)
+  (let* ((context (org-element-context))
+         (type    (org-element-property :type context)))
+    (unless (and (eq (car context) 'link) (string= type "id"))
+      (user-error "Not on an id: link"))
+    (let* ((begin (org-element-property :begin context))
+           (end   (org-element-property :end context))
+           (path  (org-element-property :path context))
+           (old   (org-element-property :contents-begin context))
+           (desc  (if old
+                      (buffer-substring-no-properties
+                       (org-element-property :contents-begin context)
+                       (org-element-property :contents-end context))
+                    path))
+           (new   (read-string "New description: " desc)))
+      (if (string= new desc)
+          (message "Description unchanged")
+        (delete-region begin end)
+        (insert (format "[[id:%s][%s]]" path new))))))
+#+end_src

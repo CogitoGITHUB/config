@@ -9,7 +9,7 @@
 
 Define extended TODO states for all notes. Supports both the original
 TODO/DONE workflow and the expanded states used by the Properties Update
-Plugin and vulpea prompts.
+Plugin and manifolding-atlas prompts.
 
 ** Config
 #+begin_src emacs-lisp

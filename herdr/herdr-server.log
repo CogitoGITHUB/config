@@ -12572,3 +12572,214 @@
 2026-08-04T08:56:35.690776Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
 2026-08-04T08:56:48.046625Z  INFO herdr::server::headless: client resize client_id=10 cols=81 rows=76 cell_width_px=0 cell_height_px=0
 2026-08-04T08:56:48.347554Z  INFO herdr::server::headless: client resize client_id=10 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-04T08:59:51.489061Z  INFO herdr::server::headless: client resize client_id=10 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-04T08:59:51.890003Z  INFO herdr::server::headless: client resize client_id=10 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-04T11:11:52.380659Z  INFO herdr::server::headless: client disconnected client_id=10
+2026-08-05T04:59:28.983961Z  INFO herdr::server::headless: client connected client_id=12 cols=81 rows=56 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-08-05T04:59:28.984140Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T04:59:29.532596Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T05:03:05.221649Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T05:03:05.522239Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T05:03:16.340101Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T05:03:16.542909Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T05:06:27.416003Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:06:27.605417Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:06:27.743686Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:06:27.894253Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:06:28.053728Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:06:28.205455Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:06:28.376621Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:06:28.564797Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:07:54.204350Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:07:54.356222Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:07:54.522913Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:07:54.673595Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:07:54.875372Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:08:31.385820Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:20:14.952652Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T05:20:15.654249Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T05:23:18.994238Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T05:23:19.394974Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T05:24:26.017935Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T05:24:26.418417Z  INFO herdr::server::headless: client resize client_id=12 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T05:33:01.760451Z  INFO herdr::server::headless: client disconnected client_id=12
+2026-08-05T05:35:49.859751Z  INFO herdr::server::headless: client connected client_id=14 cols=81 rows=56 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-08-05T05:35:49.859809Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T05:35:49.899541Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T05:36:20.929819Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:36:21.118489Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:36:21.302418Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:36:21.452316Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:37:13.807974Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T05:37:14.208507Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T05:39:51.169069Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T05:39:51.570689Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T05:40:02.309200Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:40:02.490170Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:40:02.635710Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:40:02.786283Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:40:02.938208Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:40:34.280010Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:40:34.438671Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:40:34.572006Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:40:34.706386Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:40:34.856788Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:15.634462Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:15.808681Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:15.959296Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:16.137725Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:16.299801Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:16.474826Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:16.624978Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:36.364525Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:36.526503Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:36.675730Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:36.775452Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:36.910203Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:37.060632Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:53.171544Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:53.341602Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:53.452725Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:41:53.603368Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:26.501463Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:26.663732Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:26.814990Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:26.924955Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:27.075367Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:27.213308Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:27.363546Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:27.521755Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:43.925546Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:44.088007Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:44.216676Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:42:44.367188Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:43:06.127767Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:43:06.301151Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:43:06.442179Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:43:06.592743Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:43:19.718954Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:43:19.899926Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:43:20.022935Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:43:20.173311Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T05:59:04.535390Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T05:59:05.136550Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:04:56.218945Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:04:56.619295Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:13:58.687557Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:13:59.188219Z  INFO herdr::server::headless: client resize client_id=14 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:21:15.512483Z  INFO herdr::server::headless: client disconnected client_id=14
+2026-08-05T06:21:16.048748Z  INFO herdr::server::headless: client connected client_id=16 cols=81 rows=56 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-08-05T06:21:16.048834Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T06:21:16.090735Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T06:24:21.095836Z  INFO herdr::server::headless: client resize client_id=16 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:24:21.496536Z  INFO herdr::server::headless: client resize client_id=16 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:24:42.231125Z  INFO herdr::server::headless: client resize client_id=16 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:24:42.630890Z  INFO herdr::server::headless: client resize client_id=16 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:24:49.078682Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t2"
+2026-08-05T06:24:53.981387Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t1"
+2026-08-05T06:24:58.997492Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-05T06:29:20.439989Z  INFO herdr::server::headless: client resize client_id=16 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:29:20.740453Z  INFO herdr::server::headless: client resize client_id=16 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:33:09.990269Z  INFO herdr::server::headless: client connected client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-08-05T06:33:09.990436Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T06:33:10.030902Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T06:33:23.875195Z  INFO herdr::server::headless: client resize client_id=16 cols=80 rows=24 cell_width_px=0 cell_height_px=0
+2026-08-05T06:33:23.883814Z  INFO herdr::server::headless: client disconnected client_id=16
+2026-08-05T06:33:27.335110Z  INFO herdr::server::headless: client resize client_id=18 cols=96 rows=63 cell_width_px=0 cell_height_px=0
+2026-08-05T06:33:27.635695Z  INFO herdr::server::headless: client resize client_id=18 cols=106 rows=69 cell_width_px=0 cell_height_px=0
+2026-08-05T06:33:27.735800Z  INFO herdr::server::headless: client resize client_id=18 cols=96 rows=63 cell_width_px=0 cell_height_px=0
+2026-08-05T06:33:27.936016Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:34:30.889867Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:34:31.387776Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:35:36.202677Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:35:36.394286Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:35:36.560653Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:35:36.711095Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:35:36.876908Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:35:37.062200Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:35:37.211235Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:35:37.361445Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:35:37.526692Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:05.550025Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:05.714338Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:05.884473Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:06.050708Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:38.784587Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:38.951916Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:39.101150Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:39.265114Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:49.273562Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:49.449056Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:49.607876Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:49.736701Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:36:49.886881Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:37:02.947166Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:37:10.262910Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:38:37.678509Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:38:37.855158Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:38:37.976934Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:38:38.098506Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:38:38.248939Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T06:39:39.745836Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:39:40.347008Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:49:12.358638Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:49:12.659083Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:49:48.532021Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:49:49.032672Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:50:20.986240Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:50:21.287312Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T06:50:46.743686Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T06:50:47.043960Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:12:44.863779Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:12:45.264415Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:21:59.192335Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:21:59.693089Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:23:34.220323Z  INFO herdr::server::headless: client connected client_id=20 cols=189 rows=47 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-08-05T07:23:34.220416Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T07:23:34.226686Z  WARN herdr::app: unknown theme, falling back theme="red-white" fallback="catppuccin"
+2026-08-05T07:25:59.082579Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:25:59.687093Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:26:33.784905Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:26:34.091152Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:29:09.483254Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:29:09.879366Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:31:43.423279Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:31:44.023965Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:40:05.715533Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:40:05.915603Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:40:28.654825Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t2"
+2026-08-05T07:40:33.658353Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-05T07:40:40.218375Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t1"
+2026-08-05T07:40:45.226561Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-05T07:41:31.918467Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:41:32.079118Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:41:32.216804Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:41:32.366875Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:42:16.733390Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:42:16.893871Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:42:17.036836Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:42:17.174846Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:42:17.316786Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:42:17.474034Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-05T07:43:26.036166Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t2"
+2026-08-05T07:43:31.040289Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-05T07:43:59.832637Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t1"
+2026-08-05T07:44:04.853726Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-05T07:46:00.927375Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:46:01.216052Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:47:16.887982Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:47:17.188246Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:47:22.497665Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:47:22.800243Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:49:20.712607Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:49:21.113478Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:50:09.656801Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:50:09.957579Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:51:19.462325Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:51:20.163962Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T07:58:02.506540Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=76 cell_width_px=0 cell_height_px=0
+2026-08-05T07:58:02.811551Z  INFO herdr::server::headless: client resize client_id=18 cols=81 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-05T08:04:19.041310Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t2"
+2026-08-05T08:04:24.044308Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-05T08:04:27.113948Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1H" tab_id="w1H:t1"
+2026-08-05T08:04:32.123780Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1

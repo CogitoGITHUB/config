@@ -1,0 +1,20 @@
+#+title:      POS (Part of Speech) Prompt
+#+priority:   17
+
+* POS Prompt
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'pos
+  :name 'pos
+  :label "POS"
+  :contexts '(dictionary)
+  :prompt-fn (lambda ()
+               (let ((val (completing-read "POS: "
+                                          '("⚠ WARNING" "noun" "verb" "adjective" "adverb" "phrase" "other")
+                                          nil t nil nil "⚠ WARNING")))
+                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
+  :to-plist (lambda (val _ctx)
+              (when val
+                (let ((link (my/manifolding-atlas--ensure-ref-note 'pos val)))
+                  `(:properties (("POS" . ,(or link val))))))))
+#+end_src

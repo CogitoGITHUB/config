@@ -34,10 +34,10 @@
                      (type (if colon (substring target 0 (1- colon)) ""))
                      (path (if colon (substring target colon) target)))
                 (if (and (string= type "id")
-                         (fboundp 'vulpea-db-get-by-id))
-                    (let ((note (vulpea-db-get-by-id path)))
+                         (fboundp 'manifolding-atlas-db-get-by-id))
+                    (let ((note (manifolding-atlas-db-get-by-id path)))
                       (if note
-                          (my/vulpea--open-capture-for-note note "")
+                          (my/manifolding-atlas--open-capture-for-note note "")
                         (org-id-open path)))
                   (org-id-open path)))))))
       map)

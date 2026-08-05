@@ -1,0 +1,20 @@
+#+title:      Scope Prompt
+#+priority:   23
+
+* Scope Prompt
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'rule-scope
+  :name 'rule-scope
+  :label "Scope"
+  :contexts '(rule)
+  :prompt-fn (lambda ()
+               (completing-read "Scope (auto/universal/general/focused): "
+                                '("auto" "universal" "general" "focused")
+                                nil t nil nil "auto"))
+  :to-plist (lambda (val _ctx)
+              (when (and val (not (member val '("" "auto"))))
+                `(:tags (,val)
+                  :post-apply (,(apply-partially
+                                 #'my/manifolding-atlas--ensure-ref-note 'scope val))))))
+#+end_src

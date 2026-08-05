@@ -5,7 +5,7 @@
 ;; author: Kirill Rogovoy, Thomas Jorna
 ;; Keywords: files outlines
 ;; Version: 0.1
-;; Package-Requires: ((emacs "27.1") (vulpea "2.4.0") (simple-httpd "20191103.1446") (websocket "1.13"))
+;; Package-Requires: ((emacs "27.1") (manifolding-atlas "2.4.0") (simple-httpd "20191103.1446") (websocket "1.13"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -36,12 +36,12 @@
 (require 'websocket)
 (require 'org-id)
 (require 'cl-lib)
-(require 'vulpea)
+(require 'manifolding-atlas)
 (require 'ox-html)
 
 (defgroup manifolding-mind-map nil
-  "Mind map for vulpea notes."
-  :group 'vulpea
+  "Mind map for manifolding-atlas notes."
+  :group 'manifolding-atlas
   :prefix "manifolding-mind-map-")
 
 (defvar manifolding-mind-map-root-dir
@@ -409,9 +409,9 @@ Takes _WS and FRAME as arguments."
 (defun manifolding-mind-map--on-msg-open-node (data)
   "Open a node when receiving DATA from the websocket."
   (let* ((id (alist-get 'id data))
-          (note (vulpea-db-get-by-id id))
-          (pos (vulpea-note-pos note))
-          (buf (find-file-noselect (vulpea-note-path note))))
+          (note (manifolding-atlas-db-get-by-id id))
+          (pos (manifolding-atlas-note-pos note))
+          (buf (find-file-noselect (manifolding-atlas-note-path note))))
     (run-hook-with-args 'manifolding-mind-map-before-open-node-functions id)
     (unless (window-live-p manifolding-mind-map--window)
       (if-let ((windows (window-list))
@@ -446,7 +446,7 @@ TODO: Be able to delete individual nodes."
   "Create a node when receiving DATA from the websocket."
   (let ((title (alist-get 'title data)))
     (when title
-      (vulpea-create title))))
+      (manifolding-atlas-create title))))
 
 (defun manifolding-mind-map--ws-on-close (_websocket)
   "What to do when _WEBSOCKET to manifolding-mind-map is closed."
@@ -455,27 +455,27 @@ TODO: Be able to delete individual nodes."
   (message "Connection with manifolding-mind-map closed."))
 
 (defun manifolding-mind-map--get-text (id)
-  "Retrieve the text from vulpea note ID."
-  (let ((note (vulpea-db-get-by-id id)))
+  "Retrieve the text from manifolding-atlas note ID."
+  (let ((note (manifolding-atlas-db-get-by-id id)))
     (when note
-      (vulpea-utils-with-note note
-        (when (> (vulpea-note-level note) 0)
-          (goto-char (vulpea-note-pos note))
+      (manifolding-atlas-utils-with-note note
+        (when (> (manifolding-atlas-note-level note) 0)
+          (goto-char (manifolding-atlas-note-pos note))
           (org-narrow-to-element))
         (buffer-substring-no-properties (buffer-end -1) (buffer-end 1))))))
 
 (defun manifolding-mind-map--get-html (id)
   "Retrieve the ox-html export of the note identified by ID."
-  (let* ((note (vulpea-db-get-by-id id))
-         (level (vulpea-note-level note)))
+  (let* ((note (manifolding-atlas-db-get-by-id id))
+         (level (manifolding-atlas-note-level note)))
     (when note
-      (vulpea-utils-with-note note
+      (manifolding-atlas-utils-with-note note
         (let ((org-html-with-toc nil)
               (org-export-with-section-numbers nil)
               (org-export-headline-levels 8))
           (if (> level 0)
               (progn
-                (goto-char (vulpea-note-pos note))
+                (goto-char (manifolding-atlas-note-pos note))
                 (org-export-as 'html nil t nil 'body-only nil))
             (org-export-as 'html nil nil nil 'body-only nil)))))))
 
@@ -504,7 +504,7 @@ TODO: Be able to delete individual nodes."
     (httpd-send-header t "text/plain" 200 :Access-Control-Allow-Origin "*")))
 
 (defun manifolding-mind-map--on-save ()
-  "Send graphdata on saving a vulpea buffer.
+  "Send graphdata on saving a manifolding-atlas buffer.
 
 TODO: Make this only send the changes to the graph data, not the complete graph."
   (when (and buffer-file-name
@@ -593,7 +593,7 @@ unchanged."
    'nil))
 
 (defun manifolding-mind-map--send-graphdata ()
-  "Get vulpea data, make JSON, send through websocket."
+  "Get manifolding-atlas data, make JSON, send through websocket."
   (let* ((links-db-rows (seq-concatenate
                           'list
                           (manifolding-mind-map--separate-ref-links
@@ -620,7 +620,7 @@ unchanged."
                                  #'manifolding-mind-map-sql-to-alist
                                  '(source target type))
                                 links-db-rows))
-                     (tags . ,(vulpea-db-query-tags)))))
+                     (tags . ,(manifolding-atlas-db-query-tags)))))
     (websocket-send-text manifolding-mind-map-ws-socket (json-encode
                                                 `((type . "graphdata")
                                                   (data . ,response))))))
@@ -643,20 +643,20 @@ Row format: (id path title level pos olp-string properties tags)"
   "Get all notes as rows.
 Row format: (id path title level pos olp-string properties tags)"
   (mapcar #'manifolding-mind-map--note-to-row
-          (vulpea-db-query)))
+          (manifolding-atlas-db-query)))
 
 (defun manifolding-mind-map--note-to-row (note)
-  "Convert a vulpea-note NOTE to the row format.
+  "Convert a manifolding-atlas-note NOTE to the row format.
 Row format: (id path title level pos olp-string properties tags)"
   (list
-   (vulpea-note-id note)
-   (vulpea-note-path note)
-   (vulpea-note-title note)
-   (vulpea-note-level note)
-   (vulpea-note-pos note)
-   (string-join (vulpea-note-outline-path note) " / ")
-   (vulpea-note-properties note)
-   (or (vulpea-note-tags note) '())))
+   (manifolding-atlas-note-id note)
+   (manifolding-atlas-note-path note)
+   (manifolding-atlas-note-title note)
+   (manifolding-atlas-note-level note)
+   (manifolding-atlas-note-pos note)
+   (string-join (manifolding-atlas-note-outline-path note) " / ")
+   (manifolding-atlas-note-properties note)
+   (or (manifolding-atlas-note-tags note) '())))
 
 (defun manifolding-mind-map--get-links ()
   "Get id-type links as rows.
@@ -665,13 +665,13 @@ Row format: (source dest type)"
    #'manifolding-mind-map--link-plist-to-row
    (seq-filter
     (lambda (l) (string= (plist-get l :type) "id"))
-    (vulpea-db-query-links))))
+    (manifolding-atlas-db-query-links))))
 
 (defun manifolding-mind-map--get-transclude-links ()
   "Get transclusion links from the transclude_links table.
 Row format: (source dest type)"
   (ignore-errors
-    (let* ((rows (emacsql (vulpea-db)
+    (let* ((rows (emacsql (manifolding-atlas-db)
                           [:select [source dest] :from transclude_links]))
            (result (mapcar
                     (lambda (row)
@@ -687,10 +687,10 @@ Row format: (source dest type)"
    #'manifolding-mind-map--link-plist-to-row
    (seq-filter
     (lambda (l) (string-match-p "cite" (plist-get l :type)))
-    (vulpea-db-query-links))))
+    (manifolding-atlas-db-query-links))))
 
 (defun manifolding-mind-map--link-plist-to-row (link)
-  "Convert a vulpea link plist LINK to row format.
+  "Convert a manifolding-atlas link plist LINK to row format.
 Row format: (source dest type)"
   (list
    (plist-get link :source)
@@ -704,7 +704,7 @@ otherwise keep as cite type."
   (seq-map
    (lambda (link)
      (pcase-let ((`(,source ,dest ,type) link))
-       (if (vulpea-db-get-by-id dest)
+       (if (manifolding-atlas-db-get-by-id dest)
            (list source dest "ref")
          (list source dest type))))
    links))

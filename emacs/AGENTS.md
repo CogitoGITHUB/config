@@ -7,11 +7,11 @@
 - **Load order:** `modules/*.org` sorted by `#+priority:` (default 10, lower = earlier).
 
 ## Conventions
-- **Namespace:** `my/` for user code, `my/vulpea--` for internal plugin functions.
+- **Namespace:** `my/` for user code, `my/manifolding-atlas--` for internal plugin functions.
 - **No comments in code** — don't add explanatory comments to source blocks.
 - **No blank line after headings** at any level in `.org` files.
 - **No temp files in `/tmp/`** — use `/tmp/opencode/`.
-- **Schema violations are silent** — `vulpea-db-schema-validation-action` is `'silent`. Violations tracked via MISSING PROMPTS, never interactive prompts.
+- **Schema violations are silent** — `manifolding-atlas-db-schema-validation-action` is `'silent`. Violations tracked via MISSING PROMPTS, never interactive prompts.
 - **Git commit/push:** use `git gg` (alias that adds all, commits, and pushes). Never stage/commit/push manually.
 
 ## Key Files
@@ -19,25 +19,26 @@
 |------|---------|
 | `bootstrap.org` | Boot kernel — tangles to `init.el` / `early-init.el` |
 | `modules/keyboard.org` | Modal keybinding system (hydras, modaled states) |
-| `modules/vulpea/vulpea.org` | Main notes system config (810 lines) |
-| `modules/vulpea/plugins/*.org` | Vulpea plugin modules |
-| `modules/vulpea/properties/*.org` | Note property prompts (state, tags, etc.) |
-| `modules/vulpea/vulpea-templates-system.org` | Template infrastructure: doct, yasnippet loading |
-| `modules/vulpea/templates/` | All template files: `full-file-templates/`, `snippets/` |
-| `modules/vulpea/templates/full-file-templates/{notes,plain,reference,task,math,protocol}.org` | Capture templates (body-only, no `*` heading — headingification creates it) |
-| `modules/vulpea/templates/snippets/` | Yasnippet snippet files |
+| `modules/manifolding-atlas/` | Main notes system (formerly `vulpea`, vendored + loader-managed). Full reference: `modules/manifolding-atlas/readme.org` |
+| `modules/manifolding-atlas/manifolding-atlas.org` | Main notes system config (116 lines; engine vendored under `core/`) |
+| `modules/manifolding-atlas/plugins/*.org` | Manifolding Atlas plugin modules |
+| `modules/manifolding-atlas/properties/*.org` | Note property prompts (state, tags, etc.) |
+| `modules/manifolding-atlas/manifolding-atlas-templates-system.org` | Template infrastructure: doct, yasnippet loading |
+| `modules/manifolding-atlas/templates/` | All template files: `full-file-templates/`, `snippets/` |
+| `modules/manifolding-atlas/templates/full-file-templates/{notes,plain,reference,task,math,protocol}.org` | Capture templates (body-only, no `*` heading — headingification creates it) |
+| `modules/manifolding-atlas/templates/snippets/` | Yasnippet snippet files |
 | `modules/arei.org` | Guile Scheme IDE (AREI) — requires `guile-ares-rs` installed system-wide |
 | `modules/auctex.org` | LaTeX environment (xelatex, texlive env vars, 3-pass PDF export) |
 | `modules/org-download.org` | Drag-drop files/images into org notes |
 | `modules/org-web-tools.org` | Capture web pages as org entries |
-| `modules/org-remark.org` | Annotate/highlight external content stored as vulpea notes |
+| `modules/org-remark.org` | Annotate/highlight external content stored as manifolding-atlas notes |
 | `modules/org-fragtog.org` | Auto-toggle LaTeX preview fragments |
 | `modules/org-pdftools.org` | PDF integration for org |
 
 ## Quick Reference
 - **Notes directory:** `~/test/` (`(my/notes-directory)` → `"/home/aoeu/test/"`)
 - **Notes must be in a git repo** — `before-save-hook` blocks with `user-error` if no `.git`
-- **vulpea.db:** at `~/test/admin/vulpea.db`, root-owned (`root:users 664`), excluded from git
+- **manifolding-atlas.db:** at `~/test/admin/manifolding-atlas.db`, root-owned (`root:users 664`), excluded from git
 
 ## LaTeX / TeX Live
 
@@ -56,7 +57,7 @@ The emacs-mcp-server runs inside the Emacs daemon and exposes these tools to ope
 
 | Tool | What it does |
 |------|-------------|
-| `eval-elisp` | Evaluate any Elisp in the live daemon — can access buffers, org-roam/vulpea, any loaded library |
+| `eval-elisp` | Evaluate any Elisp in the live daemon — can access buffers, org-roam/manifolding-atlas, any loaded library |
 | `get-diagnostics` | Returns diagnostics (flymake, etc.) from all open buffers |
 | `org-agenda` | Query or manipulate the Org agenda |
 | `org-search` | Search across Org files |
@@ -73,7 +74,7 @@ refused" even though the file exists. The **MCP socket is the reliable path**
 (§below). Try `emacsclient --eval '(+ 1 2)'`; if it gives Connection refused,
 use socat→MCP.
 
-**Vulpea** (v2.5.0) is loaded and accessible via `eval-elisp`. Useful for querying org-roam notes programmatically (e.g., `(vulpea-db-query ...)`).
+**Manifolding Atlas** (v2.5.0) is loaded and accessible via `eval-elisp`. Useful for querying org-roam notes programmatically (e.g., `(manifolding-atlas-db-query ...)`).
 
 **AREI** (Guile Scheme IDE) loaded — `arei-port` 63225, `scheme-mode-hook` → `arei-mode`, `arei-mode-hook` → `sesman-start`. Requires `guile-ares-rs` running as RPC server.
 

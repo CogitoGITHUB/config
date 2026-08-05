@@ -28,42 +28,42 @@
 (add-hook 'LaTeX-mode-hook
           (lambda () (add-to-list 'completion-at-point-functions #'citar-capf)))
 
-(with-eval-after-load 'vulpea
-  (defun my/citar-vulpea-get-candidates (keys)
-    "Return alist of (citekey . display) for KEYS that have vulpea notes."
+(with-eval-after-load 'manifolding-atlas
+  (defun my/citar-manifolding-atlas-get-candidates (keys)
+    "Return alist of (citekey . display) for KEYS that have manifolding-atlas notes."
     (mapcar (lambda (k) (cons k k))
             (seq-filter
              (lambda (k)
-               (not (null (vulpea-db-query-by-meta "citekey" k))))
+               (not (null (manifolding-atlas-db-query-by-meta "citekey" k))))
              keys)))
 
-  (defun my/citar-vulpea-has-notes (keys)
+  (defun my/citar-manifolding-atlas-has-notes (keys)
     "Return hash of citekey -> bool for KEYS."
     (let ((tbl (make-hash-table :test 'equal)))
       (dolist (k keys)
         (puthash k
-                 (not (null (vulpea-db-query-by-meta "citekey" k)))
+                 (not (null (manifolding-atlas-db-query-by-meta "citekey" k)))
                  tbl))
       tbl))
 
-  (defun my/citar-vulpea-open-note (citekey)
-    "Open or create a vulpea note for CITEKEY."
-    (let ((note (car (vulpea-db-query-by-meta "citekey" citekey))))
+  (defun my/citar-manifolding-atlas-open-note (citekey)
+    "Open or create a manifolding-atlas note for CITEKEY."
+    (let ((note (car (manifolding-atlas-db-query-by-meta "citekey" citekey))))
       (if note
-          (vulpea-visit note)
-        (vulpea-create citekey nil
+          (manifolding-atlas-visit note)
+        (manifolding-atlas-create citekey nil
                        :properties `(("CITEKEY" . ,citekey))))))
 
   (citar-register-notes-source
-   'citar-vulpea
-   (list :name      "Vulpea Notes"
+   'citar-manifolding-atlas
+   (list :name      "Manifolding Atlas Notes"
          :category  'file
-         :items     #'my/citar-vulpea-get-candidates
-         :hasitems  #'my/citar-vulpea-has-notes
-         :open      #'my/citar-vulpea-open-note
-         :create    #'my/citar-vulpea-open-note))
+         :items     #'my/citar-manifolding-atlas-get-candidates
+         :hasitems  #'my/citar-manifolding-atlas-has-notes
+         :open      #'my/citar-manifolding-atlas-open-note
+         :create    #'my/citar-manifolding-atlas-open-note))
 
-  (setq citar-notes-source 'citar-vulpea))
+  (setq citar-notes-source 'citar-manifolding-atlas))
 #+end_src
 
 ** Embark integration

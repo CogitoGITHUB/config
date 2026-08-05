@@ -145,7 +145,7 @@ Use them in this order of preference depending on what you need.
 
 ## 1. emacsclient (fastest, simplest elisp — when it works)
 
-Best for one-liners, state checks, calling custom functions, vulpea queries.
+Best for one-liners, state checks, calling custom functions, manifolding-atlas queries.
 No JSON, no encoding issues, just elisp.
 
 ⚠️ **Often fails with "Connection refused".** The socket file
@@ -231,7 +231,7 @@ emacsclient --socket-name $SOCK --eval "`cat /tmp/script.el`"
 | `(manifolding-emacs-reload)` | Yes | Takes 10-30s, don't block |
 | `(featurep '...)` | No | Instant, need result |
 | `(manifolding-emacs-errors-list)` | No | Instant check |
-| `(vulpea-db-query ...)` | Depends | Fast if db hot, slow if cold |
+| `(manifolding-atlas-db-query ...)` | Depends | Fast if db hot, slow if cold |
 | `(+ 1 2)` | No | Instant sanity check |
 | When daemon might be compiling | Yes | Avoid timeout waiting for busy main thread |
 
@@ -306,7 +306,7 @@ EOF
 
 # 4. Confirm your new vars/functions are defined
 socat - UNIX-CONNECT:$SOCK <<'EOF'
-{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(fboundp 'my/vulpea-gnosis-review)"}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"eval-elisp","arguments":{"expression":"(fboundp 'my/manifolding-atlas-mastering-review)"}}}
 EOF
 ```
 
@@ -492,7 +492,7 @@ Create a new roam node. `title` is required.
 | Org capture/refile/clock | MCP socket | Structured JSON params |
 | Org search/agenda with complex match | MCP socket | Match syntax as string param |
 | Elisp with complex quoting | emacsclient | No JSON escaping needed |
-| Vulpea/org-roam queries | emacsclient | Custom functions, complex elisp |
+| Manifolding Atlas/org-roam queries | emacsclient | Custom functions, complex elisp |
 | Diagnostics | MCP socket | Structured file/severity grouping |
 | Long-running daemon operation | emacsclient -n | Non-blocking |
 | Daemon is busy compiling | emacsclient (will block) or wait | MCP eval also blocks on main thread |

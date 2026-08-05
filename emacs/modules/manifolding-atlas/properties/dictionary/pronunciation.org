@@ -1,0 +1,20 @@
+#+title:      Pronunciation Prompt
+#+priority:   16
+
+* Pronunciation Prompt
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'pronunciation
+  :name 'pronunciation
+  :label "Pronunciation"
+  :contexts '(dictionary)
+  :prompt-fn (lambda ()
+               (let ((val (completing-read "Pronunciation (IPA): " '("⚠ WARNING") nil nil nil nil "⚠ WARNING")))
+                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
+  :to-plist (lambda (val _ctx)
+              (when (and val (not (string-equal val "WARNING")))
+                `(:properties (("PRONUNCIATION" . ,val))
+                  :post-apply (,(apply-partially
+                                 #'my/manifolding-atlas--apply-scoped-post
+                                 'pronunciation "PRONUNCIATION" val))))))
+#+end_src

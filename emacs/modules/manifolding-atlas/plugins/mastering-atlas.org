@@ -1,0 +1,480 @@
+#+title: Manifolding Atlas Mastering Plugin
+#+priority: 10
+
+Spaced-repetition review for manifolding-atlas notes. Each note is a reviewable card; its schedule state lives in org properties (`MASTERING_*`) and is indexed into a `mastering_schedule` table by a DB extractor for fast due-queries.
+
+*** Require
+#+begin_src emacs-lisp
+(require 'cl-lib)
+(require 'calendar)
+(require 'time-date)
+#+end_src
+
+*** Algorithm Constants
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas-mastering--proto '(0 1 2)
+  "Proto intervals for the first successful reviews.")
+
+(defvar my/manifolding-atlas-mastering--mastering-value '(0.35 0.30 1.3)
+  "Starting mastering score (plus minus synolon).")
+
+(defvar my/manifolding-atlas-mastering--amnesia 0.5
+  "Failure interval multiplier; closer to 1 = more memory loss.")
+
+(defvar my/manifolding-atlas-mastering--epignosis 0.1
+  "Boost to mastering-plus on anagnosis (accuracy).")
+
+(defvar my/manifolding-atlas-mastering--agnoia 0.2
+  "Boost to mastering-minus on anagnosis (ignorance).")
+
+(defvar my/manifolding-atlas-mastering--anagnosis 3
+  "Streak threshold for anagnosis events.")
+
+(defvar my/manifolding-atlas-mastering--lethe 2
+  "Failure threshold for lethe (interval reset to 0).")
+
+(defvar my/manifolding-atlas-mastering--synolon-max 3.0
+  "Cap on mastering-synolon (interval multiplier).")
+
+(defvar my/manifolding-atlas-mastering--interval-fuzz 0.1
+  "Fuzz factor (+/- %) to prevent review clustering.")
+
+(defvar my/manifolding-atlas-mastering--day-start-hour 3
+  "Hour at which a new review day begins.")
+#+end_src
+
+*** Date Helpers
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-mastering--round-items (list)
+  "Round all items in LIST to 2 decimal places."
+  (cl-loop for item in list
+           collect (/ (round (* item 100)) 100.0)))
+
+(defun my/manifolding-atlas-mastering--fuzz-interval (interval)
+  "Apply random fuzz to INTERVAL based on `my/manifolding-atlas-mastering--interval-fuzz'."
+  (if (or (<= interval 2) (zerop my/manifolding-atlas-mastering--interval-fuzz))
+      interval
+    (let ((fuzz (- (* 2 my/manifolding-atlas-mastering--interval-fuzz
+                      (/ (random 1001) 1000.0))
+                   my/manifolding-atlas-mastering--interval-fuzz)))
+      (* interval (1+ fuzz)))))
+
+(defun my/manifolding-atlas-mastering--date (&optional offset)
+  "Return current date as (year month day), respecting day-start-hour.
+OFFSET is days from today."
+  (let* ((shifted (time-subtract (current-time)
+                                 (seconds-to-time
+                                  (* my/manifolding-atlas-mastering--day-start-hour 3600))))
+         (decoded (decode-time shifted))
+         (target (if (and offset (not (zerop offset)))
+                     (decoded-time-add decoded (make-decoded-time :day offset))
+                   decoded)))
+    (list (decoded-time-year target)
+          (decoded-time-month target)
+          (decoded-time-day target))))
+
+(defun my/manifolding-atlas-mastering--date-diff (date &optional date2)
+  "Days from DATE to DATE2 (default today)."
+  (let* ((given (encode-time 0 0 0 (caddr date) (cadr date) (car date)))
+         (d2 (if date2
+                 (encode-time 0 0 0 (caddr date2) (cadr date2) (car date2))
+               (let ((today (my/manifolding-atlas-mastering--date)))
+                 (encode-time 0 0 0 (caddr today) (cadr today) (car today)))))
+         (diff (- (time-to-days d2) (time-to-days given))))
+    (if (>= diff 0) diff (error "DATE2 must be higher than DATE"))))
+
+(defun my/manifolding-atlas-mastering--date-later-p (date1 date2)
+  "Return t if DATE1 is later than DATE2."
+  (> (time-to-days (encode-time 0 0 0 (caddr date1) (cadr date1) (car date1)))
+     (time-to-days (encode-time 0 0 0 (caddr date2) (cadr date2) (car date2)))))
+
+(defun my/manifolding-atlas-mastering--date-to-int (date)
+  "Convert DATE (year month day) to YYYYMMDD integer."
+  (+ (* (nth 0 date) 10000) (* (nth 1 date) 100) (nth 2 date)))
+
+(defun my/manifolding-atlas-mastering--int-to-date (int)
+  "Convert YYYYMMDD integer to (year month day)."
+  (list (/ int 10000) (% (/ int 100) 100) (% int 100)))
+
+(defun my/manifolding-atlas-mastering--today-int ()
+  "Today as YYYYMMDD integer."
+  (my/manifolding-atlas-mastering--date-to-int (my/manifolding-atlas-mastering--date)))
+#+end_src
+
+*** Algorithm
+#+begin_src emacs-lisp
+(cl-defun my/manifolding-atlas-mastering--next-mastering
+    (&key mastering success epignosis agnoia anagnosis c-successes c-failures lethe)
+  "Return new MASTERING value (plus minus synolon)."
+  (let* ((g-plus (nth 0 mastering))
+         (g-minus (nth 1 mastering))
+         (g-synolon (nth 2 mastering))
+         (anagnosis-p (= (% (max 1 (if success c-successes c-failures))
+                            anagnosis)
+                         0))
+         (neo-synolon (if success
+                          (min (+ g-synolon g-plus) my/manifolding-atlas-mastering--synolon-max)
+                        (max 1.3 (- g-synolon g-minus))))
+         (neo-plus (if (and success anagnosis-p)
+                       (+ g-plus epignosis)
+                     g-plus))
+         (neo-minus (if (and (not success) anagnosis-p)
+                        (+ g-minus agnoia)
+                      g-minus))
+         (neo-plus (if (and lethe (not success) (>= c-failures lethe))
+                       (max 0.1 (- neo-plus epignosis))
+                     neo-plus)))
+    (my/manifolding-atlas-mastering--round-items (list neo-plus neo-minus neo-synolon))))
+
+(cl-defun my/manifolding-atlas-mastering--next-interval
+    (&key last-interval mastering-synolon success successful-reviews
+          amnesia proto c-fails lethe)
+  "Calculate next interval as (year month day)."
+  (let* ((last-interval (if (and (<= last-interval 0) success) 1 last-interval))
+         (amnesia (- 1 amnesia))
+         (interval (cond ((and (< successful-reviews (length proto)) success)
+                          (nth successful-reviews proto))
+                         ((and (< successful-reviews (length proto)) (not success))
+                          0)
+                         ((and (>= c-fails lethe) (not success))
+                          0)
+                         (t (let* ((success-interval (* mastering-synolon last-interval))
+                                   (failure-interval (* amnesia last-interval)))
+                              (if success success-interval
+                                (max (min success-interval failure-interval 7) 0)))))))
+    (my/manifolding-atlas-mastering--date
+     (round (my/manifolding-atlas-mastering--fuzz-interval interval)))))
+#+end_src
+
+*** Database Table
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-mastering--ensure-table ()
+  "Create mastering_schedule table if it does not exist."
+  (emacsql (manifolding-atlas-db)
+    [:create :table :if :not :exists mastering_schedule
+     ([(note-id :not-null)
+       (next-rev :not-null)
+       (last-rev :not-null)
+       (n :not-null)
+       (c-success :not-null)
+       (c-fails :not-null)
+       (t-success :not-null)
+       (t-fails :not-null)
+       (plus :not-null)
+       (minus :not-null)
+       (synolon :not-null)
+       (suspend :not-null)]
+      (:primary-key [note-id])
+      (:foreign-key [note-id] :references notes [id]
+       :on-delete :cascade))]))
+#+end_src
+
+*** DB Extractor
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-mastering--extract (ctx note-data)
+  "Extract MASTERING_* properties from NOTE-DATA into mastering_schedule.
+Initializes a default schedule when MASTERING is set but schedule
+properties are missing, so REVIEW/SUSPEND notes are never dropped."
+  (let* ((note-id (plist-get note-data :id))
+         (props (plist-get note-data :properties))
+         (mastering (cdr (assoc "MASTERING" props)))
+         (next-rev (cdr (assoc "MASTERING_NEXT_REV" props)))
+         (today (my/manifolding-atlas-mastering--today-int))
+         (to-int (lambda (k) (string-to-number (or (cdr (assoc k props)) "0")))))
+    (emacsql (manifolding-atlas-db)
+      [:delete :from mastering_schedule :where (= note-id $s1)]
+      note-id)
+    (when (and note-id mastering (not (string-equal mastering "WARNING")))
+      (emacsql (manifolding-atlas-db)
+        [:insert :into mastering_schedule :values $v1]
+        (vector note-id
+                (if next-rev (funcall to-int "MASTERING_NEXT_REV") today)
+                (if (cdr (assoc "MASTERING_LAST_REV" props)) (funcall to-int "MASTERING_LAST_REV") today)
+                (funcall to-int "MASTERING_N")
+                (funcall to-int "MASTERING_C_SUCCESS")
+                (funcall to-int "MASTERING_C_FAILS")
+                (funcall to-int "MASTERING_T_SUCCESS")
+                (funcall to-int "MASTERING_T_FAILS")
+                (if (funcall to-int "MASTERING_PLUS") (funcall to-int "MASTERING_PLUS") 0.35)
+                (if (funcall to-int "MASTERING_MINUS") (funcall to-int "MASTERING_MINUS") 0.30)
+                (if (funcall to-int "MASTERING_SYNOLON") (funcall to-int "MASTERING_SYNOLON") 1.3)
+                (if (string-equal mastering "SUSPEND") 1 0))))
+    note-data))
+
+(with-eval-after-load 'manifolding-atlas
+  (my/manifolding-atlas-mastering--ensure-table)
+  (manifolding-atlas-db-register-extractor
+   (make-manifolding-atlas-extractor
+    :name       'mastering-schedule
+    :version    1
+    :priority   55
+    :extract-fn #'my/manifolding-atlas-mastering--extract)))
+#+end_src
+
+*** Schedule Property Write
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-mastering--write-schedule-props
+    (note-id next-rev-int n success c-succ c-fails t-succ t-fails score)
+  "Write schedule properties for NOTE-ID back to its org drawer."
+  (let ((note (manifolding-atlas-db-get-by-id note-id)))
+    (when note
+      (let ((file (manifolding-atlas-note-path note))
+            (level (manifolding-atlas-note-level note))
+            (pos (manifolding-atlas-note-pos note)))
+        (when file
+          (with-current-buffer (find-file-noselect file)
+            (save-excursion
+              (if (and level (> level 0) pos)
+                  (progn (goto-char pos) (org-back-to-heading t))
+                (goto-char (point-min)))
+              (my/manifolding-atlas--drawer-put "MASTERING_NEXT_REV" (number-to-string next-rev-int))
+              (my/manifolding-atlas--drawer-put "MASTERING_LAST_REV" (number-to-string (my/manifolding-atlas-mastering--today-int)))
+              (my/manifolding-atlas--drawer-put "MASTERING_N" (number-to-string n))
+              (my/manifolding-atlas--drawer-put "MASTERING_C_SUCCESS" (number-to-string (if success (1+ c-succ) 0)))
+              (my/manifolding-atlas--drawer-put "MASTERING_C_FAILS" (number-to-string (if success 0 (1+ c-fails))))
+              (my/manifolding-atlas--drawer-put "MASTERING_T_SUCCESS" (number-to-string (if success (1+ t-succ) t-succ)))
+              (my/manifolding-atlas--drawer-put "MASTERING_T_FAILS" (number-to-string (if success t-fails (1+ t-fails))))
+              (my/manifolding-atlas--drawer-put "MASTERING_PLUS" (number-to-string (nth 0 score)))
+              (my/manifolding-atlas--drawer-put "MASTERING_MINUS" (number-to-string (nth 1 score)))
+              (my/manifolding-atlas--drawer-put "MASTERING_SYNOLON" (number-to-string (nth 2 score))))
+            (save-buffer)))))))
+
+(defun my/manifolding-atlas-mastering--init-schedule (suspend note)
+  "Initialize schedule properties for fresh note participating in REVIEW."
+  (when (manifolding-atlas-note-p note)
+    (let* ((id (manifolding-atlas-note-id note))
+           (today (my/manifolding-atlas-mastering--today-int)))
+      (my/manifolding-atlas--property-put note "MASTERING_NEXT_REV" (number-to-string today))
+      (my/manifolding-atlas--property-put note "MASTERING_LAST_REV" (number-to-string today))
+      (my/manifolding-atlas--property-put note "MASTERING_N" "0")
+      (my/manifolding-atlas--property-put note "MASTERING_C_SUCCESS" "0")
+      (my/manifolding-atlas--property-put note "MASTERING_C_FAILS" "0")
+      (my/manifolding-atlas--property-put note "MASTERING_T_SUCCESS" "0")
+      (my/manifolding-atlas--property-put note "MASTERING_T_FAILS" "0")
+      (my/manifolding-atlas--property-put note "MASTERING_PLUS" "0.35")
+      (my/manifolding-atlas--property-put note "MASTERING_MINUS" "0.30")
+      (my/manifolding-atlas--property-put note "MASTERING_SYNOLON" "1.3")
+      (unless (car (emacsql (manifolding-atlas-db)
+                    [:select [note-id] :from mastering_schedule
+                     :where (= note-id $s1)] id))
+        (emacsql (manifolding-atlas-db)
+          [:insert :into mastering_schedule :values $v1]
+          (vector id today today 0 0 0 0 0 0.35 0.30 1.3
+                  (if suspend 1 0)))))))
+#+end_src
+
+*** Algorithm Bridge
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-mastering--review-algorithm (note-id success)
+  "Compute (NEXT-REV MASTERING-SCORE LOG-ALIST) for reviewing NOTE-ID with SUCCESS."
+  (let* ((row (car (emacsql (manifolding-atlas-db)
+                   [:select [t-success c-success c-fails last-rev next-rev
+                             n t-fails plus minus synolon]
+                    :from mastering_schedule :where (= note-id $s1)]
+                   note-id)))
+         (t-success (nth 0 row))
+         (c-success (nth 1 row))
+         (c-fails (nth 2 row))
+         (last-interval (my/manifolding-atlas-mastering--date-diff
+                         (my/manifolding-atlas-mastering--int-to-date (nth 3 row))))
+         (existing-next-rev (my/manifolding-atlas-mastering--int-to-date (nth 4 row)))
+         (n (nth 5 row))
+         (t-fails (nth 6 row))
+         (mastering (list (nth 7 row) (nth 8 row) (nth 9 row)))
+         (computed-next-rev (my/manifolding-atlas-mastering--next-interval
+                             :last-interval last-interval
+                             :mastering-synolon (nth 2 mastering)
+                             :success success
+                             :successful-reviews t-success
+                             :c-fails c-fails
+                             :lethe my/manifolding-atlas-mastering--lethe
+                             :amnesia my/manifolding-atlas-mastering--amnesia
+                             :proto my/manifolding-atlas-mastering--proto))
+         (next-rev (if (and success
+                            (my/manifolding-atlas-mastering--date-later-p
+                             existing-next-rev computed-next-rev))
+                       existing-next-rev
+                     computed-next-rev)))
+    (list next-rev
+          (my/manifolding-atlas-mastering--next-mastering
+           :mastering mastering :success success
+           :epignosis my/manifolding-atlas-mastering--epignosis
+           :agnoia my/manifolding-atlas-mastering--agnoia
+           :anagnosis my/manifolding-atlas-mastering--anagnosis
+           :c-successes (if success (1+ c-success) 0)
+           :c-failures (if success 0 (1+ c-fails))
+           :lethe my/manifolding-atlas-mastering--lethe)
+          `((n . ,n) (c-success . ,c-success) (c-fails . ,c-fails)
+            (t-success . ,t-success) (t-fails . ,t-fails)))))
+
+(defun my/manifolding-atlas-mastering--update (note-id success result)
+  "Update mastering_schedule and note properties for NOTE-ID review."
+  (let* ((next-rev (nth 0 result))
+         (score (nth 1 result))
+         (log (nth 2 result))
+         (n (alist-get 'n log))
+         (c-succ (alist-get 'c-success log))
+         (c-fails (alist-get 'c-fails log))
+         (t-succ (alist-get 't-success log))
+         (t-fails (alist-get 't-fails log))
+         (today (my/manifolding-atlas-mastering--today-int)))
+    (emacsql (manifolding-atlas-db)
+      [:update mastering_schedule :set
+       last-rev = $s2, next-rev = $s3, n = $s4,
+       c-success = $s5, c-fails = $s6, t-success = $s7, t-fails = $s8,
+       plus = $s9, minus = $s10, synolon = $s11
+       :where (= note-id $s1)]
+      note-id today (my/manifolding-atlas-mastering--date-to-int next-rev) (1+ n)
+      (if success (1+ c-succ) 0)
+      (if success 0 (1+ c-fails))
+      (if success (1+ t-succ) t-succ)
+      (if success t-fails (1+ t-fails))
+      (nth 0 score) (nth 1 score) (nth 2 score))
+    (my/manifolding-atlas-mastering--write-schedule-props
+     note-id (my/manifolding-atlas-mastering--date-to-int next-rev) (1+ n)
+     success c-succ c-fails t-succ t-fails score)
+    next-rev))
+#+end_src
+
+*** Due Queries
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-mastering--due-note-ids ()
+  "Return note IDs due for review today."
+  (let ((today (my/manifolding-atlas-mastering--today-int)))
+    (mapcar #'car
+            (emacsql (manifolding-atlas-db)
+              [:select [note-id] :from mastering_schedule
+               :where (and (<= next-rev $s1) (= suspend 0))]
+              today))))
+
+(defun my/manifolding-atlas-mastering--overdue-note-ids ()
+  "Return note IDs overdue (reviewed at least once, due before today)."
+  (let ((today (my/manifolding-atlas-mastering--today-int)))
+    (mapcar #'car
+            (emacsql (manifolding-atlas-db)
+              [:select [note-id] :from mastering_schedule
+               :where (and (> n 0) (= suspend 0) (< next-rev $s1))]
+              today))))
+
+(defun my/manifolding-atlas-mastering--due-count ()
+  "Number of due notes."
+  (length (my/manifolding-atlas-mastering--due-note-ids)))
+#+end_src
+
+*** Review Session
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-mastering--display-note (id)
+  "Display note ID in review buffer."
+  (let ((note (manifolding-atlas-db-get-by-id id)))
+    (with-current-buffer "*manifolding-atlas-mastering-review*"
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (format "%s\n\n"
+                        (if note (manifolding-atlas-note-title note) id)))
+        (when note
+          (insert (format "[[id:%s][open]]\n" id)))))))
+
+(defun my/manifolding-atlas-mastering--review-session (ids)
+  "Review NOTE-IDS in sequence, grading with algorithm."
+  (let ((buf (get-buffer-create "*manifolding-atlas-mastering-review*"))
+        (total (length ids))
+        (reviewed 0))
+    (with-current-buffer buf
+      (special-mode)
+      (setq buffer-read-only t))
+    (pop-to-buffer-same-window buf)
+    (catch 'mastering-quit
+      (dolist (id ids)
+        (let* ((note (manifolding-atlas-db-get-by-id id))
+               (title (if note (manifolding-atlas-note-title note) id)))
+          (my/manifolding-atlas-mastering--display-note id)
+          (message "[%d/%d] %s" (1+ reviewed) total title)
+          (let ((choice (read-char-choice
+                         "n=next f=fail s=suspend o=open q=quit: "
+                         '(?n ?f ?s ?o ?q))))
+            (pcase choice
+              (?n (my/manifolding-atlas-mastering--update id t
+                   (my/manifolding-atlas-mastering--review-algorithm id t)))
+              (?f (my/manifolding-atlas-mastering--update id nil
+                   (my/manifolding-atlas-mastering--review-algorithm id nil)))
+              (?s (my/manifolding-atlas-mastering--set-suspend id 1))
+              (?o (when note
+                    (find-file (manifolding-atlas-note-path note))
+                    (let ((inhibit-read-only t))
+                      (with-current-buffer buf (erase-buffer)))
+                    (when (y-or-n-p "Grade this note? ")
+                      (let ((g (read-char-choice "n=next f=fail s=suspend q=quit: "
+                                                 '(?n ?f ?s ?q))))
+                        (pcase g
+                          (?n (my/manifolding-atlas-mastering--update id t
+                               (my/manifolding-atlas-mastering--review-algorithm id t)))
+                          (?f (my/manifolding-atlas-mastering--update id nil
+                               (my/manifolding-atlas-mastering--review-algorithm id nil)))
+                          (?s (my/manifolding-atlas-mastering--set-suspend id 1))
+                          (?q nil))))))
+              (?q (throw 'mastering-quit nil)))))
+        (cl-incf reviewed)))
+    (kill-buffer buf)))
+
+(defun my/manifolding-atlas-mastering--set-suspend (note-id &optional value)
+  "Toggle suspend on NOTE-ID."
+  (let ((v (if value 1 0)))
+    (emacsql (manifolding-atlas-db)
+      [:update mastering_schedule :set suspend = $s2 :where (= note-id $s1)]
+      note-id v)
+    (let ((note (manifolding-atlas-db-get-by-id note-id)))
+      (when note
+        (my/manifolding-atlas--property-put note "MASTERING" (if value "SUSPEND" "REVIEW"))))
+    (message "Suspended")))
+#+end_src
+
+*** Commands
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-mastering-review ()
+  "Start mastering review session for due notes."
+  (interactive)
+  (let ((ids (my/manifolding-atlas-mastering--due-note-ids)))
+    (if (null ids)
+        (message "No due notes.")
+      (my/manifolding-atlas-mastering--review-session ids))))
+
+(defun my/manifolding-atlas-mastering-review-overdue ()
+  "Start mastering review session for overdue notes."
+  (interactive)
+  (let ((ids (my/manifolding-atlas-mastering--overdue-note-ids)))
+    (if (null ids)
+        (message "No overdue notes.")
+      (my/manifolding-atlas-mastering--review-session ids))))
+
+(defun my/manifolding-atlas-mastering-mark-review (arg)
+  "Mark current note reviewed; with prefix, mark as failed."
+  (interactive "P")
+  (let ((note (my/manifolding-atlas--buffer-note)))
+    (unless note (user-error "No note at point"))
+    (let ((id (manifolding-atlas-note-id note)))
+      (unless (car (emacsql (manifolding-atlas-db)
+                    [:select [note-id] :from mastering_schedule
+                     :where (= note-id $s1)] id))
+        (my/manifolding-atlas-mastering--init-schedule nil note))
+      (my/manifolding-atlas-mastering--update id (not arg)
+       (my/manifolding-atlas-mastering--review-algorithm id (not arg)))
+      (message "Note marked %s." (if arg "failed" "reviewed")))))
+
+(defun my/manifolding-atlas-mastering-toggle-participation ()
+  "Toggle current note's participation in mastering review pool."
+  (interactive)
+  (let ((note (my/manifolding-atlas--buffer-note)))
+    (unless note (user-error "No note at point"))
+    (let* ((id (manifolding-atlas-note-id note))
+           (mastering (manifolding-atlas-note-meta-get note "MASTERING" 'string))
+           (active (and mastering (not (string-equal mastering "WARNING")))))
+      (if active
+          (progn
+            (my/manifolding-atlas--property-put note "MASTERING" "WARNING")
+            (emacsql (manifolding-atlas-db)
+              [:delete :from mastering_schedule :where (= note-id $s1)] id)
+            (message "Removed from review pool."))
+        (my/manifolding-atlas--property-put note "MASTERING" "REVIEW")
+        (my/manifolding-atlas-mastering--init-schedule nil note)
+        (message "Added to review pool.")))))
+#+end_src

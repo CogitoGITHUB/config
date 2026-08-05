@@ -1,0 +1,49 @@
+#+title:      State Intelligence Prompt
+#+priority:   5
+
+* State Intelligence
+Why: Tracks the epistemic credibility of the information. Default is UNVERIFIED.
+
+** Default (default UNVERIFIED)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-state-intelligence ()
+  "Prompt for STATE_INTELLIGENCE. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "STATE_INTELLIGENCE: "
+              '("⚠ WARNING" "UNVERIFIED" "CONFIRMED" "CONTESTED" "OBSOLETE")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-state-intelligence-initial (initial)
+  "Prompt for STATE_INTELLIGENCE with INITIAL pre-selected."
+  (completing-read
+   "STATE_INTELLIGENCE: "
+   '("UNVERIFIED" "CONFIRMED" "CONTESTED" "OBSOLETE")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'state-intelligence
+  :name 'state-intelligence
+  :label "State: Intelligence"
+  :prompt-fn #'my/manifolding-atlas-prompt-state-intelligence
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "STATE_INTELLIGENCE"))
+  :merge-strategy 'replace
+   :to-plist (lambda (val _ctx)
+               (if (or (null val) (string-equal val "WARNING"))
+                   `(:properties (("STATE_INTELLIGENCE" . "WARNING"))
+                     :post-apply (,(apply-partially
+                                    #'my/manifolding-atlas--clear-state-transcribes
+                                    "state-intelligence")))
+                 (let* ((link (my/manifolding-atlas--ensure-ref-note 'state-intelligence val))
+                        (ref-id (my/manifolding-atlas--id-from-link link)))
+                   `(:post-apply (,(apply-partially
+                                    #'my/manifolding-atlas--apply-state-post
+                                    "state-intelligence" val ref-id)))))))
+#+end_src

@@ -1,0 +1,23 @@
+#+title:      Rule Topics Prompt
+#+priority:   24
+
+* Rule Topics Prompt
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'rule-topics
+  :name 'rule-topics
+  :label "Rule Topics"
+  :contexts '(rule)
+  :prompt-fn (lambda ()
+               (let* ((current (org-entry-get nil "RULE_TOPICS"))
+                      (known (mapcar #'car
+                              (emacsql (manifolding-atlas-db) [:select :distinct [primary-topic] :from rules])))
+                      (defaults (when current (split-string current " " t)))
+                      (input (completing-read-multiple
+                              "Rule topics (comma-sep, first=primary, blank=universal): "
+                              known nil nil nil nil defaults)))
+                 (mapconcat #'identity input " ")))
+  :to-plist (lambda (val _ctx)
+              (when (and val (not (string-equal val "")))
+                `(:properties (("RULE_TOPICS" . ,val))))))
+#+end_src

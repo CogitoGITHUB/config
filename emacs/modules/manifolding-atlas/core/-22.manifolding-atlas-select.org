@@ -1,0 +1,321 @@
+#+TITLE: manifolding-atlas-manifolding-atlas-select
+#+priority:  -22
+* manifolding-atlas-manifolding-atlas-select
+:PROPERTIES:
+:CATEGORY: manifolding-atlas-core
+:END:
+#+begin_src emacs-lisp
+;;; manifolding-atlas-select.el --- Note selection with completion -*- lexical-binding: t; -*-
+;;
+;; Copyright (c) 2015-2026 Boris Buliga  <boris@d12frosted.io>
+;;
+;; Author: Boris Buliga <boris@d12frosted.io>
+;; Maintainer: Boris Buliga <boris@d12frosted.io>
+;;
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License as
+;; published by the Free Software Foundation, either version 3 of the
+;; License, or (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful, but
+;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+;; General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program. If not, see
+;; <http://www.gnu.org/licenses/>.
+;;
+;; Created: 11 Jul 2021
+;;
+;; URL: https://github.com/d12frosted/vulpea
+;;
+;; License: GPLv3
+;;
+;; This file is not part of GNU Emacs.
+;;
+;;; Commentary:
+;;
+;; Functionality to select a note.
+;;
+;;; Code:
+
+(require 'manifolding-atlas-utils)
+(require 'manifolding-atlas-note)
+(require 'manifolding-atlas-db)
+(require 'manifolding-atlas-db-query)
+
+(defvar manifolding-atlas-select-describe-fn #'manifolding-atlas-note-title
+  "Function to describe a note for completion.
+
+Accepts a `manifolding-atlas-note'. Returns a `string'.")
+
+(defvar manifolding-atlas-select-annotate-fn #'manifolding-atlas-select-annotate
+  "Function to annotate a note for completion.
+
+Accepts a `manifolding-atlas-note'. Returns a `string'.")
+
+(defvar manifolding-atlas-select-dyncontext-fn nil
+  "Function computing a shared context for the current selection.
+
+When non-nil, it is called once per selection with the list of
+`manifolding-atlas-note' values being presented and may return any value - the
+\"dynamic context\". That value is then passed as the second argument to
+`manifolding-atlas-select-describe-fn' and `manifolding-atlas-select-annotate-fn', but only to
+functions that accept a second argument.
+
+The point is to compute expensive shared data once - for example a table
+of backlink counts built with a single query (see
+`manifolding-atlas-db-query-backlink-counts') - and reuse it across every candidate,
+instead of recomputing it per candidate or capturing it from a wrapper
+command. Describe and annotate functions that take only a NOTE argument
+are unaffected.")
+
+(defun manifolding-atlas-select--accepts-context-p (fn)
+  "Return non-nil when FN can be called with a NOTE and a context argument."
+  (let ((arity (func-arity fn)))
+    (and (<= (car arity) 2)
+         (or (eq (cdr arity) 'many)
+             (>= (cdr arity) 2)))))
+
+(defun manifolding-atlas-select--funcall (fn note context)
+  "Call FN with NOTE, also passing CONTEXT when FN accepts a second argument."
+  (if (manifolding-atlas-select--accepts-context-p fn)
+      (funcall fn note context)
+    (funcall fn note)))
+
+(defun manifolding-atlas-select-describe (note &optional context)
+  "Describe a NOTE for completion.
+
+CONTEXT is the optional shared value produced by
+`manifolding-atlas-select-dyncontext-fn'. It is forwarded as the second argument to
+`manifolding-atlas-select-describe-fn' and `manifolding-atlas-select-annotate-fn' when they
+accept one."
+  (propertize
+   (concat
+    (manifolding-atlas-select--funcall manifolding-atlas-select-describe-fn note context)
+    (propertize
+     (manifolding-atlas-select--funcall manifolding-atlas-select-annotate-fn note context)
+     'face 'completions-annotations))
+   'manifolding-atlas-note-id
+   (manifolding-atlas-note-id note)))
+
+(defun manifolding-atlas-select-annotate (note)
+  "Annotate a NOTE for completion."
+  (let* ((alias-str
+          (if (manifolding-atlas-note-primary-title note)
+              (concat "("
+                      (manifolding-atlas-note-primary-title note)
+                      ")")
+            ""))
+         (tags-str (mapconcat
+                    (lambda (x) (concat "#" x))
+                    (manifolding-atlas-note-tags note)
+                    " "))
+         (sections (seq-remove #'string-empty-p
+                               (list alias-str
+                                     tags-str))))
+    (if (null sections)
+        ""
+      (concat " " (string-join sections " ")))))
+
+;;; Describe Functions
+
+(defun manifolding-atlas-select-describe-outline (note)
+  "Describe NOTE with outline path prefix.
+
+Shows the parent heading hierarchy before the note title.
+For example, if a note titled \"Task\" is under \"Projects > Work\",
+this displays: \"Projects → Work → Task\".
+
+File-level notes are displayed without prefix.
+
+To use this function, set `manifolding-atlas-select-describe-fn':
+
+  (setq manifolding-atlas-select-describe-fn
+        #\\='manifolding-atlas-select-describe-outline)"
+  (let ((outline-path (manifolding-atlas-note-outline-path note))
+        (title (manifolding-atlas-note-title note)))
+    (if outline-path
+        (concat
+         (propertize
+          (concat (string-join outline-path " → ") " → ")
+          'face 'completions-annotations)
+         title)
+      title)))
+
+(defun manifolding-atlas-select-describe-outline-full (note)
+  "Describe NOTE with file title and outline path prefix.
+
+Shows the file title and parent heading hierarchy before the note title.
+For example, if a note titled \"Task\" is in file \"My Notes\" under
+heading \"Projects\", this displays: \"My Notes → Projects → Task\".
+
+File-level notes show just the title (no prefix needed since
+file-title equals the title).
+
+To use this function, set `manifolding-atlas-select-describe-fn':
+
+  (setq manifolding-atlas-select-describe-fn
+        #\\='manifolding-atlas-select-describe-outline-full)"
+  (let ((file-title (manifolding-atlas-note-file-title note))
+        (outline-path (manifolding-atlas-note-outline-path note))
+        (title (manifolding-atlas-note-title note))
+        (level (manifolding-atlas-note-level note)))
+    (if (and level (> level 0) file-title)
+        (let ((full-path (cons file-title (or outline-path '()))))
+          (concat
+           (propertize
+            (concat (string-join full-path " → ") " → ")
+            'face 'completions-annotations)
+           title))
+      title)))
+
+(cl-defun manifolding-atlas-select (prompt
+                         &key
+                         require-match
+                         initial-prompt
+                         filter-fn
+                         expand-aliases)
+  "Select a note.
+
+Returns a selected `manifolding-atlas-note'. If `manifolding-atlas-note-id' is nil, it
+means that user selected non-existing note.
+
+When REQUIRE-MATCH is non-nil, use may select only existing note.
+
+PROMPT is a message to present.
+
+INITIAL-PROMPT is the initial title prompt.
+
+FILTER-FN is the function to apply on the candidates, which takes
+as its argument a `manifolding-atlas-note'.
+
+When EXPAND-ALIASES is non-nil, each note with aliases will appear
+multiple times in the completion list - once for the original title
+and once for each alias. When an alias is selected, the returned
+note will have that alias as `manifolding-atlas-note-title' and the original
+title stored in `manifolding-atlas-note-primary-title'."
+  (let ((notes (manifolding-atlas-db-query filter-fn)))
+    (manifolding-atlas-select-from
+     prompt notes
+     :require-match require-match
+     :initial-prompt initial-prompt
+     :expand-aliases expand-aliases)))
+
+(defun manifolding-atlas-select--completion-table (completions)
+  "Build a completion table over COMPLETIONS exposing the `manifolding-atlas-note' category.
+
+COMPLETIONS is an alist of (description . note). The table completes
+like COMPLETIONS and reports a completion category of `manifolding-atlas-note',
+so that completion UIs and integrations (marginalia, embark, consult)
+can recognize and act on the candidates. The candidate strings carry
+the note id as the `manifolding-atlas-note-id' text property (see
+`manifolding-atlas-select-describe')."
+  (lambda (string predicate action)
+    (if (eq action 'metadata)
+        '(metadata (category . manifolding-atlas-note))
+      (complete-with-action action completions string predicate))))
+
+(cl-defun manifolding-atlas-select-from (prompt
+                              notes
+                              &key
+                              require-match
+                              initial-prompt
+                              expand-aliases)
+  "Select a note from the list of NOTES.
+
+Returns a selected `manifolding-atlas-note'. If `manifolding-atlas-note-id' is nil, it
+means that user selected non-existing note.
+
+When REQUIRE-MATCH is non-nil, use may select only existing note.
+
+PROMPT is a message to present.
+
+INITIAL-PROMPT is the initial title prompt.
+
+When EXPAND-ALIASES is non-nil, each note with aliases will appear
+multiple times in the completion list - once for the original title
+and once for each alias. When an alias is selected, the returned
+note will have that alias as `manifolding-atlas-note-title' and the original
+title stored in `manifolding-atlas-note-primary-title'."
+  (let* ((expanded-notes (if expand-aliases
+                             (seq-mapcat #'manifolding-atlas-note-expand-aliases notes)
+                           notes))
+         (context (when manifolding-atlas-select-dyncontext-fn
+                    (funcall manifolding-atlas-select-dyncontext-fn expanded-notes)))
+         (completions (seq-map
+                       (lambda (n)
+                         (cons (manifolding-atlas-select-describe n context)
+                               n))
+                       expanded-notes))
+         (notes-table (make-hash-table :test #'equal)))
+    (seq-each (lambda (note)
+                (puthash (manifolding-atlas-note-id note) note notes-table))
+              expanded-notes)
+    (let ((note (completing-read
+                 (concat prompt ": ")
+                 (manifolding-atlas-select--completion-table completions)
+                 nil require-match initial-prompt)))
+      (or (cdr (assoc note completions))
+          (make-manifolding-atlas-note
+           :title (substring-no-properties note)
+           :level 0)))))
+
+(cl-defun manifolding-atlas-select-multiple-from (prompt
+                                       notes
+                                       &key
+                                       require-match
+                                       initial-prompt
+                                       expand-aliases
+                                       select-fn)
+  "Collect multiple elements from list of NOTES.
+
+When REQUIRE-MATCH is non-nil, use may select only existing note.
+
+PROMPT is a message to present.
+
+INITIAL-PROMPT is the initial title prompt.
+
+When EXPAND-ALIASES is non-nil, each note with aliases will appear
+multiple times in the completion list - once for the original title
+and once for each alias. When an alias is selected, the returned
+note will have that alias as `manifolding-atlas-note-title' and the original
+title stored in `manifolding-atlas-note-primary-title'.
+
+It behaves the same as the following code
+
+  (manifolding-atlas-utils-collect-while
+    #\\='manifolding-atlas-select-from nil prompt notes
+    :require-match require-match
+    :initial-prompt initial-prompt
+    :expand-aliases expand-aliases)
+
+The only difference, it allows to select a single note only once, i.e.
+the next prompt iteration doesn't contain already selected notes.
+
+Optionally, an interactive SELECT-FN can be provided to be used instead
+of `manifolding-atlas-select-from'. Signatures must match."
+  (let (result
+        value
+        (continue t)
+        (inhibit-quit t))
+    (with-local-quit
+      (while continue
+        (setq value
+              (funcall-interactively
+               (or select-fn #'manifolding-atlas-select-from)
+               (concat prompt " (C-g to stop)")
+               notes
+               :require-match require-match
+               :initial-prompt initial-prompt
+               :expand-aliases expand-aliases))
+        (setq notes (--remove (string-equal (manifolding-atlas-note-id it)
+                                            (manifolding-atlas-note-id value))
+                              notes))
+        (setq result (cons value result))))
+    (setq quit-flag nil)
+    (reverse result)))
+
+(provide 'manifolding-atlas-select)
+#+end_src

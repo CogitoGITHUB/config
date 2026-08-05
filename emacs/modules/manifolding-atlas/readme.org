@@ -1,0 +1,233 @@
+#+TITLE:      Manifolding Atlas — Module Reference
+#+PRIORITY:   5
+#+STARTUP:    content
+
+* Overview
+Manifolding Atlas is the personal [[https://github.com/d12frosted/vulpea][vulpea]]-derived note management
+system for this [[../../][manifolding-emacs]] literate Emacs config. It is a fully local,
+literate port: the upstream vulpea library, vulpea-ui UI layer and
+consult-vulpea completion front-end are **vendored** verbatim as `.org`
+source files under =core/= and evaluated directly by the
+`manifolding-emacs` boot loader — none of them are installed via
+`straight`/`leaf` recipes (only their external dependencies are).
+
+```text
+  manifolding-emacs (loader)
+  └─ modules/*.org  — sorted by #+priority: (lower = earlier)
+      └─ manifolding-atlas/          ← THIS module tree
+          ├─ core/                   priorities -31 … -13  (vendored engine)
+          ├─ manifolding-atlas.org   priority 10           (entry/config)
+          ├─ manifolding-atlas-ui.org / consult-manifolding-atlas.org (UI config)
+          ├─ manifolding-atlas-functions/  priority 12      (user extensions)
+          ├─ plugins/                priority 10/15/…       (feature plugins)
+          ├─ properties/             priority -1 …          (metadata prompts)
+          └─ templates/              priority 10            (doct + yasnippet)
+```
+
+Why it exists / architecture decisions:
+
+- The package is **loader-managed**, not `straight`-managed. The vendored
+  source is evaluated as loose elisp source blocks; only real external deps
+  (`dash`, `s`, `emacsql`, `vui`, `consult`) are `:STRAIGHT:` packages.
+- Everything was renamed from `vulpea` → `manifolding-atlas` uniformly
+  (dirs, files, symbols, features, DB). `vulpea-ui` → `manifolding-atlas-ui`,
+  `consult-vulpea` → `consult-manifolding-atlas`, `my/vulpea-*` →
+  `my/manifolding-atlas-*`.
+- All personal/custom code uses the `my/` namespace and, internally,
+  `my/manifolding-atlas--` (double dash for private helpers). No comments are
+  added to source blocks.
+
+* Quick Facts
+- **Notes directory:** `~/test/` — from `(my/notes-directory)` → `"/home/aoeu/test/"`.
+  The single source of truth for the vault location (edit only this function).
+- **Database:** `~/test/admin/manifolding-atlas.db` (SQLite via `emacsql`),
+  root-owned `root:users 664`, git-excluded (see `~/.config/emacs/.gitignore`
+  and `~/test/.gitignore`). Managed by the Atlas SQLite layer — never edit by hand.
+- **DB sync:** external method `fswatch`, auto-sync enabled.
+- **Main feature:** `manifolding-atlas` (provided by =core/-15=). Complements:
+  `manifolding-atlas-ui`, `consult-manifolding-atlas`.
+- **Key commands:** `manifolding-atlas-find`, `manifolding-atlas-insert`,
+  `manifolding-atlas-find-backlink`, `manifolding-atlas-ui-sidebar-toggle`,
+  `consult-manifolding-atlas-find`, `consult-manifolding-atlas-insert`.
+- **Reload:** `M-x manifolding-emacs-reload` (or via Emacs MCP `eval-elisp`).
+
+* File/Layout Conventions
+- **Feature/namespace prefixes:** `manifolding-atlas-*`,
+  `manifolding-atlas-ui-*`, `consult-manifolding-atlas-*`, `my/*`.
+- **`#+priority:`** controls load order (lower = earlier; negatives allowed).
+  See each file's header — always keep the numeric priority in the filename
+  in sync with the `#+priority:` keyword.
+- **No blank line after headings** at any level.
+- Each vendored core file keeps its upstream `(provide '…)` verbatim; the
+  trailing `;;; file.el ends here` banner was stripped.
+
+* Top-Level Files
+| File | Lines | Purpose |
+|------+-------+---------|
+| `manifolding-atlas.org` | 116 | Main entry module. Notes Directory (defines `my/notes-directory`, org-agenda-files, auto-mode-alist), Bootstrap (DB/db-sync/fswatch setup, `(require 'manifolding-atlas)`, `(manifolding-atlas-db-autosync-mode +1)`, parse-method overrides), plus documented API (`manifolding-atlas-find/insert/find-backlink`, buffer title get/set). |
+| `manifolding-atlas-ui.org` | 22 | UI config only (the engine is =core/-14=). Sets sidebar position/size, outline depth, backlink preview, widget collapsed, fast-parse, auto-refresh via `with-eval-after-load`. |
+| `consult-manifolding-atlas.org` | 18 | Config only (engine is =core/-13=). `(require 'consult-manifolding-atlas)` + `(consult-manifolding-atlas-mode 1)`. Provides `consult-manifolding-atlas-find` / `-insert` as drop-ins with live preview. |
+| `AGENTS.md` | 113 | Agent reference: quick facts, git guards, schema validation, prompt registry, rules system, property updates, transclusion, root dir, fast mode, live properties, key bindings, bootstrap order. |
+
+There are also ~29 **empty placeholder** `.org` stubs at the top level
+(`Advantages.org`, `Agents.org`, `Blueprint.org`, `Context.org`,
+`Counters.org`, `Decisions.org`, `Evidence.org`, `Experiments.org`,
+`Failures.org`, `Hypotheses.org`, `Journal.org`, `Laws.org`, `Leverage.org`,
+`Map.org`, `Mastery.org`, `Objectives.org`, `Philosophy.org`, `Quotes.org`,
+`Rules.org`, `ShapeShifter.org`, `Signals.org`, `Sources.org`, `State.org`,
+`Timing.org`, `TODO.org`, `TrapsExternal.org`, `TrapsInternal.org`). These
+are expected-not-yet-authored content slots, not bugs.
+
+* =core/= — Vendored Engine (priorities -31 … -13)
+Each file is one full upstream source evaluated directly as a loose elisp
+src block. Files are named =<priority>.manifolding-atlas-<basename>.org=,
+ordered lowest priority first. `-31` is the new deps shim.
+
+| File | Feature | Upstream source | What it is |
+|------+---------+-----------------+------------|
+| `-31.manifolding-atlas-deps.org` | — | new | Straight deps: `dash`, `s`, `emacsql` (`:files ("*.el")`), `vui` (`d12frosted/vui.el`), `consult` (`minad/consult`). |
+| `-30.manifolding-atlas-note.org` | `manifolding-atlas-note` | `vulpea-note.el` | Note struct (`manifolding-atlas-note`), title/type/id accessors, `note-p`, buffer/note mapping. |
+| `-29.manifolding-atlas-utils.org` | `manifolding-atlas-utils` | `vulpea-utils.el` | Link-string builder (`manifolding-atlas-utils-link-make-string`), id parsing, util helpers. |
+| `-28.manifolding-atlas-db.org` | `manifolding-atlas-db` | `vulpea-db.el` | SQLite connection (`manifolding-atlas-db`), `db-location`, connection lifecycle, `WITH-DB`. |
+| `-27.manifolding-atlas-db-query.org` | `manifolding-atlas-db-query` | `vulpea-db-query.el` | High-level queries: links-to/links-from, by-file, by-id, meta/tags helpers. |
+| `-26.manifolding-atlas-buffer.org` | `manifolding-atlas-buffer` | `vulpea-buffer.el` | Buffer↔note layer: `manifolding-atlas-buffer-title-get/set`, `buffer-note`, note-from-buffer. |
+| `-25.manifolding-atlas-schema.org` | `manifolding-atlas-schema` | `vulpea-schema.el` | DB schema DDL and versioning. |
+| `-24.manifolding-atlas-db-extract.org` | `manifolding-atlas-db-extract` | `vulpea-db-extract.el` | AST→DB row extraction, file/heading node extraction, parse context. |
+| `-23.manifolding-atlas-db-worker.org` | `manifolding-atlas-db-worker` | `vulpea-db-worker.el` | Async DB worker queue for insert/update of notes. |
+| `-22.manifolding-atlas-select.org` | `manifolding-atlas-select` | `vulpea-select.el` | Completion selection of notes (`manifolding-atlas-select`). |
+| `-21.manifolding-atlas-meta.org` | `manifolding-atlas-meta` | `vulpea-meta.el` | Metadata queries on the `meta` table. |
+| `-20.manifolding-atlas-mentions.org` | `manifolding-atlas-mentions` | `vulpea-mentions.el` | Mentions/backlinks resolution. |
+| `-19.manifolding-atlas-tags.org` | `manifolding-atlas-tags` | `vulpea-tags.el` | Tag table extraction & queries. |
+| `-18.manifolding-atlas-db-schema-validation.org` | `manifolding-atlas-db-schema-validation` | `vulpea-db-schema-validation.el` | Schema validation; action configured `'silent` (see schemas plugin). |
+| `-17.manifolding-atlas-db-sync.org` | `manifolding-atlas-db-sync` | `vulpea-db-sync.el` | File→DB sync engine (external method, auto-sync mode). |
+| `-16.manifolding-atlas-schema-flymake.org` | `manifolding-atlas-schema-flymake` | `vulpea-schema-flymake.el` | Flymake diagnostics from schema validation. |
+| `-15.manifolding-atlas.org` | `manifolding-atlas` | `vulpea.el` | The main library that ties everything together (v2.5.0, GPLv3, © d12frosted). |
+| `-14.manifolding-atlas-ui.org` | `manifolding-atlas-ui` | `vulpea-ui` (vendored) | Sidebar/outline/backlinks widget framework (depends on `vui`). |
+| `-13.consult-manifolding-atlas.org` | `consult-manifolding-atlas` | `consult-vulpea` (vendored) | Consult-powered findBy `consult-manifolding-atlas-find/-insert` with live preview. |
+
+~Upstream `#+NOTE`: the mind-map plugin and web package still need work.~
+
+* =manifolding-atlas-functions/ — User Extensions (priority 12)
+Pure custom Elisp layered on the engine. These do not exist upstream.
+
+| File | Purpose |
+|------+---------|
+| `capture-entry-points.org` | Entry points into capture: `manifolding-atlas-create` makes the file + DB row, then org-capture opens it for the body. Points to the doct template file. |
+| `capture-infrastructure.org` | Post-create capture plumbing, defvars (`my/manifolding-atlas--skip-capture`, `--new-note`, `--skip-open-prompt`), `my/manifolding-atlas-insert-heading` bookkeeping. |
+| `heading-format.org` | Creates notes with `* Title` heading (not file-level `#+title:`) via headingification so `org-back-to-heading` works — required by the Properties Update plugin. |
+| `link-utilities.org` | `manifolding-atlas-utils-link-make-string` usage; raw `id:` link construction. |
+| `note-creation.org` | Note creation orchestration incl. fast mode (0-3) and default-create function. |
+| `prompt-infrastructure.org` | Central registry so any new `.org` under `properties/` auto-joins the creation flow. |
+| `root-dir.org` | `my/manifolding-atlas-root-dir` — centralized subdirectory prompt (`.` = root, type to nest), returns relative path w/ trailing slash or `""`. |
+| `skeleton-preview.org` | Template selection preview pane (renders body template in org-mode with `%?` → title). |
+| `vault-queries.org` | Relationship queries, e.g. `my/manifolding-atlas-children-of` (by `:SOURCE:`). |
+| `AGENTS.md` | Agent reference for this layer. |
+
+* =plugins/ — Feature Plugins
+Plugins add behaviors by advising/overriding engine functions and extending
+the DB (extra tables) via the v2 plugin system. Lower-weighted subfiles load
+first. `plugins/AGENTS.md` is the entry reference.
+
+- **`0.manifolding-atlas-plugin-guide.org`** (2074): `#+disabled: t` reference
+  documentation for authoring a proper Atlas plugin from scratch. Give this
+  file to any AI to generate a new plugin.
+
+The capitalized stub files (`Advantages.org`, `Agents.org`, `Blueprint.org`,
+`Context.org`, `Counters.org`, `Decisions.org`, `Evidence.org`,
+`Experiments.org`, `Failures.org`, `Hypotheses.org`, `Journal.org`, `Laws.org`,
+`Leverage.org`, `Map.org`, `Mastery.org`, `Objectives.org`, `Philosophy.org`,
+`Quotes.org`, `Rules.org`, `ShapeShifter.org`, `Signals.org`, `Sources.org`,
+`State.org`, `Timing.org`, `TODO.org`, `TrapsExternal.org`,
+`TrapsInternal.org`) are empty placeholders.
+
+Active plugin files:
+
+| File | Lines | What it does |
+|------+-------+--------------|
+| `mastering-atlas.org` | 480 | Spaced-repetition review: each note is a reviewable card; schedule in `MASTERING_*` props, indexed to a `mastering_schedule` DB table (via a DB extractor) for fast due-queries. |
+| `manifold.org` | 825 | **Manifold Mind-Map plugin.** Controller layer for a visual mind map. Model: files→parent/child, headings→siblings, Group = one file + all heading notes = one visual card. Three edge layers: structural (file parent-child), semantic (`id:` links), presentational (transclusion). |
+| `links.org` | 533 | Guards file/heading deletion when incoming/outgoing `id:` links exist; guards untracked files & broken links; restore via git history. Uses native `manifolding-atlas-db-query-links-to/from`. Maintains `admin/broken-links` queue. |
+| `protocols.org` | 396 | Turns any heading into a protocol step; BUILD assembles steps into protocol documents (avy multi-select, transclusion pointers into topic-indexed files). Steps share a heading's RULE status (dual-mark). |
+| `dictionary.org` | 220 | Vocabulary vault. Word notes in `dictionary/` subdir; regenerates `dictionary.pws` ispell personal dictionary from notes (never hand-edit). |
+| `citation.org` | 86 | Extracts `[@citekey]` citations into a dedicated `citations` SQLite table via the plugin system; queryable after a full sync. |
+| `capture-plugin.org` | 126 | Two workflows: select text via avy → new note; or promote current heading into its own note file. Tangles to `manifolding-atlas-capture.el`. |
+| `backup-git.org` | 363 | Magit/git-gutter integration + vault git automation (guards, auto add/commit/push, restore). The "Git Guards" described in AGENTS. |
+| `rules.org` | 367 | Rules system: `:RULE: t` headings, `:RULE_TOPICS:`, scope/level tags, pointer files via `#+transclude:`, `rules` DB table. `my/manifolding-atlas-find-rules` / `-write-pointer`. |
+| `schemas.org` | 274 | Schema validation prompts/actions; base + task schemas; template-schema validation via `TEMPLATE_HASH`; `MISSING PROMPTS` tracking; `my/manifolding-atlas-schema-migrate-warnings`. |
+| `properties-update.org` | 401 | Transient menu (`SPC P`, `my/manifolding-atlas-update-properties`) with 14 toggles (tags, aliases, priority, schedule, TODO, states); `my/manifolding-atlas--fix-violations`, `-apply-fragment`. |
+| `transclusion.org` | 143 | `my/manifolding-atlas-transclusion-add`; auto-enables `org-transclusion-mode`; re-adds transclusions after save; `transclude_links` DB table (FK → `notes`, `ON DELETE CASCADE`). |
+| `live-properties.org` | 619 | Concept-based property values as Org links to ref notes (`'closed` canonical, `'scoped` per-entity, `nil` plain). Adds `#+transclude:` under owning heading via `-add-live-transcludes`. |
+| `manifolding-atlas-capture.el` | 82 | Tangled output of `capture-plugin.org` (avy & heading capture). |
+| `fast-captures/fast-dispatcher.org` | 29 | Scans `fast-captures/` for `fast-*.org` and presents a hydra menu; new types auto-discovered. `my/manifolding-atlas-quick-captures`. |
+| `fast-captures/fast-todo.org` | 54 | Quick TODO via org-capture; simple mode finishes immediately, capture mode opens buffer. `my/manifolding-atlas-quick-todo-*`. |
+| `fast-captures/fast-journal.org` | 64 | Fast timestamped journal heading in `Journal.org` (year/quarter/month). `my/manifolding-atlas-quick-journal-*`. |
+| `fast-captures/fast-observations.org` | 20 | Fast observation capture. |
+| `fast-captures/templates/default.org` | 1 | Default fast-capture body template (`* TODO %?`). |
+| `plugins/AGENTS.md` | 54 | Agent reference for the plugin layer. |
+
+* =properties/ — Property Prompts (metadata)
+Registered prompts that fire during capture (file/heading/task contexts) and
+appear in the `SPC P` update menu. `00-register.org` must load first.
+
+- **`00-register.org`** (39, priority -1): the prompt registry
+  `my/manifolding-atlas-prompt-registry` + `my/manifolding-atlas-register-prompt`.
+  Resets the registry to nil on every reload to prevent duplicate accumulation.
+- **`general/`** — file/heading-level metadata prompts:
+  `file-name`, `subdir`, `tags`, `aliases`, `position` (insert position, headings
+  only), `priority`, `schedule` (Scheduled/Deadline), `todo` (TODO state), `properties`
+  (extra), `mastering`, `mind-map`, plus the **state** family: `state-general`,
+  `state-work`, `state-intelligence`, `state-operational`, `state-validation`,
+  `state-source`, `state-checklist`, `state-dependency`. Each has an `AGENTS.md`
+  under `general/`.
+
+  State prompts are required at creation (skipping sets `"WARNING"`, tracked via
+  MISSING PROMPTS).
+- **`dictionary/`** — vocabulary metadata prompts: `etymology`, `examples`
+  (Example Sentence), `frequency`, `pos` (part of speech), `pronunciation`,
+  `register`, `synonyms`.
+- **`rules/`** — rule metadata prompts: `scope`, `level`, `topic` (Rule Topics),
+  `file-override`.
+- Each subdir carries its own `AGENTS.md`.
+
+* =templates/ — Capture & Snippet Templates
+Entry config: `templates/manifolding-atlas-templates-system.org` (43 lines).
+
+- **org-capture (doct)** → `full-file-templates/*.org`, triggered by
+  `manifolding-atlas-create` → preview select → org-capture. Body-only templates
+  (no `*` heading, no `#+title:` — headingification creates `* Title` first).
+  Selection stores `:TEMPLATE:` / `:TEMPLATE_HASH:` for schema validation.
+  Template preview pane renders with `%?` → the note's title.
+  - `notes.org` — `** Notes` + list.
+  - `task.org` — `** Objective` checkbox + `** Notes`.
+  - `reference.org` — `:ROAM_REFS:` + `** Summary`, `** Claims`, `** Connections`.
+  - `protocol.org` — `** Purpose`, `** Materials`, `** Procedure`, `** Results`, `** Analysis`, `** Notes`.
+  - `math.org` — `** Definition/Theorem/Lemma/Proof/Properties/Notes` (LaTeX `\begin{…}`).
+  - `manifolding-atlas.el` (doct declaration) defines the capture tree (`n` = new note / task / heading) bound to function `my/manifolding-atlas-capture-*`.
+- **yasnippet** → `snippets/` (currently empty dir, ready for snippets).
+- **`templates/AGENTS.md`** documents both engines.
+
+* How It Loads
+1. `bootstrap.org` → `init.el` loads `manifolding-emacs`.
+2. `manifolding-emacs-boot` → `manifolding-emacs-compile-directory` scans
+   `modules/` recursively for `.org`, sorts by `#+priority:` (default 10, lower first),
+   and evaluates each file's loose elisp src blocks (per-file
+   `:PACKAGE:`/`:STRAIGHT:` handled via the leaf builder).
+3. For this module: `core/` (-31 … -13) runs first, pulling in deps and defining the
+   engine; then `manifolding-atlas.org` / `manifolding-atlas-ui.org` /
+   `consult-manifolding-atlas.org` (10); then `manifolding-atlas-functions/` (12) and
+   the plugins (10/15); `properties/00-register.org` (-1) runs before the prompt files.
+4. Verify: `(featurep 'manifolding-atlas)`, `(featurep 'manifolding-atlas-ui)`,
+   `(featurep 'consult-manifolding-atlas)`; `(manifolding-emacs-errors-list)`.
+   Reload with `M-x manifolding-emacs-reload`.
+
+* Conventions for contributors
+- **Namespace:** `my/` (user), `my/manifolding-atlas--` (internal), never bare `vulpea`.
+- **No comments** in source blocks unless asked.
+- **No blank line** after headings.
+- Keep filename priority prefix in sync with `#+priority:`.
+- For a new plugin, start from `plugins/0.manifolding-atlas-plugin-guide.org`.
+- For a new property prompt, drop a file in `properties/` (it auto-registers via
+  `prompt-infrastructure.org` + `my/manifolding-atlas-register-prompt`); put `00-register.org`
+  first in load order.
+- DB is Atlas-managed. Add plugin tables via `[:create :table ...]` in `:config` and an
+  extractor for sync (see `citation.org`, `mastering-atlas.org`, `transclusion.org` as examples).

@@ -1,0 +1,1608 @@
+#+TITLE: manifolding-atlas-manifolding-atlas-db-sync
+#+priority:  -17
+* manifolding-atlas-manifolding-atlas-db-sync
+:PROPERTIES:
+:CATEGORY: manifolding-atlas-core
+:END:
+#+begin_src emacs-lisp
+;;; manifolding-atlas-db-sync.el --- File watching and async updates -*- lexical-binding: t; -*-
+;;
+;; Copyright (c) 2015-2026 Boris Buliga <boris@d12frosted.io>
+;;
+;; Author: Boris Buliga <boris@d12frosted.io>
+;; Maintainer: Boris Buliga <boris@d12frosted.io>
+;;
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License as
+;; published by the Free Software Foundation, either version 3 of the
+;; License, or (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful, but
+;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+;; General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program. If not, see
+;; <http://www.gnu.org/licenses/>.
+;;
+;; This file is not part of GNU Emacs.
+;;
+;; Created: 16 Nov 2025
+;;
+;; URL: https://github.com/d12frosted/vulpea
+;;
+;; License: GPLv3
+;;
+;;; Commentary:
+;;
+;; File watching and async update system for Manifolding Atlas v2.
+;;
+;; This module provides:
+;; - File watchers using filenotify
+;; - Async update queue with batching
+;; - Debouncing for rapid changes
+;; - Idle timer processing
+;; - Dual-mode support (async vs sync)
+;;
+;; Design:
+;; - Non-blocking: UI never waits for database updates
+;; - Handles external changes: git pulls, sync tools, etc.
+;; - Batch processing: 100 file changes = 1 transaction
+;; - Configurable delays and thresholds
+;;
+;;; Code:
+
+(require 'filenotify)
+(require 'seq)
+(require 'manifolding-atlas-db)
+(require 'manifolding-atlas-db-extract)
+(require 'manifolding-atlas-db-query)
+(require 'manifolding-atlas-db-worker)
+
+;;; Customization
+
+(defgroup manifolding-atlas-db-sync nil
+  "File watching and synchronization for Manifolding Atlas."
+  :group 'manifolding-atlas)
+
+(defcustom manifolding-atlas-db-sync-batch-delay 0.01
+  "Delay in seconds before processing batched updates.
+After last file change, wait this long before updating database.
+This allows batching multiple changes into single transaction."
+  :type 'number
+  :group 'manifolding-atlas-db-sync)
+
+(defcustom manifolding-atlas-db-sync-idle-delay 0.5
+  "Idle delay in seconds for processing updates.
+Process updates when Emacs has been idle for this duration."
+  :type 'number
+  :group 'manifolding-atlas-db-sync)
+
+(defcustom manifolding-atlas-db-sync-batch-size 100
+  "Maximum number of files to process in single batch.
+Limits memory usage and transaction size."
+  :type 'integer
+  :group 'manifolding-atlas-db-sync)
+
+(defcustom manifolding-atlas-db-sync-directories (list org-directory)
+  "List of directories to watch for file changes.
+Recursively watches these directories for .org files.
+Defaults to `org-directory'."
+  :type '(repeat directory)
+  :group 'manifolding-atlas-db-sync)
+
+(defcustom manifolding-atlas-db-sync-external-method 'auto
+  "Method to use for detecting external file changes.
+
+Possible values:
+- `auto' - try fswatch first, fallback to polling
+- `fswatch' - use only fswatch (error if not available)
+- `poll' - use only polling
+- nil - rely only on filenotify (unreliable for external changes)"
+  :type '(choice (const :tag "Automatic (fswatch or poll)" auto)
+          (const :tag "FSWatch only" fswatch)
+          (const :tag "Polling only" poll)
+          (const :tag "Filenotify only (unreliable)" nil))
+  :group 'manifolding-atlas-db-sync)
+
+(defcustom manifolding-atlas-db-sync-fswatch-path-style 'auto
+  "Path style to use when launching `fswatch' on Windows.
+
+The available Windows builds of fswatch expect different directory
+arguments.  The MSYS2/mingw build accepts native paths like
+\"c:/notes\"; the Cygwin build (e.g. the one distributed via winget)
+only accepts \"/cygdrive/c/notes\" and fails to watch native paths.
+
+Possible values:
+- `auto' - start with native paths and automatically switch to the
+  Cygwin style if that build's path errors are detected at runtime
+- `native' - always pass native paths (MSYS2/mingw build)
+- `cygwin' - always pass `/cygdrive/' paths (Cygwin build)
+
+Has no effect off Windows, where fswatch always receives native paths."
+  :type '(choice (const :tag "Automatic" auto)
+          (const :tag "Native (MSYS2/mingw)" native)
+          (const :tag "Cygwin (/cygdrive/)" cygwin))
+  :group 'manifolding-atlas-db-sync)
+
+(defcustom manifolding-atlas-db-sync-poll-interval 2
+  "Interval in seconds for polling external changes.
+
+Only used when `manifolding-atlas-db-sync-external-method' is `poll' or
+`auto' (when fswatch is not available)."
+  :type 'number
+  :group 'manifolding-atlas-db-sync)
+
+(defcustom manifolding-atlas-db-sync-progress-interval 100
+  "Number of files to process before reporting progress.
+When syncing a directory, report progress every N files.
+Set to nil to disable progress reporting.
+Set to a smaller value (e.g., 100) for more frequent updates,
+or a larger value (e.g., 1000) for less frequent updates."
+  :type '(choice (const :tag "Disabled" nil)
+          (integer :tag "Report every N files"))
+  :group 'manifolding-atlas-db-sync)
+
+(defcustom manifolding-atlas-db-sync-verbose t
+  "Whether to report sync progress and completion in the echo area.
+
+When non-nil, routine status messages such as \"Manifolding Atlas: Syncing N
+files...\" and \"Manifolding Atlas: Sync complete\" are shown.  Set to nil to
+silence these messages, for example to avoid distraction on every
+save when autosync is enabled.
+
+Errors and warnings are always shown regardless of this setting.
+For low-level timing diagnostics see `manifolding-atlas-db-sync-debug'."
+  :type 'boolean
+  :group 'manifolding-atlas-db-sync)
+
+(defcustom manifolding-atlas-db-sync-scan-on-enable 'async
+  "Whether to scan all files when enabling autosync mode.
+
+This initial scan detects changes made while Emacs was closed (e.g.,
+from git pulls, Dropbox sync, or external edits).  Without it, such
+changes remain invisible until the files are touched again or
+`manifolding-atlas-db-sync-full-scan' is run manually.
+
+Options:
+- `async': Scan asynchronously (may cause lag during processing)
+- `blocking': Scan synchronously (blocks Emacs until complete)
+- nil: Skip initial scan (fast startup, manual sync when needed)
+
+Set to nil for very large repositories (10000+ notes) if startup
+processing causes lag, then run `manifolding-atlas-db-sync-full-scan' manually
+after external changes.
+
+Exception: when the database is empty (e.g. the very first
+activation), an async scan is performed even when this is nil -
+otherwise the database would stay empty with no indication why."
+  :type '(choice (const :tag "Async scan (may lag)" async)
+          (const :tag "Blocking scan (wait for completion)" blocking)
+          (const :tag "Skip scan (fast startup)" nil))
+  :group 'manifolding-atlas-db-sync)
+
+;;; Variables
+
+(defvar manifolding-atlas-db-sync--watchers nil
+  "Alist of (path . descriptor) for active file watchers.")
+
+(defvar manifolding-atlas-db-sync--queue nil
+  "Queue of files pending database update.
+Each entry is (path . timestamp).")
+
+(defvar manifolding-atlas-db-sync--queue-tail nil
+  "Tail pointer for the pending queue list.")
+
+(defvar manifolding-atlas-db-sync--queue-set (make-hash-table :test 'equal)
+  "Hash table tracking files already queued.")
+
+(defvar manifolding-atlas-db-sync--force-set (make-hash-table :test 'equal)
+  "Queued paths marked for forced re-indexing.
+
+Forced entries bypass change detection and the unchanged-content
+shortcuts: they exist for parser or settings changes, where file
+content is identical but extraction output is not.")
+
+(defvar manifolding-atlas-db-sync--timer nil
+  "Timer for processing batched updates.")
+
+(defvar manifolding-atlas-db-sync--idle-timer nil
+  "Idle timer for processing updates.")
+
+(defvar manifolding-atlas-db-sync--processing nil
+  "Non-nil when currently processing updates.")
+
+(defvar manifolding-atlas-db-sync--fswatch-process nil
+  "Process handle for fswatch external monitoring.")
+
+(defvar manifolding-atlas-db-sync--fswatch-buffer ""
+  "Buffer for incomplete fswatch output lines.")
+
+(defvar manifolding-atlas-db-sync--fswatch-effective-style nil
+  "Auto-detected fswatch path style: `native', `cygwin', or nil.
+
+Set when `manifolding-atlas-db-sync-fswatch-path-style' is `auto' and the Cygwin
+build of fswatch is detected at runtime.  Reset when external
+monitoring stops.")
+
+(defvar manifolding-atlas-db-sync--fswatch-seen-valid-event nil
+  "Non-nil once fswatch has reported a valid watched-path event.
+
+Guards auto-detection so a watcher that is already working is never
+switched to a different path style by a stray error.")
+
+(defvar manifolding-atlas-db-sync--poll-timer nil
+  "Timer for polling-based external monitoring.")
+
+(defvar manifolding-atlas-db-sync--poll-scan-in-progress nil
+  "Non-nil when an async poll scan subprocess is running.")
+
+(defvar manifolding-atlas-db-sync--file-attributes (make-hash-table :test 'equal)
+  "Cache of file attributes for external change detection.")
+
+(defvar manifolding-atlas-db-sync--queue-total 0
+  "Total number of files queued for async processing.
+Set when async processing starts, used for progress reporting.")
+
+(defvar manifolding-atlas-db-sync--processed-total 0
+  "Total number of files processed in current async batch.
+Reset when async processing completes.")
+
+(defvar manifolding-atlas-db-sync--updated-total 0
+  "Total number of files actually updated in current async batch.
+Reset when async processing completes.")
+
+(defvar manifolding-atlas-db-sync--sync-start-time nil
+  "Start time of current sync phase.")
+
+(defvar manifolding-atlas-db-sync--async-dispatched 0
+  "Files sent to the extraction worker and not yet completed.")
+
+(defvar manifolding-atlas-db-sync--async-applied 0
+  "Files the worker completed with new data in the current burst.")
+
+(defvar manifolding-atlas-db-sync--async-unchanged 0
+  "Files the worker completed without changes in the current burst.")
+
+(defvar manifolding-atlas-db-sync--async-start-time nil
+  "Start time of the current background extraction burst.")
+
+(defvar manifolding-atlas-db-sync--async-completed 0
+  "Total completions (any terminal status) in the current burst.")
+
+(defvar manifolding-atlas-db-sync--announced nil
+  "Non-nil after the sync-start message was shown for this burst.
+Prevents the Syncing-N-files announcement from re-firing on
+every batch while all work is dispatched to the worker (the legacy
+processed counter only moves for synchronously processed files).")
+
+(defvar manifolding-atlas-db-sync-debug nil
+  "When non-nil, log timing information for sync operations.")
+
+;;; Mode
+
+;;;###autoload
+(define-minor-mode manifolding-atlas-db-autosync-mode
+  "Toggle automatic database synchronization.
+
+When enabled:
+- Watch org files for changes
+- Update database asynchronously
+- Batch multiple changes
+- Process during idle time
+
+When disabled:
+- Stop all file watchers
+- Clear update queue
+- Updates must be triggered manually"
+  :global t
+  :group 'manifolding-atlas-db-sync
+  (if manifolding-atlas-db-autosync-mode
+      (manifolding-atlas-db-sync--start)
+    (manifolding-atlas-db-sync--stop)))
+
+;;; Utilities
+
+(defun manifolding-atlas-db-sync--message (format-string &rest args)
+  "Display a status message when `manifolding-atlas-db-sync-verbose' is non-nil.
+FORMAT-STRING and ARGS are passed to `message'.  Use this for routine
+progress and completion reports; use `message' directly for errors and
+warnings that should always be shown."
+  (when manifolding-atlas-db-sync-verbose
+    (apply #'message format-string args)))
+
+;;; Core Functions
+
+(defun manifolding-atlas-db-sync--effective-scan-mode ()
+  "Return scan mode to use during autosync activation.
+
+Returns `manifolding-atlas-db-sync-scan-on-enable', except when the database
+is empty: then `async' is returned regardless of the setting, so
+the very first activation populates the database without requiring
+a manual `manifolding-atlas-db-sync-full-scan'."
+  (cond
+   (manifolding-atlas-db-sync-scan-on-enable)
+   ((= (manifolding-atlas-db-count-notes) 0)
+    (manifolding-atlas-db-sync--message
+     "Manifolding Atlas: database is empty, scanning all files...")
+    'async)))
+
+(defun manifolding-atlas-db-sync--start ()
+  "Start file watching and async update.
+
+Optionally performs initial scan based on
+`manifolding-atlas-db-sync-scan-on-enable' (an async scan is forced when the
+database is empty, see `manifolding-atlas-db-sync--effective-scan-mode').
+
+When `manifolding-atlas-db-sync-scan-on-enable' is `async', this function
+returns immediately without blocking.  File listing, cleanup of
+deleted files, and enqueueing are all performed asynchronously via
+a subprocess.  The `blocking' mode still scans synchronously."
+  (let ((t-total (current-time))
+        (scan-mode (manifolding-atlas-db-sync--effective-scan-mode))
+        t-phase)
+
+    ;; Kill stale scan subprocess from previous activation
+    (when-let* ((proc (get-process "manifolding-atlas-scan")))
+      (delete-process proc))
+
+    ;; Start idle timer immediately (so queue is ready to process)
+    (unless manifolding-atlas-db-sync--idle-timer
+      (setq manifolding-atlas-db-sync--idle-timer
+            (run-with-idle-timer manifolding-atlas-db-sync-idle-delay t
+                                 #'manifolding-atlas-db-sync--process-queue)))
+
+    ;; Track background extraction completions for progress reporting
+    (add-hook 'manifolding-atlas-db-worker-done-functions
+              #'manifolding-atlas-db-sync--worker-done)
+
+    ;; Start external monitoring (fswatch is async, no blocking)
+    (setq t-phase (current-time))
+    (manifolding-atlas-db-sync--setup-external-monitoring)
+    (when manifolding-atlas-db-sync-debug
+      (message "[manifolding-atlas-sync] setup-external-monitoring: %.0fms"
+               (* 1000 (float-time (time-subtract (current-time) t-phase)))))
+
+    ;; Start watching directories via filenotify unless fswatch is
+    ;; active.  When fswatch is running it already monitors the
+    ;; filesystem for all changes (including in-Emacs saves), making
+    ;; filenotify redundant.  Programmatic changes (manifolding-atlas-create,
+    ;; manifolding-atlas-utils-with-note-sync) call manifolding-atlas-db-update-file
+    ;; directly and never rely on filenotify.
+    (setq t-phase (current-time))
+    (let ((watcher-count 0))
+      (if manifolding-atlas-db-sync--fswatch-process
+          (when manifolding-atlas-db-sync-debug
+            (message "[manifolding-atlas-sync] watch-directory: skipped (fswatch active)"))
+        (when manifolding-atlas-db-sync-directories
+          (dolist (dir manifolding-atlas-db-sync-directories)
+            (manifolding-atlas-db-sync--watch-directory dir))
+          (setq watcher-count (length manifolding-atlas-db-sync--watchers)))
+        (when manifolding-atlas-db-sync-debug
+          (message "[manifolding-atlas-sync] watch-directory: %.0fms (%d watchers)"
+                   (* 1000 (float-time (time-subtract (current-time) t-phase)))
+                   watcher-count))))
+
+    ;; Initial scan and cleanup based on configuration
+    (if (and scan-mode manifolding-atlas-db-sync-directories)
+        (pcase scan-mode
+          ('async
+           ;; Use subprocess to list files, then cleanup + enqueue
+           (when manifolding-atlas-db-sync-debug
+             (message "[manifolding-atlas-sync] launching async scan subprocess..."))
+           (let ((scan-start (current-time)))
+             (manifolding-atlas-db-sync--scan-files-async
+              manifolding-atlas-db-sync-directories
+              (lambda (files)
+                ;; Guard: skip if autosync was disabled while
+                ;; subprocess was running
+                (when manifolding-atlas-db-autosync-mode
+                  (when manifolding-atlas-db-sync-debug
+                    (message "[manifolding-atlas-sync] async scan found %d files in %.0fms"
+                             (length files)
+                             (* 1000 (float-time (time-subtract (current-time) scan-start)))))
+                  ;; Cleanup: remove DB entries not in the file list
+                  (let ((cleanup-start (current-time)))
+                    (manifolding-atlas-db-sync--cleanup-deleted-files-using files)
+                    (when manifolding-atlas-db-sync-debug
+                      (message "[manifolding-atlas-sync] async cleanup: %.0fms"
+                               (* 1000 (float-time (time-subtract (current-time) cleanup-start))))))
+                  ;; Enqueue all found files for change detection
+                  (let ((enqueue-start (current-time)))
+                    (dolist (file files)
+                      (manifolding-atlas-db-sync--enqueue file))
+                    (when manifolding-atlas-db-sync-debug
+                      (message "[manifolding-atlas-sync] async enqueue: %.0fms (%d files)"
+                               (* 1000 (float-time (time-subtract (current-time) enqueue-start)))
+                               (length files)))))))))
+          ('blocking
+           ;; Scan synchronously (blocks Emacs)
+           (setq t-phase (current-time))
+           (manifolding-atlas-db-sync--cleanup-deleted-files)
+           (when manifolding-atlas-db-sync-debug
+             (message "[manifolding-atlas-sync] cleanup-deleted-files: %.0fms"
+                      (* 1000 (float-time (time-subtract (current-time) t-phase)))))
+           (setq t-phase (current-time))
+           (dolist (dir manifolding-atlas-db-sync-directories)
+             (manifolding-atlas-db-sync-update-directory dir))
+           (when manifolding-atlas-db-sync-debug
+             (message "[manifolding-atlas-sync] blocking-scan: %.0fms"
+                      (* 1000 (float-time (time-subtract (current-time) t-phase)))))))
+      ;; No scan requested, but still cleanup deleted files
+      (setq t-phase (current-time))
+      (manifolding-atlas-db-sync--cleanup-deleted-files)
+      (when manifolding-atlas-db-sync-debug
+        (message "[manifolding-atlas-sync] cleanup-deleted-files: %.0fms"
+                 (* 1000 (float-time (time-subtract (current-time) t-phase))))))
+
+    ;; If schema was rebuilt, tag settings changed, or the parser epoch
+    ;; changed, trigger forced re-index
+    (when (or manifolding-atlas-db--schema-rebuilt
+              manifolding-atlas-db--settings-changed
+              manifolding-atlas-db--parser-changed)
+      (let ((reason (cond
+                     (manifolding-atlas-db--schema-rebuilt "Schema upgraded")
+                     (manifolding-atlas-db--settings-changed "Tag inheritance settings changed")
+                     (manifolding-atlas-db--parser-changed "Parser updated"))))
+        (setq manifolding-atlas-db--schema-rebuilt nil)
+        (setq manifolding-atlas-db--settings-changed nil)
+        (setq manifolding-atlas-db--parser-changed nil)
+        (manifolding-atlas-db-sync--message "Manifolding Atlas: %s, re-indexing all files..." reason)
+        (dolist (dir manifolding-atlas-db-sync-directories)
+          (manifolding-atlas-db-sync-update-directory dir 'force))))
+
+    (when manifolding-atlas-db-sync-debug
+      (message "[manifolding-atlas-sync] start complete: %.0fms total (sync portion)"
+               (* 1000 (float-time (time-subtract (current-time) t-total)))))))
+
+(defun manifolding-atlas-db-sync--stop ()
+  "Stop file watching and clear queue."
+  ;; Remove all watchers
+  (dolist (entry manifolding-atlas-db-sync--watchers)
+    (file-notify-rm-watch (cdr entry)))
+  (setq manifolding-atlas-db-sync--watchers nil)
+
+  ;; Stop async scan subprocess if running
+  (when-let* ((proc (get-process "manifolding-atlas-scan")))
+    (delete-process proc))
+
+  ;; Stop the extraction worker
+  (remove-hook 'manifolding-atlas-db-worker-done-functions
+               #'manifolding-atlas-db-sync--worker-done)
+  (setq manifolding-atlas-db-sync--async-dispatched 0
+        manifolding-atlas-db-sync--async-applied 0
+        manifolding-atlas-db-sync--async-unchanged 0
+        manifolding-atlas-db-sync--async-completed 0
+        manifolding-atlas-db-sync--async-start-time nil
+        manifolding-atlas-db-sync--announced nil)
+  (manifolding-atlas-db-worker-stop)
+
+  ;; Stop external monitoring
+  (manifolding-atlas-db-sync--stop-external-monitoring)
+
+  ;; Cancel timers
+  (when manifolding-atlas-db-sync--timer
+    (cancel-timer manifolding-atlas-db-sync--timer)
+    (setq manifolding-atlas-db-sync--timer nil))
+  (when manifolding-atlas-db-sync--idle-timer
+    (cancel-timer manifolding-atlas-db-sync--idle-timer)
+    (setq manifolding-atlas-db-sync--idle-timer nil))
+
+  ;; Clear queue
+  (setq manifolding-atlas-db-sync--queue nil
+        manifolding-atlas-db-sync--queue-tail nil)
+  (clrhash manifolding-atlas-db-sync--queue-set)
+  (clrhash manifolding-atlas-db-sync--force-set))
+
+(defun manifolding-atlas-db-sync--watch-directory (dir)
+  "Watch DIR and all subdirectories for org file change."
+  (when (and dir (file-directory-p dir) (not (file-symlink-p dir)))
+    (unless (assoc dir manifolding-atlas-db-sync--watchers)
+      (let ((descriptor (file-notify-add-watch
+                         dir
+                         '(change)
+                         #'manifolding-atlas-db-sync--file-notify-callback)))
+        (push (cons dir descriptor) manifolding-atlas-db-sync--watchers)))
+
+    ;; Recursively watch subdirectories
+    (dolist (subdir (directory-files dir t "\\`[^.]" t))
+      (when (and (file-directory-p subdir)
+                 (not (file-symlink-p subdir))
+                 (not (string-match-p "/\\.git/" subdir)))
+        (manifolding-atlas-db-sync--watch-directory subdir)))))
+
+(defun manifolding-atlas-db-sync--watch-file (path)
+  "Watch file at PATH for change."
+  (unless (assoc path manifolding-atlas-db-sync--watchers)
+    (when (file-exists-p path)
+      (let ((descriptor (file-notify-add-watch
+                         path
+                         '(change)
+                         #'manifolding-atlas-db-sync--file-notify-callback)))
+        (push (cons path descriptor) manifolding-atlas-db-sync--watchers)))))
+
+(defun manifolding-atlas-db-sync--unwatch-file (path)
+  "Stop watching file at PATH."
+  (when-let* ((entry (assoc path manifolding-atlas-db-sync--watchers)))
+    (file-notify-rm-watch (cdr entry))
+    (setq manifolding-atlas-db-sync--watchers
+          (delq entry manifolding-atlas-db-sync--watchers))))
+
+(defun manifolding-atlas-db-sync--org-file-p (path)
+  "Return non-nil when PATH points to a tracked org file.
+
+Excludes:
+- Files not matching tracked extensions
+- Files in hidden directories (paths containing /.)"
+  (and path
+       (seq-some (lambda (ext) (string-suffix-p ext path))
+                 (manifolding-atlas-db--all-extensions))
+       (not (string-match-p "/\\." path))))
+
+(defun manifolding-atlas-db-sync--list-org-files (dir)
+  "List all tracked org files in DIR recursively.
+
+Uses `manifolding-atlas-db-sync--org-file-p' to filter files, ensuring
+consistency with file watcher filtering.
+
+DIR is expanded via `expand-file-name' to ensure returned paths
+are absolute (e.g., ~/notes becomes /home/user/notes).  This
+keeps paths consistent with `manifolding-atlas-db-sync--scan-files-async'
+and prevents tilde-vs-absolute mismatches in database queries."
+  (let ((dir (expand-file-name dir))
+        (regex (mapconcat (lambda (ext)
+                            (concat (regexp-quote ext) "\\'"))
+                          (manifolding-atlas-db--all-extensions)
+                          "\\|")))
+    (seq-filter #'manifolding-atlas-db-sync--org-file-p
+                (directory-files-recursively dir regex))))
+
+(defun manifolding-atlas-db-sync--scan-files-async (dirs callback)
+  "List org files in DIRS asynchronously, call CALLBACK with file list.
+
+Uses fd (or find as fallback) subprocess to avoid blocking Emacs.
+CALLBACK receives a list of absolute file paths."
+  (let* ((buffer "")
+         (dir (car dirs))
+         (expanded-dir (expand-file-name dir))
+         (extensions (manifolding-atlas-db--all-extensions))
+         (cmd (if (executable-find "fd")
+                  (append (list "fd" "--type" "f")
+                          (mapcan (lambda (ext)
+                                    (list "--extension" (substring ext 1)))
+                                  extensions)
+                          (list "--hidden" "--no-ignore"
+                                "--exclude" ".*"
+                                "." expanded-dir))
+                (let* ((name-args
+                        (mapcar (lambda (ext)
+                                  (list "-name" (concat "*" ext)))
+                                extensions))
+                       (name-clause
+                        (cl-loop for args in name-args
+                                 for first = t then nil
+                                 append (if first args (cons "-o" args)))))
+                  (append (list "find" expanded-dir "-type" "f")
+                          (if (> (length name-args) 1)
+                              (append '("(") name-clause '(")"))
+                            name-clause)
+                          (list "-not" "-path" "*/.*"))))))
+    (make-process
+     :name "manifolding-atlas-scan"
+     :command cmd
+     :connection-type 'pipe
+     :noquery t
+     :filter (lambda (_proc output)
+               (setq buffer (concat buffer output)))
+     :sentinel (lambda (_proc event)
+                 (when (string-prefix-p "finished" event)
+                   (let ((files (seq-filter
+                                 #'manifolding-atlas-db-sync--org-file-p
+                                 (split-string buffer "\n" t))))
+                     (if (cdr dirs)
+                         ;; More directories to scan
+                         (manifolding-atlas-db-sync--scan-files-async
+                          (cdr dirs)
+                          (lambda (more-files)
+                            (funcall callback (append files more-files))))
+                       (funcall callback files))))))))
+
+(defun manifolding-atlas-db-sync--drop-from-queue (path)
+  "Remove PATH from the pending queue."
+  (let (result)
+    (dolist (entry manifolding-atlas-db-sync--queue)
+      (unless (equal (car entry) path)
+        (push entry result)))
+    (setq manifolding-atlas-db-sync--queue (nreverse result))
+    (setq manifolding-atlas-db-sync--queue-tail (last manifolding-atlas-db-sync--queue))
+    (remhash path manifolding-atlas-db-sync--queue-set)
+    (remhash path manifolding-atlas-db-sync--force-set)))
+
+(defun manifolding-atlas-db-sync--handle-removed-file (path)
+  "Permanently remove PATH from database tracking.
+
+PATH can be a file or directory. If PATH is a directory (detected
+by trailing slash or by having files under it in the database),
+all files under that directory are removed."
+  (manifolding-atlas-db-sync--drop-from-queue path)
+  (manifolding-atlas-db-sync--unwatch-file path)
+  (let ((db (manifolding-atlas-db)))
+    (emacsql-with-transaction db
+      ;; Try exact match first
+      (manifolding-atlas-db--delete-file-notes path)
+      (emacsql db [:delete :from files :where (= path $s1)] path)
+      ;; Also handle directory removal - delete all files under this path
+      ;; This handles the case when a directory is deleted externally
+      ;; Use GLOB instead of LIKE - GLOB uses * and ? as wildcards,
+      ;; which avoids issues with % and _ in directory names
+      (let* ((dir-prefix (if (string-suffix-p "/" path)
+                             path
+                           (concat path "/")))
+             ;; Escape GLOB special characters: *, ?, [
+             (escaped-prefix (manifolding-atlas-db--escape-glob-pattern dir-prefix))
+             (glob-pattern (concat escaped-prefix "*")))
+        (dolist (file-path (mapcar #'car
+                                   (emacsql db [:select path :from files
+                                                :where (glob path $s1)]
+                                            glob-pattern)))
+          (manifolding-atlas-db--delete-file-notes file-path))
+        (emacsql db [:delete :from files :where (glob path $s1)]
+                 glob-pattern)))))
+
+(defun manifolding-atlas-db-sync--file-notify-callback (event)
+  "Handle file notification EVENT."
+  (pcase-let ((`(,_descriptor ,action ,file . ,rest) event))
+    (pcase action
+      ((or 'changed 'created 'attribute-changed)
+       (cond
+        ((and file (file-directory-p file) (eq action 'created))
+         (manifolding-atlas-db-sync--watch-directory file))
+        ((manifolding-atlas-db-sync--org-file-p file)
+         (manifolding-atlas-db-sync--enqueue file))))
+      ('deleted
+       (when (manifolding-atlas-db-sync--org-file-p file)
+         (manifolding-atlas-db-sync--handle-removed-file file)))
+      ('renamed
+       (pcase rest
+         (`(,new-path)
+          (when (manifolding-atlas-db-sync--org-file-p file)
+            (manifolding-atlas-db-sync--handle-removed-file file))
+          (when (manifolding-atlas-db-sync--org-file-p new-path)
+            (manifolding-atlas-db-sync--enqueue new-path))))))
+    nil))
+
+(defun manifolding-atlas-db-sync--enqueue (path &optional force no-count)
+  "Add PATH to update queue.
+
+With FORCE non-nil, PATH is re-indexed even if its content is
+unchanged (see `manifolding-atlas-db-sync--force-set').  A force mark also
+upgrades an already-queued entry.
+
+With NO-COUNT non-nil the entry does not increment the progress
+total: used when re-queueing an entry that was already counted
+\(flow-control saturation retries), which would otherwise inflate
+the reported total on every retry."
+  (let ((timestamp (float-time)))
+    (when force
+      (puthash path t manifolding-atlas-db-sync--force-set))
+    (unless (gethash path manifolding-atlas-db-sync--queue-set)
+      (puthash path t manifolding-atlas-db-sync--queue-set)
+
+      ;; Add new entry at the tail to maintain FIFO order
+      (let ((node (list (cons path timestamp))))
+        (if manifolding-atlas-db-sync--queue
+            (setcdr manifolding-atlas-db-sync--queue-tail node)
+          (setq manifolding-atlas-db-sync--queue node))
+        (setq manifolding-atlas-db-sync--queue-tail node))
+
+      ;; Reset batch timer
+      (when manifolding-atlas-db-sync--timer
+        (cancel-timer manifolding-atlas-db-sync--timer))
+      (setq manifolding-atlas-db-sync--timer
+            (run-with-timer manifolding-atlas-db-sync-batch-delay nil
+                            #'manifolding-atlas-db-sync--process-queue))
+
+      ;; When a sync is already in progress, account for newly discovered files
+      (when (and (not no-count)
+                 (> manifolding-atlas-db-sync--queue-total 0))
+        (setq manifolding-atlas-db-sync--queue-total
+              (1+ manifolding-atlas-db-sync--queue-total))))))
+
+(defun manifolding-atlas-db-sync--process-queue ()
+  "Process queued file update."
+  ;; When the worker request window is full, leave the queue alone
+  ;; and retry shortly - pulling a batch only to re-enqueue it would
+  ;; churn the main thread for nothing during bulk syncs
+  (if (and manifolding-atlas-db-sync--queue
+           (not manifolding-atlas-db-sync--processing)
+           manifolding-atlas-db-async-extraction
+           (manifolding-atlas-db-worker-saturated-p))
+      (progn
+        (when manifolding-atlas-db-sync--timer
+          (cancel-timer manifolding-atlas-db-sync--timer))
+        (setq manifolding-atlas-db-sync--timer
+              (run-with-timer 0.05 nil #'manifolding-atlas-db-sync--process-queue)))
+  (when (and manifolding-atlas-db-sync--queue
+             (not manifolding-atlas-db-sync--processing))
+    (setq manifolding-atlas-db-sync--processing t)
+    (unwind-protect
+        (let* ((manifolding-atlas-db-sync--batch-start-time (current-time))
+               (batch-size (min (length manifolding-atlas-db-sync--queue)
+                                manifolding-atlas-db-sync-batch-size))
+               (batch (seq-take manifolding-atlas-db-sync--queue batch-size))
+               (paths (mapcar #'car batch))
+               (db (manifolding-atlas-db))
+               (updated 0)
+               (unchanged 0)
+               (dispatched 0))
+
+          ;; Initialize totals if starting fresh
+          (when (zerop manifolding-atlas-db-sync--processed-total)
+            (setq manifolding-atlas-db-sync--queue-total (length manifolding-atlas-db-sync--queue)
+                  manifolding-atlas-db-sync--updated-total 0
+                  manifolding-atlas-db-sync--sync-start-time (current-time))
+            (when (and (> manifolding-atlas-db-sync--queue-total 1)
+                       (not manifolding-atlas-db-sync--announced))
+              (setq manifolding-atlas-db-sync--announced t)
+              (manifolding-atlas-db-sync--message "Manifolding Atlas: Syncing %d file%s..."
+                                       manifolding-atlas-db-sync--queue-total
+                                       (if (= manifolding-atlas-db-sync--queue-total 1) "" "s"))))
+
+          ;; Remove processed items from queue
+          (setq manifolding-atlas-db-sync--queue
+                (seq-drop manifolding-atlas-db-sync--queue batch-size))
+          (unless manifolding-atlas-db-sync--queue
+            (setq manifolding-atlas-db-sync--queue-tail nil))
+          (dolist (path paths)
+            (remhash path manifolding-atlas-db-sync--queue-set))
+
+          ;; Fetch all file hashes in one query (huge speedup)
+          (let* ((hash-rows (emacsql db [:select [path hash mtime size] :from files
+                                         :where (in path $v1)]
+                                     (vconcat paths)))
+                 (hash-cache (make-hash-table :test 'equal)))
+            ;; Build hash table for O(1) lookups
+            (dolist (row hash-rows)
+              (puthash (elt row 0)
+                       (list :hash (elt row 1)
+                             :mtime (elt row 2)
+                             :size (elt row 3))
+                       hash-cache))
+
+            ;; Split off files the extraction worker will handle:
+            ;; for those, only a cheap mtime/size comparison happens
+            ;; here - reading, hashing, parsing and extraction all
+            ;; run in the worker subprocess.  Forced entries (parser
+            ;; or settings changed) skip change detection entirely.
+            (let (sync-paths)
+              (dolist (path paths)
+                (let ((force (gethash path manifolding-atlas-db-sync--force-set)))
+                  (remhash path manifolding-atlas-db-sync--force-set)
+                  (cond
+                   ;; Worker window full: keep it queued, the timer
+                   ;; retries as completions free the window
+                   ((and manifolding-atlas-db-async-extraction
+                         (manifolding-atlas-db-worker-should-handle-p path)
+                         (manifolding-atlas-db-worker-saturated-p))
+                    ;; Already counted when first enqueued
+                    (manifolding-atlas-db-sync--enqueue path force 'no-count))
+                   ((and manifolding-atlas-db-async-extraction
+                         (manifolding-atlas-db-worker-should-handle-p path))
+                      (condition-case err
+                          (when (file-exists-p path)
+                            (if (or force
+                                    (manifolding-atlas-db-sync--changed-on-disk-p
+                                     path hash-cache))
+                                (progn
+                                  (when (zerop manifolding-atlas-db-sync--async-dispatched)
+                                    (setq manifolding-atlas-db-sync--async-applied 0
+                                          manifolding-atlas-db-sync--async-unchanged 0
+                                          manifolding-atlas-db-sync--async-start-time
+                                          (current-time)))
+                                  (manifolding-atlas-db-worker-request path force)
+                                  (setq manifolding-atlas-db-sync--async-dispatched
+                                        (1+ manifolding-atlas-db-sync--async-dispatched))
+                                  (setq dispatched (1+ dispatched)))
+                              (setq unchanged (1+ unchanged))))
+                        (error
+                         ;; Worker spawn/send failure: fall back to
+                         ;; synchronous processing in this batch so an
+                         ;; environmental failure cannot silently drop
+                         ;; the file
+                         (message "Manifolding Atlas: Error dispatching %s (falling back to sync): %s"
+                                  path (error-message-string err))
+                         (push (cons path force) sync-paths))))
+                   (t
+                    (push (cons path force) sync-paths)))))
+
+              ;; Process the rest in a single transaction as before
+              (when sync-paths
+                (emacsql-with-transaction db
+                  (pcase-dolist (`(,path . ,force) (nreverse sync-paths))
+                    (condition-case err
+                        (when (file-exists-p path)
+                          (cond
+                           (force
+                            (manifolding-atlas-db-update-file path)
+                            (setq updated (1+ updated)))
+                           ((manifolding-atlas-db-sync--update-file-if-changed path hash-cache)
+                            (setq updated (1+ updated)))
+                           (t
+                            (setq unchanged (1+ unchanged)))))
+                      (error
+                       (message "Manifolding Atlas: Error updating %s: %s"
+                                path (error-message-string err)))))))))
+
+          ;; Update totals
+          (setq manifolding-atlas-db-sync--processed-total (+ manifolding-atlas-db-sync--processed-total updated unchanged)
+                manifolding-atlas-db-sync--updated-total (+ manifolding-atlas-db-sync--updated-total updated))
+
+          (when manifolding-atlas-db-sync-debug
+            (message "[manifolding-atlas-sync] batch: %.0fms (%d files, %d updated, %d unchanged, %d dispatched)"
+                     (* 1000 (float-time (time-subtract (current-time) manifolding-atlas-db-sync--batch-start-time)))
+                     batch-size updated unchanged dispatched))
+
+          ;; Report progress (synchronous processing only; background
+          ;; extraction reports through the worker done hook)
+          (when (and manifolding-atlas-db-sync-progress-interval
+                     (> manifolding-atlas-db-sync--processed-total 0)
+                     (> manifolding-atlas-db-sync--queue-total manifolding-atlas-db-sync-progress-interval)
+                     (or (zerop (mod manifolding-atlas-db-sync--processed-total
+                                     manifolding-atlas-db-sync-progress-interval))
+                         (null manifolding-atlas-db-sync--queue)))
+            (manifolding-atlas-db-sync--message "Manifolding Atlas: Progress: %d/%d files (%d updated, %d unchanged)"
+                                     manifolding-atlas-db-sync--processed-total
+                                     manifolding-atlas-db-sync--queue-total
+                                     manifolding-atlas-db-sync--updated-total
+                                     (- manifolding-atlas-db-sync--processed-total manifolding-atlas-db-sync--updated-total)))
+
+          ;; Final summary when done
+          (when (null manifolding-atlas-db-sync--queue)
+            (when (> manifolding-atlas-db-sync--processed-total 0)
+              (let ((duration (when manifolding-atlas-db-sync--sync-start-time
+                                (float-time (time-subtract (current-time)
+                                                           manifolding-atlas-db-sync--sync-start-time)))))
+                (manifolding-atlas-db-sync--message "Manifolding Atlas: Sync complete - %d file%s (%d updated, %d unchanged%s)"
+                                         manifolding-atlas-db-sync--processed-total
+                                         (if (= manifolding-atlas-db-sync--processed-total 1) "" "s")
+                                         manifolding-atlas-db-sync--updated-total
+                                         (- manifolding-atlas-db-sync--processed-total manifolding-atlas-db-sync--updated-total)
+                                         (if duration
+                                             (format ", %.2fs" duration)
+                                           ""))))
+            ;; Reset counters (the announce flag stays while
+            ;; background work is still in flight; the worker done
+            ;; handler clears it with its completion summary)
+            (setq manifolding-atlas-db-sync--queue-total 0
+                  manifolding-atlas-db-sync--processed-total 0
+                  manifolding-atlas-db-sync--updated-total 0
+                  manifolding-atlas-db-sync--sync-start-time nil)
+            (when (zerop manifolding-atlas-db-sync--async-dispatched)
+              (setq manifolding-atlas-db-sync--announced nil))
+            (clrhash manifolding-atlas-db-sync--queue-set)))
+
+      (setq manifolding-atlas-db-sync--processing nil)
+
+      ;; If queue still has items, schedule another processing
+      (when manifolding-atlas-db-sync--queue
+        (when manifolding-atlas-db-sync--timer
+          (cancel-timer manifolding-atlas-db-sync--timer))
+        (setq manifolding-atlas-db-sync--timer
+              (run-with-timer manifolding-atlas-db-sync-batch-delay nil
+                              #'manifolding-atlas-db-sync--process-queue)))))))
+
+(defun manifolding-atlas-db-sync--worker-done (_path status count)
+  "Track background extraction completions for progress reporting.
+
+Registered on `manifolding-atlas-db-worker-done-functions' while autosync is
+enabled.  STATUS `stale' and `requeued' are terminal for the current
+dispatch - their retry re-enters the queue and counts anew.  COUNT is
+unused beyond distinguishing applied results.
+
+Emits the honest completion message: background sync complete only
+fires when the last in-flight file has actually landed in the
+database, not when it was dispatched."
+  (ignore count)
+  (when (> manifolding-atlas-db-sync--async-dispatched 0)
+    (pcase status
+      ('applied (setq manifolding-atlas-db-sync--async-applied
+                      (1+ manifolding-atlas-db-sync--async-applied)))
+      ('unchanged (setq manifolding-atlas-db-sync--async-unchanged
+                        (1+ manifolding-atlas-db-sync--async-unchanged)))
+      (_ nil))
+    (setq manifolding-atlas-db-sync--async-dispatched
+          (1- manifolding-atlas-db-sync--async-dispatched))
+    (setq manifolding-atlas-db-sync--async-completed
+          (1+ manifolding-atlas-db-sync--async-completed))
+    ;; Periodic progress: one line per interval, with the full picture
+    (when (and manifolding-atlas-db-sync-progress-interval
+               (> manifolding-atlas-db-sync--async-dispatched 0)
+               (zerop (mod manifolding-atlas-db-sync--async-completed
+                           manifolding-atlas-db-sync-progress-interval)))
+      (manifolding-atlas-db-sync--message
+       "Manifolding Atlas: background sync: %d done, %d in flight, %d queued"
+       manifolding-atlas-db-sync--async-completed
+       manifolding-atlas-db-sync--async-dispatched
+       (hash-table-count manifolding-atlas-db-sync--queue-set)))
+    (when (zerop manifolding-atlas-db-sync--async-dispatched)
+      (let ((total (+ manifolding-atlas-db-sync--async-applied
+                      manifolding-atlas-db-sync--async-unchanged))
+            (duration (when manifolding-atlas-db-sync--async-start-time
+                        (float-time
+                         (time-subtract (current-time)
+                                        manifolding-atlas-db-sync--async-start-time)))))
+        (when (> total 0)
+          (manifolding-atlas-db-sync--message
+           "Manifolding Atlas: background sync complete - %d file%s (%d updated, %d unchanged%s)"
+           total (if (= total 1) "" "s")
+           manifolding-atlas-db-sync--async-applied
+           manifolding-atlas-db-sync--async-unchanged
+           (if duration (format ", %.2fs" duration) "")))
+        (setq manifolding-atlas-db-sync--async-applied 0
+              manifolding-atlas-db-sync--async-unchanged 0
+              manifolding-atlas-db-sync--async-completed 0
+              manifolding-atlas-db-sync--async-start-time nil
+              manifolding-atlas-db-sync--announced nil)))))
+
+(defun manifolding-atlas-db-sync--changed-on-disk-p (path &optional hash-cache)
+  "Return non-nil when PATH's stamp differs from the stored one.
+
+Compares mtime and size only - no content hashing, so this never
+reads the file.  A file touched without a content change reports as
+changed here; the extraction worker disambiguates by comparing
+content hashes before rewriting anything.
+
+HASH-CACHE is an optional hash table mapping paths to stored info,
+as built by the queue processor; without it the database is queried
+directly."
+  (let ((attrs (file-attributes path)))
+    (and attrs
+         (let ((stored (if hash-cache
+                           (gethash path hash-cache)
+                         (manifolding-atlas-db--get-file-hash path))))
+           (or (null stored)
+               (not (equal (plist-get stored :mtime)
+                           (float-time
+                            (file-attribute-modification-time attrs))))
+               (not (equal (plist-get stored :size)
+                           (file-attribute-size attrs))))))))
+
+(cl-defun manifolding-atlas-db-sync--update-file-if-changed (path &optional hash-cache)
+  "Update database for PATH only if file has changed.
+
+Uses content hash and mtime to detect changes.
+HASH-CACHE is an optional hash table mapping paths to stored info.
+If not provided, queries database directly (slower).
+Returns t if file was updated, nil if unchanged, \\='deleted if file
+no longer exists."
+  (let ((attrs (file-attributes path)))
+    (unless attrs
+      ;; File was deleted between queue and processing
+      (manifolding-atlas-db--delete-file-notes path)
+      (cl-return-from manifolding-atlas-db-sync--update-file-if-changed 'deleted))
+    (let* ((current-mtime (float-time (file-attribute-modification-time attrs)))
+           (current-size (file-attribute-size attrs))
+           (stored-info (if hash-cache
+                            (gethash path hash-cache)
+                          (manifolding-atlas-db--get-file-hash path))))
+
+    (if (or (null stored-info)
+            (not (equal (plist-get stored-info :mtime) current-mtime))
+            (not (equal (plist-get stored-info :size) current-size)))
+        ;; File changed, compute hash to verify
+        (let ((current-hash (with-temp-buffer
+                              (insert-file-contents path)
+                              (secure-hash 'sha256 (current-buffer)))))
+          (if (or (null stored-info)
+                  (not (equal (plist-get stored-info :hash) current-hash)))
+              ;; Hash differs, update database
+              (progn
+                (manifolding-atlas-db-update-file path)
+                t)
+            ;; Hash same, no update needed
+            nil))
+      ;; No change detected
+      nil))))
+
+;;; Cleanup
+
+(defun manifolding-atlas-db-sync--cleanup-deleted-files ()
+  "Remove database entries for files that no longer exist.
+
+Returns count of removed files."
+  (let* ((db (manifolding-atlas-db))
+         (all-paths (mapcar #'car (emacsql db [:select path :from files])))
+         (deleted 0))
+    (emacsql-with-transaction db
+      (dolist (path all-paths)
+        (unless (file-exists-p path)
+          (manifolding-atlas-db--delete-file-notes path)
+          (emacsql db [:delete :from files :where (= path $s1)] path)
+          (setq deleted (1+ deleted)))))
+    (when (> deleted 0)
+      (manifolding-atlas-db-sync--message "Manifolding Atlas: Removed %d deleted file%s from database"
+                               deleted (if (= deleted 1) "" "s")))
+    deleted))
+
+(defun manifolding-atlas-db-sync--cleanup-deleted-files-using (existing-files)
+  "Remove DB entries for files not in EXISTING-FILES list.
+
+EXISTING-FILES is a list of absolute paths known to exist on disk
+\(typically from an fd/find subprocess).  This avoids per-file
+`file-exists-p' calls by comparing against the known set.
+
+Returns count of removed files."
+  (let* ((db (manifolding-atlas-db))
+         (existing-set (make-hash-table :test 'equal :size (length existing-files)))
+         (all-paths (mapcar #'car (emacsql db [:select path :from files])))
+         (deleted 0))
+    ;; Build set of existing files for O(1) lookup
+    (dolist (f existing-files)
+      (puthash f t existing-set))
+    (emacsql-with-transaction db
+      (dolist (path all-paths)
+        (unless (gethash path existing-set)
+          (manifolding-atlas-db--delete-file-notes path)
+          (emacsql db [:delete :from files :where (= path $s1)] path)
+          (setq deleted (1+ deleted)))))
+    (when (> deleted 0)
+      (manifolding-atlas-db-sync--message "Manifolding Atlas: Removed %d deleted file%s from database"
+                               deleted (if (= deleted 1) "" "s")))
+    deleted))
+
+(defun manifolding-atlas-db-sync--cleanup-untracked-files ()
+  "Remove database entries for files outside tracked directories.
+
+Only files within `manifolding-atlas-db-sync-directories' should remain in
+the database. Files that exist on disk but are outside these
+directories will be removed.
+
+This is useful when narrowing `manifolding-atlas-db-sync-directories' to a
+subdirectory - files outside that subdirectory will be cleaned up.
+
+Returns count of removed files."
+  (if (null manifolding-atlas-db-sync-directories)
+      0  ; No cleanup if no directories configured
+    (let* ((db (manifolding-atlas-db))
+           (all-paths (mapcar #'car (emacsql db [:select path :from files])))
+           (removed 0)
+           (tracked-dirs (mapcar #'expand-file-name manifolding-atlas-db-sync-directories)))
+      (emacsql-with-transaction db
+        (dolist (path all-paths)
+          (let ((expanded-path (expand-file-name path)))
+            (unless (seq-some (lambda (dir)
+                                (file-in-directory-p expanded-path dir))
+                              tracked-dirs)
+              (manifolding-atlas-db--delete-file-notes path)
+              (emacsql db [:delete :from files :where (= path $s1)] path)
+              (setq removed (1+ removed))))))
+      (when (> removed 0)
+        (manifolding-atlas-db-sync--message "Manifolding Atlas: Removed %d untracked file%s from database"
+                                 removed (if (= removed 1) "" "s")))
+      removed)))
+
+;;; Manual Update
+
+;;;###autoload
+(defun manifolding-atlas-db-sync-full-scan (&optional arg)
+  "Manually scan all sync directories for change.
+
+This is useful when `manifolding-atlas-db-sync-scan-on-enable' is nil and you need
+to detect external changes (e.g., after git pull, Dropbox sync).
+
+ARG controls scan behavior:
+
+Interactive use:
+- No prefix: Smart detection (only updates changed files)
+- \\[universal-argument]: FORCE scan (re-index everything)
+
+Programmatic use:
+- nil: Smart detection
+- \\='force or non-nil: Force re-index
+
+FORCE scan ignores change detection and re-indexes all files. Use FORCE
+when changing configuration like `manifolding-atlas-db-index-heading-level'.
+
+Examples:
+  (manifolding-atlas-db-sync-full-scan)             ; smart detection
+  (manifolding-atlas-db-sync-full-scan \\='force)   ; force re-index
+
+Also performs cleanup of:
+- Deleted files (no longer exist on disk)
+- Untracked files (outside `manifolding-atlas-db-sync-directories')"
+  (interactive "P")
+  (unless manifolding-atlas-db-sync-directories
+    (user-error "No sync directories configured. Set `manifolding-atlas-db-sync-directories'"))
+
+  ;; Decode argument (handle both prefix args and symbols)
+  (let ((force (or (eq arg 'force) arg)))
+
+    ;; Cleanup deleted and untracked files
+    (manifolding-atlas-db-sync--cleanup-deleted-files)
+    (manifolding-atlas-db-sync--cleanup-untracked-files)
+
+    ;; Scan directories
+    (if force
+        (progn
+          (manifolding-atlas-db-sync--message "Manifolding Atlas: Starting FORCE scan (re-indexing all files)...")
+          (dolist (dir manifolding-atlas-db-sync-directories)
+            (manifolding-atlas-db-sync-update-directory dir 'force)))
+      ;; Smart detection
+      (dolist (dir manifolding-atlas-db-sync-directories)
+        (manifolding-atlas-db-sync-update-directory dir)))))
+
+(defun manifolding-atlas-db-sync-update-file (path)
+  "Manually update database for file at PATH.
+
+If autosync is enabled, queues the update asynchronously.
+Otherwise, updates immediately."
+  (interactive (list (buffer-file-name)))
+  (if manifolding-atlas-db-autosync-mode
+      (manifolding-atlas-db-sync--enqueue path)
+    (manifolding-atlas-db-update-file path)))
+
+(defun manifolding-atlas-db-sync-update-directory (dir &optional force)
+  "Update database for all org files in DIR recursively.
+
+Only updates files that have actually changed (by checking mtime/size/hash).
+Files in hidden directories (paths containing /.) are excluded.
+
+With optional FORCE argument, bypass change detection and re-index all files.
+This is useful when changing configuration like `manifolding-atlas-db-index-heading-level'.
+
+FORCE processing is synchronous/blocking, unless both
+`manifolding-atlas-db-autosync-mode' and `manifolding-atlas-db-async-extraction' are
+enabled - then forced files flow through the queue and the
+extraction worker like any other change, keeping parser-epoch and
+settings migrations from freezing the session."
+  (interactive "DDirectory: ")
+  ;; A force scan usually follows a settings change; make sure a live
+  ;; worker extracts with the new values, not the ones it saw at spawn
+  (when force
+    (manifolding-atlas-db-worker-refresh-settings))
+  (let ((files (manifolding-atlas-db-sync--list-org-files dir)))
+    (if (and manifolding-atlas-db-autosync-mode
+             (or (not force) manifolding-atlas-db-async-extraction))
+        ;; Async mode: queue all files (smart detection in queue
+        ;; processing; forced entries carry their mark)
+        (progn
+          ;; Reset counters for fresh sync
+          (setq manifolding-atlas-db-sync--queue-total 0
+                manifolding-atlas-db-sync--processed-total 0
+                manifolding-atlas-db-sync--updated-total 0)
+          (dolist (file files)
+            (manifolding-atlas-db-sync--enqueue file force)))
+      ;; Sync mode: use smart detection or force
+      (let ((db (manifolding-atlas-db))
+            (updated 0)
+            (unchanged 0)
+            (total (length files))
+            (processed 0))
+        (if force
+            (manifolding-atlas-db-sync--message "Manifolding Atlas: FORCE syncing %d file%s (re-indexing all)..."
+                                     total (if (= total 1) "" "s"))
+          (manifolding-atlas-db-sync--message "Manifolding Atlas: Syncing %d file%s..." total (if (= total 1) "" "s")))
+
+        ;; Fetch all file hashes in one query for smart detection (huge speedup)
+        (let* ((hash-rows (unless force
+                            (emacsql db [:select [path hash mtime size] :from files
+                                         :where (in path $v1)]
+                                     (vconcat files))))
+               (hash-cache (when hash-rows
+                             (let ((cache (make-hash-table :test 'equal)))
+                               (dolist (row hash-rows)
+                                 (puthash (elt row 0)
+                                          (list :hash (elt row 1)
+                                                :mtime (elt row 2)
+                                                :size (elt row 3))
+                                          cache))
+                               cache))))
+          (emacsql-with-transaction db
+            (dolist (file files)
+              (condition-case err
+                  (if force
+                      ;; Force mode: always update
+                      (progn
+                        (manifolding-atlas-db-update-file file)
+                        (setq updated (1+ updated)))
+                    ;; Smart detection mode with hash cache
+                    (if (manifolding-atlas-db-sync--update-file-if-changed file hash-cache)
+                        (setq updated (1+ updated))
+                      (setq unchanged (1+ unchanged))))
+                (error
+                 (message "Manifolding Atlas: Error updating %s: %s"
+                          file (error-message-string err))))
+              (setq processed (1+ processed))
+              ;; Report progress at intervals
+              (when (and manifolding-atlas-db-sync-progress-interval
+                         (> total manifolding-atlas-db-sync-progress-interval)
+                         (zerop (mod processed manifolding-atlas-db-sync-progress-interval)))
+                (manifolding-atlas-db-sync--message "Manifolding Atlas: Progress: %d/%d files (%d updated, %d unchanged)"
+                                         processed total updated unchanged))))
+          (manifolding-atlas-db-sync--message "Manifolding Atlas: Checked %d file%s (%d updated, %d unchanged)"
+                                   (+ updated unchanged)
+                                   (if (= (+ updated unchanged) 1) "" "s")
+                                   updated
+                                   unchanged))))))
+
+;;; External Monitoring
+
+(defun manifolding-atlas-db-sync--setup-external-monitoring ()
+  "Setup external file monitoring based on `manifolding-atlas-db-sync-external-method'."
+  (pcase manifolding-atlas-db-sync-external-method
+    ('auto
+     (if (executable-find "fswatch")
+         (manifolding-atlas-db-sync--setup-fswatch)
+       (message "Manifolding Atlas: fswatch not found, using polling for external changes")
+       (manifolding-atlas-db-sync--setup-polling)))
+    ('fswatch
+     (if (executable-find "fswatch")
+         (manifolding-atlas-db-sync--setup-fswatch)
+       (user-error "Manifolding Atlas: fswatch is not available. Install it or use 'auto or 'poll")))
+    ('poll
+     (manifolding-atlas-db-sync--setup-polling))
+    (_ nil)))
+
+(defun manifolding-atlas-db-sync--stop-external-monitoring ()
+  "Stop all external file monitoring."
+  ;; Stop fswatch process
+  (when manifolding-atlas-db-sync--fswatch-process
+    (when (process-live-p manifolding-atlas-db-sync--fswatch-process)
+      (delete-process manifolding-atlas-db-sync--fswatch-process))
+    (setq manifolding-atlas-db-sync--fswatch-process nil))
+
+  ;; Clear fswatch buffer and reset path-style auto-detection
+  (setq manifolding-atlas-db-sync--fswatch-buffer "")
+  (setq manifolding-atlas-db-sync--fswatch-effective-style nil)
+  (setq manifolding-atlas-db-sync--fswatch-seen-valid-event nil)
+
+  ;; Stop polling timer
+  (when manifolding-atlas-db-sync--poll-timer
+    (cancel-timer manifolding-atlas-db-sync--poll-timer)
+    (setq manifolding-atlas-db-sync--poll-timer nil))
+
+  ;; Clear file attributes cache
+  (clrhash manifolding-atlas-db-sync--file-attributes))
+
+(defun manifolding-atlas-db-sync--setup-fswatch ()
+  "Setup file monitoring using fswatch process.
+
+No-op when a process is already running, so repeated calls do not
+spawn orphaned `fswatch' processes.  The sentinel clears
+`manifolding-atlas-db-sync--fswatch-process' before restarting, so legitimate
+restarts are unaffected."
+  (when (and manifolding-atlas-db-sync-directories
+             (not manifolding-atlas-db-sync--fswatch-process))
+    (let* ((expanded-dirs (mapcar #'expand-file-name manifolding-atlas-db-sync-directories))
+           (valid-dirs nil)
+           (invalid-dirs nil))
+      ;; Separate valid and invalid directories
+      (dolist (dir expanded-dirs)
+        (if (file-directory-p dir)
+            (push dir valid-dirs)
+          (push dir invalid-dirs)))
+
+      ;; Warn about invalid directories
+      (when invalid-dirs
+        (display-warning 'manifolding-atlas
+                         (format "Ignoring non-existent directories: %s"
+                                 (string-join (nreverse invalid-dirs) ", "))
+                         :warning))
+
+      ;; Only setup fswatch if there are valid directories
+      (when valid-dirs
+        ;; The Cygwin build of fswatch needs `/cygdrive/' paths; the
+        ;; native build (and every non-Windows platform) takes the
+        ;; directories as-is.  `file-directory-p' above ran on the
+        ;; native paths, so translate only what we hand to the process.
+        (let ((command-dirs
+               (if (eq (manifolding-atlas-db-sync--fswatch-resolve-style) 'cygwin)
+                   (mapcar #'manifolding-atlas-db-sync--fswatch-to-cygwin-path
+                           (nreverse valid-dirs))
+                 (nreverse valid-dirs))))
+          (setq manifolding-atlas-db-sync--fswatch-process
+                (make-process
+                 :name "manifolding-atlas-fswatch"
+                 :buffer (get-buffer-create "*manifolding-atlas-fswatch-debug*")
+                 :command `("fswatch"
+                            "--recursive"
+                            "--event=Updated"
+                            "--event=Created"
+                            "--event=Removed"
+                            "--event=Renamed"          ; needed to detect moves (e.g., to trash)
+                            "--exclude" "\\.#.*$"      ; exclude auto-save files
+                            "--exclude" "#.*#$"        ; exclude backup files
+                            "--exclude" ".*~$"         ; exclude backup files
+                            "--exclude" "\\.git/"      ; exclude .git directory
+                            "--format" "%p|||%f"      ; include event flag with ||| separator
+                            ,@command-dirs)
+                 :noquery t
+                 :filter #'manifolding-atlas-db-sync--fswatch-filter
+                 :sentinel #'manifolding-atlas-db-sync--fswatch-sentinel))
+          (manifolding-atlas-db-sync--message "Manifolding Atlas: Started fswatch monitoring"))))))
+
+(defun manifolding-atlas-db-sync--fswatch-normalize-path (path)
+  "Canonicalize PATH as reported by fswatch.
+
+On Windows the available fswatch builds report paths in a form that
+does not match `expand-file-name' output, so the watched-directory
+check below fails and external changes are never synced (see issue
+#344).  The MSYS2/mingw build emits an upper-case drive letter and a
+backslash before the file name; the Cygwin build prefixes paths with
+\"/cygdrive/\".  Normalize both to the forward-slash, lower-case-drive
+form manifolding-atlas stores in the database.
+
+On non-Windows systems PATH is returned unchanged, since a backslash is
+a legal file-name character there."
+  (when (and (stringp path) (not (string-empty-p path)))
+    (if (not (memq system-type '(windows-nt ms-dos cygwin)))
+        path
+      (let ((p path))
+        ;; /cygdrive/c/... -> c:/...
+        (when (string-match "\\`/cygdrive/\\([A-Za-z]\\)/" p)
+          (setq p (concat (match-string 1 p) ":/"
+                          (substring p (match-end 0)))))
+        ;; Backslash separators -> forward slashes.
+        (setq p (replace-regexp-in-string "\\\\" "/" p))
+        ;; Lower-case the drive letter to match `expand-file-name'.
+        (when (string-match "\\`\\([A-Za-z]\\):" p)
+          (setq p (concat (downcase (match-string 1 p))
+                          (substring p 1))))
+        p))))
+
+(defun manifolding-atlas-db-sync--fswatch-path-valid-p (path)
+  "Return non-nil if PATH is within a watched directory.
+
+PATH is compared case-insensitively on Windows, whose file systems are
+case-insensitive and where fswatch may report a different drive-letter
+case than `expand-file-name'."
+  (and path
+       (file-name-absolute-p path)
+       (let ((ignore-case (memq system-type '(windows-nt ms-dos cygwin))))
+         (seq-some (lambda (dir)
+                     (string-prefix-p (file-name-as-directory (expand-file-name dir))
+                                      path ignore-case))
+                   manifolding-atlas-db-sync-directories))))
+
+(defun manifolding-atlas-db-sync--fswatch-to-cygwin-path (path)
+  "Convert a native Windows PATH to the Cygwin `/cygdrive/' form.
+
+For example \"c:/Users/foo/notes\" becomes
+\"/cygdrive/c/Users/foo/notes\".  A PATH with no drive letter is
+returned unchanged (with backslashes converted to forward slashes)."
+  (let ((p (replace-regexp-in-string "\\\\" "/" path)))
+    (if (string-match "\\`\\([A-Za-z]\\):/" p)
+        (concat "/cygdrive/" (downcase (match-string 1 p)) "/"
+                (substring p (match-end 0)))
+      p)))
+
+(defun manifolding-atlas-db-sync--fswatch-resolve-style ()
+  "Return the effective fswatch path style: `native' or `cygwin'.
+
+Honors `manifolding-atlas-db-sync-fswatch-path-style'; in `auto' mode returns the
+style detected so far, defaulting to `native' until the Cygwin build is
+detected."
+  (pcase manifolding-atlas-db-sync-fswatch-path-style
+    ('native 'native)
+    ('cygwin 'cygwin)
+    (_ (or manifolding-atlas-db-sync--fswatch-effective-style 'native))))
+
+(defun manifolding-atlas-db-sync--fswatch-cygwin-error-p (line)
+  "Return non-nil when LINE is a Cygwin fswatch path-handling error.
+
+The Cygwin build cannot open native Windows paths and prints an
+\"Invalid handle\" error for each one instead of watching it."
+  (and (stringp line)
+       (string-match-p "Invalid handle" line)))
+
+(defun manifolding-atlas-db-sync--fswatch-switch-to-cygwin ()
+  "Remember the Cygwin path style and restart fswatch with it.
+
+Used by auto-detection: the Cygwin build of fswatch cannot watch the
+native paths manifolding-atlas passes, so once its error output is seen the
+watcher is restarted with `/cygdrive/' directories instead."
+  (setq manifolding-atlas-db-sync--fswatch-effective-style 'cygwin)
+  (setq manifolding-atlas-db-sync--fswatch-buffer "")
+  (manifolding-atlas-db-sync--message
+   "Manifolding Atlas: detected Cygwin fswatch, retrying with /cygdrive/ paths")
+  (when manifolding-atlas-db-sync--fswatch-process
+    ;; Suppress the sentinel's auto-restart; we restart explicitly below.
+    (set-process-sentinel manifolding-atlas-db-sync--fswatch-process #'ignore)
+    (when (process-live-p manifolding-atlas-db-sync--fswatch-process)
+      (delete-process manifolding-atlas-db-sync--fswatch-process))
+    (setq manifolding-atlas-db-sync--fswatch-process nil))
+  (manifolding-atlas-db-sync--setup-fswatch))
+
+(defun manifolding-atlas-db-sync--fswatch-filter (_proc output)
+  "Process fswatch OUTPUT.
+
+OUTPUT may contain multiple events separated by newlines.
+Handles partial lines by buffering incomplete output."
+  ;; Prepend any buffered incomplete line from previous call
+  (setq output (concat manifolding-atlas-db-sync--fswatch-buffer output))
+
+  ;; Split into lines, keeping track of whether output ends with newline
+  (let* ((ends-with-newline (string-suffix-p "\n" output))
+         (lines (split-string output "\n" t)))
+
+    ;; If output doesn't end with newline, last line is incomplete - buffer it
+    (if ends-with-newline
+        (setq manifolding-atlas-db-sync--fswatch-buffer "")
+      (setq manifolding-atlas-db-sync--fswatch-buffer (or (car (last lines)) ""))
+      (setq lines (butlast lines)))
+
+    (if (and (eq manifolding-atlas-db-sync-fswatch-path-style 'auto)
+             (not manifolding-atlas-db-sync--fswatch-seen-valid-event)
+             (not (eq manifolding-atlas-db-sync--fswatch-effective-style 'cygwin))
+             (seq-some #'manifolding-atlas-db-sync--fswatch-cygwin-error-p lines))
+        ;; The Cygwin build cannot watch the native paths we passed and
+        ;; only emits errors; switch path style and restart instead of
+        ;; processing this batch.
+        (manifolding-atlas-db-sync--fswatch-switch-to-cygwin)
+      ;; Process complete lines
+      (dolist (line lines)
+        (let* ((raw (string-trim line))
+               (parts (split-string raw "|||" t))
+               (file (manifolding-atlas-db-sync--fswatch-normalize-path (car parts)))
+               (flags (cadr parts)))
+          (when (and file
+                     (not (string-empty-p file))
+                     (manifolding-atlas-db-sync--fswatch-path-valid-p file)
+                     (not (string-match-p "/\\.git/" file))
+                     (not (string-match-p "/\\.#" file))
+                     (not (string-match-p "#$" file))
+                     (not (string-match-p "~$" file)))
+            ;; A valid watched-path event means the current path style
+            ;; works; lock it in so a later stray error cannot flip it.
+            (setq manifolding-atlas-db-sync--fswatch-seen-valid-event t)
+            (cond
+             ;; Explicit removal event
+             ((and flags (string-match-p "Removed" flags))
+              (manifolding-atlas-db-sync--handle-removed-file file))
+             ;; File/directory no longer exists (e.g., moved to trash)
+             ((not (file-exists-p file))
+              (manifolding-atlas-db-sync--handle-removed-file file))
+             ;; Directory created/renamed - scan for org files inside
+             ((file-directory-p file)
+              (dolist (org-file (manifolding-atlas-db-sync--list-org-files file))
+                (manifolding-atlas-db-sync--enqueue org-file)))
+             ;; Regular file change
+             ((manifolding-atlas-db-sync--org-file-p file)
+              (manifolding-atlas-db-sync--enqueue file)))))))))
+
+(defun manifolding-atlas-db-sync--fswatch-sentinel (proc event)
+  "Handle fswatch PROC sentinel EVENT."
+  (unless (process-live-p proc)
+    (message "Manifolding Atlas: fswatch process died (%s), restarting..." (string-trim event))
+    (setq manifolding-atlas-db-sync--fswatch-process nil)
+    ;; Restart after a delay
+    (run-at-time 2 nil #'manifolding-atlas-db-sync--setup-fswatch)))
+
+(defun manifolding-atlas-db-sync--setup-polling ()
+  "Setup polling-based external monitoring.
+
+No-op when a timer is already running, so repeated calls do not
+leak orphaned polling timers."
+  (when (and manifolding-atlas-db-sync-directories
+             (not manifolding-atlas-db-sync--poll-timer))
+    (let* ((expanded-dirs (mapcar #'expand-file-name manifolding-atlas-db-sync-directories))
+           (valid-dirs (seq-filter #'file-directory-p expanded-dirs))
+           (invalid-dirs (seq-remove #'file-directory-p expanded-dirs)))
+      ;; Warn about invalid directories
+      (when invalid-dirs
+        (display-warning 'manifolding-atlas
+                         (format "Ignoring non-existent directories: %s"
+                                 (string-join invalid-dirs ", "))
+                         :warning))
+
+      ;; Only setup polling if there are valid directories
+      (when valid-dirs
+        ;; Initialize file attributes cache
+        (manifolding-atlas-db-sync--update-file-attributes-cache)
+        ;; Start polling timer
+        (setq manifolding-atlas-db-sync--poll-timer
+              (run-with-timer manifolding-atlas-db-sync-poll-interval
+                              manifolding-atlas-db-sync-poll-interval
+                              #'manifolding-atlas-db-sync--check-external-changes))
+        (manifolding-atlas-db-sync--message "Manifolding Atlas: Started polling for external changes every %s seconds"
+                                 manifolding-atlas-db-sync-poll-interval)))))
+
+(defun manifolding-atlas-db-sync--update-file-attributes-cache ()
+  "Update cache of file attributes for all org files."
+  (dolist (dir manifolding-atlas-db-sync-directories)
+    (when (file-directory-p dir)
+      (dolist (file (manifolding-atlas-db-sync--list-org-files dir))
+        (when (file-exists-p file)
+          (puthash file (file-attributes file) manifolding-atlas-db-sync--file-attributes))))))
+
+(defun manifolding-atlas-db-sync--check-external-changes ()
+  "Check for externally modified files by comparing mtimes.
+
+Uses fd (or find) subprocess to list files asynchronously, then
+compares modification times in the callback.  Skips if a previous
+scan is still in progress.
+
+Detects three types of changes:
+- New files: files not previously in the cache
+- Modified files: files with changed modification time
+- Deleted files: files in cache but no longer on disk"
+  (unless manifolding-atlas-db-sync--poll-scan-in-progress
+    (setq manifolding-atlas-db-sync--poll-scan-in-progress t)
+    (manifolding-atlas-db-sync--scan-files-async
+     manifolding-atlas-db-sync-directories
+     (lambda (files)
+       (unwind-protect
+           (manifolding-atlas-db-sync--check-external-changes-with-files files)
+         (setq manifolding-atlas-db-sync--poll-scan-in-progress nil))))))
+
+(defun manifolding-atlas-db-sync--check-external-changes-with-files (files)
+  "Compare FILES against cached attributes and enqueue modified ones.
+
+FILES is a list of org file paths from async directory scan."
+  (let ((seen (make-hash-table :test 'equal)))
+    (dolist (file files)
+      (when (file-exists-p file)
+        (let ((curr-attr (file-attributes file))
+              (cached-attr (gethash file manifolding-atlas-db-sync--file-attributes)))
+          (puthash file curr-attr manifolding-atlas-db-sync--file-attributes)
+          (puthash file t seen)
+          (cond
+           ;; New file - not in cache before
+           ((not cached-attr)
+            (manifolding-atlas-db-sync--enqueue file))
+           ;; Modified file - mtime changed
+           ((not (equal (file-attribute-modification-time curr-attr)
+                        (file-attribute-modification-time cached-attr)))
+            (manifolding-atlas-db-sync--enqueue file))))))
+    ;; Detect deletions - files in cache but not seen on disk
+    (let (removed)
+      (maphash (lambda (path _)
+                 (unless (gethash path seen)
+                   (push path removed)))
+               manifolding-atlas-db-sync--file-attributes)
+      (dolist (path removed)
+        (remhash path manifolding-atlas-db-sync--file-attributes)
+        (manifolding-atlas-db-sync--handle-removed-file path)))))
+
+;;; Debug/Testing
+
+(defun manifolding-atlas-db-sync--test-scan (dir)
+  "Test function to measure directory scan performance.
+Returns list of files found in DIR."
+  (let* ((files nil)
+         (start-time (current-time))
+         (buffer "")
+         (process (start-process
+                   "manifolding-atlas-find-test"
+                   nil
+                   "find" dir
+                   "-type" "f"
+                   "-name" "*.org"
+                   "-print")))
+    (set-process-filter
+     process
+     (lambda (_proc output)
+       (setq buffer (concat buffer output))
+       (let ((last-newline (string-match-p "\n[^\n]*\\'" buffer)))
+         (when last-newline
+           (let ((complete-part (substring buffer 0 (1+ last-newline))))
+             (dolist (file (split-string complete-part "\n" t))
+               (push file files))
+             (setq buffer (substring buffer (1+ last-newline))))))))
+
+    (set-process-sentinel
+     process
+     (lambda (_proc _event)
+       (when (not (string-empty-p buffer))
+         (push buffer files))
+       (let ((duration (float-time (time-subtract (current-time) start-time))))
+         (message "Test scan: %d files found in %.2fs" (length files) duration))))
+
+    ;; Return process for async handling
+    process))
+
+;;; Provide
+
+(provide 'manifolding-atlas-db-sync)
+#+end_src

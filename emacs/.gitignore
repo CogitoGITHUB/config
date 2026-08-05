@@ -19,8 +19,8 @@ projectile-bookmarks.eld
 projectile.cache
 straight/
 /manifolding-emacs/
-vulpea.db
-vulpea.db.corrupted
+manifolding-atlas.db
+manifolding-atlas.db.corrupted
 .org-id-locations
 elfeed/
 eww-bookmarks

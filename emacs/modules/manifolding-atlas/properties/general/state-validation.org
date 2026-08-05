@@ -1,0 +1,51 @@
+#+title:      State Validation Prompt
+#+priority:   5
+
+
+
+* State Validation
+Why: Tracks the Prime Constraint review lifecycle. Default is DRAFT.
+
+** Default (default DRAFT)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-state-validation ()
+  "Prompt for STATE_VALIDATION. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "STATE_VALIDATION: "
+              '("⚠ WARNING" "DRAFT" "REVIEWED" "VALIDATED" "FAILED" "SUPERSEDED")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-state-validation-initial (initial)
+  "Prompt for STATE_VALIDATION with INITIAL pre-selected."
+  (completing-read
+   "STATE_VALIDATION: "
+   '("DRAFT" "REVIEWED" "VALIDATED" "FAILED" "SUPERSEDED")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'state-validation
+  :name 'state-validation
+  :label "State: Validation"
+  :prompt-fn #'my/manifolding-atlas-prompt-state-validation
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "STATE_VALIDATION"))
+  :merge-strategy 'replace
+   :to-plist (lambda (val _ctx)
+               (if (or (null val) (string-equal val "WARNING"))
+                   `(:properties (("STATE_VALIDATION" . "WARNING"))
+                     :post-apply (,(apply-partially
+                                    #'my/manifolding-atlas--clear-state-transcribes
+                                    "state-validation")))
+                 (let* ((link (my/manifolding-atlas--ensure-ref-note 'state-validation val))
+                        (ref-id (my/manifolding-atlas--id-from-link link)))
+                   `(:post-apply (,(apply-partially
+                                    #'my/manifolding-atlas--apply-state-post
+                                    "state-validation" val ref-id)))))))
+#+end_src

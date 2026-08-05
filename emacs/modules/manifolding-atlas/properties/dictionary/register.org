@@ -1,0 +1,21 @@
+#+title:      Register Prompt
+#+priority:   14
+
+* Register Prompt
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'register
+  :name 'register
+  :label "Register"
+  :contexts '(dictionary)
+  :prompt-fn (lambda ()
+               (let ((val (completing-read "Register: "
+                                          '("⚠ WARNING" "formal" "informal" "slang" "technical"
+                                            "archaic" "literary" "colloquial")
+                                          nil t nil nil "⚠ WARNING")))
+                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
+  :to-plist (lambda (val _ctx)
+              (when val
+                (let ((link (my/manifolding-atlas--ensure-ref-note 'register val)))
+                  `(:properties (("REGISTER" . ,(or link val))))))))
+#+end_src

@@ -3,7 +3,7 @@
 #+AUTHOR:     aoeu
 #+DATE:       2026-05-31
 #+DESCRIPTION: Modal keybindings — modaled states, hydras, tool integrations
-#+KEYWORDS:   emacs keybinding modaled hydra avy consult vulpea
+#+KEYWORDS:   emacs keybinding modaled hydra avy consult manifolding-atlas
 #+LANGUAGE:   en
 # ──────────────────────────────────────────────────────────────────────
 #+PROPERTY:   header-args:emacs-lisp :lexical t :results silent
@@ -306,9 +306,9 @@
     ("Q"    . my/org-insert-code-block)
     ("L"    . org-latex-preview)
     ("X"    . my/org-insert-latex-block)
-    ;; Vulpea
-    ("V"    . vulpea-find)
-    ("I"    . vulpea-insert)
+    ;; Manifolding Atlas
+    ("V"    . manifolding-atlas-find)
+    ("I"    . manifolding-atlas-insert)
     ;; Version control
     ("u"    . vundo)
     ("U"    . git-timemachine)
@@ -542,46 +542,46 @@
      ("p" org-tree-slide-mode      "present"    :exit t))
    "Quick Access"
    (("o" org-open-at-point          "open link"    :exit t)
-    ("v" my/vulpea-hydra/body       "vulpea"       :exit t)
+    ("v" my/manifolding-atlas-hydra/body       "manifolding-atlas"       :exit t)
     ("T" ghostel                    "terminal"     :exit t)
-    ("z" my/vulpea-quick-captures   "fast capture"  :exit t)
+    ("z" my/manifolding-atlas-quick-captures   "fast capture"  :exit t)
     ("/" evil-show-digraphs         "digraphs"     :exit t))
    "Exit"
    (("q" nil "quit" :exit t)
     ("Q" nil "quit" :exit t))))
 #+end_src
-** SPC v — Vulpea
+** SPC v — Manifolding Atlas
 #+begin_src emacs-lisp
-(pretty-hydra-define my/vulpea-hydra
-  (:title "Vulpea" :quit-key "q" :separator "─")
+(pretty-hydra-define my/manifolding-atlas-hydra
+  (:title "Manifolding Atlas" :quit-key "q" :separator "─")
   ("Find"
-   (("v" vulpea-find "find note" :exit t)
-    ("V" my/vulpea-insert-link "insert link" :exit t)
-    ("r" my/vulpea-rename-link "rename link" :exit t))
+   (("v" manifolding-atlas-find "find note" :exit t)
+    ("V" my/manifolding-atlas-insert-link "insert link" :exit t)
+    ("r" my/manifolding-atlas-rename-link "rename link" :exit t))
    "Capture"
-   (("h" my/vulpea-capture-heading "new heading" :exit t)
-    ("c" my/vulpea-insert-heading "at point" :exit t)
-    ("H" my/vulpea-heading-to-note "heading→note" :exit t))
+   (("h" my/manifolding-atlas-capture-heading "new heading" :exit t)
+    ("c" my/manifolding-atlas-insert-heading "at point" :exit t)
+    ("H" my/manifolding-atlas-heading-to-note "heading→note" :exit t))
    "Meta"
-   (("f" my/vulpea--fix-violations "fix warnings" :exit t)
-    ("P" my/vulpea-update-properties "update props" :exit t)
-    ("u" vulpea-ui-sidebar-toggle "vulpea ui" :exit t))
+   (("f" my/manifolding-atlas--fix-violations "fix warnings" :exit t)
+    ("P" my/manifolding-atlas-update-properties "update props" :exit t)
+    ("u" manifolding-atlas-ui-sidebar-toggle "manifolding-atlas ui" :exit t))
    "Rules"
-   (("k" my/vulpea-rules-mark-as-rule "mark rule" :exit t)
-    ("K" my/vulpea-rules-goto-routed-file "rule file" :exit t)
-    ("R" my/vulpea-find-rules "find rules" :exit t))
+   (("k" my/manifolding-atlas-rules-mark-as-rule "mark rule" :exit t)
+    ("K" my/manifolding-atlas-rules-goto-routed-file "rule file" :exit t)
+    ("R" my/manifolding-atlas-find-rules "find rules" :exit t))
    "Protocols"
-   (("p" my/vulpea-protocols-build "build" :exit t)
-    ("m" my/vulpea-protocols-mark-as-step "mark step" :exit t)
-    ("M" my/vulpea-protocols-goto-routed-file "protocol file" :exit t)
-    ("i" my/vulpea-find-protocols "find protocols" :exit t))
+   (("p" my/manifolding-atlas-protocols-build "build" :exit t)
+    ("m" my/manifolding-atlas-protocols-mark-as-step "mark step" :exit t)
+    ("M" my/manifolding-atlas-protocols-goto-routed-file "protocol file" :exit t)
+    ("i" my/manifolding-atlas-find-protocols "find protocols" :exit t))
    "Vocab"
-   (("w" my/vulpea-dictionary-menu "dictionary" :exit t))
-   "Gnosis"
-   (("g" my/vulpea-gnosis-review "review due" :exit t)
-    ("G" my/vulpea-gnosis-review-overdue "review overdue" :exit t)
-    ("M" my/vulpea-gnosis-mark-review "mark reviewed" :exit t)
-    ("t" my/vulpea-gnosis-toggle-participation "toggle pool" :exit t))
+   (("w" my/manifolding-atlas-dictionary-menu "dictionary" :exit t))
+   "Mastering"
+   (("g" my/manifolding-atlas-mastering-review "review due" :exit t)
+    ("G" my/manifolding-atlas-mastering-review-overdue "review overdue" :exit t)
+    ("M" my/manifolding-atlas-mastering-mark-review "mark reviewed" :exit t)
+    ("t" my/manifolding-atlas-mastering-toggle-participation "toggle pool" :exit t))
    "Transclude"
    (("y" my/transclusion-hydra/body "transclude" :exit t))
    "Back"
@@ -592,8 +592,8 @@
 (pretty-hydra-define my/transclusion-hydra
   (:title "Transclusion" :quit-key "q" :separator "─")
   ("Add"
-   (("a" my/vulpea-transclusion-add       "add"         :exit t)
-    ("b" (my/vulpea-transclusion-add t)   "body only"   :exit t)
+   (("a" my/manifolding-atlas-transclusion-add       "add"         :exit t)
+    ("b" (my/manifolding-atlas-transclusion-add t)   "body only"   :exit t)
     ("A" org-transclusion-add-all         "add all"     :exit t))
    "Manage"
    (("r" org-transclusion-remove          "remove"      :exit t)
@@ -697,7 +697,7 @@
     ("k" my/org-clock-hydra/body   "clock"    :exit t)
     ("e" my/org-edit-hydra/body    "edit"     :exit t)
     ("c" my/org-capture-hydra/body "capture"  :exit t)
-    ("v" my/org-vulpea-hydra/body  "vulpea"   :exit t))
+    ("v" my/org-manifolding-atlas-hydra/body  "manifolding-atlas"   :exit t))
    "Back"
    (("SPC" my/main-hydra/body "main menu" :exit t))))
 (pretty-hydra-define my/org-agenda-hydra
@@ -748,19 +748,19 @@
 (pretty-hydra-define my/org-capture-hydra
   (:title "Org › Capture" :quit-key "q" :separator "─")
   ("Capture"
-   (("n" (lambda () (interactive) (org-capture nil "vn")) "vulpea note"  :exit t)
-    ("h" my/vulpea-capture-heading              "heading"      :exit t)
+   (("n" (lambda () (interactive) (org-capture nil "vn")) "manifolding-atlas note"  :exit t)
+    ("h" my/manifolding-atlas-capture-heading              "heading"      :exit t)
     ("t" (lambda () (interactive) (org-capture nil "t"))  "task"         :exit t)
     ("c" org-capture                                       "capture menu" :exit t))
    "Back"
    (("SPC" my/org-hydra/body "org" :exit t))))
-(pretty-hydra-define my/org-vulpea-hydra
-  (:title "Org › Vulpea" :quit-key "q" :separator "─")
-   ("Vulpea"
-    (    ("f" vulpea-find              "find note"    :exit t)
-     ("i" vulpea-insert            "insert link"  :exit t)
-     ("r" my/vulpea-rename-link    "rename link"  :exit t)
-     ("u" vulpea-ui-sidebar-toggle "sidebar"      :exit t))
+(pretty-hydra-define my/org-manifolding-atlas-hydra
+  (:title "Org › Manifolding Atlas" :quit-key "q" :separator "─")
+   ("Manifolding Atlas"
+    (    ("f" manifolding-atlas-find              "find note"    :exit t)
+     ("i" manifolding-atlas-insert            "insert link"  :exit t)
+     ("r" my/manifolding-atlas-rename-link    "rename link"  :exit t)
+     ("u" manifolding-atlas-ui-sidebar-toggle "sidebar"      :exit t))
     "Back"
     (("SPC" my/org-hydra/body "org" :exit t))))
 #+end_src

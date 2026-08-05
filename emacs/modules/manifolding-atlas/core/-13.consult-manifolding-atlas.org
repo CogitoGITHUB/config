@@ -1,0 +1,205 @@
+#+TITLE: manifolding-atlas-consult-manifolding-atlas
+#+priority:  -13
+* manifolding-atlas-consult-manifolding-atlas
+:PROPERTIES:
+:CATEGORY: manifolding-atlas-core
+:END:
+#+begin_src emacs-lisp
+;;; consult-manifolding-atlas.el --- Use Consult in tandem with Manifolding Atlas -*- lexical-binding: t -*-
+
+;; Copyright (C) 2026 Fabrizio Contigiani
+
+;; Author: Fabrizio Contigiani <fabcontigiani@gmail.com>
+;; Maintainer: Fabrizio Contigiani <fabcontigiani@gmail.com>
+;; URL: https://github.com/fabcontigiani/consult-vulpea
+;; Version: 0.2.1
+;; Package-Requires: ((emacs "28.1") (manifolding-atlas "2.0.0") (consult "2.2"))
+;; Keywords: convenience, notes, manifolding-atlas
+
+;; This file is NOT part of GNU Emacs.
+
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; This package integrates `manifolding-atlas' with `consult' to provide
+;; enhanced minibuffer interactions, most notably live file previews
+;; when selecting notes with `manifolding-atlas-find' and `manifolding-atlas-insert'.
+;;
+;; To enable, simply turn on `consult-manifolding-atlas-mode':
+;;
+;;   (consult-manifolding-atlas-mode 1)
+;;
+;; Features:
+;;
+;; 1. **Live previews**: When selecting notes via `manifolding-atlas-find' or
+;;    `manifolding-atlas-insert', you get a live preview of the note file as you
+;;    navigate through candidates.
+;;
+;; 2. **Consult-powered grep/find**: Use `consult-manifolding-atlas-grep' and
+;;    `consult-manifolding-atlas-find' to search within your manifolding-atlas directories
+;;    with live previews.
+
+;;; Code:
+
+(require 'consult)
+(require 'manifolding-atlas)
+(require 'manifolding-atlas-note)
+(require 'manifolding-atlas-db)
+(require 'manifolding-atlas-select)
+
+(defgroup consult-manifolding-atlas ()
+  "Use Consult with Manifolding Atlas for enhanced note selection."
+  :group 'manifolding-atlas
+  :group 'consult
+  :group 'minibuffer
+  :link '(url-link :tag "GitHub" "https://github.com/fabcontigiani/consult-vulpea"))
+
+;;;; User options
+
+(defcustom consult-manifolding-atlas-grep-command #'consult-ripgrep
+  "Consult-powered grep command to use for `consult-manifolding-atlas-grep'.
+Common choices are `consult-grep' and `consult-ripgrep'."
+  :type 'function
+  :group 'consult-manifolding-atlas)
+
+(defcustom consult-manifolding-atlas-find-command #'consult-find
+  "Consult-powered find command to use for `consult-manifolding-atlas-find'."
+  :type 'function
+  :group 'consult-manifolding-atlas)
+
+(defcustom consult-manifolding-atlas-preview-key consult-preview-key
+  "Preview key for manifolding-atlas note selection.
+Defaults to `consult-preview-key'."
+  :type '(choice (const :tag "Any key" any)
+                 (const :tag "No preview" nil)
+                 key-sequence)
+  :group 'consult-manifolding-atlas)
+
+;;;; Helper functions
+
+(defun consult-manifolding-atlas--note-preview ()
+  "Create a preview function for manifolding-atlas notes.
+Expects CAND to be a `manifolding-atlas-note' object (via :lookup)."
+  (let ((open (consult--temporary-files))
+        (preview (consult--buffer-preview)))
+    (lambda (action cand)
+      (when (eq action 'exit)
+        (funcall open))
+      (when (and (eq action 'preview) (manifolding-atlas-note-p cand))
+        (funcall preview action
+                 (funcall open (manifolding-atlas-note-path cand)))))))
+
+;;;; Core selection function
+
+(cl-defun consult-manifolding-atlas-select-from (prompt
+                                       notes
+                                       &key
+                                       require-match
+                                       initial-prompt
+                                       expand-aliases)
+  "Select a note from NOTES using consult with preview.
+
+Returns a selected `manifolding-atlas-note'. If `manifolding-atlas-note-id' is nil, it
+means that user selected a non-existing note.
+
+This is a drop-in replacement for `manifolding-atlas-select-from' that adds
+consult-style live previews.
+
+PROMPT is the message to present.
+REQUIRE-MATCH when non-nil means user must select an existing note.
+INITIAL-PROMPT is the initial input for the prompt.
+EXPAND-ALIASES when non-nil expands note aliases for completion."
+  (let* ((expanded-notes (if expand-aliases
+                             (seq-mapcat #'manifolding-atlas-note-expand-aliases notes)
+                           notes))
+         ;; Build candidates as alist: (description . note)
+         (candidates
+          (mapcar
+           (lambda (note)
+             (cons (manifolding-atlas-select-describe note) note))
+           expanded-notes))
+         ;; Track user's raw input for new note creation
+         (user-input nil)
+         (note (consult--read
+                candidates
+                :prompt (concat prompt ": ")
+                :require-match require-match
+                :initial initial-prompt
+                :history 'minibuffer-history
+                :state (consult-manifolding-atlas--note-preview)
+                :preview-key consult-manifolding-atlas-preview-key
+                :category 'manifolding-atlas-note
+                :sort t
+                ;; :lookup returns the note object from alist, making it
+                ;; available to :state for preview and as the return value.
+                ;; Also captures raw input for new note creation.
+                :lookup (lambda (selected candidates &rest _)
+                          (setq user-input selected)
+                          (cdr (assoc selected candidates))))))
+    (or note
+        (let ((title (or (and user-input
+                              (not (string-empty-p (string-trim user-input)))
+                              (substring-no-properties user-input))
+                         (and initial-prompt
+                              (not (string-empty-p (string-trim initial-prompt)))
+                              (substring-no-properties initial-prompt)))))
+          (make-manifolding-atlas-note
+           :title (or title "")
+           :level 0)))))
+
+;;;; Commands
+
+;;;###autoload
+(defun consult-manifolding-atlas-grep ()
+  "Search manifolding-atlas notes using grep with live preview.
+Uses `consult-manifolding-atlas-grep-command'. Searches all directories
+in `manifolding-atlas-db-sync-directories'."
+  (interactive)
+  (let ((dir (or (bound-and-true-p manifolding-atlas-db-sync-directories)
+                 (list org-directory))))
+    (funcall-interactively consult-manifolding-atlas-grep-command dir)))
+
+;;;###autoload
+(defun consult-manifolding-atlas-find ()
+  "Find manifolding-atlas note files using find with live preview.
+Uses `consult-manifolding-atlas-find-command'. Searches all directories
+in `manifolding-atlas-db-sync-directories'."
+  (interactive)
+  (let ((dir (or (bound-and-true-p manifolding-atlas-db-sync-directories)
+                 (list org-directory))))
+    (funcall-interactively consult-manifolding-atlas-find-command dir)))
+
+;;;; Minor mode
+
+;;;###autoload
+(define-minor-mode consult-manifolding-atlas-mode
+  "Use Consult in tandem with Manifolding Atlas.
+
+When enabled, this mode replaces `manifolding-atlas-select-from' with a
+consult-powered version that provides live previews when
+selecting notes."
+  :global t
+  :lighter " cv"
+  :group 'consult-manifolding-atlas
+  (if consult-manifolding-atlas-mode
+      (progn
+        ;; Override manifolding-atlas-select-from with our consult version
+        (advice-add #'manifolding-atlas-select-from
+                    :override #'consult-manifolding-atlas-select-from))
+    ;; Remove our advice
+    (advice-remove #'manifolding-atlas-select-from #'consult-manifolding-atlas-select-from)))
+
+(provide 'consult-manifolding-atlas)
+#+end_src
