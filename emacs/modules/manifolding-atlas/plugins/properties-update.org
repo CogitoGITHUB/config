@@ -13,8 +13,31 @@
 (defvar my/manifolding-atlas--current-context nil
   "'file or 'heading — derived from note level.")
 
+(defvar my/manifolding-atlas--current-contexts nil
+  "List of contexts applicable to the current note: the base
+'file/'heading context plus any tag-derived contexts (contact,
+dictionary, rule, task) matched from the note's tags.")
+
 (defvar my/manifolding-atlas--selected-keys nil
   "List of :key symbols toggled for update.")
+#+end_src
+*** Note Contexts
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--note-contexts (note)
+  "Return contexts applicable to NOTE.
+If the note carries a tag matching a specialized registered context
+(contact, dictionary, rule), return only those specialized contexts so
+the menu adapts to the note's kind.  Otherwise return the base
+'file/'heading context derived from the note's level."
+  (let* ((level (manifolding-atlas-note-level note))
+         (base (if (and level (> level 0)) 'heading 'file))
+         (tags (manifolding-atlas-note-tags note))
+         (registered (delete-dups
+                      (seq-mapcat (lambda (s) (plist-get s :contexts))
+                                  my/manifolding-atlas-prompt-registry)))
+         (specialized (cl-remove-if-not (lambda (c) (member (symbol-name c) tags))
+                                        (cl-remove 'file (cl-remove 'heading registered)))))
+    (if specialized specialized (list base))))
 #+end_src
 *** Prompt Lookup
 #+begin_src emacs-lisp
@@ -22,7 +45,9 @@
   "Find prompt spec with KEY matching the current note context."
   (seq-find (lambda (s)
               (and (eq (plist-get s :key) key)
-                   (memq my/manifolding-atlas--current-context (plist-get s :contexts))))
+                   (seq-intersection
+                    my/manifolding-atlas--current-contexts
+                    (plist-get s :contexts) #'eq)))
             my/manifolding-atlas-prompt-registry))
 
 (defun my/manifolding-atlas--clean-display-val (val)
@@ -83,7 +108,9 @@ DESC is a pre-computed string (computed fresh each time the menu opens)."
                            (and (not (memq k '(position)))
                                 (plist-get s :read-current-fn)
                                 (plist-get s :prompt-fn)
-                                (memq my/manifolding-atlas--current-context (plist-get s :contexts)))))
+                                (seq-intersection
+                                 my/manifolding-atlas--current-contexts
+                                 (plist-get s :contexts) #'eq))))
                        my/manifolding-atlas-prompt-registry))
              (keys "abcdefghijklmnopqrstuvwxyz")
              (idx 0)
@@ -388,6 +415,7 @@ skip the prompt and open the menu directly."
       (user-error "Note has no file path"))
     (setq my/manifolding-atlas--current-note note
           my/manifolding-atlas--current-context (if (and level (> level 0)) 'heading 'file)
+          my/manifolding-atlas--current-contexts (my/manifolding-atlas--note-contexts note)
           my/manifolding-atlas--selected-keys nil)
     (find-file file)
     (goto-char (or (and pos (> pos 0) pos) (point-min)))

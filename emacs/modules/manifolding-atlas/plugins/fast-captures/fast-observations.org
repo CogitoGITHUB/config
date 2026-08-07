@@ -8,7 +8,7 @@ Fast observation capture. Creates an observation heading in Observations.org.
 (defun my/manifolding-atlas-quick-observations ()
   (interactive)
   (let* ((file (expand-file-name "admin/Observations"
-                                  (my/notes-directory))))
+                                  (my/manifolding-atlas-root-dir))))
     (make-directory (file-name-directory file) t)
     (let ((org-capture-templates
            `(("o" "Quick Observation" entry (file ,file)

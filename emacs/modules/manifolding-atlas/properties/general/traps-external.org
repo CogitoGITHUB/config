@@ -1,0 +1,42 @@
+#+title:      Traps External Prompt
+#+priority:   36
+
+* Traps External
+Why: Traps authored for opposing actors. Positions, framings, and conditions that limit their options or force unfavorable moves. Constructed deliberately — never reactively.
+
+** Default (default WARNING)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-traps-external ()
+  "Prompt for TRAPS_EXTERNAL. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "TRAPS_EXTERNAL: "
+              '("⚠ WARNING" "DESIGNED" "SPRUNG" "RETIRED")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-traps-external-initial (initial)
+  "Prompt for TRAPS_EXTERNAL with INITIAL pre-selected."
+  (completing-read
+   "TRAPS_EXTERNAL: "
+   '("DESIGNED" "SPRUNG" "RETIRED")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'traps-external
+  :name 'traps-external
+  :label "Traps External"
+  :prompt-fn #'my/manifolding-atlas-prompt-traps-external
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "TRAPS_EXTERNAL"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (if (or (null val) (string-equal val "WARNING"))
+                  `(:properties (("TRAPS_EXTERNAL" . "WARNING")))
+                `(:properties (("TRAPS_EXTERNAL" . ,val))))))
+#+end_src

@@ -1,0 +1,42 @@
+#+title:      Counters Prompt
+#+priority:   32
+
+* Counters
+Why: Adversarial defense. The moves others could make against this position, and the pre-built responses. A position without mapped counters is not a design — it is a hope.
+
+** Default (default WARNING)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-counters ()
+  "Prompt for COUNTERS. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "COUNTERS: "
+              '("⚠ WARNING" "MAPPED" "MAINTAINED" "STALE")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-counters-initial (initial)
+  "Prompt for COUNTERS with INITIAL pre-selected."
+  (completing-read
+   "COUNTERS: "
+   '("MAPPED" "MAINTAINED" "STALE")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'counters
+  :name 'counters
+  :label "Counters"
+  :prompt-fn #'my/manifolding-atlas-prompt-counters
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "COUNTERS"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (if (or (null val) (string-equal val "WARNING"))
+                  `(:properties (("COUNTERS" . "WARNING")))
+                `(:properties (("COUNTERS" . ,val))))))
+#+end_src

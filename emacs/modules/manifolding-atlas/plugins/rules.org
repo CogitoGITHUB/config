@@ -30,7 +30,7 @@ Design summary (for anyone debugging this):
 * State
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-rules--rules-directory
-  (expand-file-name "rules/" (my/notes-directory))
+  (expand-file-name "rules/" (my/manifolding-atlas-root-dir))
   "Directory where rule topic-index files live.")
 
 (defcustom my/manifolding-atlas-rules-topic-file-map nil

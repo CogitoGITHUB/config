@@ -1,13 +1,13 @@
 #+TITLE:      Manifolding Atlas
 #+NOTE: The manifolding-mind-map manifolding-atlas plugin and mind map web package need work
 
-* Notes Directory
+* Manifolding Atlas Root Dir
 :PROPERTIES:
 :CATEGORY: config
 :END:
 #+begin_src emacs-lisp
-(defun my/notes-directory ()
-  "Return the root notes directory.
+(defun my/manifolding-atlas-root-dir ()
+  "Return the manifold atlas root directory.
 Both manifolding-atlas reads from this single function.
 Change only this path to relocate the entire vault."
   "/home/aoeu/test/")
@@ -15,19 +15,19 @@ Change only this path to relocate the entire vault."
 (setq org-agenda-files
       (cl-remove-if
        (lambda (f) (string-match-p (regexp-quote "/.git/") f))
-       (nconc (directory-files-recursively (my/notes-directory) "\\.org$")
-              (directory-files-recursively (my/notes-directory) "[^./]+$"))))
+       (nconc (directory-files-recursively (my/manifolding-atlas-root-dir) "\\.org$")
+              (directory-files-recursively (my/manifolding-atlas-root-dir) "[^./]+$"))))
 
 (add-to-list 'auto-mode-alist
-             `(,(concat "\\`" (regexp-quote (directory-file-name (my/notes-directory)))
+             `(,(concat "\\`" (regexp-quote (directory-file-name (my/manifolding-atlas-root-dir)))
                         "/" "\\(.*/\\)?" "[^./]+\\'")
                . org-mode))
 #+end_src
 * Manifolding Atlas Bootstrap
 #+begin_src emacs-lisp
-(setq manifolding-atlas-db-location             (expand-file-name "admin/manifolding-atlas.db" (my/notes-directory)))
-(setq manifolding-atlas-db-sync-directories     (list (my/notes-directory)))
-(setq manifolding-atlas-default-notes-directory (my/notes-directory))
+(setq manifolding-atlas-db-location             (expand-file-name "admin/manifolding-atlas.db" (my/manifolding-atlas-root-dir)))
+(setq manifolding-atlas-db-sync-directories     (list (my/manifolding-atlas-root-dir)))
+(setq manifolding-atlas-default-notes-directory (my/manifolding-atlas-root-dir))
 (setq manifolding-atlas-db-sync-external-method 'fswatch)
 (setq manifolding-atlas-db-sync-verbose          nil)
 (require 'manifolding-atlas)

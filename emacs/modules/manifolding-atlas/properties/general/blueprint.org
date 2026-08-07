@@ -1,0 +1,42 @@
+#+title:      Blueprint Prompt
+#+priority:   22
+
+* Blueprint
+Why: The load-bearing architecture of what is being constructed. Not goals — design decisions. The structure that, if changed, forces everything downstream to change with it.
+
+** Default (default WARNING)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-blueprint ()
+  "Prompt for BLUEPRINT. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "BLUEPRINT: "
+              '("⚠ WARNING" "DRAFT" "STABLE" "CHANGED" "SUPERSEDED")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-blueprint-initial (initial)
+  "Prompt for BLUEPRINT with INITIAL pre-selected."
+  (completing-read
+   "BLUEPRINT: "
+   '("DRAFT" "STABLE" "CHANGED" "SUPERSEDED")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'blueprint
+  :name 'blueprint
+  :label "Blueprint"
+  :prompt-fn #'my/manifolding-atlas-prompt-blueprint
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "BLUEPRINT"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (if (or (null val) (string-equal val "WARNING"))
+                  `(:properties (("BLUEPRINT" . "WARNING")))
+                `(:properties (("BLUEPRINT" . ,val))))))
+#+end_src

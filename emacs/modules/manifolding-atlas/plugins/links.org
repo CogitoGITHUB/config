@@ -9,13 +9,13 @@ Uses native =manifolding-atlas-db-query-links-to= and =manifolding-atlas-db-quer
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-links--broken-links-file "admin/broken-links"
   "Filename for the broken links repair queue.
-Lives in `my/notes-directory'. Auto-created if missing.")
+Lives in `my/manifolding-atlas-root-dir'. Auto-created if missing.")
 (setq my/manifolding-atlas-links--broken-links-file "admin/broken-links")
 
 (defun my/manifolding-atlas-links--broken-links-path ()
   "Return full path to broken-links in the vault root."
   (expand-file-name my/manifolding-atlas-links--broken-links-file
-                    (my/notes-directory)))
+                    (my/manifolding-atlas-root-dir)))
 
 (defun my/manifolding-atlas-links--ensure-broken-links-file ()
   "Create broken-links if it does not exist.
@@ -35,13 +35,13 @@ Creates the file and commits to Git."
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-links--deleted-files-file "admin/deleted-files"
   "Filename for tracking all deleted .org files.
-Lives in `my/notes-directory'. Auto-created if missing.")
+Lives in `my/manifolding-atlas-root-dir'. Auto-created if missing.")
 (setq my/manifolding-atlas-links--deleted-files-file "admin/deleted-files")
 
 (defun my/manifolding-atlas-links--deleted-files-path ()
   "Return full path to deleted-files in the vault root."
   (expand-file-name my/manifolding-atlas-links--deleted-files-file
-                    (my/notes-directory)))
+                    (my/manifolding-atlas-root-dir)))
 
 (defun my/manifolding-atlas-links--ensure-deleted-files-file ()
   "Create deleted-files if it does not exist."
@@ -75,13 +75,13 @@ Lives in `my/notes-directory'. Auto-created if missing.")
                    my/manifolding-atlas-links--deleted-files-file
                    my/manifolding-atlas-missing--file))
     (my/manifolding-atlas-links--delete-if-empty
-     (expand-file-name f (my/notes-directory)))))
+     (expand-file-name f (my/manifolding-atlas-root-dir)))))
 
 (defun my/manifolding-atlas-links--cleanup-on-save ()
   "After saving an admin file, delete ALL empty admin files."
   (when (and buffer-file-name
              (member (buffer-file-name)
-                     (mapcar (lambda (f) (expand-file-name f (my/notes-directory)))
+                     (mapcar (lambda (f) (expand-file-name f (my/manifolding-atlas-root-dir)))
                              (list my/manifolding-atlas-links--broken-links-file
                                    my/manifolding-atlas-links--deleted-files-file
                                    my/manifolding-atlas-missing--file))))
@@ -90,7 +90,7 @@ Lives in `my/notes-directory'. Auto-created if missing.")
 (defun my/manifolding-atlas-links--setup-admin-buffer ()
   "Configure admin files: jump to first heading, RET follows link."
   (when (member (buffer-file-name)
-                (mapcar (lambda (f) (expand-file-name f (my/notes-directory)))
+                (mapcar (lambda (f) (expand-file-name f (my/manifolding-atlas-root-dir)))
                         (list my/manifolding-atlas-links--broken-links-file
                               my/manifolding-atlas-links--deleted-files-file
                               my/manifolding-atlas-missing--file)))
@@ -128,7 +128,7 @@ recorded in the :DELETED_REFS: property for later restore."
   (let ((path (my/manifolding-atlas-links--ensure-deleted-files-file))
         root rel deleted-id deleted-title heading)
     (setq root (expand-file-name (or (vc-root-dir) "")
-                                 (my/notes-directory)))
+                                 (my/manifolding-atlas-root-dir)))
     (setq rel (file-relative-name (expand-file-name file) root))
     (setq deleted-id (org-entry-get (point-min) "ID"))
     (setq deleted-title (cadr (assoc "TITLE"
@@ -176,7 +176,7 @@ Captured before deletion so the file can be scanned while it still exists.")
   "Return list of ref note IDs referenced by FILE.
 Scans FILE for [[id:ID][...]] links that resolve to a note under
 admin/refs/. Returns the list of matching IDs."
-  (let ((root (my/notes-directory))
+  (let ((root (my/manifolding-atlas-root-dir))
         ref-ids)
     (when (file-exists-p file)
       (with-temp-buffer
@@ -195,15 +195,15 @@ admin/refs/. Returns the list of matching IDs."
       (and path
            (file-in-directory-p path
                                 (expand-file-name "admin/refs/"
-                                                  (my/notes-directory)))))))
+                                                  (my/manifolding-atlas-root-dir)))))))
 
 (defun my/manifolding-atlas-links--ref-orphaned-p (ref-id deleted-file)
   "Non-nil when REF-ID is referenced only by DELETED-FILE.
 Scans every file in the vault; returns nil when any OTHER file links
 to REF-ID. Skipped files: DELETED-FILE itself and files under admin/refs/."
-  (let* ((root (my/notes-directory))
+  (let* ((root (my/manifolding-atlas-root-dir))
         (deleted-exp (expand-file-name deleted-file))
-        (refs-dir (expand-file-name "admin/refs/" (my/notes-directory)))
+        (refs-dir (expand-file-name "admin/refs/" (my/manifolding-atlas-root-dir)))
         (files (nconc (directory-files-recursively root "\\.org\\'")
                       (directory-files-recursively root "[^./]+\\'")))
         (orphaned t))
@@ -220,7 +220,7 @@ to REF-ID. Skipped files: DELETED-FILE itself and files under admin/refs/."
   (when-let ((note (manifolding-atlas-db-get-by-id ref-id)))
     (let ((path (manifolding-atlas-note-path note)))
       (and path
-           (file-relative-name path (my/notes-directory))))))
+           (file-relative-name path (my/manifolding-atlas-root-dir))))))
 
 (defun my/manifolding-atlas-links--orphaned-refs-for (file)
   "Return relative paths of refs that only FILE references.
@@ -409,7 +409,7 @@ n — cancels deletion via user-error."
       (when (and (file-exists-p expanded)
                  (not (file-in-directory-p
                        expanded
-                       (expand-file-name "admin/refs/" (my/notes-directory))))
+                       (expand-file-name "admin/refs/" (my/manifolding-atlas-root-dir))))
                  (or (string-suffix-p ".org" expanded)
                      (not (string-match-p "\\." (file-name-nondirectory expanded))))
                  (not (member (file-name-nondirectory expanded)
@@ -450,7 +450,7 @@ again for each ref cannot re-enter with stale state."
           my/manifolding-atlas-links--deleted-title nil
           my/manifolding-atlas-links--deleted-refs  nil)
     (dolist (rel refs)
-      (let ((path (expand-file-name rel (my/notes-directory))))
+      (let ((path (expand-file-name rel (my/manifolding-atlas-root-dir))))
         (when (file-exists-p path)
           (delete-file path))))))
 #+end_src

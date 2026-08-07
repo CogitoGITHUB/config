@@ -262,6 +262,7 @@ Existing plugins:
   - capture-plugin.org                Avy + heading capture (tangles to .el)
   - citation.org                      DB extractor for [@citekey]
   - manifold.org                      mind map DB + UI
+  - recipes.org                       manual recipe notes (no URL), recipes/ subdir
 
 ** Org structure guidelines
 #+begin_src org
@@ -389,14 +390,14 @@ Register functions on Emacs hooks. Examples from this config:
 (defun my/manifolding-atlas-git-auto-commit ()
   "After save in notes dir: git add, commit, and push."
   (when (and buffer-file-name
-             (file-in-directory-p buffer-file-name (my/notes-directory)))
-    (let ((default-directory (my/notes-directory))
+             (file-in-directory-p buffer-file-name (my/manifolding-atlas-root-dir)))
+    (let ((default-directory (my/manifolding-atlas-root-dir))
           (file buffer-file-name))
       (ignore-errors
         (magit-call-git "add" "--all")
         (when (= 0 (magit-call-git "commit" "-m"
                                    (format "auto: %s [%s]"
-                                           (file-relative-name file (my/notes-directory))
+                                           (file-relative-name file (my/manifolding-atlas-root-dir))
                                            (format-time-string "%H:%M:%S"))))
           ...)))))
 
@@ -1806,7 +1807,7 @@ buffer, or nil. Used by 6 of 10 plugins.
     (car notes)))
 #+end_src
 
-** =my/notes-directory=
+** =my/manifolding-atlas-root-dir=
 Returns the root notes directory path (source: manifolding-atlas.org line 13):
 
 #+begin_src emacs-lisp
@@ -1887,10 +1888,10 @@ Create a new note programmatically:
 * Notes directory and paths
 #+begin_src emacs-lisp
 ;; Root notes directory
-(my/notes-directory)  ; → "/home/aoeu/test/"
+(my/manifolding-atlas-root-dir)  ; → "/home/aoeu/test/"
 
 ;; Check if a file is inside the vault
-(file-in-directory-p buffer-file-name (my/notes-directory))
+(file-in-directory-p buffer-file-name (my/manifolding-atlas-root-dir))
 
 ;; Org agenda files (all .org files in vault)
 org-agenda-files
@@ -1901,12 +1902,12 @@ This config auto-commits vault changes via =backup-git.org=. Plugins rarely
 need to interact with git directly, but when they do:
 
 #+begin_src emacs-lisp
-(let ((default-directory (my/notes-directory)))
+(let ((default-directory (my/manifolding-atlas-root-dir)))
   (magit-call-git "add" "--all")
   (magit-call-git "commit" "-m" "message"))
 
 ;; Shell-level git:
-(let ((default-directory (my/notes-directory)))
+(let ((default-directory (my/manifolding-atlas-root-dir)))
   (shell-command-to-string "git log --oneline -5"))
 #+end_src
 

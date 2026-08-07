@@ -25,7 +25,7 @@ be both a rule and a protocol step.
 *** State
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-protocols--protocols-directory
-  (expand-file-name "protocols/" (my/notes-directory))
+  (expand-file-name "protocols/" (my/manifolding-atlas-root-dir))
   "Directory where protocol topic-index files live.")
 
 (defcustom my/manifolding-atlas-protocols-topic-file-map nil

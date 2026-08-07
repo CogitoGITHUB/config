@@ -617,7 +617,7 @@ Default: <notes-dir>/manifold-map.json"
   (interactive)
   (let* ((path  (or output-path
                     (expand-file-name "manifold-map.json"
-                                      (my/notes-directory))))
+                                      (my/manifolding-atlas-root-dir))))
          (edges (mm/all-edges))
          (data  `((nodes . ,(vconcat (mm/json--build-nodes)))
                   (edges . ((structural     .

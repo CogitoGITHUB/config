@@ -24,7 +24,7 @@ With a prefix argument, clear it."
   (interactive
    (if current-prefix-arg
        (list nil)
-     (let* ((root (my/notes-directory))
+     (let* ((root (my/manifolding-atlas-root-dir))
             (default (if my/manifolding-atlas--active-dir
                          (expand-file-name my/manifolding-atlas--active-dir root)
                        root))
@@ -40,7 +40,7 @@ With a prefix argument, clear it."
 ** Subdirectory Prompt (Dired)
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-prompt-subdir ()
-  "Prompt for a subdirectory inside `my/notes-directory'.
-Delegates to `my/manifolding-atlas-root-dir'."
-  (my/manifolding-atlas-root-dir))
+  "Prompt for a subdirectory inside `my/manifolding-atlas-root-dir'.
+Delegates to `my/manifolding-atlas-choose-subdir'."
+  (my/manifolding-atlas-choose-subdir))
 #+end_src

@@ -4,7 +4,7 @@
 * State
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-dictionary-directory
-  (expand-file-name "dictionary/" (my/notes-directory))
+  (expand-file-name "dictionary/" (my/manifolding-atlas-root-dir))
   "Directory (inside the vault) where word notes live.")
 
 (defvar my/manifolding-atlas-dictionary-pws-file
@@ -111,12 +111,12 @@ general prompts (state, tags, etc.).  Tags are set automatically:
 `dictionary', the slugified WORD, and each subdirectory level
 under `dictionary/'."
   (interactive "sWord: ")
-  (let* ((root (expand-file-name "dictionary/" (my/notes-directory)))
+  (let* ((root (expand-file-name "dictionary/" (my/manifolding-atlas-root-dir)))
          (_ (make-directory root t))
          (added (format-time-string "[%Y-%m-%d]"))
          (slug (my/manifolding-atlas-dictionary--slugify word))
-         (subdir (my/manifolding-atlas-root-dir
-                  (expand-file-name "dictionary/" (my/notes-directory))
+         (subdir (my/manifolding-atlas-choose-subdir
+                  (expand-file-name "dictionary/" (my/manifolding-atlas-root-dir))
                   "Subdirectory under dictionary/: "))
           (file-name (concat "dictionary/" subdir slug))
          (path-tags (if (string-empty-p subdir)

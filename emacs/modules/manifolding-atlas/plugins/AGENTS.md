@@ -18,6 +18,7 @@ Each plugin is an `.org` file under `modules/manifolding-atlas/plugins/`. They a
 | `protocols.org` | Protocol handler registration |
 | `rules.org` | Heading-based rule system with routing |
 | `schemas.org` | DB schema validation, MISSING PROMPTS generation |
+| `recipes.org` | Recipe notes — manual (no URL/source), default subdir `recipes/`, `my/manifolding-atlas-recipe-create`, `my/manifolding-atlas-recipes-edit-servings` |
 | `transclusion.org` | Org-transclusion integration |
 | `manifolding-atlas-capture.el` | Elisp helper loaded alongside capture |
 
@@ -52,3 +53,11 @@ Each plugin is an `.org` file under `modules/manifolding-atlas/plugins/`. They a
 - `:RULE_TOPICS:` space-separated, first is primary
 - Pointer files use `#+transclude:` (not bare links)
 - Binding: `SPC v k` (mark rule), `SPC v K` (rule file), `SPC v R` (find rules)
+
+### recipes.org
+- **Manual authoring only** — no URL fetch, no source/source-url property
+- Notes tagged `recipe`, default subdir `recipes/` (fixed, unlike `choose-subdir`)
+- `my/manifolding-atlas-recipe-create` — slugify title, collect prompt context `(recipe)`, open capture
+- `my/manifolding-atlas-recipes-edit-servings` — wraps `org-chef-edit-servings` on the recipe at point
+- Recipe-specific properties (`SERVINGS`, `PREP_TIME`, `COOK_TIME`, `READY_IN`) come from the body template `templates/full-file-templates/recipes.org`
+- Binding: `SPC v` → hydra → `R` group

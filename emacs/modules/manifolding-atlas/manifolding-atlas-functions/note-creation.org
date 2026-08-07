@@ -33,7 +33,7 @@ Return 0 (normal), 1 (skip general), 2 (skip all), or 3 (quick, no body)."
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-default-subdir-root nil
   "When non-nil, use this as the default directory for the subdirectory prompt
-instead of `my/notes-directory'.")
+instead of `my/manifolding-atlas-root-dir'.")
 
 (with-eval-after-load 'manifolding-atlas
   (setq manifolding-atlas-create-default-function
@@ -43,7 +43,7 @@ instead of `my/notes-directory'.")
                  (slug (if (string-empty-p raw-name)
                            (manifolding-atlas-title-to-slug title)
                          (file-name-sans-extension raw-name)))
-                  (subdir (my/manifolding-atlas-root-dir (or my/manifolding-atlas-default-subdir-root (my/notes-directory))))
+                  (subdir (my/manifolding-atlas-choose-subdir (or my/manifolding-atlas-default-subdir-root (my/manifolding-atlas-root-dir))))
                  (fname (concat subdir slug))
                  (prompts (my/manifolding-atlas-collect-prompts-with-fast '() '(file))))
             (setq my/manifolding-atlas--pending-post-apply (plist-get prompts :post-apply))

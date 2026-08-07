@@ -38,7 +38,7 @@ Why it exists / architecture decisions:
   added to source blocks.
 
 * Quick Facts
-- **Notes directory:** `~/test/` — from `(my/notes-directory)` → `"/home/aoeu/test/"`.
+- **Notes directory:** `~/test/` — from `(my/manifolding-atlas-root-dir)` → `"/home/aoeu/test/"`.
   The single source of truth for the vault location (edit only this function).
 - **Database:** `~/test/admin/manifolding-atlas.db` (SQLite via `emacsql`),
   root-owned `root:users 664`, git-excluded (see `~/.config/emacs/.gitignore`
@@ -64,7 +64,7 @@ Why it exists / architecture decisions:
 * Top-Level Files
 | File | Lines | Purpose |
 |------+-------+---------|
-| `manifolding-atlas.org` | 116 | Main entry module. Notes Directory (defines `my/notes-directory`, org-agenda-files, auto-mode-alist), Bootstrap (DB/db-sync/fswatch setup, `(require 'manifolding-atlas)`, `(manifolding-atlas-db-autosync-mode +1)`, parse-method overrides), plus documented API (`manifolding-atlas-find/insert/find-backlink`, buffer title get/set). |
+| `manifolding-atlas.org` | 116 | Main entry module. Notes Directory (defines `my/manifolding-atlas-root-dir`, org-agenda-files, auto-mode-alist), Bootstrap (DB/db-sync/fswatch setup, `(require 'manifolding-atlas)`, `(manifolding-atlas-db-autosync-mode +1)`, parse-method overrides), plus documented API (`manifolding-atlas-find/insert/find-backlink`, buffer title get/set). |
 | `manifolding-atlas-ui.org` | 22 | UI config only (the engine is =core/-14=). Sets sidebar position/size, outline depth, backlink preview, widget collapsed, fast-parse, auto-refresh via `with-eval-after-load`. |
 | `consult-manifolding-atlas.org` | 18 | Config only (engine is =core/-13=). `(require 'consult-manifolding-atlas)` + `(consult-manifolding-atlas-mode 1)`. Provides `consult-manifolding-atlas-find` / `-insert` as drop-ins with live preview. |
 | `AGENTS.md` | 115 | Agent reference: quick facts, git guards, schema validation, prompt registry, rules system, property updates, transclusion, root dir, fast mode, live properties, key bindings, bootstrap order. |
@@ -118,7 +118,7 @@ Pure custom Elisp layered on the engine. These do not exist upstream.
 | `link-utilities.org` | `manifolding-atlas-utils-link-make-string` usage; raw `id:` link construction. |
 | `note-creation.org` | Note creation orchestration incl. fast mode (0-3) and default-create function. |
 | `prompt-infrastructure.org` | Central registry so any new `.org` under `properties/` auto-joins the creation flow. |
-| `root-dir.org` | `my/manifolding-atlas-root-dir` — centralized subdirectory prompt (`.` = root, type to nest), returns relative path w/ trailing slash or `""`. |
+| `root-dir.org` | `my/manifolding-atlas-choose-subdir` — centralized subdirectory prompt (`.` = root, type to nest), returns relative path w/ trailing slash or `""`. |
 | `skeleton-preview.org` | Template selection preview pane (renders body template in org-mode with `%?` → title). |
 | `vault-queries.org` | Relationship queries, e.g. `my/manifolding-atlas-children-of` (by `:SOURCE:`). |
 | `AGENTS.md` | Agent reference for this layer. |

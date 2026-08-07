@@ -10,16 +10,16 @@ Centralized directory prompt shared by all capture paths.
 Each caller passes its own root; the function returns the relative path.
 
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-root-dir (&optional root prompt)
+(defun my/manifolding-atlas-choose-subdir (&optional root prompt)
   "Prompt for a subdirectory under ROOT.
-ROOT defaults to `(my/notes-directory)'.  PROMPT defaults to \"Subdirectory: \".
+ROOT defaults to `(my/manifolding-atlas-root-dir)'.  PROMPT defaults to \"Subdirectory: \".
 Returns the relative path from ROOT as a directory name (with trailing slash),
 or \"\" if ROOT itself is selected (Enter at root prompt).
 Type \".\" or press Enter for root level; select or type a subdirectory name."
-  (let* ((root (expand-file-name (or root (my/notes-directory))))
+  (let* ((root (expand-file-name (or root (my/manifolding-atlas-root-dir))))
          (dirs (cl-loop for f in (directory-files root nil "^[^.]" t)
                          when (and (file-directory-p (expand-file-name f root))
-                                   (not (member f '("admin" "dictionary"))))
+                                   (not (member f '("admin" "dictionary" "contacts"))))
                          collect f))
          (candidates (cons "." dirs))
          (choice (completing-read (or prompt "Subdirectory: ") candidates nil nil nil nil ".")))

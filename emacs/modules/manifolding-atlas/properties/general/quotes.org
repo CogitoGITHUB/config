@@ -1,0 +1,42 @@
+#+title:      Quotes Prompt
+#+priority:   34
+
+* Quotes
+Why: Repetition retained because it resists paraphrase without loss. Statements that remain true under scrutiny and carry weight later. Not inspiration — compression.
+
+** Default (default WARNING)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-quotes ()
+  "Prompt for QUOTES. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "QUOTES: "
+              '("⚠ WARNING" "CURATED" "RETAINED" "REMOVED")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-quotes-initial (initial)
+  "Prompt for QUOTES with INITIAL pre-selected."
+  (completing-read
+   "QUOTES: "
+   '("CURATED" "RETAINED" "REMOVED")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'quotes
+  :name 'quotes
+  :label "Quotes"
+  :prompt-fn #'my/manifolding-atlas-prompt-quotes
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "QUOTES"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (if (or (null val) (string-equal val "WARNING"))
+                  `(:properties (("QUOTES" . "WARNING")))
+                `(:properties (("QUOTES" . ,val))))))
+#+end_src

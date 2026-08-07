@@ -18,6 +18,7 @@ Templates in `manifolding-atlas/templates/full-file-templates/`:
 - **task** — Action items: `** Objective` (checkbox) + `** Notes`
 - **math** — Math/concepts: `** Definition`, `** Theorem`, `** Lemma`, `** Proof`, `** Properties`, `** Notes`
 - **protocol** — Experimental methods: `** Purpose`, `** Materials`, `** Procedure`, `** Results`, `** Analysis`, `** Notes`
+- **recipes** — Recipe: `:PROPERTIES:` (`:SERVINGS: :PREP_TIME: :COOK_TIME: :READY_IN:`) + `** Ingredients`, `** Directions`
 
 Templates contain **only body content** (no `*` heading, no `#+title:` metadata) — headingification creates `* Title` before the template is inserted.
 

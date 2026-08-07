@@ -36,7 +36,7 @@ immediately; capture mode opens the buffer with cursor ready.
                  (if (memq c '(?\n ?\r ?\s)) ?c c)))
          (template (my/manifolding-atlas-quick-todo--choose-template))
          (file (expand-file-name "Todo"
-                                  (my/notes-directory))))
+                                  (my/manifolding-atlas-root-dir))))
     (if (eq mode ?s)
         (let ((text (read-string "TODO: "))
               (org-capture-initial text)

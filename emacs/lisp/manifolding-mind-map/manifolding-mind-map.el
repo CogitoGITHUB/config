@@ -415,7 +415,7 @@ Takes _WS and FRAME as arguments."
     (run-hook-with-args 'manifolding-mind-map-before-open-node-functions id)
     (unless (window-live-p manifolding-mind-map--window)
       (if-let ((windows (window-list))
-               (notes-dir (my/notes-directory))
+               (notes-dir (my/manifolding-atlas-root-dir))
                (or-windows (seq-filter
                             (lambda (window)
                               (when-let ((bf (buffer-file-name
@@ -508,7 +508,7 @@ TODO: Be able to delete individual nodes."
 
 TODO: Make this only send the changes to the graph data, not the complete graph."
   (when (and buffer-file-name
-             (string-prefix-p (my/notes-directory) buffer-file-name))
+             (string-prefix-p (my/manifolding-atlas-root-dir) buffer-file-name))
     (manifolding-mind-map--send-variables manifolding-mind-map-ws-socket)
     (manifolding-mind-map--send-graphdata)))
 
@@ -713,7 +713,7 @@ otherwise keep as cite type."
   "Send the current node data to the web-socket."
   (when (and (websocket-openp manifolding-mind-map-ws-socket)
              buffer-file-name
-             (string-prefix-p (my/notes-directory) buffer-file-name)
+             (string-prefix-p (my/manifolding-atlas-root-dir) buffer-file-name)
              (buffer-file-name (buffer-base-buffer)))
     (let* ((node (org-id-get)))
       (unless (string= manifolding-mind-map--ws-current-node node)
@@ -738,7 +738,7 @@ otherwise keep as cite type."
 
 (defun manifolding-mind-map--send-variables (ws)
   "Send miscellaneous variables through the websocket WS."
-  (let ((notes-dir (my/notes-directory))
+  (let ((notes-dir (my/manifolding-atlas-root-dir))
         (attach-dir (if (boundp 'org-attach-id-dir)
                         org-attach-id-dir
                       (expand-file-name ".attach/" org-directory)))
@@ -831,7 +831,7 @@ Falls back to frame parameters or sensible defaults."
 TODO: Exclude org-attach dirs."
    (seq-filter
     (lambda (file) (and (file-directory-p file) (manifolding-mind-map-allowed-directory-p file)))
-    (directory-files-recursively (my/notes-directory)
+    (directory-files-recursively (my/manifolding-atlas-root-dir)
                                  ".*" t #'manifolding-mind-map-allowed-directory-p)))
 
 (defun manifolding-mind-map-allowed-directory-p (dir)

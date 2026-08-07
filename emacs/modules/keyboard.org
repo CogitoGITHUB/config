@@ -577,11 +577,19 @@
     ("i" my/manifolding-atlas-find-protocols "find protocols" :exit t))
    "Vocab"
    (("w" my/manifolding-atlas-dictionary-menu "dictionary" :exit t))
+   "Contacts"
+   (("C" my/manifolding-atlas-contacts-menu "contacts" :exit t))
    "Mastering"
    (("g" my/manifolding-atlas-mastering-review "review due" :exit t)
     ("G" my/manifolding-atlas-mastering-review-overdue "review overdue" :exit t)
     ("M" my/manifolding-atlas-mastering-mark-review "mark reviewed" :exit t)
     ("t" my/manifolding-atlas-mastering-toggle-participation "toggle pool" :exit t))
+   "Todo"
+   (("s" atlas-search-todo-dir "search todo" :exit t))
+   "Recipe"
+   (("n" my/manifolding-atlas-recipe-create "new recipe" :exit t)
+    ("e" my/manifolding-atlas-recipes-edit-servings "edit servings" :exit t)
+    ("f" my/manifolding-atlas-recipes-menu "recipes" :exit t))
    "Transclude"
    (("y" my/transclusion-hydra/body "transclude" :exit t))
    "Back"

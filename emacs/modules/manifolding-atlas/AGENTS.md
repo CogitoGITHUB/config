@@ -3,7 +3,8 @@
 > Full module reference (every file, every dir, load order): **`readme.org`** in this directory.
 
 ## Quick Facts
-- **Notes directory:** `~/test/` (`(my/notes-directory)` returns `"/home/aoeu/test/"`)
+- **Notes directory:** `~/test/` (`(my/manifolding-atlas-root-dir)` returns `"/home/aoeu/test/"`)
+- **Note files are EXTENSIONLESS** (e.g. `~/test/test`, `~/test/contacts/test`) — there are NO `.org` files in the vault. Org content lives in plain files; headingification and org-mode association come from content, not extension. Any file matcher MUST accept extensionless files (and `.org` for compat), never `.org`-only.
 - **Database:** `~/test/admin/manifolding-atlas.db` (root-owned `root:users 664`, excluded from git via `.gitignore`)
 - **DB sync:** Uses `fswatch` (external method), auto-sync mode enabled
 - **Git remote:** `https://github.com/CogitoGITHUB/test.git`, branch `main` tracking `origin/main`
@@ -57,10 +58,19 @@
 
 ## Root Dir (manifolding-atlas-functions/root-dir.org)
 - `my/manifolding-atlas-root-dir` — centralized directory prompt, `(&optional root prompt)`
-  - root defaults to `(my/notes-directory)`, prompt defaults to `"Subdirectory: "`
+  - root defaults to `(my/manifolding-atlas-root-dir)`, prompt defaults to `"Subdirectory: "`
   - Type `.` or press Enter for root level
   - Select or type a subdirectory name to nest
   - Returns relative path from root (with trailing slash) or `""` for root itself
+
+## Recipes (plugins/recipes.org)
+- Manual recipe notes (NO URL fetch / NO source) — you author ingredients + directions by hand
+- Default subdir `recipes/` (unlike the normal `my/manifolding-atlas-choose-subdir` which is root-based)
+- Note tagged `recipe`; body template `templates/full-file-templates/recipes.org` carries recipe-specific properties: `SERVINGS`, `PREP_TIME`, `COOK_TIME`, `READY_IN`
+- `my/manifolding-atlas-recipe-create` — prompt title, slug, recipe properties + body
+- `my/manifolding-atlas-recipes-edit-servings` — rescale ingredient quantities to new servings
+- Schema: `recipe` schema on tag `recipe` validates the recipe-specific properties
+- Binding: `SPC v` → Manifolding Atlas hydra → `R` group (recipe create/edit)
 
 ## Fast Mode (0-3)
 - `a` = **0 normal** — all prompts fire, body template opens
@@ -73,7 +83,7 @@
 - **Default parameters:** `manifolding-atlas-create-default-function` prompts for subdir, file-level prompts, file name
 - **Capture flow:** `manifolding-atlas-create` → `org-capture` for body editing via chosen capture template
 - **Templates:** all under `templates/` — `full-file-templates/` (doct), `snippets/`
-- **Full templates:** 6 files in `templates/full-file-templates/`: `plain`, `notes`, `reference`, `task`, `math`, `protocol`
+- **Full templates:** 7 files in `templates/full-file-templates/`: `plain`, `notes`, `reference`, `task`, `math`, `protocol`, `recipes`
 - **Template content:** body-only — NO `*` heading or `#+title:` metadata (heading is already created by headingification). Templates use `**` sub-headings and `%?` cursor placeholder.
 - **Template preview:** when selecting a template, the preview pane shows the rendered output in `org-mode` (outline expanded, `org-indent-mode` on) with `%?` replaced by the note's title — you see exactly what will land in the file
 - **All state prompts required** at create time (skipping sets `"WARNING"` → tracked via MISSING PROMPTS)

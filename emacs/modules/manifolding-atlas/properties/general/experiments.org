@@ -1,0 +1,42 @@
+#+title:      Experiments Prompt
+#+priority:   40
+
+* Experiments
+Why: Active tests only. For each: hypothesis being tested, method, current result, and exit condition. Without an exit condition, it is not an experiment — only activity mistaken for design.
+
+** Default (default WARNING)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-experiments ()
+  "Prompt for EXPERIMENTS. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "EXPERIMENTS: "
+              '("⚠ WARNING" "RUNNING" "COMPLETE" "INCONCLUSIVE" "ABANDONED")
+              nil nil nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-experiments-initial (initial)
+  "Prompt for EXPERIMENTS with INITIAL pre-selected."
+  (completing-read
+   "EXPERIMENTS: "
+   '("RUNNING" "COMPLETE" "INCONCLUSIVE" "ABANDONED")
+   nil nil nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'experiments
+  :name 'experiments
+  :label "Experiments"
+  :prompt-fn #'my/manifolding-atlas-prompt-experiments
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "EXPERIMENTS"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (if (or (null val) (string-equal val "WARNING"))
+                  `(:properties (("EXPERIMENTS" . "WARNING")))
+                `(:properties (("EXPERIMENTS" . ,val))))))
+#+end_src

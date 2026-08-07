@@ -1,0 +1,42 @@
+#+title:      Traps Internal Prompt
+#+priority:   35
+
+* Traps Internal
+Why: Known personal failure modes specific to this deployment context. Cognitive patterns, emotional triggers, and behavioral loops that cause or will cause damage. Recognition in advance is the only viable defense.
+
+** Default (default WARNING)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-traps-internal ()
+  "Prompt for TRAPS_INTERNAL. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "TRAPS_INTERNAL: "
+              '("⚠ WARNING" "MAPPED" "ACTIVE" "TAMED" "UNKNOWN")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-traps-internal-initial (initial)
+  "Prompt for TRAPS_INTERNAL with INITIAL pre-selected."
+  (completing-read
+   "TRAPS_INTERNAL: "
+   '("MAPPED" "ACTIVE" "TAMED" "UNKNOWN")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'traps-internal
+  :name 'traps-internal
+  :label "Traps Internal"
+  :prompt-fn #'my/manifolding-atlas-prompt-traps-internal
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "TRAPS_INTERNAL"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (if (or (null val) (string-equal val "WARNING"))
+                  `(:properties (("TRAPS_INTERNAL" . "WARNING")))
+                `(:properties (("TRAPS_INTERNAL" . ,val))))))
+#+end_src

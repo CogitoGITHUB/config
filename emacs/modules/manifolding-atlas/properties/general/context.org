@@ -1,0 +1,42 @@
+#+title:      Context Prompt
+#+priority:   25
+
+* Context
+Why: The operational environment this ShapeShifter was deployed into. Timing, dependencies, pressures, and constraints you did not choose. The same move produces different results in different context.
+
+** Default (default WARNING)
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-context ()
+  "Prompt for CONTEXT. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read
+              "CONTEXT: "
+              '("⚠ WARNING" "CAPTURED" "REFRESHED" "STALE")
+              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+#+end_src
+
+** With initial value
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-context-initial (initial)
+  "Prompt for CONTEXT with INITIAL pre-selected."
+  (completing-read
+   "CONTEXT: "
+   '("CAPTURED" "REFRESHED" "STALE")
+   nil t nil nil initial))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'context
+  :name 'context
+  :label "Context"
+  :prompt-fn #'my/manifolding-atlas-prompt-context
+  :contexts '(file heading task)
+  :read-current-fn (lambda () (org-entry-get nil "CONTEXT"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              (if (or (null val) (string-equal val "WARNING"))
+                  `(:properties (("CONTEXT" . "WARNING")))
+                `(:properties (("CONTEXT" . ,val))))))
+#+end_src

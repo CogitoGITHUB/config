@@ -18,7 +18,7 @@ Infrastructure files loaded by manifolding-emacs. These provide the core buildin
 ## Note Creation Flow
 
 1. **Entry point** (`capture-entry-points.org` or `dictionary.org`):
-   - `my/manifolding-atlas-capture-new-file` or `my/manifolding-atlas-capture-task-file` or `my/manifolding-atlas-dictionary-new-word`
+   - `my/manifolding-atlas-capture-new-file` or `my/manifolding-atlas-capture-task-file` or `my/manifolding-atlas-dictionary-new-word` (or `my/manifolding-atlas-recipe-create` from `recipes.org`)
    - Prompts for title → file name → subdirectory → fast level
 
 2. **Fast level** (`note-creation.org`):

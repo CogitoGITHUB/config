@@ -12,6 +12,6 @@
 ** Config
 #+begin_src emacs-lisp
 (setq org-download-image-dir
-      (expand-file-name "attachments" (my/notes-directory)))
+      (expand-file-name "attachments" (my/manifolding-atlas-root-dir)))
 (org-download-enable)
 #+end_src

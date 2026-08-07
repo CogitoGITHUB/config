@@ -25,7 +25,8 @@
 | `modules/manifolding-atlas/properties/*.org` | Note property prompts (state, tags, etc.) |
 | `modules/manifolding-atlas/manifolding-atlas-templates-system.org` | Template infrastructure: doct, yasnippet loading |
 | `modules/manifolding-atlas/templates/` | All template files: `full-file-templates/`, `snippets/` |
-| `modules/manifolding-atlas/templates/full-file-templates/{notes,plain,reference,task,math,protocol}.org` | Capture templates (body-only, no `*` heading — headingification creates it) |
+| `modules/manifolding-atlas/templates/full-file-templates/{notes,plain,reference,task,math,protocol,recipes}.org` | Capture templates (body-only, no `*` heading — headingification creates it) |
+| `modules/manifolding-atlas/plugins/recipes.org` | Recipe plugin — manual recipe notes under `recipes/` (no URL fetch); `my/manifolding-atlas-recipe-create`, `my/manifolding-atlas-recipes-edit-servings` |
 | `modules/manifolding-atlas/templates/snippets/` | Yasnippet snippet files |
 | `modules/arei.org` | Guile Scheme IDE (AREI) — requires `guile-ares-rs` installed system-wide |
 | `modules/auctex.org` | LaTeX environment (xelatex, texlive env vars, 3-pass PDF export) |
@@ -36,7 +37,7 @@
 | `modules/org-pdftools.org` | PDF integration for org |
 
 ## Quick Reference
-- **Notes directory:** `~/test/` (`(my/notes-directory)` → `"/home/aoeu/test/"`)
+- **Notes directory:** `~/test/` (`(my/manifolding-atlas-root-dir)` → `"/home/aoeu/test/"`)
 - **Notes must be in a git repo** — `before-save-hook` blocks with `user-error` if no `.git`
 - **manifolding-atlas.db:** at `~/test/admin/manifolding-atlas.db`, root-owned (`root:users 664`), excluded from git
 

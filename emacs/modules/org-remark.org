@@ -12,6 +12,6 @@
 ** Config
 #+begin_src emacs-lisp
 (setq org-remark-notes-file-path
-      (expand-file-name "highlights.org" (my/notes-directory)))
+      (expand-file-name "highlights.org" (my/manifolding-atlas-root-dir)))
 (org-remark-global-tracking-mode 1)
 #+end_src

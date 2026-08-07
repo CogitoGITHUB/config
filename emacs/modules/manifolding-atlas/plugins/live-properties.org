@@ -162,7 +162,7 @@ Three ref types: ~'closed~ (shared, deduped), ~'scoped~ (per-entity), ~nil~ (pla
 (defun my/manifolding-atlas--ensure-ref-note (property-type value &optional _note)
   (when (and value (not (string-equal value "WARNING")))
     (let* ((slug (my/manifolding-atlas--canonicalize value))
-           (root (expand-file-name (format "admin/refs/%s/" property-type) (my/notes-directory)))
+           (root (expand-file-name (format "admin/refs/%s/" property-type) (my/manifolding-atlas-root-dir)))
            (path (expand-file-name slug root))
            (id (my/manifolding-atlas--note-id-by-path path))
            (title (format "%s: %s" (my/manifolding-atlas--property-display-name property-type) value)))
@@ -322,7 +322,8 @@ level, and pos before delegating to the drawer primitive."
                     (goto-char anchor)
                     (beginning-of-line)
                     (unless (bolp) (insert "\n"))
-                    (insert (format "#+transclude: [[id:%s][%s]]\n" id label))))))))
+                    (insert (format "#+transclude: [[id:%s][%s]] :property\n"
+                                    id label))))))))
         (save-buffer)))))
 
 (defun my/manifolding-atlas--live-transcludes-after-create (note)
@@ -343,7 +344,7 @@ level, and pos before delegating to the drawer primitive."
   (when-let ((file (org-id-find-id-file id)))
     (string-prefix-p
      (expand-file-name (format "admin/refs/%s/" property-type)
-                       (my/notes-directory))
+                       (my/manifolding-atlas-root-dir))
      (expand-file-name file))))
 
 (defun my/manifolding-atlas--transclude-exists-p (id)
@@ -378,7 +379,7 @@ level, and pos before delegating to the drawer primitive."
                            (point))))
           (beginning-of-line)
           (unless (bolp) (insert "\n"))
-          (insert (format "#+transclude: [[id:%s][%s: %s]]\n"
+          (insert (format "#+transclude: [[id:%s][%s: %s]] :property\n"
                           ref-id
                           (my/manifolding-atlas--property-display-name property-type)
                           drawer-value))
@@ -387,7 +388,7 @@ level, and pos before delegating to the drawer primitive."
     removed))
 
 (defun my/manifolding-atlas--ref-in-use-p (id)
-  (let* ((root (my/notes-directory))
+  (let* ((root (my/manifolding-atlas-root-dir))
          (refs-dir (expand-file-name "admin/refs/" root))
          (files (nconc (directory-files-recursively root "\\.org\\'")
                        (directory-files-recursively root "[^./]+\\'")))
@@ -407,13 +408,13 @@ level, and pos before delegating to the drawer primitive."
                  (file-exists-p path)
                  (file-in-directory-p
                   path
-                  (expand-file-name "admin/refs/" (my/notes-directory))))
+                  (expand-file-name "admin/refs/" (my/manifolding-atlas-root-dir))))
         (message "my/manifolding-atlas: deleting unused ref %s" path)
         (delete-file path)))))
 
 (defun my/manifolding-atlas--sweep-orphaned-refs ()
   (interactive)
-  (let* ((root (my/notes-directory))
+  (let* ((root (my/manifolding-atlas-root-dir))
          (refs-dir (expand-file-name "admin/refs/" root))
          (files (directory-files-recursively refs-dir "[^./]+\\'" t))
          count)
@@ -482,7 +483,7 @@ Transclusion rendering is stripped first so the drawer edits see raw
   (when (and value (not (string-equal value "WARNING")))
     (let* ((slug (my/manifolding-atlas--canonicalize (or parent-id "orphan")))
            (val-slug (my/manifolding-atlas--canonicalize value))
-           (root (expand-file-name (format "admin/refs/%s/" property-type) (my/notes-directory)))
+           (root (expand-file-name (format "admin/refs/%s/" property-type) (my/manifolding-atlas-root-dir)))
            (path (expand-file-name (format "%s-%s" slug val-slug) root)))
       (make-directory root t)
       (let ((manifolding-atlas-create-default-function (lambda (_) '())))
@@ -500,10 +501,10 @@ Transclusion rendering is stripped first so the drawer edits see raw
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--hidden-note-p (path)
   (or (string-prefix-p
-       (expand-file-name "admin/refs/" (my/notes-directory))
+       (expand-file-name "admin/refs/" (my/manifolding-atlas-root-dir))
        path)
       (string-prefix-p
-       (expand-file-name "admin/Journal/" (my/notes-directory))
+       (expand-file-name "admin/Journal/" (my/manifolding-atlas-root-dir))
        path)))
 
 (setq manifolding-atlas-find-default-filter

@@ -16,7 +16,7 @@ Fast journal entry capture. Creates a timestamped heading in Journal.org.
          (week (format-time-string "W%V" parsed))
          (dir (expand-file-name
                (format "admin/Journal/%s/%s/%s/%s/" year quarter month week)
-               (my/notes-directory)))
+               (my/manifolding-atlas-root-dir)))
          (file (expand-file-name date dir)))
     `(:dir ,dir :file ,file :year ,year
            :quarter ,quarter :month ,month :week ,week :date ,date)))
