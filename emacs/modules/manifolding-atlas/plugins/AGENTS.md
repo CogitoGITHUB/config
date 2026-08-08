@@ -58,6 +58,6 @@ Each plugin is an `.org` file under `modules/manifolding-atlas/plugins/`. They a
 - **Manual authoring only** — no URL fetch, no source/source-url property
 - Notes tagged `recipe`, default subdir `recipes/` (fixed, unlike `choose-subdir`)
 - `my/manifolding-atlas-recipe-create` — slugify title, collect prompt context `(recipe)`, open capture
-- `my/manifolding-atlas-recipes-edit-servings` — wraps `org-chef-edit-servings` on the recipe at point
+- `my/manifolding-atlas-recipes-edit-servings` — rescale ingredient quantities in `** Ingredients` to a new SERVINGS value
 - Recipe-specific properties (`SERVINGS`, `PREP_TIME`, `COOK_TIME`, `READY_IN`) come from the body template `templates/full-file-templates/recipes.org`
 - Binding: `SPC v` → hydra → `R` group

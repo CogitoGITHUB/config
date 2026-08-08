@@ -148,8 +148,10 @@ the quantities in the Ingredients list to match."
       (user-error "Could not find a recipe with a SERVINGS property"))
     (let ((mult (/ (float desired-n) (float current))))
       (save-excursion
-        (my/manifolding-atlas-recipes--rescale-ingredients mult))
-      (org-entry-put nil "SERVINGS" (format "%s" desired-n)))
+        (org-back-to-heading t)
+        (while (and (not (org-entry-get nil "SERVINGS")) (org-up-heading-safe)))
+        (my/manifolding-atlas-recipes--rescale-ingredients mult)
+        (org-entry-put nil "SERVINGS" (format "%s" desired-n))))
     (message "Servings: %s → %s (quantities rescaled)" current desired-n)))
 #+end_src
 
