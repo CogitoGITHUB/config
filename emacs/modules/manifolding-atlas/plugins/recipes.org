@@ -66,14 +66,18 @@ Commands:
       (org-capture nil "v"))))
 
 (defun my/manifolding-atlas-recipe-create ()
-  "Create a new recipe note in `my/manifolding-atlas-recipes-directory'.
-Prompts for title, then collects the general (file) prompts, tags the
-note `recipe', and opens the `recipes' body template for editing."
+  "Create a new recipe note under `my/manifolding-atlas-recipes-directory'.
+Prompts for title and an optional subdirectory under `recipes/' ("." or empty = straight into `recipes/`), collects the recipe prompts, tags the note `recipe', and opens the `recipes' body template for editing."
   (interactive)
   (let* ((manifolding-atlas-create-default-function (lambda (_) '()))
+         (root (expand-file-name my/manifolding-atlas-recipes-directory
+                                 (my/manifolding-atlas-root-dir)))
+         (_ (make-directory root t))
          (title (read-string "Recipe title: "))
          (slug (my/manifolding-atlas-recipes--slugify title))
-         (fname (concat my/manifolding-atlas-recipes-directory slug))
+         (subdir (my/manifolding-atlas-choose-subdir
+                  root "Subdirectory under recipes/: "))
+         (fname (concat my/manifolding-atlas-recipes-directory subdir slug))
          (fast (my/manifolding-atlas--fast-level))
          (prompts (my/manifolding-atlas-collect-prompts-with-fast '(recipe) nil fast))
          (tags (cons "recipe" (plist-get prompts :tags)))
