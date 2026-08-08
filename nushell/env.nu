@@ -1,5 +1,5 @@
-$env.PROMPT_INDICATOR_VI_INSERT = $"(ansi red): "
-$env.PROMPT_INDICATOR_VI_NORMAL = $"(ansi red)〉"
+$env.PROMPT_INDICATOR_VI_INSERT = $"(ansi white): "
+$env.PROMPT_INDICATOR_VI_NORMAL = $"(ansi white)〉"
 
 # /home/aoeu/.config/nushell/env.nu
 $env._ZO_DATA_DIR = "/home/aoeu/.config/nushell"
@@ -35,7 +35,7 @@ if ($"($env.HOME)/.guix-home/on-first-login" | path exists) {
 }
 
 
-$env.FZF_DEFAULT_OPTS = "--color=fg:#8B0000,fg+:#FFFFFF,bg+:#8B0000,hl:#CC0000,hl+:#FFFFFF,header:#8B0000,spinner:#8B0000,info:#999999,pointer:#8B0000,marker:#8B0000,prompt:#8B0000,border:#8B0000,separator:#8B0000,scrollbar:#8B0000 --border=rounded --padding=1 --margin=1 --info=inline --bind=ctrl-a:select-all --bind=ctrl-j:down --bind=ctrl-k:up"
+$env.FZF_DEFAULT_OPTS = "--color=fg:#FFFFFF,fg+:#FFFFFF,hl:#FFFFFF,hl+:#FFFFFF,header:#FFFFFF,spinner:#FFFFFF,info:#FFFFFF,pointer:#FFFFFF,marker:#FFFFFF,prompt:#FFFFFF,border:#FFFFFF,separator:#FFFFFF,scrollbar:#FFFFFF --border=rounded --padding=1 --margin=1 --info=inline --bind=ctrl-a:select-all --bind=ctrl-j:down --bind=ctrl-k:up"
 
 
 $env.PATH = ($env.PATH | prepend $"($env.HOME)/.nix-profile/bin")

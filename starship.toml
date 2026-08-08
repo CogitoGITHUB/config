@@ -2,39 +2,39 @@ add_newline = false
 command_timeout = 800
 
 format = """
-[](#8B0000)🌹  [](bold #D4A574)$username\
-[](#8B0000) at [](bold #C49A6C)$hostname\
-[](#8B0000) in [](bold #9C6644)$directory\
-[](#8B0000) on [](bold #7F4F24)$git_branch\
-[](#8B0000)$git_status
-[](fg:#8B0000)🕊️ [](fg:#D4A574)$time\
-[](#8B0000)
-[](bold #8B0000)$character\
+[](#FFFFFF)🌹  [](bold #FFFFFF)$username\
+[](#FFFFFF) at [](bold #FFFFFF)$hostname\
+[](#FFFFFF) in [](bold #FFFFFF)$directory\
+[](#FFFFFF) on [](bold #FFFFFF)$git_branch\
+[](#FFFFFF)$git_status
+[](fg:#FFFFFF)🕊️ [](fg:#FFFFFF)$time\
+[](#FFFFFF)
+[](bold #FFFFFF)$character\
 """
 
 [username]
-style_user = "#8B0000"
-style_root = "#8B0000"
+style_user = "#FFFFFF"
+style_root = "#FFFFFF"
 format = "[$user]($style)"
 show_always = true
 
 [hostname]
-style = "#D4A574"
+style = "#FFFFFF"
 format = "[$hostname]($style)"
 ssh_only = false
 
 [directory]
-style = "#C49A6C"
+style = "#FFFFFF"
 format = "[$path]($style)"
 truncation_length = 3
 truncation_symbol = "…/"
 
 [git_branch]
-style = "#9C6644"
+style = "#FFFFFF"
 format = "[\\($branch\\)]($style)"
 
 [git_status]
-style = "#7F4F24"
+style = "#FFFFFF"
 format = " [$all_status$ahead_behind]($style)"
 conflicted = "⚔️$count"
 ahead = "🌱$count"
@@ -49,14 +49,14 @@ deleted = "💔$count"
 
 [time]
 disabled = false
-style = "#D4A574"
+style = "#FFFFFF"
 time_format = "%Y-%m-%d %H:%M"
 format = "[ $time]($style)"
 
 [character]
 format = "$symbol"
-success_symbol = "[🌹](bold #8B0000)"
-error_symbol = "[🥀](bold #8B0000)"
+success_symbol = "[🌹](bold #FFFFFF)"
+error_symbol = "[🥀](bold #FFFFFF)"
 
 [cmd_duration]
 disabled = true

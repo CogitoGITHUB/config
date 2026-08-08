@@ -1,0 +1,70 @@
+##############################################
+#                                            #
+#           Shape-White Theme                #
+#                                            #
+##############################################
+
+# White text on transparent background
+
+###############################################################################
+#                           Code Syntax Highlighting                          #
+###############################################################################
+
+code_syntax_highlight = "github"
+
+###############################################################################
+#                                 Base Colors                                 #
+###############################################################################
+
+#-- Full Screen
+full_screen_fg = "#FFFFFF"
+full_screen_bg = "#FFFFFF"
+
+#-- Gradient
+gradient_color = ["#FFFFFF", "#FFFFFF"]
+
+#-- File Panel
+file_panel_fg = "#FFFFFF"
+file_panel_bg = "#FFFFFF"
+file_panel_border = "#FFFFFF"
+file_panel_border_active = "#FFFFFF"
+file_panel_top_directory_icon = "#FFFFFF"
+file_panel_top_path = "#FFFFFF"
+file_panel_item_selected_fg = "#FFFFFF"
+file_panel_item_selected_bg = "#FFFFFF"
+
+#-- Footer
+footer_fg = "#FFFFFF"
+footer_bg = "#FFFFFF"
+footer_border = "#FFFFFF"
+footer_border_active = "#FFFFFF"
+
+#-- Sidebar
+sidebar_fg = "#FFFFFF"
+sidebar_bg = "#FFFFFF"
+sidebar_title = "#FFFFFF"
+sidebar_border = "#FFFFFF"
+sidebar_border_active = "#FFFFFF"
+sidebar_item_selected_fg = "#FFFFFF"
+sidebar_item_selected_bg = "#FFFFFF"
+sidebar_divider = "#FFFFFF"
+
+#-- Modals
+modal_fg = "#FFFFFF"
+modal_bg = "#FFFFFF"
+modal_border_active = "#FFFFFF"
+modal_cancel_fg = "#FFFFFF"
+modal_cancel_bg = "#FFFFFF"
+modal_confirm_fg = "#FFFFFF"
+modal_confirm_bg = "#FFFFFF"
+
+#-- Help Menu
+help_menu_hotkey = "#FFFFFF"
+help_menu_title = "#FFFFFF"
+
+#-- Special
+cursor = "#FFFFFF"
+correct = "#FFFFFF"
+error = "#FFFFFF"
+hint = "#FFFFFF"
+cancel = "#FFFFFF"

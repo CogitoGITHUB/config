@@ -14,18 +14,18 @@
 
 #+begin_src emacs-lisp
 (defun manifold/pure-red--default ()
-  (set-face-attribute 'default nil :foreground "#8B0000" :background "unspecified-bg")
-  (set-face-attribute 'fringe nil :foreground "#8B0000" :background "unspecified-bg")
-  (set-face-attribute 'region nil :foreground "#ffcccc" :background "#5a0000")
-  (set-face-attribute 'highlight nil :foreground "#8B0000" :background "unspecified-bg")
-  (set-face-attribute 'cursor nil :background "#808080"))
+  (set-face-attribute 'default nil :foreground "#FFFFFF" :background "unspecified-bg")
+  (set-face-attribute 'fringe nil :foreground "#FFFFFF" :background "unspecified-bg")
+  (set-face-attribute 'region nil :foreground "#FFFFFF" :background "unspecified-bg")
+  (set-face-attribute 'highlight nil :foreground "#FFFFFF" :background "unspecified-bg")
+  (set-face-attribute 'cursor nil :background "#FFFFFF"))
 #+end_src
 
 ** Focused Line
 #+begin_src emacs-lisp
 (defun manifold/pure-red--hl-line ()
   (with-eval-after-load 'hl-line
-    (set-face-attribute 'hl-line nil :background "#2a2a2a" :inherit nil))
+    (set-face-attribute 'hl-line nil :background "unspecified-bg" :inherit nil))
   (global-hl-line-mode 1))
 #+end_src
 
@@ -34,18 +34,18 @@
 (defun manifold/pure-red--org ()
   (dolist (level '(org-level-1 org-level-2 org-level-3
                    org-level-4 org-level-5 org-level-6 org-level-7 org-level-8))
-    (set-face-attribute level nil :foreground "#8B0000" :background "unspecified-bg" :weight 'bold :inherit nil))
-  (set-face-attribute 'org-document-title nil :foreground "#8B0000" :background 'unspecified :height 2.0 :weight 'bold :inherit nil :extend nil)
+    (set-face-attribute level nil :foreground "#FFFFFF" :background "unspecified-bg" :weight 'bold :inherit nil))
+  (set-face-attribute 'org-document-title nil :foreground "#FFFFFF" :background 'unspecified :height 2.0 :weight 'bold :inherit nil :extend nil)
   (set-face-attribute 'org-level-1 nil :height 1.8)
   (set-face-attribute 'org-level-2 nil :height 1.6)
   (set-face-attribute 'org-level-3 nil :height 1.4)
   (set-face-attribute 'org-level-4 nil :height 1.2)
-  (set-face-attribute 'org-link nil :foreground "#9370DB" :background "unspecified-bg" :weight 'normal :inherit nil)
+  (set-face-attribute 'org-link nil :foreground "#FFFFFF" :background "unspecified-bg" :weight 'normal :inherit nil)
   (dolist (face '(org-block org-block-begin-line org-block-end-line
                   org-code org-verbatim org-meta-line org-todo org-done
                   org-date org-special-keyword org-tag org-drawer
                   org-property-value org-table))
-    (set-face-attribute face nil :foreground "#8B0000" :background "unspecified-bg" :weight 'normal :inherit nil)))
+    (set-face-attribute face nil :foreground "#FFFFFF" :background "unspecified-bg" :weight 'normal :inherit nil)))
 #+end_src
 
 ** Code
@@ -57,7 +57,7 @@
                   font-lock-type-face font-lock-constant-face font-lock-builtin-face
                   font-lock-warning-face font-lock-doc-face font-lock-preprocessor-face
                   font-lock-regexp-grouping-backslash font-lock-regexp-grouping-construct))
-    (set-face-attribute face nil :foreground "#8B0000" :background "unspecified-bg" :weight 'normal :inherit nil)))
+    (set-face-attribute face nil :foreground "#FFFFFF" :background "unspecified-bg" :weight 'normal :inherit nil)))
 #+end_src
 
 ** LaTeX
@@ -71,7 +71,7 @@
                     font-latex-sectioning-1-face font-latex-sectioning-2-face
                     font-latex-sectioning-3-face font-latex-sectioning-4-face
                     font-latex-sectioning-5-face))
-      (set-face-attribute face nil :foreground "#8B0000" :background "unspecified-bg" :inherit nil))))
+      (set-face-attribute face nil :foreground "#FFFFFF" :background "unspecified-bg" :inherit nil))))
 #+end_src
 
 ** PDF
@@ -79,7 +79,7 @@
 #+begin_src emacs-lisp
 (defun manifold/pure-red--pdf ()
   (with-eval-after-load 'pdf-view
-    (setq pdf-view-midnight-colors '("#8B0000" . "unspecified-bg"))))
+    (setq pdf-view-midnight-colors '("#FFFFFF" . "unspecified-bg"))))
 #+end_src
 
 ** Line Numbers
@@ -87,8 +87,8 @@
 #+begin_src emacs-lisp
 (defun manifold/pure-red--line-numbers ()
   (when (facep 'line-number)
-    (set-face-attribute 'line-number nil :foreground "#8B0000" :background "unspecified-bg")
-    (set-face-attribute 'line-number-current-line nil :foreground "#8B0000" :background "unspecified-bg" :weight 'bold)))
+    (set-face-attribute 'line-number nil :foreground "#FFFFFF" :background "unspecified-bg")
+    (set-face-attribute 'line-number-current-line nil :foreground "#FFFFFF" :background "unspecified-bg" :weight 'bold)))
 #+end_src
 
 ** Minibuffer
@@ -97,9 +97,9 @@
 (defun manifold/pure-red--minibuffer ()
   (dolist (face '(minibuffer-prompt completions-annotations completions-common-part
                   completions-first-difference shadow help-key-binding))
-    (set-face-attribute face nil :foreground "#8B0000" :background "unspecified-bg" :weight 'normal :inherit nil))
+    (set-face-attribute face nil :foreground "#FFFFFF" :background "unspecified-bg" :weight 'normal :inherit nil))
   (when (facep 'completions-highlight)
-    (set-face-attribute 'completions-highlight nil :foreground "#8B0000" :background "unspecified-bg" :inherit nil)))
+    (set-face-attribute 'completions-highlight nil :foreground "#FFFFFF" :background "unspecified-bg" :inherit nil)))
 #+end_src
 
 ** Vertico
@@ -109,7 +109,7 @@
   (with-eval-after-load 'vertico
     (dolist (face '(vertico-current vertico-group-title vertico-group-separator vertico-multiline))
       (when (facep face)
-        (set-face-attribute face nil :foreground "#8B0000" :background "unspecified-bg" :inherit nil)))))
+        (set-face-attribute face nil :foreground "#FFFFFF" :background "unspecified-bg" :inherit nil)))))
 #+end_src
 
 ** Orderless
@@ -119,7 +119,7 @@
   (with-eval-after-load 'orderless
     (dolist (face '(orderless-match-face-0 orderless-match-face-1
                     orderless-match-face-2 orderless-match-face-3))
-      (set-face-attribute face nil :foreground "#8B0000" :background "unspecified-bg" :weight 'bold :inherit nil))))
+      (set-face-attribute face nil :foreground "#FFFFFF" :background "unspecified-bg" :weight 'bold :inherit nil))))
 #+end_src
 
 ** Ivy
@@ -132,7 +132,7 @@
                     ivy-highlight-face ivy-remote ivy-subdir ivy-virtual ivy-confirm-face
                     ivy-match-required-face))
       (when (facep face)
-        (set-face-attribute face nil :foreground "#8B0000" :background "unspecified-bg" :weight 'normal :inherit nil)))))
+        (set-face-attribute face nil :foreground "#FFFFFF" :background "unspecified-bg" :weight 'normal :inherit nil)))))
 #+end_src
 
 ** Helm
@@ -145,16 +145,16 @@
                     helm-buffer-file helm-buffer-process helm-ff-directory helm-ff-file
                     helm-grep-match))
       (when (facep face)
-        (set-face-attribute face nil :foreground "#8B0000" :background "unspecified-bg" :weight 'normal :inherit nil)))))
+        (set-face-attribute face nil :foreground "#FFFFFF" :background "unspecified-bg" :weight 'normal :inherit nil)))))
 #+end_src
 
 ** Mode Line
 
 #+begin_src emacs-lisp
 (defun manifold/pure-red--mode-line ()
-  (set-face-attribute 'mode-line nil :foreground "#8B0000" :background "unspecified-bg" :box nil)
-  (set-face-attribute 'mode-line-inactive nil :foreground "#8B0000" :background "unspecified-bg" :box nil)
-  (set-face-attribute 'header-line nil :foreground "#8B0000" :background "unspecified-bg" :box nil :inherit nil))
+  (set-face-attribute 'mode-line nil :foreground "#FFFFFF" :background "unspecified-bg" :box nil)
+  (set-face-attribute 'mode-line-inactive nil :foreground "#FFFFFF" :background "unspecified-bg" :box nil)
+  (set-face-attribute 'header-line nil :foreground "#FFFFFF" :background "unspecified-bg" :box nil :inherit nil))
 #+end_src
 
 ** Apply

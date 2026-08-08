@@ -51,13 +51,13 @@
 
   (defun my/centaur-tabs-theme ()
     (set-face-attribute 'centaur-tabs-selected nil
-                        :foreground "#ff0000")
+                        :foreground "#FFFFFF")
     (set-face-attribute 'centaur-tabs-selected-modified nil
-                        :foreground "#ff0000")
+                        :foreground "#FFFFFF")
     (set-face-attribute 'centaur-tabs-unselected nil
-                        :foreground "#888888")
+                        :foreground "#FFFFFF")
     (set-face-attribute 'centaur-tabs-unselected-modified nil
-                        :foreground "#888888"))
+                        :foreground "#FFFFFF"))
 
   (add-hook 'centaur-tabs-init-hook #'my/centaur-tabs-theme)
   (my/centaur-tabs-theme)

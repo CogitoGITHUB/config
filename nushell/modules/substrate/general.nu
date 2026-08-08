@@ -37,15 +37,15 @@ $env.config = {
     }
 
     explore: {
-        status_bar_background: { fg: "#8B0000", bg: "#3D0000" }
-        command_bar_text: { fg: "#8B0000" }
-        highlight: { fg: "#8B0000", bg: "#3D0000" }
+        status_bar_background: { fg: "#FFFFFF" }
+        command_bar_text: { fg: "#FFFFFF" }
+        highlight: { fg: "#FFFFFF" }
         status: {
-            error: { fg: "#8B0000", bg: "#3D0000" }
-            warn: { fg: "#8B0000", bg: "#3D0000" }
-            info: { fg: "#8B0000", bg: "#3D0000" }
+            error: { fg: "#FFFFFF" }
+            warn: { fg: "#FFFFFF" }
+            info: { fg: "#FFFFFF" }
         }
-        selected_cell: { bg: "#3D0000" }
+        selected_cell: {}
     }
 
     history: {
@@ -105,11 +105,11 @@ $env.config = {
                 col_padding: 2
             }
             style: {
-                text: dark_red
-                selected_text: { fg: dark_red, bg: "#3D0000" }
-                description_text: dark_red
+                text: { fg: "#FFFFFF" }
+                selected_text: { fg: "#FFFFFF" }
+                description_text: { fg: "#FFFFFF" }
                 match_text: { attr: u }
-                selected_match_text: { fg: dark_red, bg: "#3D0000" }
+                selected_match_text: { fg: "#FFFFFF" }
             }
         }
         {
@@ -132,11 +132,11 @@ $env.config = {
                 correct_cursor_pos: false
             }
             style: {
-                text: dark_red
-                selected_text: { fg: dark_red, bg: "#3D0000" }
-                description_text: dark_red
+                text: { fg: "#FFFFFF" }
+                selected_text: { fg: "#FFFFFF" }
+                description_text: { fg: "#FFFFFF" }
                 match_text: { attr: u }
-                selected_match_text: { fg: dark_red, bg: "#3D0000" }
+                selected_match_text: { fg: "#FFFFFF" }
             }
         }
         {
@@ -148,9 +148,9 @@ $env.config = {
                 page_size: 10
             }
             style: {
-                text: dark_red
-                selected_text: { fg: dark_red, bg: "#3D0000" }
-                description_text: dark_red
+                text: { fg: "#FFFFFF" }
+                selected_text: { fg: "#FFFFFF" }
+                description_text: { fg: "#FFFFFF" }
             }
         }
         {
@@ -166,9 +166,9 @@ $env.config = {
                 description_rows: 10
             }
             style: {
-                text: dark_red
-                selected_text: { fg: dark_red, bg: "#3D0000" }
-                description_text: dark_red
+                text: { fg: "#FFFFFF" }
+                selected_text: { fg: "#FFFFFF" }
+                description_text: { fg: "#FFFFFF" }
             }
         }
     ]

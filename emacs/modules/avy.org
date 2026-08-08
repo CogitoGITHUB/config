@@ -19,9 +19,9 @@
     ;; Always visible purple highlights
     (setq avy-background nil)
     (custom-set-faces
-     '(avy-lead-face   ((t (:foreground "#ffffff" :background "#8b00ff" :weight bold))))
-     '(avy-lead-face-0 ((t (:foreground "#ffffff" :background "#9933ff" :weight bold))))
-     '(avy-lead-face-1 ((t (:foreground "#ffffff" :background "#aa44ff" :weight bold))))
-     '(avy-lead-face-2 ((t (:foreground "#ffffff" :background "#bb55ff" :weight bold))))))
+     '(avy-lead-face   ((t (:foreground "#ffffff" :background unspecified :weight bold))))
+     '(avy-lead-face-0 ((t (:foreground "#ffffff" :background unspecified :weight bold))))
+     '(avy-lead-face-1 ((t (:foreground "#ffffff" :background unspecified :weight bold))))
+     '(avy-lead-face-2 ((t (:foreground "#ffffff" :background unspecified :weight bold))))))
   
 #+end_src

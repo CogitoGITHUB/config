@@ -279,7 +279,7 @@ strategy = "auto"
 # name = "autumn"
 
 [theme]
-name = "red"
+name = "shape-white"
 
 
 debug = true

@@ -6,15 +6,17 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "2": 2,
-        "1": 1
+        "5": 22,
+        "1": 1,
+        "6": 23
       },
-      "next_public_pane_number": 20,
+      "next_public_pane_number": 25,
       "public_tab_numbers": [
         1,
-        2
+        22,
+        23
       ],
-      "next_public_tab_number": 20,
+      "next_public_tab_number": 25,
       "tabs": [
         {
           "custom_name": "opencode",
@@ -38,18 +40,38 @@
           "root_pane": 1
         },
         {
-          "custom_name": "emacs",
+          "custom_name": null,
           "layout": {
-            "Pane": 2
+            "Pane": 5
           },
           "panes": {
-            "2": {
-              "cwd": "/home/aoeu/test"
+            "5": {
+              "cwd": "/home/aoeu/.config/emacs"
             }
           },
           "zoomed": false,
-          "focused": 2,
-          "root_pane": 2
+          "focused": 5,
+          "root_pane": 5
+        },
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 6
+          },
+          "panes": {
+            "6": {
+              "cwd": "/home/aoeu/.config/ManifoldOS",
+              "agent_session": {
+                "source": "herdr:opencode",
+                "agent": "opencode",
+                "kind": "id",
+                "value": "ses_01ee6a766ffepxCFSM7k5DcW1A"
+              }
+            }
+          },
+          "zoomed": false,
+          "focused": 6,
+          "root_pane": 6
         }
       ],
       "active_tab": 0

@@ -1,24 +1,24 @@
 onboarding = false
 [theme]
-name = "red-white"
+name = "shape-white"
 auto_switch = false
 
 [theme.custom]
-panel_bg  = "#FFFFFF"
-surface0  = "#FFFFFF"
-surface1  = "#FFFFFF"
-overlay0  = "#CC0000"
-overlay1  = "#FF0000"
-text      = "#FF0000"
-subtext0  = "#CC0000"
-accent    = "#E53935"
-mauve     = "#EF5350"
-red       = "#E53935"
-green     = "#E53935"
-yellow    = "#E53935"
-blue      = "#E53935"
-teal      = "#EF5350"
-peach     = "#E57373"
+panel_bg  = "reset"
+surface0  = "reset"
+surface1  = "reset"
+overlay0  = "#FFFFFF"
+overlay1  = "#FFFFFF"
+text      = "#FFFFFF"
+subtext0  = "#FFFFFF"
+accent    = "#FFFFFF"
+mauve     = "#FFFFFF"
+red       = "#FFFFFF"
+green     = "#FFFFFF"
+yellow    = "#FFFFFF"
+blue      = "#FFFFFF"
+teal      = "#FFFFFF"
+peach     = "#FFFFFF"
 
 [ui.toast]
 delivery = "herdr"

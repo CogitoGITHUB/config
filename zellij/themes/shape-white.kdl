@@ -1,0 +1,128 @@
+themes {
+    red {
+        fg 255 255 255
+        bg -1 -1 -1
+        red 255 255 255
+        green 255 255 255
+        yellow 255 255 255
+        blue 255 255 255
+        cyan 255 255 255
+        magenta 255 255 255
+        orange 255 255 255
+        purple 255 255 255
+        black 255 255 255
+        white -1 -1 -1
+        text_unselected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        text_selected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        ribbon_unselected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        ribbon_selected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        frame_unselected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        frame_selected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        frame_highlight {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        exit_code_success {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        exit_code_error {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        table_title {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        table_cell_selected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        table_cell_unselected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        list_selected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+        list_unselected {
+            base 255 255 255
+            background -1 -1 -1
+            emphasis_0 255 255 255
+            emphasis_1 255 255 255
+            emphasis_2 255 255 255
+            emphasis_3 255 255 255
+        }
+    }
+}

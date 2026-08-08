@@ -51,7 +51,7 @@
 ;; :foreground from (face-background 'cursor nil t).  Ensure cursor
 ;; has an explicit background so that ever resolves to a valid color.
 (unless (face-background 'cursor nil t)
-  (set-face-attribute 'cursor nil :background "#808080"))
+  (set-face-attribute 'cursor nil :background "#FFFFFF"))
 #+end_src
 
 ** Extra Integrations

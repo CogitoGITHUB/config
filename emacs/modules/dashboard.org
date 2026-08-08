@@ -202,7 +202,7 @@
     (dolist (face '(dashboard-banner-logo-title dashboard-text-banner))
       (when (facep face)
         (set-face-attribute face nil
-                            :foreground "#8B0000" :background 'unspecified :weight 'bold :inherit nil)))))
+                            :foreground "#FFFFFF" :background 'unspecified :weight 'bold :inherit nil)))))
 #+end_src
 
 ** Faces — Headings
@@ -212,7 +212,7 @@
   (with-eval-after-load 'dashboard
     (when (facep 'dashboard-heading)
       (set-face-attribute 'dashboard-heading nil
-                          :foreground "#8B0000" :background 'unspecified :weight 'bold :inherit nil))))
+                          :foreground "#FFFFFF" :background 'unspecified :weight 'bold :inherit nil))))
 #+end_src
 
 ** Faces — Items
@@ -222,7 +222,7 @@
   (with-eval-after-load 'dashboard
     (when (facep 'dashboard-items-face)
       (set-face-attribute 'dashboard-items-face nil
-                          :foreground "#8B0000" :background 'unspecified :weight 'normal :inherit nil))))
+                          :foreground "#FFFFFF" :background 'unspecified :weight 'normal :inherit nil))))
 #+end_src
 
 ** Faces — Footer
@@ -233,7 +233,7 @@
     (dolist (face '(dashboard-footer dashboard-footer-icon-face))
       (when (facep face)
         (set-face-attribute face nil
-                            :foreground "#8B0000" :background 'unspecified :weight 'normal :inherit nil)))))
+                            :foreground "#FFFFFF" :background 'unspecified :weight 'normal :inherit nil)))))
 #+end_src
 
 ** Faces — Apply

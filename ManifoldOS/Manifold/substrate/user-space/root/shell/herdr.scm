@@ -8,14 +8,14 @@
 (define-public herdr
   (package
     (name "herdr")
-    (version "0.7.5")
+    (version "0.8.0")
     (source
       (origin
         (method url-fetch)
         (uri (string-append
               "https://github.com/ogulcancelik/herdr/releases/download/v" version
               "/herdr-linux-x86_64"))
-        (sha256 (base32 "0lwjqnajw50rjaxxn5zxqr0r3jmwjyzffc4scwy2sk1y0y435j1x"))))
+        (sha256 (base32 "0a6dk9p5zczmyg9ga8n60fsbfvgj3cmvdjbshmzb2b7s81zflwmq"))))
     (build-system trivial-build-system)
     (arguments
       '(#:modules ((guix build utils))
@@ -31,4 +31,4 @@
     (home-page "https://herdr.dev")
     (synopsis "Agent multiplexer that lives in your terminal")
     (description "Herdr is an agent-aware terminal multiplexer with workspaces, tabs, panes, mouse support, and session persistence. Detects agent states (blocked, working, done).")
-    (license license:agpl3)))
+    (license license:asl2.0)))

@@ -24,8 +24,8 @@
   (org-fancy-priorities-list . '((?A . "🌹")
                                   (?B . "🥀")
                                   (?C . "·")))
-  (org-priority-faces . '((?A :foreground "#8B0000" :weight bold)
-                           (?B :foreground "#CD5C5C")
-                           (?C :foreground "#696969"))))
+  (org-priority-faces . '((?A :foreground "#FFFFFF" :weight bold)
+                           (?B :foreground "#FFFFFF")
+                           (?C :foreground "#FFFFFF"))))
 #+end_src
 

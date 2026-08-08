@@ -1,0 +1,13 @@
+[theme]
+name = "shape-white"
+
+[colors]
+Base = "#FFFFFF"
+Guidance = "#FFFFFF"
+Annotation = "#FFFFFF"
+AlertInfo = "#FFFFFF"
+AlertWarn = "#FFFFFF"
+Title = "#FFFFFF"
+Muted = "#FFFFFF"
+Important = "#FFFFFF"
+AlertError = "#FFFFFF"
