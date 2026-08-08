@@ -67,7 +67,7 @@ Commands:
 
 (defun my/manifolding-atlas-recipe-create ()
   "Create a new recipe note under `my/manifolding-atlas-recipes-directory'.
-Prompts for title and an optional subdirectory under `recipes/' ("." or empty = straight into `recipes/`), collects the recipe prompts, tags the note `recipe', and opens the `recipes' body template for editing."
+Prompts for title and an optional subdirectory under `recipes/' (dot or empty = straight into `recipes/'), collects the recipe prompts, tags the note `recipe', and opens the `recipes' body template for editing."
   (interactive)
   (let* ((manifolding-atlas-create-default-function (lambda (_) '()))
          (root (expand-file-name my/manifolding-atlas-recipes-directory

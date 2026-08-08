@@ -23,3 +23,12 @@ OpenCode connects via socat to the Unix socket.
 #+begin_src emacs-lisp
   (add-hook 'emacs-startup-hook #'mcp-server-start-unix)
 #+end_src
+
+** No exit prompt :config:
+#+begin_src emacs-lisp
+  (defun my/mcp-server-no-exit-prompt ()
+    (dolist (proc (process-list))
+      (when (string-prefix-p "emacs-mcp" (process-name proc))
+        (set-process-query-on-exit-flag proc nil))))
+  (advice-add 'mcp-server-start-unix :after #'my/mcp-server-no-exit-prompt)
+#+end_src
