@@ -2,47 +2,76 @@
   "version": 3,
   "workspaces": [
     {
-      "id": "w1H",
+      "id": "w1N",
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "9": 26,
-        "10": 27
+        "6": 5,
+        "1": 1,
+        "4": 3,
+        "2": 2
       },
-      "next_public_pane_number": 28,
+      "next_public_pane_number": 6,
       "public_tab_numbers": [
-        26,
-        27
+        1,
+        2,
+        3
       ],
-      "next_public_tab_number": 28,
+      "next_public_tab_number": 4,
       "tabs": [
         {
-          "custom_name": "reshape system",
+          "custom_name": "Opencode Emacs",
           "layout": {
-            "Pane": 9
+            "Pane": 1
           },
           "panes": {
-            "9": {
+            "1": {
               "cwd": "/home/aoeu/.config/emacs"
             }
           },
           "zoomed": false,
-          "focused": 9,
-          "root_pane": 9
+          "focused": 1,
+          "root_pane": 1
+        },
+        {
+          "custom_name": "System Reshape",
+          "layout": {
+            "Pane": 2
+          },
+          "panes": {
+            "2": {
+              "cwd": "/home/aoeu/.config/ManifoldOS"
+            }
+          },
+          "zoomed": false,
+          "focused": 2,
+          "root_pane": 2
         },
         {
           "custom_name": null,
           "layout": {
-            "Pane": 10
+            "Split": {
+              "direction": "Vertical",
+              "ratio": 0.5,
+              "first": {
+                "Pane": 4
+              },
+              "second": {
+                "Pane": 6
+              }
+            }
           },
           "panes": {
-            "10": {
-              "cwd": "/home/aoeu/.config"
+            "4": {
+              "cwd": "/home/aoeu/.config/ManifoldOS"
+            },
+            "6": {
+              "cwd": "/home/aoeu/.config/ManifoldOS"
             }
           },
           "zoomed": false,
-          "focused": 10,
-          "root_pane": 10
+          "focused": 6,
+          "root_pane": 4
         }
       ],
       "active_tab": 1
