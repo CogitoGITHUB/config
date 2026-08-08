@@ -75,7 +75,7 @@ note `recipe', and opens the `recipes' body template for editing."
          (slug (my/manifolding-atlas-recipes--slugify title))
          (fname (concat my/manifolding-atlas-recipes-directory slug))
          (fast (my/manifolding-atlas--fast-level))
-         (prompts (my/manifolding-atlas-collect-prompts-with-fast '(recipe) '(file) fast))
+         (prompts (my/manifolding-atlas-collect-prompts-with-fast '(recipe) nil fast))
          (tags (cons "recipe" (plist-get prompts :tags)))
          (recipe (my/manifolding-atlas--create-file-wrapper
                   title fname tags

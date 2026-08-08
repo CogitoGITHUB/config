@@ -50,6 +50,8 @@ All prompts register via `my/manifolding-atlas-register-prompt` into `my/manifol
 | `'heading` | Heading-level creation |
 | `'task` | Task notes (tagged `task`) |
 | `'dictionary` | Dictionary word notes |
+| `'recipe` | Recipe notes (tagged `recipe`, created via `recipe-create`) |
+| `'contacts` | Contact notes numbering|
 
 ## Fast Mode Levels
 
