@@ -16953,3 +16953,11 @@
 2026-08-09T21:52:27.248676Z  INFO herdr::server::headless: client connected client_id=16 cols=240 rows=67 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
 2026-08-09T21:52:27.248737Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
 2026-08-09T21:52:40.891432Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
+2026-08-09T21:56:47.491931Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:tB"
+2026-08-09T21:56:49.370750Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:tE"
+2026-08-09T21:56:52.044055Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:t1"
+2026-08-09T21:56:54.415468Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:tC"
+2026-08-09T21:56:56.524489Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:t9"
+2026-08-09T21:56:57.740833Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:tB"
+2026-08-09T21:56:59.186110Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:tE"
+2026-08-09T21:57:04.192843Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
