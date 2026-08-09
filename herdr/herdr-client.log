@@ -7702,3 +7702,6 @@
 2026-08-09T19:27:42.444413Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=22279
 2026-08-09T19:27:42.444476Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
 2026-08-09T19:27:42.454693Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame
+2026-08-09T21:52:27.202855Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=20574
+2026-08-09T21:52:27.203423Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
+2026-08-09T21:52:27.247044Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame

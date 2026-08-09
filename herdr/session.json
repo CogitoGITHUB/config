@@ -6,9 +6,9 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
+        "7": 16,
         "2": 11,
         "1": 1,
-        "7": 16,
         "5": 14,
         "4": 13
       },
@@ -16,8 +16,8 @@
       "public_tab_numbers": [
         12,
         1,
-        11,
         9,
+        11,
         14
       ],
       "next_public_tab_number": 15,
@@ -51,20 +51,6 @@
           "root_pane": 1
         },
         {
-          "custom_name": "System Reshape",
-          "layout": {
-            "Pane": 4
-          },
-          "panes": {
-            "4": {
-              "cwd": "/home/aoeu/.config/ManifoldOS"
-            }
-          },
-          "zoomed": false,
-          "focused": 4,
-          "root_pane": 4
-        },
-        {
           "custom_name": "Emacs Testing",
           "layout": {
             "Pane": 2
@@ -77,6 +63,20 @@
           "zoomed": false,
           "focused": 2,
           "root_pane": 2
+        },
+        {
+          "custom_name": "System Reshape",
+          "layout": {
+            "Pane": 4
+          },
+          "panes": {
+            "4": {
+              "cwd": "/home/aoeu/.config/ManifoldOS"
+            }
+          },
+          "zoomed": false,
+          "focused": 4,
+          "root_pane": 4
         },
         {
           "custom_name": "Git Push",
