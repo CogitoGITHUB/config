@@ -7,18 +7,20 @@
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
         "1": 1,
-        "2": 11,
         "5": 14,
+        "7": 16,
+        "2": 11,
         "4": 13
       },
-      "next_public_pane_number": 16,
+      "next_public_pane_number": 17,
       "public_tab_numbers": [
         12,
         1,
         11,
-        9
+        9,
+        14
       ],
-      "next_public_tab_number": 14,
+      "next_public_tab_number": 15,
       "tabs": [
         {
           "custom_name": "SysWatch",
@@ -75,9 +77,23 @@
           "zoomed": false,
           "focused": 2,
           "root_pane": 2
+        },
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 7
+          },
+          "panes": {
+            "7": {
+              "cwd": "/home/aoeu/.config"
+            }
+          },
+          "zoomed": false,
+          "focused": 7,
+          "root_pane": 7
         }
       ],
-      "active_tab": 1
+      "active_tab": 4
     }
   ],
   "active": 0,
