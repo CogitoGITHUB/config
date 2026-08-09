@@ -9,12 +9,12 @@
         "1": 1,
         "2": 11
       },
-      "next_public_pane_number": 12,
+      "next_public_pane_number": 13,
       "public_tab_numbers": [
         1,
         9
       ],
-      "next_public_tab_number": 10,
+      "next_public_tab_number": 11,
       "tabs": [
         {
           "custom_name": "Opencode Emacs",
