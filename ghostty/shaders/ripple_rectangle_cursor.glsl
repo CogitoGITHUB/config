@@ -91,13 +91,21 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     vec4 previousCursor = vec4(normalize(iPreviousCursor.xy, 1.), normalize(iPreviousCursor.zw, 0.));
 
     vec2 centerCC = currentCursor.xy - (currentCursor.zw * offsetFactor);
+    vec2 centerCP = previousCursor.xy - (previousCursor.zw * offsetFactor);
 
     float cellWidth = max(currentCursor.z, previousCursor.z); // width of the 'block' cursor
     
-    // check for significant width change
+    // check for significant width change (vim block/line mode switch)
     float widthChange = abs(currentCursor.z - previousCursor.z);
     float widthThresholdNorm = cellWidth * CURSOR_WIDTH_CHANGE_THRESHOLD;
     float isModeChange = step(widthThresholdNorm, widthChange);
+
+    // check for any cursor movement (e.g. arrow keys moving one cell)
+    float moveDist = distance(centerCC, centerCP);
+    float moveThresholdNorm = cellWidth * 0.3;
+    float isMove = step(moveThresholdNorm, moveDist);
+
+    float trigger = step(0.5, isModeChange + isMove);
 
 
     // ANIMATION
@@ -105,7 +113,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     // don't clamp yet; we need to know if it's > 1.0 (finished)
      float isAnimating = 1.0 - step(1.0, rippleProgress); // progress < 1.0 ? 1.0: 0.0
      
-     if (isModeChange > 0.0 && isAnimating > 0.0) {
+     if (trigger > 0.0 && isAnimating > 0.0) {
         // Apply easing to progress
         // float easedProgress = rippleProgress;
         // float easedProgress = easeOutQuad(rippleProgress);
