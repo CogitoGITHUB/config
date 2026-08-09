@@ -9,6 +9,7 @@
   #:use-module (gnu services guix)
   #:use-module (guix gexp)
   #:use-module (substrate user-space home loaders audio)
+  #:use-module (substrate user-space home emacs daemon)
   #:export (mappingos-home-environment))
 
 (define-public mappingos-home-environment
@@ -17,7 +18,8 @@
     (services
      (append
       home-audio-services
-      (list (simple-service 'pulseaudio-restart
+      (list home-emacs-daemon-service
+            (simple-service 'pulseaudio-restart
                            home-shepherd-service-type
                            (list (shepherd-service
                                   (documentation "Restart PulseAudio at login")

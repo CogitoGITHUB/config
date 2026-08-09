@@ -41,7 +41,7 @@ hl.bind(mod .. " + M",          hl.dsp.exec_cmd("dms ipc call processlist toggle
 hl.bind(mod .. " + N",          hl.dsp.exec_cmd("dms ipc call notifications toggle"))
 hl.bind(mod .. " + P",          hl.dsp.exec_cmd("dms ipc call notepad toggle"))
 hl.bind(mod .. " + X",          hl.dsp.exec_cmd("dms ipc call powermenu toggle"))
-hl.bind(mod .. " + SHIFT + L",  hl.dsp.exec_cmd("dms ipc call lock lock"))
+hl.bind(mod .. " + SHIFT + L",  hl.dsp.exec_cmd("bash /home/aoeu/.config/quickshell/manifolding/lock/lock.sh"))
 hl.bind(mod .. " + SHIFT + Space", hl.dsp.exec_cmd("dms ipc call spotlight toggle"))
 -- ── Audio ──────────────────────────────────────────────────────────────────
 hl.bind("XF86AudioRaiseVolume",  hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"),  { repeating = true })

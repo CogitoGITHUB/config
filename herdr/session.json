@@ -7,15 +7,33 @@
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
         "1": 1,
-        "2": 11
+        "2": 11,
+        "5": 14,
+        "4": 13
       },
-      "next_public_pane_number": 13,
+      "next_public_pane_number": 16,
       "public_tab_numbers": [
+        12,
         1,
+        11,
         9
       ],
-      "next_public_tab_number": 11,
+      "next_public_tab_number": 14,
       "tabs": [
+        {
+          "custom_name": "SysWatch",
+          "layout": {
+            "Pane": 5
+          },
+          "panes": {
+            "5": {
+              "cwd": "/home/aoeu/.config/emacs"
+            }
+          },
+          "zoomed": false,
+          "focused": 5,
+          "root_pane": 5
+        },
         {
           "custom_name": "Opencode Emacs",
           "layout": {
@@ -31,7 +49,21 @@
           "root_pane": 1
         },
         {
-          "custom_name": null,
+          "custom_name": "System Reshape",
+          "layout": {
+            "Pane": 4
+          },
+          "panes": {
+            "4": {
+              "cwd": "/home/aoeu/.config/ManifoldOS"
+            }
+          },
+          "zoomed": false,
+          "focused": 4,
+          "root_pane": 4
+        },
+        {
+          "custom_name": "Emacs Testing",
           "layout": {
             "Pane": 2
           },
