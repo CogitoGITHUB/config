@@ -1,0 +1,5 @@
+config-file = ?font.ghostty
+config-file = ?colors.ghostty
+config-file = ?keybinds.ghostty
+config-file = ?window.ghostty
+config-file = ?cursor.ghostty
