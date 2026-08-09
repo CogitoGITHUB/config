@@ -171,11 +171,15 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     float lineLength = distance(centerCC, centerCP);
     float minDist = currentCursor.w * THRESHOLD_MIN_DISTANCE;
     
+    // Long jumps resolve faster: scale the animation time down as distance grows
+    float distScale = clamp(8.0 * currentCursor.w / max(lineLength, 1e-6), 0.25, 1.0);
+    float durEff = DURATION * distScale;
+    
     vec4 newColor = vec4(fragColor);
 
     float baseProgress = iTime - iTimeCursorChange;
     
-    if (lineLength > minDist && baseProgress < DURATION - 0.001) {
+    if (lineLength > minDist && baseProgress < durEff - 0.001) {
         // defining corners of cursors
 
         // Y (Height) with TRAIL_THICKNESS
@@ -216,8 +220,8 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
         vec2 cp_br = vec2(cp_new_right_x, cp_new_bottom_y);
 
         // calculating durations for every corner
-        const float DURATION_TRAIL = DURATION;
-        const float DURATION_LEAD = DURATION * (1.0 - TRAIL_SIZE);
+        const float DURATION_TRAIL = durEff;
+        const float DURATION_LEAD = durEff * (1.0 - TRAIL_SIZE);
         const float DURATION_SIDE = (DURATION_LEAD + DURATION_TRAIL) / 2.0;
 
         vec2 moveVec = centerCC - centerCP;

@@ -16590,3 +16590,12 @@
 2026-08-09T19:30:22.662920Z  INFO herdr::server::headless: client resize client_id=14 cols=191 rows=56 cell_width_px=0 cell_height_px=0
 2026-08-09T19:30:22.864312Z  INFO herdr::server::headless: client resize client_id=14 cols=190 rows=55 cell_width_px=0 cell_height_px=0
 2026-08-09T19:30:23.779567Z  INFO herdr::server::headless: client resize client_id=14 cols=191 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-09T19:30:49.055429Z  INFO herdr::server::headless: client resize client_id=14 cols=189 rows=55 cell_width_px=0 cell_height_px=0
+2026-08-09T19:30:52.764928Z  INFO herdr::server::headless: client resize client_id=14 cols=191 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-09T19:31:21.632010Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
+2026-08-09T19:31:42.086790Z  INFO herdr::server::headless: client resize client_id=14 cols=189 rows=55 cell_width_px=0 cell_height_px=0
+2026-08-09T19:31:42.809329Z  INFO herdr::server::headless: client resize client_id=14 cols=191 rows=56 cell_width_px=0 cell_height_px=0
+2026-08-09T19:33:49.158418Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:t9"
+2026-08-09T19:33:54.162385Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
+2026-08-09T19:34:05.383961Z  INFO herdr::server::headless: client resize client_id=14 cols=189 rows=55 cell_width_px=0 cell_height_px=0
+2026-08-09T19:34:11.227035Z  INFO herdr::server::headless: client resize client_id=14 cols=191 rows=56 cell_width_px=0 cell_height_px=0
