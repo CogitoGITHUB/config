@@ -6,10 +6,10 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "1": 1,
-        "5": 14,
-        "7": 16,
         "2": 11,
+        "1": 1,
+        "7": 16,
+        "5": 14,
         "4": 13
       },
       "next_public_pane_number": 17,
@@ -79,7 +79,7 @@
           "root_pane": 2
         },
         {
-          "custom_name": null,
+          "custom_name": "Git Push",
           "layout": {
             "Pane": 7
           },
