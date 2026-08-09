@@ -26,6 +26,7 @@ source ~/.local/share/atuin/init.nu
 $env.config.color_config = $light_theme
 
 # starship
+$env.NO_COLOR = "1"
 starship init nu | save -f ($nu.data-dir | path join "vendor/autoload/starship.nu")
 
 # PSLEEP style
