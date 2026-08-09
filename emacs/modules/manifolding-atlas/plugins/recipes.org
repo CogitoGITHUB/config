@@ -13,8 +13,9 @@ Commands:
 
 * State
 #+begin_src emacs-lisp
-(defvar my/manifolding-atlas-recipes-directory "recipes/"
-  "Vault subdirectory where recipe notes live.")
+(defvar my/manifolding-atlas-recipes-directory
+  (expand-file-name "recipes/" (my/manifolding-atlas-root-dir))
+  "Directory (inside the vault) where recipe notes live.")
 #+end_src
 
 * Helpers
@@ -67,17 +68,18 @@ Commands:
 
 (defun my/manifolding-atlas-recipe-create ()
   "Create a new recipe note under `my/manifolding-atlas-recipes-directory'.
-Prompts for title and an optional subdirectory under `recipes/' (dot or empty = straight into `recipes/'), collects the recipe prompts, tags the note `recipe', and opens the `recipes' body template for editing."
+Prompts for title, fast mode level, recipe-specific prompts (SERVINGS etc.), and
+opens the `recipes' body template for editing."
   (interactive)
   (let* ((manifolding-atlas-create-default-function (lambda (_) '()))
-         (root (expand-file-name my/manifolding-atlas-recipes-directory
-                                 (my/manifolding-atlas-root-dir)))
+         (root (expand-file-name "recipes/" (my/manifolding-atlas-root-dir)))
          (_ (make-directory root t))
          (title (read-string "Recipe title: "))
          (slug (my/manifolding-atlas-recipes--slugify title))
          (subdir (my/manifolding-atlas-choose-subdir
-                  root "Subdirectory under recipes/: "))
-         (fname (concat my/manifolding-atlas-recipes-directory subdir slug))
+                  (expand-file-name "recipes/" (my/manifolding-atlas-root-dir))
+                  "Subdirectory under recipes/: "))
+         (fname (concat "recipes/" subdir slug))
          (fast (my/manifolding-atlas--fast-level))
          (prompts (my/manifolding-atlas-collect-prompts-with-fast '(recipe) nil fast))
          (tags (cons "recipe" (plist-get prompts :tags)))
@@ -87,10 +89,7 @@ Prompts for title and an optional subdirectory under `recipes/' (dot or empty = 
                   (plist-get prompts :body))))
     (dolist (fn (plist-get prompts :post-apply))
       (funcall fn recipe))
-    (if (= fast 3)
-        (when (y-or-n-p (format "Open %s? " slug))
-          (find-file (expand-file-name fname (my/manifolding-atlas-root-dir))))
-      (my/manifolding-atlas-recipes--open-capture recipe))))
+    (my/manifolding-atlas-recipes--open-capture recipe)))
 #+end_src
 
 * Edit Servings

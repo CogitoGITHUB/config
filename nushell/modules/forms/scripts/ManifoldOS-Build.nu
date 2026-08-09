@@ -3,7 +3,7 @@ source ~/.config/nushell/modules/forms/scripts/ManifoldOS-Sources.nu
 def mb-flow [current: string, timings: record] {
     print -n "\e[2J\e[H"
     print ""
-    print $"(ansi red_bold)🌹 MANIFOLD // BUILD 🌹(ansi reset)"
+    print $"(ansi white_bold)🌹 MANIFOLD // BUILD 🌹(ansi reset)"
     print ""
     for step in ["Cache" "Build"] {
         let elapsed   = ($timings | get -o $step | default "")
@@ -43,18 +43,18 @@ def ManifoldOS-Build [] {
     print ""
 
     if $r.exit_code != 0 {
-        print $"(ansi red_bold)🌹 MANIFOLD // BUILD — FAILED  ($total)s(ansi reset)"
+        print $"(ansi white_bold)🌹 MANIFOLD // BUILD — FAILED  ($total)s(ansi reset)"
         print ""
         $output | lines | where { |l| $l =~ "constitution:|error:" } | each { |l| print $"  ($l | str trim)" }
         print ""
-        print $"(ansi grey)📋 ($log)(ansi reset)"
+        print $"(ansi white)📋 ($log)(ansi reset)"
     } else {
-        print $"(ansi green_bold)🌹 MANIFOLD // BUILD — OK  ($total)s(ansi reset)"
+        print $"(ansi white_bold)🌹 MANIFOLD // BUILD — OK  ($total)s(ansi reset)"
         print ""
         $output | lines | where { |l| $l =~ "constitution: scanned" } | last 1 | each { |l| print $"  ($l | str trim)" }
         print ""
-        $output | lines | where { |l| $l =~ "WARNING:" } | each { |l| print $"(ansi yellow)  ($l | str trim)(ansi reset)" }
-        print $"(ansi grey)📋 ($log)(ansi reset)"
+        $output | lines | where { |l| $l =~ "WARNING:" } | each { |l| print $"(ansi white)  ($l | str trim)(ansi reset)" }
+        print $"(ansi white)📋 ($log)(ansi reset)"
     }
 
     print ""

@@ -12,6 +12,5 @@
                (let ((val (read-string "Cook time (e.g. 30 min): " nil nil nil "⚠ WARNING")))
                  (if (or (string-empty-p val) (string-equal val "⚠ WARNING")) "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when (and val (not (string-equal val "WARNING")))
-                `(:properties (("COOK_TIME" . ,val))))))
+              `(:properties (("COOK_TIME" . ,val)))))
 #+end_src

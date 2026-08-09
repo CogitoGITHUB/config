@@ -2,6 +2,7 @@
 local mod = "SUPER"
 -- ── Applications ───────────────────────────────────────────────────────────
 hl.bind(mod .. " + Return",     hl.dsp.exec_cmd(terminal))
+hl.bind(mod .. " + W",          hl.dsp.exec_cmd("/home/aoeu/.config/quickshell/qs-wallpaper-picker/scripts/open_picker.sh"))
 hl.bind(mod .. " + BackSpace",  hl.dsp.window.close())
 hl.bind(mod .. " + E",          hl.dsp.exec_cmd("emacs"))
 hl.bind(mod .. " + O",          hl.dsp.exec_cmd("qutebrowser"))

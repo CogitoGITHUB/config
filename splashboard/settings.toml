@@ -5,16 +5,16 @@
 [theme]
 bg = "#ffffff"
 bg_subtle = "#ffffff"
-text = "#cc0000"
-text_secondary = "#cc0000"
-text_dim = "#cc0000"
-panel_title = "#cc0000"
-panel_border = "#cc0000"
-status_ok = "#cc0000"
-status_warn = "#cc0000"
-status_error = "#cc0000"
-accent_today = "#cc0000"
-accent_event = "#cc0000"
-palette_series = ["#cc0000", "#cc0000", "#cc0000", "#cc0000"]
-palette_heatmap = ["#cc0000", "#cc0000", "#cc0000", "#cc0000", "#cc0000"]
+text = "#FFFFFF"
+text_secondary = "#FFFFFF"
+text_dim = "#FFFFFF"
+panel_title = "#FFFFFF"
+panel_border = "#FFFFFF"
+status_ok = "#FFFFFF"
+status_warn = "#FFFFFF"
+status_error = "#FFFFFF"
+accent_today = "#FFFFFF"
+accent_event = "#FFFFFF"
+palette_series = ["#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFFFFF"]
+palette_heatmap = ["#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFFFFF"]
 

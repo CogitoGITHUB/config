@@ -33,7 +33,7 @@ def get-github-token [] {
     if not ($gitignore   | path exists) { "*" | save -f $gitignore }
     if ($token_path | path exists) { return (open $token_path | str trim) }
     print -n "\e[2J\e[H"
-    print $"(ansi red_bold)🌹 MANIFOLD // GITHUB TOKEN SETUP 🌹(ansi reset)"
+    print $"(ansi white_bold)🌹 MANIFOLD // GITHUB TOKEN SETUP 🌹(ansi reset)"
     try { xdg-open "https://github.com/settings/tokens/new?scopes=repo&description=ManifoldOS" } catch {
         print "  https://github.com/settings/tokens/new?scopes=repo&description=ManifoldOS"
     }
@@ -41,7 +41,7 @@ def get-github-token [] {
     if ($token | is-empty) { return null }
     $token | save -f $token_path
     chmod 600 $token_path
-    print $"(ansi green)  ✓ saved(ansi reset)"
+    print $"(ansi white)  ✓ saved(ansi reset)"
     $token
 }
 
@@ -53,7 +53,7 @@ def get-gitlab-token [] {
     if not ($gitignore   | path exists) { "*" | save -f $gitignore }
     if ($token_path | path exists) { return (open $token_path | str trim) }
     print -n "\e[2J\e[H"
-    print $"(ansi red_bold)🌹 MANIFOLD // GITLAB TOKEN SETUP 🌹(ansi reset)"
+    print $"(ansi white_bold)🌹 MANIFOLD // GITLAB TOKEN SETUP 🌹(ansi reset)"
     try { xdg-open "https://gitlab.com/-/profile/personal_access_tokens?name=ManifoldOS&scopes=api" } catch {
         print "  https://gitlab.com/-/profile/personal_access_tokens?name=ManifoldOS&scopes=api"
     }
@@ -61,7 +61,7 @@ def get-gitlab-token [] {
     if ($token | is-empty) { return null }
     $token | save -f $token_path
     chmod 600 $token_path
-    print $"(ansi green)  ✓ saved(ansi reset)"
+    print $"(ansi white)  ✓ saved(ansi reset)"
     $token
 }
 
@@ -116,8 +116,8 @@ def bootstrap-repo [] {
     let repo = (pwd)
     let repo_name = ($repo | path basename)
     print -n "\e[2J\e[H"
-    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
-    print $"(ansi grey)  Bootstrapping ($repo_name)(ansi reset)"
+    print $"(ansi white_bold)🌹 MANIFOLD // RESHAPING HISTORY 🌹(ansi reset)"
+    print $"(ansi white)  Bootstrapping ($repo_name)(ansi reset)"
     let provider = (["GitHub" "GitLab"] | input list --fuzzy "Push to:")
     let token = if $provider == "GitHub" { get-github-token } else { get-gitlab-token }
     if $token == null { return false }
@@ -150,7 +150,7 @@ def bootstrap-repo [] {
         let pr2 = (do { git -C $repo push -u origin $bm } | complete)
         if $pr2.exit_code != 0 { return false }
     }
-    print $"(ansi green)  ✓ pushed → ($remote_url) on ($bm)(ansi reset)"
+    print $"(ansi white)  ✓ pushed → ($remote_url) on ($bm)(ansi reset)"
     true
 }
 
@@ -236,7 +236,7 @@ def check-remote-reachable [repo: string] {
     let r = (do { ssh -T $"git@($host)" -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=5 } | complete)
     let ok = ($r.stderr | str contains "successfully authenticated") or ($r.stdout | str contains "successfully authenticated") or ($r.exit_code == 1)
     if not $ok {
-        print $"(ansi red_bold)  🥀 REMOTE UNREACHABLE — cannot reach ($host) via SSH(ansi reset)"
+        print $"(ansi white_bold)  🥀 REMOTE UNREACHABLE — cannot reach ($host) via SSH(ansi reset)"
         true
     } else { false }
 }
@@ -247,7 +247,7 @@ def check-divergence [repo: string, branch: string] {
     let ahead  = (try { git -C $repo rev-list --count $"origin/($branch)..($branch)" | str trim | into int } catch { 0 })
     let behind = (try { git -C $repo rev-list --count $"($branch)..origin/($branch)" | str trim | into int } catch { 0 })
     if $ahead == 0 or $behind == 0 { return false }
-    print $"(ansi red_bold)  🥀 DIVERGED — ($branch) is ($ahead) ahead, ($behind) behind(ansi reset)"
+    print $"(ansi white_bold)  🥀 DIVERGED — ($branch) is ($ahead) ahead, ($behind) behind(ansi reset)"
     let choice = (["rebase onto remote" "abort"] | input list --fuzzy "Divergence strategy:")
     if $choice == "abort" { return true }
     let r = (do { git -C $repo rebase $"origin/($branch)" } | complete)
@@ -261,7 +261,7 @@ def check-behind [repo: string, branch: string] {
     if not (remote-branch-exists $repo $branch) { return false }
     let behind = (try { git -C $repo rev-list --count $"($branch)..origin/($branch)" | str trim | into int } catch { 0 })
     if $behind == 0 { return false }
-    print $"(ansi red_bold)  🥀 BEHIND REMOTE — ($branch) is ($behind) commit\(s\) behind(ansi reset)"
+    print $"(ansi white_bold)  🥀 BEHIND REMOTE — ($branch) is ($behind) commit\(s\) behind(ansi reset)"
     let choice = ([
         "fast-forward  — rebase local commits on top of remote (recommended)"
         "pull only     — move branch to remote tip, discard local"
@@ -297,7 +297,7 @@ def check-behind [repo: string, branch: string] {
 def check-conflicts [repo: string] {
     let conflicted = (try { git -C $repo diff --name-only --diff-filter=U | lines | where { |l| $l | is-not-empty } } catch { [] })
     if not ($conflicted | is-empty) {
-        print $"(ansi red_bold)  🥀 UNRESOLVED CONFLICTS(ansi reset)"
+        print $"(ansi white_bold)  🥀 UNRESOLVED CONFLICTS(ansi reset)"
         $conflicted | print
         ["abort"] | input list --fuzzy "Resolve manually then re-run:" | ignore
         return true
@@ -320,7 +320,7 @@ def check-large-files [repo: string] {
         | where { |x| $x != null }
     } catch { [] })
     if not ($large | is-empty) {
-        print $"(ansi red_bold)  🥀 LARGE FILES — ($config.max_file_size_mb)MB limit exceeded(ansi reset)"
+        print $"(ansi white_bold)  🥀 LARGE FILES — ($config.max_file_size_mb)MB limit exceeded(ansi reset)"
         $large | print
         let choice = (["continue anyway" "abort"] | input list --fuzzy "Large files — proceed?")
         $choice == "abort"
@@ -330,7 +330,7 @@ def check-large-files [repo: string] {
 def check-stash [repo: string] {
     let count = (try { git -C $repo stash list | lines | length } catch { 0 })
     if $count > 0 {
-        print $"(ansi red_bold)  🥀 STASHED CHANGES — ($count) stashes(ansi reset)"
+        print $"(ansi white_bold)  🥀 STASHED CHANGES — ($count) stashes(ansi reset)"
         git -C $repo stash list | lines | print
         let choice = (["continue anyway" "abort"] | input list --fuzzy "Stash detected — proceed?")
         $choice == "abort"
@@ -355,7 +355,7 @@ def check-gitignore [repo: string] {
         }
     })
     if not ($suspicious | is-empty) {
-        print $"(ansi red_bold)  🥀 SUSPICIOUS FILES(ansi reset)"
+        print $"(ansi white_bold)  🥀 SUSPICIOUS FILES(ansi reset)"
         $suspicious | print
         let choice = (["continue anyway" "abort"] | input list --fuzzy "Suspicious files — proceed?")
         $choice == "abort"
@@ -377,28 +377,28 @@ def hub-render-summary [bm: string, changed: list, commit_msg: string, sync: rec
     let wilt = "🥀"
     print -n "\e[2J\e[H"
     print ""
-    print $"(ansi red_bold)  ($rose) ($bm)  ↑($sync.ahead) ↓($sync.behind)  ($elapsed)(ansi reset)"
+    print $"(ansi white_bold)  ($rose) ($bm)  ↑($sync.ahead) ↓($sync.behind)  ($elapsed)(ansi reset)"
     print ""
-    print $"(ansi red)  ($rose) ($commit_msg)(ansi reset)"
+    print $"(ansi white)  ($rose) ($commit_msg)(ansi reset)"
     print ""
     for f in $changed {
         let sym = match $f.status { "deleted" => $wilt _ => $rose }
-        print $"(ansi red)  ($sym) ($f.status)  ($f.file)(ansi reset)"
+        print $"(ansi white)  ($sym) ($f.status)  ($f.file)(ansi reset)"
     }
     print ""
      let total   = ($changed | length)
      let deleted = ($changed | where status == "deleted" | length)
-     let health  = (if $total == 0 { $"(ansi red)nothing changed(ansi reset)" }
-         else if $deleted == $total { $"(ansi red)($wilt)($wilt)($wilt)  everything was lost(ansi reset)" }
-         else if $deleted > ($total / 2 | math floor) { $"(ansi red)($rose)($wilt)($wilt)  the history shifts(ansi reset)" }
-         else { $"(ansi red)($rose)($rose)($rose)($rose)($rose)  the history has been reshaped(ansi reset)" })
+     let health  = (if $total == 0 { $"(ansi white)nothing changed(ansi reset)" }
+         else if $deleted == $total { $"(ansi white)($wilt)($wilt)($wilt)  everything was lost(ansi reset)" }
+         else if $deleted > ($total / 2 | math floor) { $"(ansi white)($rose)($wilt)($wilt)  the history shifts(ansi reset)" }
+         else { $"(ansi white)($rose)($rose)($rose)($rose)($rose)  the history has been reshaped(ansi reset)" })
      print $"  ($health)"
      print ""
 }
 
 def render-failure [stage: string, reason: string] {
-    print $"(ansi red_bold)  🥀 ($stage) FAILED(ansi reset)"
-    print $"(ansi grey)  ($reason)(ansi reset)"
+    print $"(ansi white_bold)  🥀 ($stage) FAILED(ansi reset)"
+    print $"(ansi white)  ($reason)(ansi reset)"
 }
 
 # =============================================================================
@@ -414,7 +414,7 @@ def fzf-run [input_str: string, args: list<string>] {
 
 # ── commit & push ─────────────────────────────────────────────────────────────
 def hub-commit-push [repo: string, bm: string, msg: string] {
-    print $"(ansi red)  🌹 fetching...(ansi reset)"
+    print $"(ansi white)  🌹 fetching...(ansi reset)"
     let fetch_result = (do { git -C $repo fetch origin } | complete)
     if $fetch_result.exit_code != 0 { render-failure "FETCH" $fetch_result.stderr; return }
     if (check-divergence $repo $bm)   { return }
@@ -429,11 +429,11 @@ def hub-commit-push [repo: string, bm: string, msg: string] {
         $"[($bm)] (date now | format date '%Y-%m-%d %H:%M')"
     } else { $msg }
     let author = $"($config.author_name) <($config.author_email)>"
-    print $"(ansi red)  🌹 staging & committing...(ansi reset)"
+    print $"(ansi white)  🌹 staging & committing...(ansi reset)"
     git -C $repo add -A | ignore
     let ci = (do { git -C $repo commit -m $commit_msg --author $author } | complete)
     if $ci.exit_code != 0 { render-failure "COMMIT" $ci.stderr; return }
-    print $"(ansi red)  🌹 pushing...(ansi reset)"
+    print $"(ansi white)  🌹 pushing...(ansi reset)"
     let pr = (do-push $repo $bm)
     if $pr.exit_code != 0 { render-failure "PUSH" $pr.stderr; return }
     try { git -C $repo fetch origin } catch { }
@@ -449,7 +449,7 @@ def branch-fzf-lines [repo: string] {
         | each { |l|
             let is_current = ($l | str starts-with "*")
             let name   = ($l | str replace --regex '^\*?\s+' '' | str trim)
-            let marker = if $is_current { $"(ansi green_bold)*(ansi reset)" } else { " " }
+            let marker = if $is_current { $"(ansi white_bold)*(ansi reset)" } else { " " }
             let sync   = (resolve-ahead-behind $repo $name)
             let last   = (try { git -C $repo log -1 "--format=%h  %ar  %s" $name | str trim } catch { "no commits" })
             $"($marker)\t($name)\t↑($sync.ahead) ↓($sync.behind)\t($last)"
@@ -911,7 +911,7 @@ def hub-fix-head [repo: string] {
     let branch = (resolve-branch $repo)
 
     if ($branch | str starts-with "__rebase__") {
-        print $"(ansi red_bold)  🥀 REBASE IN PROGRESS(ansi reset)"
+        print $"(ansi white_bold)  🥀 REBASE IN PROGRESS(ansi reset)"
         let choice = (["continue" "abort"] | input list --fuzzy "Rebase:")
         if $choice == "continue" {
             let r = (do { git -C $repo rebase --continue } | complete)
@@ -924,7 +924,7 @@ def hub-fix-head [repo: string] {
         return
     }
     if ($branch | str starts-with "__merge__") {
-        print $"(ansi red_bold)  🥀 MERGE IN PROGRESS(ansi reset)"
+        print $"(ansi white_bold)  🥀 MERGE IN PROGRESS(ansi reset)"
         let choice = (["continue" "abort"] | input list --fuzzy "Merge:")
         if $choice == "continue" {
             let r = (do { git -C $repo merge --continue } | complete)
@@ -937,7 +937,7 @@ def hub-fix-head [repo: string] {
         return
     }
     if ($branch | str starts-with "__cherry-pick__") {
-        print $"(ansi red_bold)  🥀 CHERRY-PICK IN PROGRESS(ansi reset)"
+        print $"(ansi white_bold)  🥀 CHERRY-PICK IN PROGRESS(ansi reset)"
         let choice = (["continue" "abort"] | input list --fuzzy "Cherry-pick:")
         if $choice == "continue" {
             git -C $repo cherry-pick --continue | ignore
@@ -949,7 +949,7 @@ def hub-fix-head [repo: string] {
         return
     }
     if ($branch | str starts-with "__bisect__") {
-        print $"(ansi red_bold)  🥀 BISECT IN PROGRESS(ansi reset)"
+        print $"(ansi white_bold)  🥀 BISECT IN PROGRESS(ansi reset)"
         git -C $repo bisect reset | ignore
         print "  🌹 bisect reset"
         input "  Press enter..." | ignore
@@ -957,7 +957,7 @@ def hub-fix-head [repo: string] {
     }
     if ($branch | str starts-with "__detached__") {
         let hash = ($branch | str replace "__detached__" "")
-        print $"(ansi red_bold)  🥀 DETACHED HEAD at ($hash)(ansi reset)"
+        print $"(ansi white_bold)  🥀 DETACHED HEAD at ($hash)(ansi reset)"
         let nearby = (try {
             git -C $repo branch --contains HEAD | lines | where { |l| $l | is-not-empty }
             | each { |l| $l | str replace --regex '^\*?\s+' '' }
@@ -1008,18 +1008,18 @@ def interactive-hub [repo: string, msg: string] {
     let last_commit = (try { git -C $repo log -1 "--format=%h %s" --color=never | str trim } catch { "" })
     let stash_cnt = (try { git -C $repo stash list | lines | length } catch { 0 })
     let remote_url = (try { git -C $repo remote get-url origin | str trim | str replace --regex "^.*:" "" } catch { "" })
-    let state   = if ($branch | str starts-with "__") { $"(ansi red_bold)⚠ ($branch)(ansi reset)" } else { $branch }
+    let state   = if ($branch | str starts-with "__") { $"(ansi white_bold)⚠ ($branch)(ansi reset)" } else { $branch }
 
     # Display git information above the menu
     print -n "\e[2J\e[H"
-    print $"(ansi red_bold)🌹 MANIFOLD(ansi reset)"
-    print $"  (ansi red)🌹 Branch: ($state)(ansi reset)"
-    print $"  (ansi red)🌹 Sync: ↑($sync.ahead) ↓($sync.behind)  Stash: ($stash_cnt)(ansi reset)"
-    if ($last_commit | is-not-empty) { print $"  (ansi red)🌹 Commit: ($last_commit)(ansi reset)" }
+    print $"(ansi white_bold)🌹 MANIFOLD(ansi reset)"
+    print $"  (ansi white)🌹 Branch: ($state)(ansi reset)"
+    print $"  (ansi white)🌹 Sync: ↑($sync.ahead) ↓($sync.behind)  Stash: ($stash_cnt)(ansi reset)"
+    if ($last_commit | is-not-empty) { print $"  (ansi white)🌹 Commit: ($last_commit)(ansi reset)" }
     let tags_display = if ($head_tag | is-not-empty) { $head_tag } else { $tags | into string }
-    print $"  (ansi red)🌹 Tags: ($tags_display)(ansi reset)"
-    print $"  (ansi red)🌹 Changes: ($changed)(ansi reset)"
-    if ($remote_url | is-not-empty) { print $"  (ansi red)🌹 Remote: ($remote_url)(ansi reset)" }
+    print $"  (ansi white)🌹 Tags: ($tags_display)(ansi reset)"
+    print $"  (ansi white)🌹 Changes: ($changed)(ansi reset)"
+    if ($remote_url | is-not-empty) { print $"  (ansi white)🌹 Remote: ($remote_url)(ansi reset)" }
     print ""
 
       let options = [
@@ -1155,7 +1155,7 @@ def ManifoldOS-Reshaping-History [msg: string = "update"] {
 
     let repo = (find-repo-root)
     if $repo == null {
-        print $"(ansi red_bold)🌹 MANIFOLD(ansi reset)"
+        print $"(ansi white_bold)🌹 MANIFOLD(ansi reset)"
         let choice = (["bootstrap repo here" "abort"] | input list --fuzzy "No repo found:")
         if $choice == "abort" { return }
         if not (bootstrap-repo) { return }

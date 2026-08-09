@@ -12,6 +12,5 @@
                (let ((val (read-string "Ready in total: ")))
                  (if (string-empty-p val) "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when (and val (not (string-equal val "WARNING")))
-                `(:properties (("READY_IN" . ,val))))))
+              `(:properties (("READY_IN" . ,val)))))
 #+end_src

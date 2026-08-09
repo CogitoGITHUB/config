@@ -12,6 +12,5 @@
                (let ((val (read-string "Servings (e.g. 4): " nil nil nil "⚠ WARNING")))
                  (if (or (string-empty-p val) (string-equal val "⚠ WARNING")) "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when (and val (not (string-equal val "WARNING")))
-                `(:properties (("SERVINGS" . ,val))))))
+              `(:properties (("SERVINGS" . ,val)))))
 #+end_src

@@ -155,7 +155,7 @@ def print-section [path: string, label: string, subtitle: string, description: s
         let status = if $count > 0 { $"● ($count)" } else { "○ empty" }
         let rose = if $count > 0 { "🌹" } else { "🥀" }
         print ""
-        print $"(ansi red_bold)  ($rose) ($label) ($rose) ($subtitle) ($rose) ($status)(ansi reset)"
+        print $"(ansi white_bold)  ($rose) ($label) ($rose) ($subtitle) ($rose) ($status)(ansi reset)"
         print $"  ($rose) ($description)"
         if $count > 0 {
             print ""
@@ -174,7 +174,7 @@ def repo-status-line [] {
         let all = ($log_raw ++ $status_raw | each { |l| {info: $l} })
         if ($all | length) > 0 {
             print ""
-            print $"(ansi red_bold)  🌹 REPO(ansi reset)"
+            print $"(ansi white_bold)  🌹 REPO(ansi reset)"
             $all | table | print
         }
     } catch { }
@@ -194,11 +194,11 @@ def draw-workspace [] {
     let dir_name = ($env.PWD | path basename)
     print ""
     print ($env.PWD | path split)
-    print $"(ansi red_bold)  ($dir_name)(ansi reset)"
+    print $"(ansi white_bold)  ($dir_name)(ansi reset)"
     ls | select name type size modified | sort-by name | table | print
     print ""
-    print $"(ansi grey)  🌹 \"To choose is to affirm, by your choice, the weight of your own existence.(ansi reset)"
-    print $"(ansi grey)     You are condemned to be free.\" — Jean-Paul Sartre 🌹(ansi reset)"
+    print $"(ansi white)  🌹 \"To choose is to affirm, by your choice, the weight of your own existence.(ansi reset)"
+    print $"(ansi white)     You are condemned to be free.\" — Jean-Paul Sartre 🌹(ansi reset)"
     print ""
     for entry in $WORKSPACE {
         if $entry.file != "TODO.org" {
@@ -234,7 +234,7 @@ def workspace-health [] {
         "The garden is tended. Every shape is alive."
     }
     print $"  ($bar)"
-    print $"(ansi grey)  ($msg)(ansi reset)"
+    print $"(ansi white)  ($msg)(ansi reset)"
 }
 
 # =============================================================================
@@ -243,7 +243,7 @@ def workspace-health [] {
 def show-commands [] {
     clear
     print ""
-    print $"(ansi red_bold)  🌹 COMMANDS(ansi reset)"
+    print $"(ansi white_bold)  🌹 COMMANDS(ansi reset)"
     print ""
     $COMMANDS | table | print
     print ""
@@ -260,18 +260,18 @@ def jj-describe [] {
     try {
         let current = (do { jj log --no-graph -r '@' --template 'description' } | complete | get stdout | str trim)
         if ($current | is-not-empty) {
-            print $"(ansi grey)  current: ($current)(ansi reset)"
+            print $"(ansi white)  current: ($current)(ansi reset)"
         }
         print -n $"(ansi purple)  Description: (ansi reset)"
         let msg = (input "" | str trim)
         if ($msg | is-empty) {
-            print $"(ansi grey)  — no change(ansi reset)"
+            print $"(ansi white)  — no change(ansi reset)"
             return
         }
         do { jj describe -m $msg } | complete | null
-        print $"(ansi green)  ✓ described: ($msg)(ansi reset)"
+        print $"(ansi white)  ✓ described: ($msg)(ansi reset)"
     } catch {
-        print $"(ansi red)  ✗ jj describe failed(ansi reset)"
+        print $"(ansi white)  ✗ jj describe failed(ansi reset)"
     }
 }
 
@@ -279,7 +279,7 @@ def jj-push-confirmed [] {
     let status = (do { jj status } | complete | get stdout | str trim)
     let log    = (do { jj log --no-graph -r '@' } | complete | get stdout | str trim)
     print ""
-    print $"(ansi red_bold)  🌹 PENDING(ansi reset)"
+    print $"(ansi white_bold)  🌹 PENDING(ansi reset)"
     print $log
     if ($status | is-not-empty) {
         print ""
@@ -290,9 +290,9 @@ def jj-push-confirmed [] {
     let ans = (input "" | str trim | str lowercase)
     if $ans == "y" {
         ManifoldOS-Reshaping-History
-        print $"(ansi green)  ✓ pushed(ansi reset)"
+        print $"(ansi white)  ✓ pushed(ansi reset)"
     } else {
-        print $"(ansi grey)  — cancelled(ansi reset)"
+        print $"(ansi white)  — cancelled(ansi reset)"
     }
 }
 
@@ -305,9 +305,9 @@ def quick-capture [] {
     let text = (input "" | str trim)
     if ($text | is-not-empty) {
         $"\n* TODO ($text)" | save --append $todo_path
-        print $"(ansi green)  ✓ ($text)(ansi reset)"
+        print $"(ansi white)  ✓ ($text)(ansi reset)"
     } else {
-        print $"(ansi grey)  — nothing captured(ansi reset)"
+        print $"(ansi white)  — nothing captured(ansi reset)"
     }
 }
 
@@ -317,7 +317,7 @@ def quick-capture [] {
 def progress-last [] {
     let todo_path = ($env.PWD | path join "TODO.org")
     if not ($todo_path | path exists) {
-        print $"(ansi grey)  — TODO.org not found(ansi reset)"
+        print $"(ansi white)  — TODO.org not found(ansi reset)"
         return
     }
     let lines = (open --raw $todo_path | lines)
@@ -327,7 +327,7 @@ def progress-last [] {
         | get 0?
     )
     if ($last_todo | is-empty) {
-        print $"(ansi grey)  — no TODO items found(ansi reset)"
+        print $"(ansi white)  — no TODO items found(ansi reset)"
         return
     }
     let idx = $last_todo.index
@@ -335,13 +335,13 @@ def progress-last [] {
     let updated = ($lines | enumerate | each { |e| if $e.index == $idx { $toggled } else { $e.item } })
     $updated | str join "\n" | save --force $todo_path
     let label = ($toggled | str replace "* IN-PROGRESS " "")
-    print $"(ansi yellow)  ◎ in progress: ($label)(ansi reset)"
+    print $"(ansi white)  ◎ in progress: ($label)(ansi reset)"
 }
 
 def done-last [] {
     let todo_path = ($env.PWD | path join "TODO.org")
     if not ($todo_path | path exists) {
-        print $"(ansi grey)  — TODO.org not found(ansi reset)"
+        print $"(ansi white)  — TODO.org not found(ansi reset)"
         return
     }
     let lines = (open --raw $todo_path | lines)
@@ -351,7 +351,7 @@ def done-last [] {
         | get 0?
     )
     if ($last_active | is-empty) {
-        print $"(ansi grey)  — no active items found(ansi reset)"
+        print $"(ansi white)  — no active items found(ansi reset)"
         return
     }
     let idx = $last_active.index
@@ -359,13 +359,13 @@ def done-last [] {
     let updated = ($lines | enumerate | each { |e| if $e.index == $idx { $toggled } else { $e.item } })
     $updated | str join "\n" | save --force $todo_path
     let label = ($toggled | str replace "* DONE " "")
-    print $"(ansi green)  ✓ done: ($label)(ansi reset)"
+    print $"(ansi white)  ✓ done: ($label)(ansi reset)"
 }
 
 def delete-last [] {
     let todo_path = ($env.PWD | path join "TODO.org")
     if not ($todo_path | path exists) {
-        print $"(ansi grey)  — TODO.org not found(ansi reset)"
+        print $"(ansi white)  — TODO.org not found(ansi reset)"
         return
     }
     let lines = (open --raw $todo_path | lines)
@@ -375,14 +375,14 @@ def delete-last [] {
         | get 0?
     )
     if ($last_done | is-empty) {
-        print $"(ansi grey)  — no DONE items to delete (mark done first)(ansi reset)"
+        print $"(ansi white)  — no DONE items to delete (mark done first)(ansi reset)"
         return
     }
     let idx = $last_done.index
     let label = ($lines | get $idx | str replace "* DONE " "")
     let updated = ($lines | enumerate | where { |e| $e.index != $idx } | get item)
     $updated | str join "\n" | save --force $todo_path
-    print $"(ansi red)  ✗ deleted: ($label)(ansi reset)"
+    print $"(ansi white)  ✗ deleted: ($label)(ansi reset)"
 }
 
 # =============================================================================
@@ -435,10 +435,10 @@ def workspace-loop [] {
                     print ""
                     repo-status-line
                     print ""
-                    print $"(ansi grey)  🌹 \"To choose is to affirm, by your choice, the weight of your own existence.(ansi reset)"
-                    print $"(ansi grey)     You are condemned to be free.\" — Jean-Paul Sartre 🌹(ansi reset)"
+                    print $"(ansi white)  🌹 \"To choose is to affirm, by your choice, the weight of your own existence.(ansi reset)"
+                    print $"(ansi white)     You are condemned to be free.\" — Jean-Paul Sartre 🌹(ansi reset)"
                     print ""
-                    print $"(ansi red_bold)  🌹 Reshaping is only adaptation under pressure 🌹(ansi reset)"
+                    print $"(ansi white_bold)  🌹 Reshaping is only adaptation under pressure 🌹(ansi reset)"
                     print ""
                     print-section ($env.PWD | path join "TODO.org") "TODO" "What is unfinished and consuming attention" "A ledger of open, executable items assigned to the active ShapeShifter. No speculation, no someday-maybe. If it is on this list, it is active. If it is not executable, it belongs in Hypotheses or Blueprint. The Architect reviews this. The ShapeShifter executes it."
                     print ""

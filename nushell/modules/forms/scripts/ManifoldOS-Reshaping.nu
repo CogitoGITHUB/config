@@ -103,8 +103,8 @@
 source ~/.config/nushell/modules/forms/scripts/workspace-vc-roots.nu
 
 def print-section [label: string, subtitle: string, rows: list] {
-    print $"  (ansi red_bold)(char rose) ($label)(ansi reset)"
-    print $"  (ansi grey)($subtitle)(ansi reset)"
+    print $"  (ansi white_bold)(char rose) ($label)(ansi reset)"
+    print $"  (ansi white)($subtitle)(ansi reset)"
     print ""
     if ($rows | is-not-empty) {
         $rows | table | print
@@ -115,10 +115,10 @@ def print-git-sections [repo: string, changed: list, push_results: list] {
     let branch = (try { git -C $repo branch --show-current | str trim } catch { "unknown" })
     let remote = (try { git -C $repo remote get-url origin | str trim } catch { "" })
     let status_count = (try { git -C $repo status --short | lines | length } catch { 0 })
-    print $"  (ansi red_bold)(char rose) GIT(ansi reset)"
-    print $"  (ansi grey)branch: ($branch)(ansi reset)"
-    if ($remote | is-not-empty) { print $"  (ansi grey)remote: ($remote)(ansi reset)" }
-    print $"  (ansi grey)changed: ($changed | length) files(ansi reset)"
+    print $"  (ansi white_bold)(char rose) GIT(ansi reset)"
+    print $"  (ansi white)branch: ($branch)(ansi reset)"
+    if ($remote | is-not-empty) { print $"  (ansi white)remote: ($remote)(ansi reset)" }
+    print $"  (ansi white)changed: ($changed | length) files(ansi reset)"
     print ""
 }
 
@@ -138,8 +138,8 @@ def print-git-sections [repo: string, changed: list, push_results: list] {
 def rs-flow [steps: list, current: string, timings: record, substage: string = ""] {
     print -n "\e[2J\e[H"
     print ""
-    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
-    print $"(ansi grey)  A staged collapse of system state into new configuration.(ansi reset)"
+    print $"(ansi white_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
+    print $"(ansi white)  A staged collapse of system state into new configuration.(ansi reset)"
     print ""
 
     for step in $steps {
@@ -248,8 +248,8 @@ def extract-core-error [all_output: string] {
 def render-errors [all_output: string, log_file: string] {
     print -n "\e[2J\e[H"
     print ""
-    print $"(ansi red_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
-    print $"(ansi grey)  Error encountered during workflow.(ansi reset)"
+    print $"(ansi white_bold)🌹 MANIFOLD // RESHAPING 🌹(ansi reset)"
+    print $"(ansi white)  Error encountered during workflow.(ansi reset)"
     print ""
 
     # Primary error — constitution-aware, most actionable line first
@@ -280,8 +280,8 @@ def render-errors [all_output: string, log_file: string] {
     print ""
 
     # Recovery: revert or inspect
-    print $"(ansi yellow)🔄 REVERT TO LAST PUSH(ansi reset)"
-    print $"(ansi grey)  Go back to last known good commit?(ansi reset)"
+    print $"(ansi white)🔄 REVERT TO LAST PUSH(ansi reset)"
+    print $"(ansi white)  Go back to last known good commit?(ansi reset)"
     print ""
     let revert_choice = (
         ["no — keep trying to fix" "yes — revert to last push"]
@@ -296,8 +296,8 @@ def render-errors [all_output: string, log_file: string] {
     }
 
     # Inspection options — only shown if user wants to dig in
-    print $"(ansi yellow)📖 INSPECT ERROR?(ansi reset)"
-    print $"(ansi grey)  Select no to exit and return to the prompt.(ansi reset)"
+    print $"(ansi white)📖 INSPECT ERROR?(ansi reset)"
+    print $"(ansi white)  Select no to exit and return to the prompt.(ansi reset)"
     print ""
     let inspect_choice = (
         ["no — return to prompt" "diagnostics — warnings + raw output" "full-log — open log in pager"]
@@ -314,9 +314,9 @@ def render-errors [all_output: string, log_file: string] {
         try {
             less $log_file
         } catch {
-            print $"(ansi grey)Unable to open log with less, showing raw content:(ansi reset)"
+            print $"(ansi white)Unable to open log with less, showing raw content:(ansi reset)"
             print ""
-            try { open --raw $log_file | print } catch { print $"(ansi red)Failed to read log file(ansi reset)" }
+            try { open --raw $log_file | print } catch { print $"(ansi white)Failed to read log file(ansi reset)" }
         }
     } else {
         # Diagnostics: constitution + Guix warnings, excluding shell noise
@@ -486,7 +486,7 @@ def render-summary [results: list, changed: list, timings: record, log_file: str
     let warnings    = (extract-warnings $log_content)
 
     # Success banner
-    print $"(ansi green_bold)✓ RECONFIGURATION SUCCESSFUL(ansi reset)"
+    print $"(ansi white_bold)✓ RECONFIGURATION SUCCESSFUL(ansi reset)"
     print ""
 
     # Constitution scan summary — always present on success
@@ -620,7 +620,7 @@ def render-summary [results: list, changed: list, timings: record, log_file: str
     print-section "EMACS" "control center status" [{ state: $emacs_state }]
 
     print ""
-    print $"(ansi green_bold)✓ System reconfiguration and git history updated(ansi reset)"
+    print $"(ansi white_bold)✓ System reconfiguration and git history updated(ansi reset)"
     print ""
 }
 

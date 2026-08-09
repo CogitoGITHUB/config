@@ -25,24 +25,6 @@ fetcher = "clock"
 format = "%A  ·  %e %B %Y  ·  day %j of %Y"
 render = { type = "text_plain", align = "center" }
 
-
-
-
-# ── Weather ─────────────────────────────────────────────────────────
-# Change lat/lon to your location. Tokyo and Seoul are fixed.
-
-[[widget]]
-id = "weather_title"
-fetcher = "basic_static"
-format = "🌹 Weather 🌹"
-render = { type = "text_plain", align = "center", color = "panel_title" }
-
-[[widget]]
-id = "system_name"
-fetcher = "system_info_host"
-kind = "os"
-render = { type = "text_plain", align = "center" }
-
 [[widget]]
 id = "sartre_title"
 fetcher = "basic_static"
@@ -68,100 +50,6 @@ id = "title_world_clock"
 fetcher = "basic_static"
 format = "🌹 World Clock 🌹"
 render = { type = "text_plain", align = "center", color = "text_secondary" }
-
-[[widget]]
-id = "title_home"
-fetcher = "basic_static"
-format = "🌹 Home 🌹"
-render = { type = "text_plain", align = "center", color = "text_secondary" }
-
-[[widget]]
-id = "title_tokyo"
-fetcher = "basic_static"
-format = "🌹 Tokyo 🌹"
-render = { type = "text_plain", align = "center", color = "text_secondary" }
-
-[[widget]]
-id = "title_seoul"
-fetcher = "basic_static"
-format = "🌹 Seoul 🌹"
-render = { type = "text_plain", align = "center", color = "text_secondary" }
-
-[[widget]]
-id = "title_nyc"
-fetcher = "basic_static"
-format = "🌹 NYC 🌹"
-render = { type = "text_plain", align = "center", color = "text_secondary" }
-
-[[widget]]
-id = "title_crypto"
-fetcher = "basic_static"
-format = "🌹 Crypto 🌹"
-render = { type = "text_plain", align = "center", color = "text_secondary" }
-
-[[widget]]
-id = "title_stocks"
-fetcher = "basic_static"
-format = "🌹 Stocks 🌹"
-render = { type = "text_plain", align = "center", color = "text_secondary" }
-
-[[widget]]
-id = "weather_home"
-fetcher = "weather"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
-  [widget.options]
-  latitude = 45.44
-  longitude = 28.05
-  units = "metric"
-
-[[widget]]
-id = "weather_tokyo"
-fetcher = "weather"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
-  [widget.options]
-  latitude = 35.6762
-  longitude = 139.6503
-  units = "metric"
-
-[[widget]]
-id = "weather_seoul"
-fetcher = "weather"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
-  [widget.options]
-  latitude = 37.5665
-  longitude = 126.9780
-  units = "metric"
-
-[[widget]]
-id = "weather_nyc"
-fetcher = "weather"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
-  [widget.options]
-  latitude = 40.71
-  longitude = -74.01
-  units = "metric"
-
-
-
-# ── Crypto ──────────────────────────────────────────────────────────
-
-[[widget]]
-id = "crypto"
-fetcher = "crypto_watchlist"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
-  [widget.options]
-  coins = ["bitcoin", "monero", "ethereum", "solana"]
-  vs_currency = "usd"
-
-# ── Stocks ──────────────────────────────────────────────────────────
-
-[[widget]]
-id = "stocks"
-fetcher = "stock_watchlist"
-render = { type = "animated_splitflap", layout = "rows", column_align = ["left", "right"], duration_ms = 200 }
-  [widget.options]
-  symbols = ["TSLA", "SPCX", "AAPL", "MSFT", "GOOG"]
-
 
 # ── Layout ──────────────────────────────────────────────────────────
 
@@ -190,6 +78,16 @@ height = { length = 1 }
 height = { length = 1 }
 flex = "center"
   [[row.child]]
+  widget = "date"
+  width = { length = 70 }
+
+[[row]]
+height = { length = 1 }
+
+[[row]]
+height = { length = 1 }
+flex = "center"
+  [[row.child]]
   widget = "title_world_clock"
   width = { length = 70 }
 
@@ -199,75 +97,6 @@ flex = "center"
   [[row.child]]
   widget = "world_clock"
   width = { length = 70 }
-
-[[row]]
-height = { length = 1 }
-
-[[row]]
-height = { length = 1 }
-flex = "center"
-  [[row.child]]
-  widget = "weather_title"
-  width = { length = 70 }
-
-[[row]]
-height = { length = 1 }
-flex = "center"
-gap = 2
-  [[row.child]]
-  widget = "title_home"
-  width = { length = 16 }
-  [[row.child]]
-  widget = "title_tokyo"
-  width = { length = 16 }
-  [[row.child]]
-  widget = "title_seoul"
-  width = { length = 16 }
-  [[row.child]]
-  widget = "title_nyc"
-  width = { length = 16 }
-
-[[row]]
-height = { length = 4 }
-flex = "center"
-gap = 2
-  [[row.child]]
-  widget = "weather_home"
-  width = { length = 16 }
-  [[row.child]]
-  widget = "weather_tokyo"
-  width = { length = 16 }
-  [[row.child]]
-  widget = "weather_seoul"
-  width = { length = 16 }
-  [[row.child]]
-  widget = "weather_nyc"
-  width = { length = 16 }
-
-[[row]]
-height = { length = 1 }
-
-[[row]]
-height = { length = 1 }
-flex = "center"
-gap = 2
-  [[row.child]]
-  widget = "title_crypto"
-  width = { length = 34 }
-  [[row.child]]
-  widget = "title_stocks"
-  width = { length = 34 }
-
-[[row]]
-height = { length = 7 }
-flex = "center"
-gap = 2
-  [[row.child]]
-  widget = "crypto"
-  width = { length = 34 }
-  [[row.child]]
-  widget = "stocks"
-  width = { length = 34 }
 
 [[row]]
 height = { length = 1 }

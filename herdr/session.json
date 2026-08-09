@@ -6,18 +6,15 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "6": 5,
         "1": 1,
-        "4": 3,
-        "2": 2
+        "2": 11
       },
-      "next_public_pane_number": 6,
+      "next_public_pane_number": 12,
       "public_tab_numbers": [
         1,
-        2,
-        3
+        9
       ],
-      "next_public_tab_number": 4,
+      "next_public_tab_number": 10,
       "tabs": [
         {
           "custom_name": "Opencode Emacs",
@@ -34,47 +31,21 @@
           "root_pane": 1
         },
         {
-          "custom_name": "System Reshape",
+          "custom_name": null,
           "layout": {
             "Pane": 2
           },
           "panes": {
             "2": {
-              "cwd": "/home/aoeu/.config/ManifoldOS"
+              "cwd": "/home/aoeu/test"
             }
           },
           "zoomed": false,
           "focused": 2,
           "root_pane": 2
-        },
-        {
-          "custom_name": null,
-          "layout": {
-            "Split": {
-              "direction": "Vertical",
-              "ratio": 0.5,
-              "first": {
-                "Pane": 4
-              },
-              "second": {
-                "Pane": 6
-              }
-            }
-          },
-          "panes": {
-            "4": {
-              "cwd": "/home/aoeu/.config/ManifoldOS"
-            },
-            "6": {
-              "cwd": "/home/aoeu/.config/ManifoldOS"
-            }
-          },
-          "zoomed": false,
-          "focused": 6,
-          "root_pane": 4
         }
       ],
-      "active_tab": 1
+      "active_tab": 0
     }
   ],
   "active": 0,

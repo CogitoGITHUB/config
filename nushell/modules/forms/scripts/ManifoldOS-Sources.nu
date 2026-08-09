@@ -61,7 +61,7 @@ def ManifoldOS-Sources [] {
     }
 
     print ""
-    print $"(ansi yellow)⚠  MANIFOLD SOURCES — UPDATES AVAILABLE(ansi reset)"
+    print $"(ansi white)⚠  MANIFOLD SOURCES — UPDATES AVAILABLE(ansi reset)"
     print ""
     $updates | select package current latest behind | print
     print ""

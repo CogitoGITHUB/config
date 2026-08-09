@@ -1,11 +1,4 @@
 
-:PROPERTIES:
-:SERVINGS:
-:PREP_TIME:
-:COOK_TIME:
-:READY_IN:
-:END:
-
 ** Ingredients
 
 ** Directions

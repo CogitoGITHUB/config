@@ -27,7 +27,14 @@ config.scrollback_lines = 20000
 config.enable_tab_bar = true
 config.use_fancy_tab_bar = false
 config.window_decorations = "NONE"
-config.window_background_opacity = 1.0
+config.window_background_opacity = 0.0
+
+-- ===== Animated cursor =====
+config.default_cursor_style = "BlinkingBar"
+config.cursor_blink_rate = 500
+config.cursor_blink_ease_in = "EaseInOut"
+config.cursor_blink_ease_out = "EaseInOut"
+config.animation_fps = 80
 
 -- ===== Modal plugin =====
 local modal = wezterm.plugin.require("https://github.com/MLFlexer/modal.wezterm")

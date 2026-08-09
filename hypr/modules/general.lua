@@ -5,8 +5,8 @@ hl.config({
         border_size = 2,
 
         col = {
-            active_border   = "0xff8B0000",
-            inactive_border = "0xaa2a0000",
+            active_border   = "0xff8b0000",
+            inactive_border = "0xaa808080",
         },
 
         resize_on_border = true,

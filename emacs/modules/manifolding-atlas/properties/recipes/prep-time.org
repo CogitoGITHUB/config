@@ -12,6 +12,5 @@
                (let ((val (read-string "Prep time (e.g. 15 min): " nil nil nil "⚠ WARNING")))
                  (if (or (string-empty-p val) (string-equal val "⚠ WARNING")) "WARNING" val)))
   :to-plist (lambda (val _ctx)
-              (when (and val (not (string-equal val "WARNING")))
-                `(:properties (("PREP_TIME" . ,val))))))
+              `(:properties (("PREP_TIME" . ,val)))))
 #+end_src
