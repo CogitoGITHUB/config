@@ -7685,3 +7685,10 @@
 2026-08-09T18:29:19.151606Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
 2026-08-09T18:29:19.301816Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
 2026-08-09T18:29:19.301894Z  WARN herdr::raw_input: flushing lone escape after input timeout; if this follows an alt chord or focus switch it may reach the pane as plain esc bytes=[27]
+2026-08-09T18:55:59.326093Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=7830
+2026-08-09T18:55:59.326196Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
+2026-08-09T18:55:59.563624Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame
+2026-08-09T18:56:05.126118Z  INFO herdr::logging: herdr exiting event="app.shutdown" subsystem="client" outcome="completed" pid=1338
+2026-08-09T18:56:31.066461Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=8127
+2026-08-09T18:56:31.066499Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
+2026-08-09T18:56:31.142221Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame

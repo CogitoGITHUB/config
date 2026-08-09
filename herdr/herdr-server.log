@@ -16489,3 +16489,17 @@
 2026-08-09T18:39:14.636689Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:t1"
 2026-08-09T18:39:19.640661Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1
 2026-08-09T18:42:24.357751Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-08-09T18:55:41.343071Z  INFO herdr::server::headless: client resize client_id=2 cols=191 rows=47 cell_width_px=0 cell_height_px=0
+2026-08-09T18:55:59.563816Z  INFO herdr::server::headless: client connected client_id=6 cols=92 rows=50 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-08-09T18:55:59.564797Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
+2026-08-09T18:55:59.585054Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
+2026-08-09T18:56:02.469559Z  INFO herdr::server::headless: client detached client_id=6
+2026-08-09T18:56:02.470780Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
+2026-08-09T18:56:02.477442Z  INFO herdr::server::headless: client disconnected client_id=6
+2026-08-09T18:56:03.790916Z  INFO herdr::server::headless: client resize client_id=2 cols=192 rows=48 cell_width_px=0 cell_height_px=0
+2026-08-09T18:56:05.125363Z  INFO herdr::server::headless: client detached client_id=2
+2026-08-09T18:56:05.126079Z  INFO herdr::server::headless: client disconnected client_id=2
+2026-08-09T18:56:31.142370Z  INFO herdr::server::headless: client connected client_id=8 cols=93 rows=47 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-08-09T18:56:31.142430Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
+2026-08-09T18:56:31.151247Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
+2026-08-09T18:56:33.951175Z  INFO herdr::server::headless: client resize client_id=8 cols=192 rows=48 cell_width_px=0 cell_height_px=0

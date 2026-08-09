@@ -1,1 +1,1 @@
-terminal = "wezterm"
+terminal = "ghostty"
