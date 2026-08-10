@@ -6,9 +6,9 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "4": 13,
         "7": 16,
         "1": 1,
+        "4": 13,
         "2": 11,
         "5": 14
       },
@@ -71,7 +71,7 @@
           },
           "panes": {
             "4": {
-              "cwd": "/home/aoeu/.config/ManifoldOS"
+              "cwd": "/home/aoeu/.config"
             }
           },
           "zoomed": false,
@@ -93,7 +93,7 @@
           "root_pane": 7
         }
       ],
-      "active_tab": 4
+      "active_tab": 3
     }
   ],
   "active": 0,

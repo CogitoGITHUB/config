@@ -24,12 +24,13 @@
   #:use-module (substrate user-space root desktop wayland slurp)
   #:use-module (substrate user-space root desktop wayland swappy)
   #:use-module (substrate user-space root desktop wayland wl-clipboard)
+  #:use-module (substrate user-space root desktop wayland appcards)
   #:use-module (substrate user-space root desktop wayland wofi)
   #:use-module (substrate user-space root desktop wayland cliphist)
   #:use-module (gnu packages imagemagick)
   #:use-module (gnu packages web)
   #:use-module (gnu packages xdisorg)
-  #:re-export (seatd seatd-service hyprland qutebrowser quickshell mpvpaper imagemagick jq python-pyprland hyprsunset rose-pine-hyprcursor greetd blender mpv ffmpeg obs obs-cli kdenlive gst-editing-services mlt opentimelineio xytz grim slurp swappy wl-clipboard cliphist wofi)
+  #:re-export (seatd seatd-service hyprland qutebrowser quickshell mpvpaper imagemagick jq python-pyprland hyprsunset rose-pine-hyprcursor greetd blender mpv ffmpeg obs obs-cli kdenlive gst-editing-services mlt opentimelineio xytz grim slurp swappy wl-clipboard cliphist wofi appcards)
   #:export (root-desktop-packages))
 
 (define-public root-desktop-packages
@@ -38,4 +39,4 @@
         (awww (@ (gnu packages wm) awww))
         (wlogout (@ (gnu packages wm) wlogout))
         (grimblast (@ (gnu packages wm) grimblast)))
-    (list seatd hyprland hypridle qutebrowser quickshell mako mpvpaper awww imagemagick jq python-pyprland hyprsunset rose-pine-hyprcursor greetd blender mpv ffmpeg obs obs-cli kdenlive gst-editing-services mlt opentimelineio xytz grim slurp swappy wl-clipboard wlogout cliphist grimblast wofi)))
+    (list seatd hyprland hypridle qutebrowser quickshell mako mpvpaper awww imagemagick jq python-pyprland hyprsunset rose-pine-hyprcursor greetd blender mpv ffmpeg obs obs-cli kdenlive gst-editing-services mlt opentimelineio xytz grim slurp swappy wl-clipboard wlogout cliphist grimblast wofi appcards)))

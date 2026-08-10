@@ -22,7 +22,7 @@
                                                       (number->string (getuid)))
                                        "EMACS_NATIVECOMP_AOTCOMP=no"
                                        "EMACS_NATIVECOMP_DRIVER=no")
-                                 #:log-file (string-append (getenv "HOME") "/.emacs.d/daemon.log")
+                                 #:log-file "/tmp/opencode/emacs-daemon.log"
                                  #:directory (getenv "HOME")))
                       (stop #~(make-kill-destructor))
                       (respawn? #f)

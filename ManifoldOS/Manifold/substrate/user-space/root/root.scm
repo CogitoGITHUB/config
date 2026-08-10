@@ -12,6 +12,7 @@
   #:use-module (gnu services containers)
   #:use-module (gnu packages databases)
   #:use-module (gnu packages package-management)
+  #:use-module (gnu services nix)
   #:use-module (substrate user-space root emacs-packages emacs-packages)
   #:use-module (substrate user-space root users users)
   #:use-module (substrate user-space root loaders core)
@@ -37,8 +38,8 @@
   #:use-module (substrate user-space root loaders data)
   #:use-module (substrate user-space root loaders sandbox)
   #:use-module (substrate user-space root loaders fonts)
-  #:use-module (substrate user-space root loaders wayland)
   #:use-module (substrate user-space root loaders password-manager)
+  #:use-module (substrate user-space root loaders package-manager)
   #:use-module (substrate user-space root loaders games)
   #:use-module (substrate user-space root loaders containers)
 
@@ -69,7 +70,6 @@
           root-desktop-video-packages
           root-desktop-image-packages
           root-desktop-3d-packages
-          root-desktop-wayland-packages
           root-security-packages
           root-password-manager-packages
           root-games-packages
@@ -86,6 +86,7 @@
   (append
     (list (service openssh-service-type)
           seatd-service)
+    (list (service nix-service-type))
     root-networking-services
     root-audio-services
     (list (service libvirt-service-type)
