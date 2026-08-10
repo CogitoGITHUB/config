@@ -17525,3 +17525,14 @@
 2026-08-10T16:25:10.933220Z  INFO herdr::server::headless: client resize client_id=26 cols=191 rows=56 cell_width_px=0 cell_height_px=0
 2026-08-10T16:25:11.133288Z  INFO herdr::server::headless: client resize client_id=26 cols=189 rows=55 cell_width_px=0 cell_height_px=0
 2026-08-10T16:28:33.280746Z  INFO herdr::server::headless: client resize client_id=26 cols=188 rows=55 cell_width_px=0 cell_height_px=0
+2026-08-10T16:29:32.288387Z  INFO herdr::server::headless: client connected client_id=28 cols=93 rows=55 cell_width_px=0 cell_height_px=0 render_encoding=SemanticFrame
+2026-08-10T16:29:32.288536Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
+2026-08-10T16:29:32.301194Z  WARN herdr::app: unknown theme, falling back theme="shape-white" fallback="catppuccin"
+2026-08-10T16:29:36.758184Z  INFO herdr::server::headless: client resize client_id=28 cols=80 rows=24 cell_width_px=0 cell_height_px=0
+2026-08-10T16:29:36.764067Z  INFO herdr::server::headless: client detached client_id=28
+2026-08-10T16:29:36.769155Z  INFO herdr::server::headless: client disconnected client_id=28
+2026-08-10T16:29:36.858828Z  INFO herdr::server::headless: client resize client_id=26 cols=189 rows=55 cell_width_px=0 cell_height_px=0
+2026-08-10T16:29:43.225413Z  INFO herdr::logging: spawning pane terminal event="pane.spawn.start" subsystem="pane" outcome="started" pane_id=10 rows=54 cols=185 scrollback_limit_bytes=10000000
+2026-08-10T16:29:43.229768Z  INFO herdr::logging: pane child spawned event="pane.spawned" subsystem="pane" outcome="ok" pane_id=10 pid=29808
+2026-08-10T16:29:43.230530Z  INFO herdr::logging: tab focused event="tab.focus" subsystem="tab" outcome="ok" workspace_id="w1N" tab_id="w1N:tF"
+2026-08-10T16:29:51.537812Z  INFO herdr::logging: session saved event="persist.save" subsystem="persist" outcome="ok" path=/home/aoeu/.config/herdr/session.json workspaces=1

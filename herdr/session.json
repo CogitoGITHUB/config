@@ -6,13 +6,15 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "1": 1
+        "1": 1,
+        "10": 17
       },
-      "next_public_pane_number": 17,
+      "next_public_pane_number": 18,
       "public_tab_numbers": [
-        1
+        1,
+        15
       ],
-      "next_public_tab_number": 15,
+      "next_public_tab_number": 16,
       "tabs": [
         {
           "custom_name": "Opencode Emacs",
@@ -27,9 +29,23 @@
           "zoomed": false,
           "focused": 1,
           "root_pane": 1
+        },
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 10
+          },
+          "panes": {
+            "10": {
+              "cwd": "/home/aoeu/.config/hypr"
+            }
+          },
+          "zoomed": false,
+          "focused": 10,
+          "root_pane": 10
         }
       ],
-      "active_tab": 0
+      "active_tab": 1
     }
   ],
   "active": 0,
