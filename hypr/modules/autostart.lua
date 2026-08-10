@@ -1,5 +1,8 @@
 -- modules/autostart.lua
 hl.on("hyprland.start", function()
+    hl.exec_cmd("hyprctl plugin load /home/aoeu/.local/share/hyprland/plugins/HyprWindowShade.so")
+    hl.exec_cmd("hyprctl plugin load /home/aoeu/.local/share/hyprland/plugins/hyprglass.so")
+    hl.exec_cmd("hyprctl plugin load /home/aoeu/.local/share/hyprland/plugins/hypreasymotion.so")
     hl.exec_cmd("awww-daemon")
     hl.exec_cmd("awww img /home/aoeu/.config/wallpaper/roses/rose-on-book.jpg")
     hl.exec_cmd("ghostty")

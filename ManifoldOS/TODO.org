@@ -1,1 +1,5 @@
-maybe make a netbird vm
+https://github.com/Iamvismorf/Snippy make a module
+https://github.com/moverest/wl-kbptr.git
+make a fastfetch inspired by how guix os system definition looks !!!!
+https://github.com/Darkkal44/qylock
+make a hypr scrathpad for emacs quick capture so i can note faster

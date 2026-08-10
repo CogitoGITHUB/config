@@ -61,3 +61,15 @@ hl.gesture({ fingers = 3, direction = "horizontal", action = "scroll_move" })
 hl.gesture({ fingers = 3, direction = "vertical",   action = "scroll_move" })
 hl.bind(mod .. " + SHIFT + up",   hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mod .. " + SHIFT + down", hl.dsp.focus({ workspace = "e-1" }))
+-- ── HyprWindowShade (per-window shaders) ─────────────────────────────────
+local shade_dir = "/home/aoeu/.config/hypr/shaders"
+local shade_reading = shade_dir .. "/reading_mode.glsl"
+local shade_gray    = shade_dir .. "/grayscale.glsl"
+local shade_glitch  = shade_dir .. "/glitch.glsl"
+hl.bind(mod .. " + R", function() hl.plugin.HyprWindowShade.togglewindowshader(shade_reading) end)
+hl.bind(mod .. " + SHIFT + G", function() hl.plugin.HyprWindowShade.togglewindowshader(shade_gray) end)
+hl.bind(mod .. " + SHIFT + J", function() hl.plugin.HyprWindowShade.togglewindowshader(shade_glitch) end)
+hl.bind(mod .. " + SHIFT + K", function() hl.plugin.HyprWindowShade.toggleclassshader("com.mitchellh.ghostty", shade_reading) end)
+hl.bind(mod .. " + SHIFT + D", function() hl.plugin.HyprWindowShade.reloadshaders() end)
+-- ── Easymotion (keyboard-driven selection, Dvorak home row) ───────────────
+hl.bind(mod .. " + U",          function() hl.plugin.hypreasymotion.start() end)

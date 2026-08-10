@@ -7706,3 +7706,18 @@
 2026-08-09T21:52:27.203423Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
 2026-08-09T21:52:27.247044Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame
 2026-08-09T22:03:04.489300Z  INFO herdr::logging: herdr exiting event="app.shutdown" subsystem="client" outcome="completed" pid=20574
+2026-08-10T13:22:56.502723Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=6599
+2026-08-10T13:22:56.502883Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
+2026-08-10T13:22:56.550180Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame
+2026-08-10T14:19:22.973531Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=13087
+2026-08-10T14:19:22.973582Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
+2026-08-10T14:19:23.078672Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame
+2026-08-10T15:18:22.421623Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=20063
+2026-08-10T15:18:22.421698Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
+2026-08-10T15:18:22.552625Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame
+2026-08-10T15:36:05.748907Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=22043
+2026-08-10T15:36:05.748963Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
+2026-08-10T15:36:05.887083Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame
+2026-08-10T16:05:40.481168Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=25557
+2026-08-10T16:05:40.481315Z  INFO herdr::client: connecting to server path=/home/aoeu/.config/herdr/herdr-client.sock
+2026-08-10T16:05:40.625112Z  INFO herdr::client: handshake succeeded version=19 encoding=SemanticFrame
