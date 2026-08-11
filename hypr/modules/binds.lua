@@ -10,7 +10,7 @@ hl.bind(mod .. " + C",          hl.dsp.exec_cmd("google-chrome"))
 hl.bind(mod .. " + D",          hl.dsp.exec_cmd("wofi --show drun"))
 hl.bind(mod .. " + S",          hl.dsp.exec_cmd("omarchy-tui-shell toggle"))
 -- ── Fullscreen ─────────────────────────────────────────────────────────────
-hl.bind(mod .. " + Space",      hl.dsp.window.fullscreen())
+hl.bind(mod .. " + F",          hl.dsp.window.fullscreen())
 -- ── Layout navigation ──────────────────────────────────────────────────────
 hl.bind(mod .. " + right",      hl.dsp.layout("move +col"))
 hl.bind(mod .. " + T",          hl.dsp.layout("move +col"))
@@ -72,4 +72,4 @@ hl.bind(mod .. " + SHIFT + J", function() hl.plugin.HyprWindowShade.togglewindow
 hl.bind(mod .. " + SHIFT + K", function() hl.plugin.HyprWindowShade.toggleclassshader("com.mitchellh.ghostty", shade_reading) end)
 hl.bind(mod .. " + SHIFT + D", function() hl.plugin.HyprWindowShade.reloadshaders() end)
 -- ── Easymotion (keyboard-driven selection, Dvorak home row) ───────────────
-hl.bind(mod .. " + U",          function() hl.plugin.hypreasymotion.start() end)
+hl.bind(mod .. " + Space",     function() hl.plugin.hypreasymotion.start() end)

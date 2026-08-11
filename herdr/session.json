@@ -6,8 +6,8 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/emacs",
       "public_pane_numbers": {
-        "10": 17,
-        "1": 1
+        "1": 1,
+        "2": 17
       },
       "next_public_pane_number": 18,
       "public_tab_numbers": [
@@ -33,19 +33,19 @@
         {
           "custom_name": null,
           "layout": {
-            "Pane": 10
+            "Pane": 2
           },
           "panes": {
-            "10": {
+            "2": {
               "cwd": "/home/aoeu/.config/hypr"
             }
           },
           "zoomed": false,
-          "focused": 10,
-          "root_pane": 10
+          "focused": 2,
+          "root_pane": 2
         }
       ],
-      "active_tab": 1
+      "active_tab": 0
     }
   ],
   "active": 0,
