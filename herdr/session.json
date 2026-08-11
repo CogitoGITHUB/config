@@ -6,9 +6,9 @@
       "custom_name": null,
       "identity_cwd": "/home/aoeu/.config/hypr",
       "public_pane_numbers": {
+        "1": 1,
         "3": 18,
-        "2": 17,
-        "1": 1
+        "2": 17
       },
       "next_public_pane_number": 19,
       "public_tab_numbers": [
