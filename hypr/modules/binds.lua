@@ -28,13 +28,7 @@ hl.bind(mod .. " + comma",           hl.dsp.layout("colresize -conf"),    { repe
 hl.bind(mod .. " + SHIFT + period",  hl.dsp.layout("colresize +0.05"),   { repeating = true })
 hl.bind(mod .. " + SHIFT + comma",   hl.dsp.layout("colresize -0.05"),   { repeating = true })
 -- ── Workspaces ─────────────────────────────────────────────────────────────
-for i = 1, 9 do
-    hl.bind(mod .. " + " .. i,         hl.dsp.focus({ workspace = tostring(i) }))
-    hl.bind(mod .. " + CTRL + " .. i,  hl.dsp.window.move({ workspace = tostring(i) }))
-end
-hl.bind(mod .. " + 0",          hl.dsp.focus({ workspace = "10" }))
-hl.bind(mod .. " + CTRL + 0",   hl.dsp.window.move({ workspace = "10" }))
--- TODO: special/scratchpad workspaces -- figure out later
+-- Workspace switching/moving handled by split-monitor-workspaces module.
 -- ── DMS Shell ────────────────────────────────────────────────────────────────
 hl.bind(mod .. " + V",          hl.dsp.exec_cmd("dms ipc call clipboard toggle"))
 hl.bind(mod .. " + M",          hl.dsp.exec_cmd("dms ipc call processlist toggle"))

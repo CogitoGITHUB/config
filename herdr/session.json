@@ -4,26 +4,28 @@
     {
       "id": "w1N",
       "custom_name": null,
-      "identity_cwd": "/home/aoeu/.config/emacs",
+      "identity_cwd": "/home/aoeu/.config/hypr",
       "public_pane_numbers": {
-        "1": 1,
-        "2": 17
+        "3": 18,
+        "2": 17,
+        "1": 1
       },
-      "next_public_pane_number": 18,
+      "next_public_pane_number": 19,
       "public_tab_numbers": [
         1,
-        15
+        15,
+        16
       ],
-      "next_public_tab_number": 16,
+      "next_public_tab_number": 17,
       "tabs": [
         {
-          "custom_name": "Opencode Emacs",
+          "custom_name": "Opencode Hypr",
           "layout": {
             "Pane": 1
           },
           "panes": {
             "1": {
-              "cwd": "/home/aoeu/.config/emacs"
+              "cwd": "/home/aoeu/.config/hypr"
             }
           },
           "zoomed": false,
@@ -31,21 +33,36 @@
           "root_pane": 1
         },
         {
-          "custom_name": null,
+          "custom_name": "Opencode Emacs",
           "layout": {
             "Pane": 2
           },
           "panes": {
             "2": {
-              "cwd": "/home/aoeu/.config/hypr"
+              "cwd": "/home/aoeu/.config/emacs"
             }
           },
           "zoomed": false,
           "focused": 2,
           "root_pane": 2
+        },
+        {
+          "custom_name": "Git p",
+          "layout": {
+            "Pane": 3
+          },
+          "panes": {
+            "3": {
+              "cwd": "/home/aoeu/.config",
+              "label": "Git Push"
+            }
+          },
+          "zoomed": false,
+          "focused": 3,
+          "root_pane": 3
         }
       ],
-      "active_tab": 0
+      "active_tab": 2
     }
   ],
   "active": 0,
