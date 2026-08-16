@@ -261,3 +261,29 @@ cd test/
 ls
 nu
 opencode
+emacs
+cd
+lz
+ls
+emacs .
+pkg install opencode
+emacs .
+emacs --debug-init
+grep -R "straight-use-package\|straight.el\|bootstrap" \<\n>  ~/.config/emacs \<\n>  ~/.emacs.d 2>/dev/null
+grep -RniE 'straight-use-package|straight\.el|bootstrap' ~/.config/emacs ~/.emacs.d 2>/dev/null
+ls -l ~/.config/emacs/straight/repos/straight.el/bootstrap.el
+ls -la ~/.config/emacs/straight
+ls -la ~/.config/emacs/straight/repos
+curl
+mkdir ~/.config/emacs/straight<\n>git clone https://github.com/radian-software/straight.el ~/.config/emacs/straight/repos/straight.el
+ls ~/.config/emacs/straight/repos/straight.el
+ls ~/.config/emacs/straight/repos/straight.el/bootstrap.el
+emacs
+emacs .config/
+pkg install neovim
+mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
+source ~/.local/share/atuin/init.nu
+mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
+pkg install atuin
+mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
+pkg install starship
