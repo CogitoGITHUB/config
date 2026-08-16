@@ -1,5 +1,6 @@
 ;;; early-init.el --- -*- lexical-binding: t -*-
 
+
 (setq make-backup-files nil)
 (setq-default truncate-lines nil)
 (setq-default word-wrap t)

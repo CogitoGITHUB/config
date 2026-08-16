@@ -1760,6 +1760,7 @@ Each element has the form (NAME . (FILE . POSITION))."
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-contacts--files ()
   "Return all contact Org files under the contacts directory."
+  (make-directory my/manifolding-atlas-contacts-directory t)
   (directory-files-recursively my/manifolding-atlas-contacts-directory "\\.org\\'"))
 
 (defun org-contacts-files ()

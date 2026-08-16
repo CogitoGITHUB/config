@@ -12,6 +12,14 @@
 #+TAGS:       config(c) keys(k) hydra(h) state(s) :noexport(x)
 #+TODO:       TODO NEXT ACTIVE BLOCKED | DONE SKIP
 # ──────────────────────────────────────────────────────────────────────
+
+* KEYBOARD — Modal Keybindings
+:PROPERTIES:
+:CATEGORY: keyboard
+:PACKAGE:  modaled
+:STRAIGHT: (modaled :type git :host github :repo "DCsunset/modaled")
+:END:
+
 * Custom Commands
 ** Navigation
 #+begin_src emacs-lisp

@@ -13,10 +13,6 @@
 
 ** Config
 #+begin_src emacs-lisp
-  (condition-case nil
-      (nerd-icons-install-fonts t)
-    (error (message "nerd-icons: font download failed (no network?) — icons may not display")))
-
   (with-eval-after-load 'dired
     (when (fboundp 'nerd-icons-dired-mode)
       (nerd-icons-dired-mode 1)))

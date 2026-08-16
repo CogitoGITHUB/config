@@ -287,3 +287,8 @@ mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
 pkg install atuin
 mkdir ~/.local/share/atuin/<\n>atuin init nu | save ~/.local/share/atuin/init.nu
 pkg install starship
+grep -RniE 'git-gutter|modaled|pretty-hydra|citar-embark|simple-httpd|embark-consult' ~/.config/emacs/modules ~/.config/emacs/bootstrap.org
+grep -RniE '/home/aoeu/test|aoeu/test' ~/.config/emacs/modules ~/.config/emacs/bootstrap.org
+nu
+nu
+nu

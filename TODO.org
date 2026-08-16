@@ -39,3 +39,4 @@ https://github.com/elij/graph-fa2
 [8/10, 00:48] Paul: super s in hypr .. take that calds package and make it custom
 [8/10, 00:59] Paul: herder worktree ????on spaces
 [8/10, 01:01] Paul: also herder config might need update for new version pkg
+https://github.com/system1970/opencode-mobile-use.git IMPORTANT

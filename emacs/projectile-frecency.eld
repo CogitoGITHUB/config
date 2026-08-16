@@ -1,0 +1,1 @@
+(("/data/data/com.termux/files/home/.config/" ("emacs/logs/startup-20260816-122620.log" 1 1786872555)))
