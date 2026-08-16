@@ -1,1 +1,41 @@
 #+TITLE: TODO
+
+
+
+https://github.com/larrasket/org-draw.git
+[7/17, 19:54] Paul: https://github.com/nagisanzenin/engram.git
+[7/22, 12:08] Paul: https://github.com/0xK3vin/MegaMemory claude vulpea convo
+[7/22, 19:36] Paul: https://github.com/jatinkrmalik/vocalinux.git
+[7/22, 21:00] Paul: https://github.com/domcyrus/rustnet.git
+[7/22, 21:04] Paul: https://github.com/hamza-abdelmoumene/lyrics-tool.git
+[7/22, 21:05] Paul: https://github.com/hamza-abdelmoumene/vespera.git
+[7/22, 21:19] Paul: https://codeberg.org/jjba23/ggg.git
+[7/22, 23:21] Paul: https://github.com/eval-exec/neomacs it has a nix build test it
+[7/23, 17:26] Paul: https://github.com/kbrdn1/gwm-cli
+[7/23, 23:23] Paul: https://github.com/kil0bit-kb/scrcpy-gui.git
+[7/31, 02:12] Paul: https://github.com/Andrew-Velox/animfetch.git
+[7/31, 14:00] Paul: https://github.com/yibie/grid-table.git
+[7/31, 18:40] Paul: https://github.com/Hinikaa/tileroot.git
+[8/8, 10:34] Paul: https://github.com/fosrl/pangolin.git
+[8/8, 16:12] Paul: https://github.com/nilbuild/slim
+[8/8, 17:15] Paul: https://github.com/alvinunreal/oh-my-opencode-slim.git
+[8/8, 17:15] Paul: https://github.com/tickernelz/opencode-mem.git
+[8/8, 17:16] Paul: https://github.com/mksglu/context-mode.git
+[8/8, 17:16] Paul: https://github.com/makeplane/plane-mcp-server.git
+[8/8, 17:17] Paul: https://github.com/bmad-code-org/BMAD-METHOD.git
+[8/8, 17:18] Paul: https://github.com/abhigyanpatwari/GitNexus.git !!!
+[8/8, 17:18] Paul: https://github.com/ferdinandobons/CodeDebrief.git
+[8/8, 19:25] Paul: schema reinforcement
+[8/8, 20:43] Paul: thinking types property .. see chatgpt chat
+[8/8, 20:44] Paul: manifolding atlas agenda
+[8/8, 20:44] Paul: [8/4, 12:06] Paul: https://github.com/kristjoc/bible-gateway add parts from database in dashboard and has a touch-type practice on the text you want do the same in vulpea ❗
+[8/5, 11:21] Paul: mind map + mastering atlas ❗❗
+[8/9, 15:53] Paul: https://github.com/ManofJELLO/HyprWindowShade.git
+[8/9, 17:12] Paul: https://github.com/caelestia-dots/shell.git
+[8/9, 22:43] Paul: retroarch in system use opencode to test it further and download games
+[8/9, 22:47] Paul: ‼️ in emacs graph visualization ‼️
+https://github.com/elij/graph-fa2
+‼️‼️‼️‼️‼️‼️🌹🌹🌹🌹
+[8/10, 00:48] Paul: super s in hypr .. take that calds package and make it custom
+[8/10, 00:59] Paul: herder worktree ????on spaces
+[8/10, 01:01] Paul: also herder config might need update for new version pkg
