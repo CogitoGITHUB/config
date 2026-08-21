@@ -1,29 +1,12 @@
-# Templates System
+# templates — generation artifacts
 
-All template files live under `manifolding-atlas/templates/` — two engines:
+templates.org: templates root helper (`my/templates-directory`), doct
+loading (loads files/*.el), yasnippet dir config.
 
-| Engine | Config in | Template dir | Trigger |
-|--------|-----------|-------------|---------|
-| **org-capture (doct)** | `manifolding-atlas-templates-system.org` | `full-file-templates/*.org` | `manifolding-atlas-create` → preview select → `org-capture` |
-| **yasnippet** | `manifolding-atlas-templates-system.org` | `snippets/` | `TAB` inline expansion |
+files/: body-only capture templates (no * heading — headingification
+creates it): notes, task, reference (ROAM_REFS), protocol, math, recipes
+(SERVINGS/PREP_TIME/COOK_TIME/READY_IN) + atlas.el (doct declarations,
+defines my/capture-manifolding-atlas).
 
-## org-capture (doct) — Preview
-
-When creating a note via `manifolding-atlas-create`, a `completing-read` lets you pick a body template. The split-window preview shows the rendered output in `org-mode` (`outline-show-all` + `org-indent-mode`) with `%?` replaced by the note's actual title. You see exactly what will land in the file.
-
-Templates in `manifolding-atlas/templates/full-file-templates/`:
-- **plain** — Minimal: just places cursor for typing
-- **notes** — General notes: `** Notes` with list
-- **reference** — External sources: `:PROPERTIES:` (`:ROAM_REFS:`) + `** Summary`, `** Claims`, `** Connections`
-- **task** — Action items: `** Objective` (checkbox) + `** Notes`
-- **math** — Math/concepts: `** Definition`, `** Theorem`, `** Lemma`, `** Proof`, `** Properties`, `** Notes`
-- **protocol** — Experimental methods: `** Purpose`, `** Materials`, `** Procedure`, `** Results`, `** Analysis`, `** Notes`
-- **recipes** — Recipe: `:PROPERTIES:` (`:SERVINGS: :PREP_TIME: :COOK_TIME: :READY_IN:`) + `** Ingredients`, `** Directions`
-
-Templates contain **only body content** (no `*` heading, no `#+title:` metadata) — headingification creates `* Title` before the template is inserted.
-
-Selection stores `:TEMPLATE:` and `:TEMPLATE_HASH:` properties on the note for schema validation.
-
-## yasnippet
-
-YASnippet snippets live under `snippets/`. Triggered with `TAB` after typing a snippet key (`yas-expand`).
+Selection stores TEMPLATE/TEMPLATE_HASH on notes; template schemas
+enforce declared properties (see domains/schema/schema.org).

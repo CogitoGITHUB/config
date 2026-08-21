@@ -1,0 +1,33 @@
+#+title:      Fast Captures Dispatcher
+#+priority:   15
+
+Dynamic dispatcher that scans infra/fast/ for capture org files and
+presents a hydra menu.  New capture types are picked up automatically.
+
+* Core
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-quick-captures ()
+  "Choose a fast capture type via hydra menu."
+  (interactive)
+  (let* ((dir (expand-file-name "modules/manifolding-atlas/infra/fast/"
+                                user-emacs-directory))
+         (files (seq-filter
+                 (lambda (f)
+                   (and (not (file-directory-p (expand-file-name f dir)))
+                        (not (string= f "dispatcher.org"))))
+                 (directory-files dir nil "\\.org\\'")))
+         (bindings (delq nil (mapcar (lambda (f)
+                                       (let* ((name (file-name-sans-extension f))
+                                              (fn (intern (concat "my/manifolding-atlas-quick-" name))))
+                                         (when (fboundp fn)
+                                           (let ((key (char-to-string (aref name 0)))
+                                                 (label (capitalize name)))
+                                             `(,key ,fn ,label :exit t)))))
+                                     files))))
+    (eval (macroexpand
+           `(defhydra my/quick-captures-hydra
+              (:title "Fast Captures" :quit-key "q" :separator "─")
+               "Actions"
+               ,@bindings)))
+    (my/quick-captures-hydra/body)))
+#+end_src

@@ -292,3 +292,7 @@ grep -RniE '/home/aoeu/test|aoeu/test' ~/.config/emacs/modules ~/.config/emacs/b
 nu
 nu
 nu
+nu
+y
+nu
+nu

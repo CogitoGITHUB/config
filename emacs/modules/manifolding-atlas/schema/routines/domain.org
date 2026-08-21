@@ -1,0 +1,25 @@
+#+title: Routines Domain Prompt
+#+priority: 5
+
+* Prompt
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-prompt-routine-domain ()
+  "Prompt for ROUTINE_DOMAIN. Returns \"WARNING\" if skipped."
+  (let ((val (completing-read "ROUTINE_DOMAIN: "
+                              (cons "⚠ WARNING"
+                                    my/manifolding-atlas-routines--domains)
+                              nil t nil nil "⚠ WARNING")))
+    (if (string-equal val "⚠ WARNING") "WARNING" val)))
+
+(my/manifolding-atlas-register-prompt
+ :key 'routine-domain
+ :name 'routine-domain
+ :label "Routines: Domain"
+ :prompt-fn #'my/manifolding-atlas-prompt-routine-domain
+ :contexts '(routine)
+ :read-current-fn (lambda () (org-entry-get nil "ROUTINE_DOMAIN"))
+ :merge-strategy 'replace
+ :to-plist (lambda (val _ctx)
+             (when val
+               `(:properties (("ROUTINE_DOMAIN" . ,val))))))
+#+end_src

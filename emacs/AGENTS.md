@@ -19,15 +19,14 @@
 |------|---------|
 | `bootstrap.org` | Boot kernel — tangles to `init.el` / `early-init.el` |
 | `modules/keyboard.org` | Modal keybinding system (hydras, modaled states) |
-| `modules/manifolding-atlas/` | Main notes system (formerly `vulpea`, vendored + loader-managed). Full reference: `modules/manifolding-atlas/readme.org` |
-| `modules/manifolding-atlas/manifolding-atlas.org` | Main notes system config (116 lines; engine vendored under `core/`) |
-| `modules/manifolding-atlas/plugins/*.org` | Manifolding Atlas plugin modules |
-| `modules/manifolding-atlas/properties/*.org` | Note property prompts (state, tags, etc.) |
-| `modules/manifolding-atlas/manifolding-atlas-templates-system.org` | Template infrastructure: doct, yasnippet loading |
-| `modules/manifolding-atlas/templates/` | All template files: `full-file-templates/`, `snippets/` |
-| `modules/manifolding-atlas/templates/full-file-templates/{notes,plain,reference,task,math,protocol,recipes}.org` | Capture templates (body-only, no `*` heading — headingification creates it) |
-| `modules/manifolding-atlas/plugins/recipes.org` | Recipe plugin — manual recipe notes under `recipes/` (no URL fetch); `my/manifolding-atlas-recipe-create`, `my/manifolding-atlas-recipes-edit-servings` |
-| `modules/manifolding-atlas/templates/snippets/` | Yasnippet snippet files |
+| `modules/manifolding-atlas/` | Main notes system (formerly `vulpea`, vendored + loader-managed). Full reference: `modules/manifolding-atlas/README.org` — remastered layout: core/ infra/ domains/ schema/ templates/ |
+| `modules/manifolding-atlas/atlas.org` | Main entry/config (engine vendored under `core/`) |
+| `modules/manifolding-atlas/domains/<name>/<name>.org` | Capability domains (mastering, routines, protocols, rules, recipes, schema, …) |
+| `modules/manifolding-atlas/schema/**/*.org` | Prompt/schema definitions (register.org + general/, dictionary/, rules/, recipes/, contacts/, routines/) |
+| `modules/manifolding-atlas/infra/capture/prompt-engine.org` | Prompt registry + MISSING PROMPTS engine |
+| `modules/manifolding-atlas/templates/templates.org` | Template infrastructure: doct, yasnippet loading |
+| `modules/manifolding-atlas/templates/files/` | Capture templates (body-only, no `*` heading) + atlas.el (doct) |
+| `modules/manifolding-atlas/domains/recipes/recipes.org` | Recipe domain — manual recipe notes under `recipes/`; `my/manifolding-atlas-recipe-create`, `my/manifolding-atlas-recipes-edit-servings` |
 | `modules/arei.org` | Guile Scheme IDE (AREI) — requires `guile-ares-rs` installed system-wide |
 | `modules/auctex.org` | LaTeX environment (xelatex, texlive env vars, 3-pass PDF export) |
 | `modules/org-download.org` | Drag-drop files/images into org notes |

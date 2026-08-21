@@ -1,0 +1,17 @@
+#+title: Manifolding Atlas — Module README
+
+The Atlas is the knowledge system of this config: a vulpea-derived,
+loader-managed notes engine with a literate org module tree.
+
+| Layer     | Path       | Role                                          |
+|-----------+------------+-----------------------------------------------|
+| core      | core/      | vendored engine, dependency-ordered (-31…-13) |
+| infra     | infra/     | reusable machinery (capture, fast, elisp)     |
+| domains   | domains/   | capabilities (one directory per domain)       |
+| schema    | schema/    | the data language: prompts & registries       |
+| templates | templates/ | generation artifacts (files/, templates.org)  |
+
+Entry points: atlas.org, atlas-ui.org, atlas-consult.org.
+Load order: =#+priority:= per file, lower first (core negatives load first).
+Notes vault: ~/test/ (extensionless files). DB: ~/test/admin/manifolding-atlas.db.
+Reload: M-x manifolding-emacs-reload. See AGENTS.md for agent context.

@@ -573,7 +573,8 @@
    "Meta"
    (("f" my/manifolding-atlas--fix-violations "fix warnings" :exit t)
     ("P" my/manifolding-atlas-update-properties "update props" :exit t)
-    ("u" manifolding-atlas-ui-sidebar-toggle "manifolding-atlas ui" :exit t))
+    ("u" manifolding-atlas-ui-sidebar-toggle "manifolding-atlas ui" :exit t)
+    ("E" my/manifolding-atlas-reinforce-sweep "schema sweep" :exit t))
    "Rules"
    (("k" my/manifolding-atlas-rules-mark-as-rule "mark rule" :exit t)
     ("K" my/manifolding-atlas-rules-goto-routed-file "rule file" :exit t)
@@ -598,6 +599,15 @@
    (("n" my/manifolding-atlas-recipe-create "new recipe" :exit t)
     ("e" my/manifolding-atlas-recipes-edit-servings "edit servings" :exit t)
     ("f" my/manifolding-atlas-recipes-menu "recipes" :exit t))
+   "Routines"
+   (("N" my/manifolding-atlas-routines-create "new routine" :exit t)
+    ("J" my/manifolding-atlas-routines-chain-create "new chain" :exit t)
+    ("F" my/manifolding-atlas-routines-find "find routine" :exit t)
+    ("B" my/manifolding-atlas-routines-generate "generate" :exit t)
+    ("X" my/manifolding-atlas-routines-run "run" :exit t)
+    ("!" my/manifolding-atlas-routines-validate "validate" :exit t)
+    ("S" my/manifolding-atlas-routines-report "report" :exit t)
+    ("T" my/manifolding-atlas-routines-menu "menu" :exit t))
    "Transclude"
    (("y" my/transclusion-hydra/body "transclude" :exit t))
    "Back"

@@ -1,0 +1,42 @@
+#+title:      Thinking Types Prompt
+#+priority:   1
+
+* Thinking Types
+Why: Classify how a note thinks — analytical, logical, critical, creative,
+abstract, reflective, intuitive. Space-separated, multiple allowed,
+blank/skip = WARNING.
+
+** Prompt
+#+begin_src emacs-lisp
+(defconst my/manifolding-atlas-thinking-types
+  '("analytical" "logical" "critical" "creative"
+    "abstract" "reflective" "intuitive"))
+
+(defun my/manifolding-atlas-prompt-thinking-types ()
+  "Prompt for THINKING_TYPES. Returns \"WARNING\" if skipped."
+  (let* ((raw (completing-read-multiple
+               "Thinking types (comma-separated, blank = skip): "
+               my/manifolding-atlas-thinking-types nil nil))
+         (vals (seq-filter
+                (lambda (v)
+                  (and (not (string-empty-p v))
+                       (member v my/manifolding-atlas-thinking-types)))
+                raw)))
+    (if vals
+        (string-join (delete-dups vals) " ")
+      "WARNING")))
+#+end_src
+
+** Registration
+#+begin_src emacs-lisp
+(my/manifolding-atlas-register-prompt
+  :key 'thinking-types
+  :name 'thinking-types
+  :label "Thinking: Types"
+  :prompt-fn #'my/manifolding-atlas-prompt-thinking-types
+  :contexts '(file heading)
+  :read-current-fn (lambda () (org-entry-get nil "THINKING_TYPES"))
+  :merge-strategy 'replace
+  :to-plist (lambda (val _ctx)
+              `(:properties (("THINKING_TYPES" . ,val)))))
+#+end_src

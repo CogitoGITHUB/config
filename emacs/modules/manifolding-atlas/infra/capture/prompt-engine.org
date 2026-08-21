@@ -1,0 +1,305 @@
+#+title: Manifolding Atlas — Prompt Infrastructure
+#+priority: 12
+* Prompt Infrastructure
+:PROPERTIES:
+:CATEGORY: editing
+:END:
+
+Central registry so that adding a new .org to modules/manifolding-atlas/schema/ automatically
+includes its prompt in the creation flow.
+
+The registry defvar and defun live in
+[[file:../../schema/register.org]] so they load before any
+prompt file calls ~my/manifolding-atlas-register-prompt~.
+
+** Help File Mapping
+
+A few prompt names don't match their filename
+(e.g. `scheduled` lives in `schedule.org` with `deadline`).
+
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas-prompt-help-map
+  '((scheduled . "schedule.org")
+    (deadline  . "schedule.org"))
+  "Alist mapping prompt :name to help filename.
+Entries here override the default <name>.org.")
+
+(defun my/manifolding-atlas--help-file (name)
+  "Return the help filename for prompt NAME."
+  (or (alist-get name my/manifolding-atlas-prompt-help-map)
+      (format "%s.org" name)))
+
+(defvar my/manifolding-atlas--help-opened nil
+  "Non-nil when a help buffer was opened for the current prompt.")
+
+(defun my/manifolding-atlas--show-help (name)
+  "Open prompt NAME's help file full-screen with org-tree-slide.
+Search recursively under `properties/' for the file."
+  (let* ((file (my/manifolding-atlas--help-file name))
+          (properties-dir (expand-file-name "modules/manifolding-atlas/schema/"
+                                            user-emacs-directory))
+         (path (car (file-expand-wildcards
+                     (concat properties-dir "**/" file) t))))
+    (when (and path (file-exists-p path))
+      (setq my/manifolding-atlas--help-opened t)
+      (delete-other-windows)
+      (find-file path)
+      (goto-char (point-min))
+      (org-tree-slide-mode 1))))
+
+(defun my/manifolding-atlas--close-help ()
+  "Stop org-tree-slide and kill the help buffer, if one was opened."
+  (when my/manifolding-atlas--help-opened
+    (setq my/manifolding-atlas--help-opened nil)
+    (org-tree-slide-mode -1)
+    (kill-buffer)))
+#+end_src
+
+** TODO State Carrier
+
+Global variable to pass TODO state from prompt collection through
+to the heading-format file writer, so TODO appears on the heading
+line (`* TODO Title`) instead of in the property drawer.
+
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas--creation-todo nil
+  "TODO value for the current note creation.
+Set by `my/manifolding-atlas-collect-prompts', read by the heading-format
+advice on `manifolding-atlas--format-note-content'.")
+#+end_src
+
+** Collector
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect-prompts (context &rest extra-contexts)
+  "Run all registered prompts matching CONTEXT (or any of EXTRA-CONTEXTS).
+When CONTEXT is a list, match prompts whose contexts overlap with it.
+Single-symbol callers (like `(my/manifolding-atlas-collect-prompts 'file)`) continue working."
+  (let* ((contexts (if (listp context) context (cons context extra-contexts)))
+         result)
+    (dolist (spec my/manifolding-atlas-prompt-registry)
+      (when (seq-intersection contexts (plist-get spec :contexts) #'eq)
+        (my/manifolding-atlas--show-help (plist-get spec :name))
+        (let (val frag)
+          (setq val (condition-case nil
+                        (funcall (plist-get spec :prompt-fn))
+                      (quit nil)))
+          (setq frag (funcall (plist-get spec :to-plist) val context))
+          (when-let ((v (plist-get frag :tags)))
+            (setq result (plist-put result :tags
+                         (append (plist-get result :tags) v))))
+          (when-let ((v (plist-get frag :properties)))
+            (setq result (plist-put result :properties
+                         (append (plist-get result :properties)
+                                 (cl-remove-if (lambda (p) (string-empty-p (cdr p))) v)))))
+          (when-let ((v (plist-get frag :body)))
+            (setq result (plist-put result :body
+                         (concat (or (plist-get result :body) "") v))))
+          (when-let ((v (plist-get frag :post-apply)))
+            (setq result (plist-put result :post-apply
+                         (append (plist-get result :post-apply) v))))
+          (when-let ((v (plist-get frag :after)))
+            (setq result (plist-put result :after v)))
+          (when-let ((v (plist-get frag :file-name)))
+            (setq result (plist-put result :file-name v)))
+          (when (plist-member frag :todo)
+            (setq result (plist-put result :todo (plist-get frag :todo))
+                  my/manifolding-atlas--creation-todo (plist-get frag :todo))))
+        (my/manifolding-atlas--close-help)))
+    result))
+#+end_src
+
+** Fast Collector
+
+When fast mode is active, all prompts return their "skip" defaults
+(e.g. "WARNING" for state prompts) without user interaction.
+This function temporarily overrides input primitives to achieve that.
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--fast-read-string (prompt &optional initial-input history default-value _inherit)
+  "Return DEFAULT-VALUE or INITIAL-INPUT or empty — no prompt."
+  (or default-value initial-input ""))
+
+(defun my/manifolding-atlas--fast-completing-read (prompt collection &optional predicate _require-match initial-input history default-value _inherit)
+  "Return DEFAULT-VALUE or first candidate."
+  (or default-value
+      (if (and collection (not (functionp collection))) (car collection) "")
+      ""))
+
+(defun my/manifolding-atlas--fast-read-char-choice (prompt chars &optional _inhibit-keyboard-quit)
+  "Return \\r or first char — maps to skip/default in all prompt functions."
+  (if (memq ?\r chars) ?\r (car chars)))
+
+(defun my/manifolding-atlas--collect-default-prompts (context &rest extra-contexts)
+  "Like `my/manifolding-atlas-collect-prompts' but all prompts return defaults.
+Temporarily overrides `read-string', `completing-read' and
+`read-char-choice' to return their default/skip values."
+  (cl-letf (((symbol-function 'read-string) #'my/manifolding-atlas--fast-read-string)
+            ((symbol-function 'completing-read) #'my/manifolding-atlas--fast-completing-read)
+            ((symbol-function 'read-char-choice) #'my/manifolding-atlas--fast-read-char-choice))
+    (apply #'my/manifolding-atlas-collect-prompts context extra-contexts)))
+
+(defun my/manifolding-atlas-collect-prompts-with-fast (specialized-contexts general-contexts &optional fast-level)
+  "Collect prompts using fast mode levels.
+SPECIALIZED-CONTEXTS fire at level 0 and 1, skip at level >= 2.
+GENERAL-CONTEXTS fire only at level 0, skip at level >= 1.
+Returns merged plist with :tags, :properties, :body, :post-apply.
+When FAST-LEVEL is nil, prompts the user via `my/manifolding-atlas--fast-level'."
+  (let* ((fast (or fast-level (my/manifolding-atlas--fast-level)))
+         (spec (if (>= fast 2)
+                   (my/manifolding-atlas--collect-default-prompts specialized-contexts)
+                 (my/manifolding-atlas-collect-prompts specialized-contexts)))
+         (gen  (if (= fast 0)
+                   (my/manifolding-atlas-collect-prompts general-contexts)
+                 (my/manifolding-atlas--collect-default-prompts general-contexts))))
+    (list :tags (append (plist-get gen :tags) (plist-get spec :tags))
+          :properties (append (plist-get gen :properties) (plist-get spec :properties))
+          :body (concat (plist-get gen :body) (plist-get spec :body))
+          :post-apply (append (plist-get gen :post-apply) (plist-get spec :post-apply)))))
+#+end_src
+
+** Missing Prompts Management
+
+Manages MISSING PROMPTS — an auto-generated file tracking notes whose
+state prompts were skipped (set to WARNING).
+
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas-missing--file "admin/MISSING PROMPTS"
+  "Filename for tracking notes with WARNING state properties.")
+(setq my/manifolding-atlas-missing--file "admin/MISSING PROMPTS")
+
+(defun my/manifolding-atlas-missing--path ()
+  "Return full path to MISSING PROMPTS."
+  (expand-file-name my/manifolding-atlas-missing--file
+                    (my/manifolding-atlas-root-dir)))
+
+(defun my/manifolding-atlas-missing--ensure-file ()
+  "Create MISSING PROMPTS if it does not exist."
+  (let ((path (my/manifolding-atlas-missing--path)))
+    (make-directory (file-name-directory path) t)
+    (unless (file-exists-p path)
+      (with-temp-file path
+        (insert "#+TITLE: MISSING PROMPTS\n")
+        (insert "#+AUTHOR: Shape\n")
+        (insert "#+DESCRIPTION: Auto-generated - notes with unanswered state prompts.\n")
+        (insert "#+STARTUP: overview\n\n")))
+    path))
+
+(defun my/manifolding-atlas-missing--rebuild-from-health ()
+  "Rebuild MISSING PROMPTS from schema health data.
+Lists all notes with schema violations, grouped by schema.
+Each entry includes violation details in the property drawer."
+  (interactive)
+  (let ((path (my/manifolding-atlas-missing--path))
+        (by-id (make-hash-table :test #'equal)))
+    (make-directory (file-name-directory path) t)
+    (dolist (health (manifolding-atlas-schema-collection-health))
+      (let ((schema-name (manifolding-atlas-schema-health-schema health)))
+        (dolist (pair (manifolding-atlas-schema-health-invalid-notes health))
+          (let* ((note (car pair))
+                 (violations (cdr pair))
+                 (id (manifolding-atlas-note-id note))
+                 (title (manifolding-atlas-note-title note))
+                 (existing (gethash id by-id)))
+            (if existing
+                (progn
+                  (plist-put existing :schemas
+                             (cons (symbol-name schema-name)
+                                   (plist-get existing :schemas)))
+                  (plist-put existing :violations
+                             (append violations (plist-get existing :violations))))
+              (puthash id
+                       (list :id id :title title
+                             :schemas (list (symbol-name schema-name))
+                             :violations violations)
+                       by-id))))))
+    (let (entries)
+      (maphash (lambda (_id plist) (push plist entries)) by-id)
+      (if entries
+          (with-temp-file path
+            (insert "#+TITLE: MISSING PROMPTS\n")
+            (insert "#+AUTHOR: Shape\n")
+            (insert "#+DESCRIPTION: Auto-generated - notes with schema violations.\n")
+            (insert "#+STARTUP: overview\n\n")
+            (dolist (entry (nreverse entries))
+              (insert (format "* TODO [[id:%s][%s]]\n"
+                              (plist-get entry :id)
+                              (plist-get entry :title)))
+              (insert "  :PROPERTIES:\n")
+              (insert (format "  :CREATED:       %s\n"
+                              (format-time-string "<%Y-%m-%d %a>")))
+              (insert (format "  :SCHEMAS:       %s\n"
+                              (string-join (plist-get entry :schemas) ", ")))
+              (let ((vs (plist-get entry :violations)))
+                (when vs
+                  (insert (format "  :VIOLATIONS:    %s\n"
+                                  (string-join
+                                   (mapcar #'manifolding-atlas-violation-message vs)
+                                   "; ")))))
+              (insert "  :END:\n\n")))
+        (when (file-exists-p path)
+          (delete-file path))))))
+
+(defun my/manifolding-atlas--post-sync (_property _value _note)
+  "No-op.  Schema health replaces per-property MISSING PROMPTS sync."
+  nil)
+#+end_src
+
+** Rebuild & Hooks
+
+#+begin_src emacs-lisp
+(add-hook 'org-capture-after-finalize-hook #'my/manifolding-atlas-missing--rebuild-from-health)
+
+(defvar my/manifolding-atlas-missing--startup-timer nil
+  "Timer handle for retrying startup rebuild until DB is ready.")
+
+(defun my/manifolding-atlas-missing--startup-rebuild ()
+  "Run rebuild-from-health if manifolding-atlas DB has notes; retry later if not."
+  (condition-case nil
+      (if (> (length (manifolding-atlas-db-query)) 0)
+          (progn
+            (my/manifolding-atlas-missing--rebuild-from-health)
+            (when my/manifolding-atlas-missing--startup-timer
+              (cancel-timer my/manifolding-atlas-missing--startup-timer)
+              (setq my/manifolding-atlas-missing--startup-timer nil)))
+        (setq my/manifolding-atlas-missing--startup-timer
+              (run-with-idle-timer 5 nil #'my/manifolding-atlas-missing--startup-rebuild)))
+    (error
+     (setq my/manifolding-atlas-missing--startup-timer
+           (run-with-idle-timer 5 nil #'my/manifolding-atlas-missing--startup-rebuild)))))
+
+;; Disabled: `manifolding-atlas-db-query' in a startup retry loop triggers
+;; recursive sqlite3_step CPU spike on daemon start.
+;;(my/manifolding-atlas-missing--startup-rebuild)
+#+end_src
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--heading-schedule-apply (val note)
+  "Post-apply: set SCHEDULED to VAL on NOTE.
+Argument order is (val note) for use with apply-partially."
+  (manifolding-atlas-visit note)
+  (org-schedule nil val)
+  (save-buffer)
+  (kill-buffer))
+#+end_src
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--heading-deadline-apply (val note)
+  "Post-apply: set DEADLINE to VAL on NOTE.
+Argument order is (val note) for use with apply-partially."
+  (manifolding-atlas-visit note)
+  (org-deadline nil val)
+  (save-buffer)
+  (kill-buffer))
+#+end_src
+
+** Pending Post-Apply
+
+managed by =my/manifolding-atlas--pending-post-apply= for file-level creation (bridges
+prompt collection to =:after= advice on =manifolding-atlas-create=).
+
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas--pending-post-apply nil
+  "Post-apply functions for current note creation.
+Set by `my/manifolding-atlas--default-create-fn', consumed by the capture functions.")
+#+end_src
