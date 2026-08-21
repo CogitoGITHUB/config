@@ -1,0 +1,417 @@
+#+title: Manifolding Atlas — Declarative Org Prompts
+#+priority: 0
+
+Turns plain org outlines into registered prompts. A declarative file has
+a level-1 heading shaped like a PROPERTY_KEY whose level-2 headings are
+the allowed options — no elisp. Editing headings edits the prompt;
+adding a file adds a property; deleting a file removes it. Files that
+contain src blocks are treated as legacy elisp prompts and skipped.
+
+Optional drawer metadata under the level-1 heading:
+:CONTEXTS: file heading task …   (default: file heading)
+:REQUIRED: t                     (feeds base-schema tracking)
+:KIND:     property|live|todo|multi|tags|template   (default property)
+:LIVE:     <family>              (for KIND live — ref-note linking family)
+:LABEL:    <display label>       (default: the KEY)
+:TASK-DEFAULT: <value>           (extra task-context registration default)
+
+* Requires
+#+begin_src emacs-lisp
+(require 'manifolding-atlas)
+(require 'cl-lib)
+#+end_src
+
+* Template helpers
+Shared by the KIND template declarative prompt (moved from
+schema/general/template.org so that file can be pure data).
+#+begin_src emacs-lisp
+(defconst my/manifolding-atlas-prompt-template--none "none")
+
+(defvar my/manifolding-atlas-prompt-template--deferred nil
+  "When non-nil, defer to the file-level preview chooser.")
+
+(defun my/manifolding-atlas-prompt-template--defer-around (orig &rest args)
+  (let ((my/manifolding-atlas-prompt-template--deferred t))
+    (apply orig args)))
+
+(with-eval-after-load 'manifolding-atlas
+  (dolist (fn '(my/manifolding-atlas-capture-new-file
+                my/manifolding-atlas-capture-task-file))
+    (advice-add fn :around
+                #'my/manifolding-atlas-prompt-template--defer-around)))
+
+(defun my/manifolding-atlas-prompt-template--names ()
+  "Return available template names from templates/files."
+  (condition-case nil
+      (mapcar (lambda (f)
+                (file-name-sans-extension (file-name-nondirectory f)))
+              (directory-files (my/manifolding-atlas-template-files-dir)
+                               t "\\.org\\'"))
+    (error nil)))
+
+(defun my/manifolding-atlas-prompt-template ()
+  "Prompt for TEMPLATE. Returns \"WARNING\" if skipped, \"none\" for none."
+  (if my/manifolding-atlas-prompt-template--deferred
+      "WARNING"
+    (completing-read "TEMPLATE: "
+                     (append '("⚠ WARNING" "none")
+                             (my/manifolding-atlas-prompt-template--names))
+                     nil t nil nil "⚠ WARNING")))
+
+(defun my/manifolding-atlas-prompt-template--apply (val note)
+  "Post-apply: keep TEMPLATE_HASH in sync with VAL on NOTE."
+  (when note
+    (if (and val
+             (not (member val '("WARNING" my/manifolding-atlas-prompt-template--none))))
+        (my/manifolding-atlas--property-put
+         note "TEMPLATE_HASH"
+         (or (my/manifolding-atlas--capture-file-hash val) "unknown"))
+      (manifolding-atlas-visit note)
+      (org-entry-delete nil "TEMPLATE_HASH")
+      (save-buffer))))
+#+end_src
+
+* Parser
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-org-prompt--parse (file)
+  "Return specs (KEY OPTIONS PLIST) declared in FILE, or nil."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (goto-char (point-min))
+    (when (not (re-search-forward "begin_src" nil t))
+      (goto-char (point-min))
+      (let ((specs nil) key opts plist)
+        (while (not (eobp))
+          (cond
+           ((looking-at "^\\* \\([A-Z][A-Z0-9_]*\\)[ \t]*$")
+            (when key
+              (push (list key (nreverse opts) plist) specs))
+            (setq key (match-string 1) opts nil plist nil)
+            (forward-line 1)
+            (when (looking-at "^[ \t]*:PROPERTIES:[ \t]*$")
+              (forward-line 1)
+              (while (not (or (eobp) (looking-at "^[ \t]*:END:[ \t]*$")))
+                (when (looking-at "^[ \t]*:\\([A-Z-]+\\):[ \t]*\\(.*\\)$")
+                  (setq plist
+                        (plist-put plist
+                                   (intern (concat ":" (match-string 1)))
+                                   (string-trim (match-string 2)))))
+                (forward-line))
+              (forward-line 1)))
+           ((and key (looking-at "^\\*\\*+ [. ]*\\(.*?\\)[ \t]*$"))
+            (push (match-string 1) opts)
+            (forward-line 1))
+           ((looking-at "^\\* ")
+            (when key
+              (push (list key (nreverse opts) plist) specs))
+            (setq key nil opts nil plist nil)
+            (forward-line 1))
+           (t (forward-line 1))))
+        (when key
+          (push (list key (nreverse opts) plist) specs))
+        (nreverse specs)))))
+#+end_src
+
+* Registration
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-org-prompt--register-all ()
+  "Register every declarative prompt found under schema/."
+  (dolist (file (my/manifolding-atlas-org-prompt--schema-files))
+    (dolist (spec (my/manifolding-atlas-org-prompt--parse file))
+      (apply #'my/manifolding-atlas-org-prompt--register file spec))))
+
+(defun my/manifolding-atlas-org-prompt--register (file key options plist)
+  "Register one declarative prompt from FILE: KEY with OPTIONS and PLIST."
+  (let* ((key-sym (intern (downcase
+                           (or (plist-get plist :id)
+                               (replace-regexp-in-string "_" "-" key)))))
+         (prop key)
+         (kind (intern (downcase
+                        (or (plist-get plist :kind) "property"))))
+         (contexts (mapcar #'intern
+                           (split-string
+                            (or (plist-get plist :contexts)
+                                "file heading"))))
+         (label (or (plist-get plist :label) key))
+         (task-default (plist-get plist :task-default))
+         (make-fn
+          (lambda (&optional default)
+            (lambda ()
+              (my/manifolding-atlas-org-prompt--ask
+               file key label kind options plist default))))
+         (main-fn (funcall make-fn nil)))
+    (defalias (intern (concat "my/manifolding-atlas-prompt-" key-sym))
+              main-fn)
+    (my/manifolding-atlas-register-prompt
+     :key key-sym
+     :name key-sym
+     :label label
+     :prompt-fn main-fn
+     :contexts contexts
+     :read-current-fn
+     (if (eq kind 'todo)
+         (lambda () (org-get-todo-state))
+       (lambda () (org-entry-get nil prop)))
+     :merge-strategy (if (eq kind 'tags) 'merge 'replace)
+     :to-plist
+     (lambda (val _ctx)
+       (my/manifolding-atlas-org-prompt--fragment
+        prop kind plist val)))
+    (when (and task-default (memq 'task contexts))
+      (my/manifolding-atlas-register-prompt
+       :key key-sym
+       :name key-sym
+       :label label
+       :prompt-fn (funcall make-fn task-default)
+       :contexts '(task)
+       :read-current-fn
+       (if (eq kind 'todo)
+           (lambda () (org-get-todo-state))
+         (lambda () (org-entry-get nil prop)))
+       :merge-strategy (if (eq kind 'tags) 'merge 'replace)
+       :to-plist
+       (lambda (val _ctx)
+         (my/manifolding-atlas-org-prompt--fragment
+          prop kind plist val))))))
+#+end_src
+
+* Asking
+#+begin_src emacs-lisp
+(defcustom my/manifolding-atlas-org-prompt-ui 'buffer
+  "How declarative prompts ask for a value.
+`buffer'     open the prompt's org file; navigate freely, RET on an
+             option heading (level 2 or deeper — level-3+ are variants)
+             selects it, m marks for multi-select, q cancels.
+`minibuffer' classic completing-read over the flattened options."
+  :type '(choice (const :tag "File buffer" buffer)
+                 (const :tag "Minibuffer" minibuffer))
+  :group 'manifolding-atlas)
+
+(defvar my/manifolding-atlas-org-prompt--buffer-result nil)
+(defvar my/manifolding-atlas-org-prompt--buffer-marks nil)
+
+(defun my/manifolding-atlas-org-prompt--buffer-refresh-marks ()
+  (remove-overlays (point-min) (point-max) 'atlas-mark t)
+  (dolist (title my/manifolding-atlas-org-prompt--buffer-marks)
+    (save-excursion
+      (goto-char (point-min))
+      (when (re-search-forward
+             (format "^\\*\\*+ %s[ \t]*$" (regexp-quote title)) nil t)
+        (let ((ov (make-overlay (line-beginning-position)
+                                (line-end-position))))
+          (overlay-put ov 'atlas-mark t)
+          (overlay-put ov 'face 'highlight))))))
+
+(defun my/manifolding-atlas-org-prompt--buffer-accept ()
+  "Accept the option heading at point."
+  (interactive)
+  (if (not (and (org-at-heading-p) (>= (org-outline-level) 2)))
+      (message "Point must be on an option heading (level 2 or deeper)")
+    (let* ((title (org-get-heading t t t t))
+           (multi (eq my/manifolding-atlas-org-prompt--this-kind 'multi)))
+      (setq my/manifolding-atlas-org-prompt--buffer-result
+            (if (and multi my/manifolding-atlas-org-prompt--buffer-marks)
+                (string-join
+                 (reverse my/manifolding-atlas-org-prompt--buffer-marks) " ")
+              title))
+      (exit-recursive-edit))))
+
+(defun my/manifolding-atlas-org-prompt--buffer-mark ()
+  "Toggle mark on the option heading at point."
+  (interactive)
+  (if (not (and (org-at-heading-p) (>= (org-outline-level) 2)))
+      (message "Point must be on an option heading")
+    (let ((title (org-get-heading t t t t)))
+      (setq my/manifolding-atlas-org-prompt--buffer-marks
+            (if (member title my/manifolding-atlas-org-prompt--buffer-marks)
+                (delq title my/manifolding-atlas-org-prompt--buffer-marks)
+              (cons title my/manifolding-atlas-org-prompt--buffer-marks)))
+      (my/manifolding-atlas-org-prompt--buffer-refresh-marks))))
+
+(defun my/manifolding-atlas-org-prompt--buffer-abort ()
+  "Cancel selection."
+  (interactive)
+  (setq my/manifolding-atlas-org-prompt--buffer-result nil)
+  (exit-recursive-edit))
+
+(defvar-local my/manifolding-atlas-org-prompt--this-kind nil)
+
+(defun my/manifolding-atlas-org-prompt--ask-buffer (file kind default)
+  "Open FILE and let the user pick an option with RET. Editable."
+  (setq my/manifolding-atlas-org-prompt--buffer-result nil
+        my/manifolding-atlas-org-prompt--buffer-marks nil)
+  (let ((buf (find-file-noselect file)))
+    (with-current-buffer buf
+      (goto-char (point-min))
+      (when (fboundp 'outline-show-all) (outline-show-all))
+      (when (and default (not (string-empty-p default)))
+        (when (re-search-forward
+               (format "^\\*\\*+ %s[ \t]*$" (regexp-quote default)) nil t)
+          (recenter-top-bottom)))
+      (local-set-key (kbd "RET") #'my/manifolding-atlas-org-prompt--buffer-accept)
+      (local-set-key (kbd "<return>") #'my/manifolding-atlas-org-prompt--buffer-accept)
+      (local-set-key (kbd "m") #'my/manifolding-atlas-org-prompt--buffer-mark)
+      (local-set-key (kbd "q") #'my/manifolding-atlas-org-prompt--buffer-abort)
+      (setq my/manifolding-atlas-org-prompt--this-kind kind))
+    (pop-to-buffer buf)
+    (message "RET select · m mark · q cancel")
+    (recursive-edit)
+    (with-current-buffer buf
+      (local-unset-key (kbd "RET"))
+      (local-unset-key (kbd "<return>"))
+      (local-unset-key (kbd "m"))
+      (local-unset-key (kbd "q")))
+    my/manifolding-atlas-org-prompt--buffer-result))
+
+(defun my/manifolding-atlas-org-prompt--ask
+    (file key label kind options plist default)
+  (if (and (eq my/manifolding-atlas-org-prompt-ui 'buffer)
+           file (file-exists-p file)
+           (memq kind '(property live todo multi tagopt)))
+      (or (my/manifolding-atlas-org-prompt--ask-buffer file kind default)
+          (if default default "WARNING"))
+    (my/manifolding-atlas-org-prompt--ask-minibuffer
+     key label kind options plist default)))
+
+(defun my/manifolding-atlas-org-prompt--ask-minibuffer
+    (key label kind options plist default)
+  (pcase kind
+    ('template
+     (my/manifolding-atlas-prompt-template))
+    ('free
+     (let ((val (read-string (format "%s: " label) nil nil
+                             (or default "⚠ WARNING"))))
+       (if (string-empty-p val) "WARNING" val)))
+    ('topics
+     (let* ((current (org-entry-get nil key))
+            (known (mapcar #'car
+                           (emacsql (manifolding-atlas-db)
+                                    [:select :distinct [primary-topic]
+                                     :from rules])))
+            (defaults (when current (split-string current " " t))))
+       (mapconcat #'identity
+                  (completing-read-multiple
+                   "Topics (comma-sep, first=primary, blank=universal): "
+                   known nil nil nil nil defaults)
+                  " ")))
+    ('tags
+     (let* ((db-tags (condition-case nil
+                         (manifolding-atlas-db-query-tags)
+                       (error nil)))
+            (cands (append '("⚠ tag-warning") options db-tags))
+            (input (completing-read
+                    "Tags (comma-separated, ⚠ tag-warning skips): "
+                    cands nil nil nil nil "⚠ tag-warning")))
+       (if (or (string-empty-p input)
+               (string= input "⚠ tag-warning"))
+           '("tag-warning")
+         (delete-dups
+          (cl-remove-if #'string-empty-p
+                        (split-string input "[ \t]*,[ \t]*" t))))))
+    ('multi
+     (let* ((raw (completing-read-multiple
+                  (format "%s (comma-separated, blank = skip): " label)
+                  (cons "⚠ WARNING" options) nil nil))
+            (vals (delete-dups
+                   (cl-remove-if
+                    (lambda (v)
+                      (or (string-empty-p v)
+                          (string-equal v "⚠ WARNING")))
+                    raw))))
+       (if vals (string-join vals " ") "WARNING")))
+    ('tagopt
+     (let ((sentinel (or default "auto")))
+       (completing-read (format "%s: " label)
+                        (cons sentinel options)
+                        nil t nil nil sentinel)))
+    (_
+     (let ((val (completing-read
+                 (format "%s: " label)
+                 (cons "⚠ WARNING" options)
+                 nil t nil nil (or default "⚠ WARNING"))))
+       (if (string-equal val "⚠ WARNING")
+           (if default default "WARNING")
+         val)))))
+#+end_src
+
+* Fragments
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-org-prompt--fragment (key kind plist val)
+  (pcase kind
+    ('todo
+     `(:todo ,val
+       :post-apply (,(apply-partially
+                      #'my/manifolding-atlas--post-sync "TODO" val))))
+    ('tags
+     (when val
+       `(:tags ,val
+         :post-apply (,(apply-partially
+                        #'my/manifolding-atlas--post-sync
+                        "TAGS" (car val))
+                      ,@(mapcar (lambda (v)
+                                  (apply-partially
+                                   #'my/manifolding-atlas--ensure-ref-note
+                                   'tags v))
+                                val)))))
+    ('tagopt
+     (let ((sentinel (or (plist-get plist :default) "auto")))
+       (when (and val (not (string-equal val sentinel)))
+         `(:tags (,val)
+           :post-apply (,(apply-partially
+                          #'my/manifolding-atlas--ensure-ref-note
+                          (intern (downcase
+                                   (or (plist-get plist :live) key)))
+                          val))))))
+    ('mastering
+     (cond
+      ((or (null val) (string-equal val "WARNING"))
+       `(:properties ((,key . "WARNING"))))
+      ((string-equal val "SUSPEND")
+       `(:properties ((,key . "SUSPEND"))
+         :post-apply (,(apply-partially
+                        #'my/manifolding-atlas-mastering--init-schedule t))))
+      (t
+       `(:properties ((,key . ,val))
+         :post-apply (,(apply-partially
+                        #'my/manifolding-atlas-mastering--init-schedule nil))))))
+    ('scoped
+     (when (and val (not (string-equal val "WARNING")))
+       `(:properties ((,key . ,val))
+         :post-apply (,(apply-partially
+                        #'my/manifolding-atlas--apply-scoped-post
+                        (intern (downcase
+                                 (or (plist-get plist :live) key)))
+                        key val)))))
+    ('template
+     `(:properties (("TEMPLATE" . ,val))
+       :post-apply (,(apply-partially
+                      #'my/manifolding-atlas-prompt-template--apply
+                      val))))
+    ('multi
+     (when val
+       `(:properties ((,key . ,val)))))
+    ('live
+     (let ((family (intern
+                    (downcase
+                     (or (plist-get plist :live)
+                         (replace-regexp-in-string "_" "-" key))))))
+       (if (or (null val) (string-equal val "WARNING"))
+           `(:properties ((,key . "WARNING"))
+             :post-apply (,(apply-partially
+                            #'my/manifolding-atlas--clear-state-transcribes
+                            family)))
+         (let* ((link (my/manifolding-atlas--ensure-ref-note family val))
+                (ref-id (my/manifolding-atlas--id-from-link link)))
+           `(:post-apply (,(apply-partially
+                            #'my/manifolding-atlas--apply-state-post
+                            family val ref-id)))))))
+    (_
+     (when val
+       `(:properties ((,key . ,val)))))))
+#+end_src
+
+* Boot
+#+begin_src emacs-lisp
+(with-eval-after-load 'manifolding-atlas
+  (my/manifolding-atlas-org-prompt--register-all))
+#+end_src

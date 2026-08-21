@@ -1,18 +1,10 @@
 #+title:      Phone Prompt
 #+priority:   25
 
-* Phone Prompt
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'contact-phone
-  :name 'contact-phone
-  :label "Phone"
-  :contexts '(contact)
-  :prompt-fn (lambda ()
-               (let ((val (completing-read "Phone: " '("⚠ WARNING") nil nil nil nil "⚠ WARNING")))
-                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
-  :read-current-fn (lambda () (org-entry-get nil "PHONE"))
-  :to-plist (lambda (val _ctx)
-              (when val
-                `(:properties (("PHONE" . ,val))))))
-#+end_src
+* PHONE
+:PROPERTIES:
+:ID: contact-phone
+:CONTEXTS: contact
+:KIND: free
+:LABEL: Phone
+:END:

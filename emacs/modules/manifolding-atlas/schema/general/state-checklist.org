@@ -1,50 +1,13 @@
 #+title:      State Checklist Prompt
 #+priority:   5
 
-* State Checklist
-Why: Tracks the spaced repetition / active recall lifecycle of the note.
-Default is nil (not in checklist system).
-
-** Default (default nil)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-state-checklist ()
-  "Prompt for STATE_CHECKLIST. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "STATE_CHECKLIST: "
-              '("⚠ WARNING" "CHECKLIST" "REVIEWING" "MASTERED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-state-checklist-initial (initial)
-  "Prompt for STATE_CHECKLIST with INITIAL pre-selected."
-  (completing-read
-   "STATE_CHECKLIST: "
-   '("CHECKLIST" "REVIEWING" "MASTERED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'state-checklist
-  :name 'state-checklist
-  :label "State: Checklist"
-  :prompt-fn #'my/manifolding-atlas-prompt-state-checklist
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "STATE_CHECKLIST"))
-  :merge-strategy 'replace
-   :to-plist (lambda (val _ctx)
-               (if (or (null val) (string-equal val "WARNING"))
-                   `(:properties (("STATE_CHECKLIST" . "WARNING"))
-                     :post-apply (,(apply-partially
-                                    #'my/manifolding-atlas--clear-state-transcribes
-                                    "state-checklist")))
-                 (let* ((link (my/manifolding-atlas--ensure-ref-note 'state-checklist val))
-                        (ref-id (my/manifolding-atlas--id-from-link link)))
-                   `(:post-apply (,(apply-partially
-                                    #'my/manifolding-atlas--apply-state-post
-                                    "state-checklist" val ref-id)))))))
-#+end_src
+* STATE_CHECKLIST
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: live
+:LIVE: state-checklist
+:LABEL: State: Checklist
+:END:
+** CHECKLIST
+** REVIEWING
+** MASTERED

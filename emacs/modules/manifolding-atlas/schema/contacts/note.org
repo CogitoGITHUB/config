@@ -1,18 +1,10 @@
 #+title:      Note Prompt
 #+priority:   22
 
-* Note Prompt
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'contact-note
-  :name 'contact-note
-  :label "Note"
-  :contexts '(contact)
-  :prompt-fn (lambda ()
-               (let ((val (completing-read "Note: " '("⚠ WARNING") nil nil nil nil "⚠ WARNING")))
-                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
-  :read-current-fn (lambda () (org-entry-get nil "NOTE"))
-  :to-plist (lambda (val _ctx)
-              (when val
-                `(:properties (("NOTE" . ,val))))))
-#+end_src
+* NOTE
+:PROPERTIES:
+:ID: contact-note
+:CONTEXTS: contact
+:KIND: free
+:LABEL: Note
+:END:

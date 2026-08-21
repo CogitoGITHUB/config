@@ -1,17 +1,103 @@
 #+title: Manifolding Atlas — Module README
 
 The Atlas is the knowledge system of this config: a vulpea-derived,
-loader-managed notes engine with a literate org module tree.
+loader-managed notes engine over a plain-org vault.
 
-| Layer     | Path       | Role                                          |
-|-----------+------------+-----------------------------------------------|
-| core      | core/      | vendored engine, dependency-ordered (-31…-13) |
-| infra     | infra/     | reusable machinery (capture, fast, elisp)     |
-| domains   | domains/   | capabilities (one directory per domain)       |
-| schema    | schema/    | the data language: prompts & registries       |
-| templates | templates/ | generation artifacts (files/, templates.org)  |
+* Architecture
 
-Entry points: atlas.org, atlas-ui.org, atlas-consult.org.
-Load order: =#+priority:= per file, lower first (core negatives load first).
-Notes vault: ~/test/ (extensionless files). DB: ~/test/admin/manifolding-atlas.db.
-Reload: M-x manifolding-emacs-reload. See AGENTS.md for agent context.
+| Layer     | Path       | Role                                                   |
+|-----------+------------+--------------------------------------------------------|
+| core      | core/      | vendored engine, dependency-ordered (-31…-13)          |
+| infra     | infra/     | reusable machinery: capture flows, declarative         |
+|           |            | prompt engine, fast captures, module paths             |
+| domains   | domains/   | capabilities — one directory per domain                |
+| schema    | schema/    | the data language: prompt outlines & registries        |
+| templates | templates/ | generation artifacts (files/ + doct declarations)      |
+
+Entry points: =atlas.org= (vault root, DB, autosync, parse advice),
+=atlas-ui.org= (sidebar/outline UI), =atlas-consult.org= (consult
+completion). Loading: manifolding-emacs scans every .org under
+modules/, sorts by =#+priority:= (lower first — core negatives load
+before everything), and evaluates their elisp blocks.
+
+infra/paths.org is the single source of truth for all in-module
+locations; nothing else hardcodes module paths.
+
+* Domains (what the Atlas can do)
+
+| Domain               | Capability                                                        |
+|----------------------+-------------------------------------------------------------------|
+| search               | vault TODO search                                                 |
+| backup (git)         | save-guarded auto commit/push, delete guards                      |
+| capture              | avy region→note, heading→note promotion                           |
+| citation             | [@citekey] extraction into SQLite                                 |
+| contacts             | contact notes + typed property prompts                            |
+| dictionary           | vocabulary notes, personal wordlist regeneration                  |
+| links                | broken-link guards, rename, deleted-file tracking                 |
+| live-properties      | property values as ref-note links (+ scoped refs)                 |
+| manifold             | mind-map controller                                               |
+| mastering            | spaced repetition (mastering_schedule table, review sessions)     |
+| properties           | SPC P transient menu, violation fixer                             |
+| protocols            | heading→protocol steps, BUILD assembly via transclusion           |
+| recipes              | recipe notes, servings rescaling                                  |
+| routines             | atomic/composite routines + chains, avy build flow,               |
+|                      | reorder buffer, org generation, step-runner buffer,               |
+|                      | session journaling (sessions/<Y>/<Q>/<m>/<W>/) ,                  |
+|                      | temporal-aware streaks + compliance report                        |
+| rules                | :RULE: headings routed to topic files via transclusion            |
+| schema               | schema definitions; index-time action = warning                   |
+| schema-reinforcement | sweeps → MISSING PROMPTS, debounced triggers, boot sweep,         |
+|                      | save-guard, prompt/template registry audit                        |
+| transclusion         | org-transclusion engine (vendored) + helpers                      |
+
+plugin-guide.org: authoritative authoring reference for new domains.
+
+* Schema — how knowledge is described
+
+Prompts are DECLARATIVE ORG OUTLINES (infra/capture/org-prompts.org):
+
+#+begin_example
+* STATE_WORK                      ← level 1 = property key
+:PROPERTIES:
+:CONTEXTS: file heading task      :REQUIRED: t
+:KIND: live                       :LIVE: state-work
+:END:
+** ACTIVE                         ← level 2+ = options
+*** AWAY                          ← deeper = variants of PAUSED-style options
+#+end_example
+
+Kinds: property, live (ref-note links), scoped, free, todo, multi,
+tags, tagopt, topics, template, mastering. Editing a heading edits the
+prompt; a new file is a new property. Every declarative prompt also
+defines my/manifolding-atlas-prompt-<key>.
+
+Selection opens the prompt's own file in a normal editable buffer:
+navigate/fold/edit freely, RET on an option selects it, m marks for
+multi-select, q cancels to WARNING. (my/manifolding-atlas-org-prompt-ui
+='minibuffer restores completing-read.)
+
+Behavioral prompts that are not option lists stay as elisp: mind-map,
+tags, schedule, aliases, subdir, file-name, position, properties,
+rules/file-override.
+
+register.org owns the prompt registry (reset each reload).
+domains/schema/schema.org derives base/task/template schemas directly
+from these outlines (level-1=key, descendants=one-of); index-time
+validation warns, and MISSING PROMPTS is kept fresh by
+schema-reinforcement sweeps.
+
+* Templates — how new knowledge is generated
+
+templates/files/: body-only capture templates (notes, task, reference,
+protocol, math, recipes) + atlas.el (doct tree). Selection stores
+TEMPLATE/TEMPLATE_HASH; per-template schemas enforce declared
+properties. templates/templates.org wires doct + yasnippet.
+
+* Vault & operations
+
+Notes: ~/test/ (extensionless). DB: ~/test/admin/manifolding-atlas.db
+(never hand-edit). Git-required saves; auto commit/push on save.
+Keybindings: SPC v hydra (see modules/keyboard.org) — includes
+Routines column and E=schema sweep. Reload after edits:
+M-x manifolding-emacs-reload; verify via
+(manifolding-emacs-errors-list). Agent context: AGENTS.md per layer.

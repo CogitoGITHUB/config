@@ -9,8 +9,8 @@ Template infrastructure: directory root, org-capture (doct), yasnippet.
 #+begin_src emacs-lisp
 (defun my/templates-directory ()
   "Return the root templates directory.
-Change only this path to relocate all templates."
-  (expand-file-name "modules/manifolding-atlas/templates/" user-emacs-directory))
+Delegates to the central module path helper."
+  (my/manifolding-atlas-templates-dir))
 #+end_src
 ** Org Capture (doct)
 :PROPERTIES:

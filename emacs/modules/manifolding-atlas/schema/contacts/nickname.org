@@ -1,18 +1,10 @@
 #+title:      Nickname Prompt
 #+priority:   24
 
-* Nickname Prompt
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'contact-nickname
-  :name 'contact-nickname
-  :label "Nickname"
-  :contexts '(contact)
-  :prompt-fn (lambda ()
-               (let ((val (completing-read "Nickname: " '("⚠ WARNING") nil nil nil nil "⚠ WARNING")))
-                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
-  :read-current-fn (lambda () (org-entry-get nil "NICKNAME"))
-  :to-plist (lambda (val _ctx)
-              (when val
-                `(:properties (("NICKNAME" . ,val))))))
-#+end_src
+* NICKNAME
+:PROPERTIES:
+:ID: contact-nickname
+:CONTEXTS: contact
+:KIND: free
+:LABEL: Nickname
+:END:

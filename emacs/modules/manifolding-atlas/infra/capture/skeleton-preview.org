@@ -6,8 +6,7 @@
 :END:
 #+begin_src emacs-lisp :lexical t
 (defun my/manifolding-atlas--capture-dir ()
-  (expand-file-name "modules/manifolding-atlas/templates/files/"
-                    user-emacs-directory))
+  (my/manifolding-atlas-template-files-dir))
 
 (defun my/manifolding-atlas--capture-names ()
   (mapcar (lambda (f)

@@ -1,25 +1,29 @@
-#+title: Routines Temporal Prompt
-#+priority: 5
+#+title:      Routines Temporal Prompt
+#+priority:   5
 
-* Prompt
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-routine-temporal ()
-  "Prompt for ROUTINE_TEMPORAL. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read "ROUTINE_TEMPORAL: "
-                              (cons "⚠ WARNING"
-                                    (my/manifolding-atlas-routines--temporal-values))
-                              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-
-(my/manifolding-atlas-register-prompt
- :key 'routine-temporal
- :name 'routine-temporal
- :label "Routines: Temporal"
- :prompt-fn #'my/manifolding-atlas-prompt-routine-temporal
- :contexts '(routine)
- :read-current-fn (lambda () (org-entry-get nil "ROUTINE_TEMPORAL"))
- :merge-strategy 'replace
- :to-plist (lambda (val _ctx)
-             (when val
-               `(:properties (("ROUTINE_TEMPORAL" . ,val))))))
-#+end_src
+* ROUTINE_TEMPORAL
+:PROPERTIES:
+:CONTEXTS: routine
+:KIND: property
+:LABEL: Routines: Temporal
+:END:
+** HOUR
+** DAY-PART
+** DAY
+** DAILY
+** NIGHTLY
+** WEEKLY
+** MONTHLY
+** QUARTERLY
+** SEASONAL
+** YEARLY
+** WAKE
+** MORNING
+** MIDDAY
+** AFTERNOON
+** EVENING
+** NIGHT
+** SPRING
+** SUMMER
+** AUTUMN
+** WINTER

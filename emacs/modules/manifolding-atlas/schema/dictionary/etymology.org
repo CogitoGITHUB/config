@@ -1,21 +1,19 @@
 #+title:      Etymology Prompt
 #+priority:   15
 
-* Etymology Prompt
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'etymology
-  :name 'etymology
-  :label "Etymology"
-  :contexts '(dictionary)
-  :prompt-fn (lambda ()
-               (let ((val (completing-read "Etymology: "
-                                          '("⚠ WARNING" "Latin" "Greek" "Old English" "French"
-                                            "German" "Arabic" "Hindi" "Japanese" "Other")
-                                          nil t nil nil "⚠ WARNING")))
-                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
-  :to-plist (lambda (val _ctx)
-              (when val
-                (let ((link (my/manifolding-atlas--ensure-ref-note 'etymology val)))
-                  `(:properties (("ETYMOLOGY" . ,(or link val))))))))
-#+end_src
+* ETYMOLOGY
+:PROPERTIES:
+:CONTEXTS: dictionary
+:KIND: live
+:LIVE: etymology
+:LABEL: Etymology
+:END:
+** Latin
+** Greek
+** Old English
+** French
+** German
+** Arabic
+** Hindi
+** Japanese
+** Other

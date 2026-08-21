@@ -20,41 +20,59 @@ prompt or template file automatically keeps the schema in sync.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-schema--prompt-dir ()
   "Return the manifolding-atlas/schema directory."
-  (expand-file-name "manifolding-atlas/schema"
-                    (expand-file-name "modules" user-emacs-directory)))
+  (my/manifolding-atlas-schema-dir))
 
 (defun my/manifolding-atlas-schema--template-dir ()
   "Return the capture templates directory."
-  (expand-file-name "templates/files"
-                    (expand-file-name "manifolding-atlas"
-                                      (expand-file-name "modules" user-emacs-directory))))
+  (my/manifolding-atlas-template-files-dir))
 
-(defun my/manifolding-atlas-schema--extract-choices (prompt-name)
-  "Extract completing-read choices (excl. WARNING sentinel) from prompt file PROMPT-NAME."
+(defun my/manifolding-atlas-schema--outline-spec (prompt-name)
+  "Return (KEY . OPTIONS) from declarative file PROMPT-NAME.org, or nil.
+Declarative = no src blocks; level-1 KEY heading, level-2 options."
   (let* ((dir (my/manifolding-atlas-schema--prompt-dir))
          (files (directory-files-recursively dir (format "^%s\\.org$" prompt-name))))
     (when files
       (with-temp-buffer
         (insert-file-contents (car files))
         (goto-char (point-min))
-        (when (re-search-forward "completing-read" nil t)
-          (condition-case nil
-              (when (re-search-forward "'(\"" nil t)
-                (let ((items (save-excursion
-                               (backward-char 2)
-                               (read (current-buffer)))))
-                  (cl-remove-if (lambda (s) (string-match-p "WARNING" s)) items)))
-            (error nil)))))))
+        (when (not (re-search-forward "begin_src" nil t))
+          (let ((spec (car (my/manifolding-atlas-org-prompt--parse
+                            (car files)))))
+            (when spec
+              (cons (nth 0 spec) (nth 1 spec)))))))))
+
+(defun my/manifolding-atlas-schema--extract-choices (prompt-name)
+  "Extract allowed values for PROMPT-NAME: level-2 options from a
+declarative file, else legacy regex over elisp lists (WARNING excluded)."
+  (or (cdr (my/manifolding-atlas-schema--outline-spec prompt-name))
+      (let* ((dir (my/manifolding-atlas-schema--prompt-dir))
+             (files (directory-files-recursively
+                     dir (format "^%s\\.org$" prompt-name))))
+        (when files
+          (with-temp-buffer
+            (insert-file-contents (car files))
+            (goto-char (point-min))
+            (when (re-search-forward "completing-read" nil t)
+              (condition-case nil
+                  (when (re-search-forward "'(\"" nil t)
+                    (let ((items (save-excursion
+                                   (backward-char 2)
+                                   (read (current-buffer)))))
+                      (cl-remove-if (lambda (s) (string-match-p "WARNING" s)) items)))
+                (error nil))))))))
 
 (defun my/manifolding-atlas-schema--extract-prop-key (prompt-name)
-  "Extract the property drawer key from prompt file PROMPT-NAME."
-  (let* ((dir (my/manifolding-atlas-schema--prompt-dir))
-         (files (directory-files-recursively dir (format "^%s\\.org$" prompt-name))))
-    (when files
-      (with-temp-buffer
-        (insert-file-contents (car files))
-        (when (re-search-forward "org-entry-get nil \"\\([A-Z_]+?\\)\"" nil t)
-          (match-string 1))))))
+  "Extract the property drawer key for PROMPT-NAME: level-1 heading of a
+declarative file, else legacy regex over the elisp source."
+  (or (car (my/manifolding-atlas-schema--outline-spec prompt-name))
+      (let* ((dir (my/manifolding-atlas-schema--prompt-dir))
+             (files (directory-files-recursively
+                     dir (format "^%s\\.org$" prompt-name))))
+        (when files
+          (with-temp-buffer
+            (insert-file-contents (car files))
+            (when (re-search-forward "org-entry-get nil \"\\([A-Z_]+?\\)\"" nil t)
+              (match-string 1)))))))
 
 (defun my/manifolding-atlas-schema--validate (choices val _note)
   "Validate a field value against CHOICES (dynamic-binding compat).

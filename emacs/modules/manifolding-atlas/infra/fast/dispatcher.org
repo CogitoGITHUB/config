@@ -9,8 +9,7 @@ presents a hydra menu.  New capture types are picked up automatically.
 (defun my/manifolding-atlas-quick-captures ()
   "Choose a fast capture type via hydra menu."
   (interactive)
-  (let* ((dir (expand-file-name "modules/manifolding-atlas/infra/fast/"
-                                user-emacs-directory))
+  (let* ((dir (my/manifolding-atlas-infra-fast-dir))
          (files (seq-filter
                  (lambda (f)
                    (and (not (file-directory-p (expand-file-name f dir)))

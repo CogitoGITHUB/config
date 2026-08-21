@@ -1,10 +1,14 @@
 # infra — reusable machinery
 
+paths.org: single source of truth for in-module locations
+(module/schema/templates/files/fast). Every other file delegates here.
+
 capture/: entry-points (create flows), infrastructure (choose-capture),
 heading-format (* Title advice), link-utilities, note-creation (fast mode),
-prompt-engine (registry, collectors, MISSING PROMPTS rebuild), root-dir
-(subdir prompt), skeleton-preview (template preview + capture-path/hash),
-vault-queries (children-of etc).
+prompt-engine (registry, collectors, MISSING PROMPTS rebuild), org-prompts
+(declarative outline→prompt engine + buffer picker + template helpers),
+root-dir (subdir prompt), skeleton-preview (template preview +
+capture-path/hash), vault-queries (children-of etc).
 
 fast/: dispatcher hydra auto-discovers sibling org files; journal/todo/
 observations implement my/manifolding-atlas-quick-* commands;

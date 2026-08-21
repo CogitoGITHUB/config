@@ -1,42 +1,13 @@
 #+title:      Rules Prompt
 #+priority:   23
 
-* Rules
-Why: Self-defined boundaries and imposed constraints that structure this deployment and reduce variance. Some chosen, some external and non-negotiable.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-rules ()
-  "Prompt for RULES. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "RULES: "
-              '("⚠ WARNING" "DRAFT" "RATIFIED" "AMENDED" "REVOKED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-rules-initial (initial)
-  "Prompt for RULES with INITIAL pre-selected."
-  (completing-read
-   "RULES: "
-   '("DRAFT" "RATIFIED" "AMENDED" "REVOKED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'rules
-  :name 'rules
-  :label "Rules"
-  :prompt-fn #'my/manifolding-atlas-prompt-rules
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "RULES"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("RULES" . "WARNING")))
-                `(:properties (("RULES" . ,val))))))
-#+end_src
+* RULES
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Rules
+:END:
+** DRAFT
+** RATIFIED
+** AMENDED
+** REVOKED

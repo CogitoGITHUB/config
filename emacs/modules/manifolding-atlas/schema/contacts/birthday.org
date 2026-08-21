@@ -1,18 +1,10 @@
 #+title:      Birthday Prompt
 #+priority:   23
 
-* Birthday Prompt
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'contact-birthday
-  :name 'contact-birthday
-  :label "Birthday"
-  :contexts '(contact)
-  :prompt-fn (lambda ()
-               (let ((val (completing-read "Birthday: " '("⚠ WARNING") nil nil nil nil "⚠ WARNING")))
-                 (if (string-equal val "⚠ WARNING") "WARNING" val)))
-  :read-current-fn (lambda () (org-entry-get nil "BIRTHDAY"))
-  :to-plist (lambda (val _ctx)
-              (when val
-                `(:properties (("BIRTHDAY" . ,val))))))
-#+end_src
+* BIRTHDAY
+:PROPERTIES:
+:ID: contact-birthday
+:CONTEXTS: contact
+:KIND: free
+:LABEL: Birthday
+:END:

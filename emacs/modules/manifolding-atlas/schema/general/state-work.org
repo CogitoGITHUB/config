@@ -1,49 +1,17 @@
 #+title:      State Work Prompt
 #+priority:   5
 
-* State Work
-Why: Tracks the current work status of the note. Default is ACTIVE.
-
-** Default (default ACTIVE)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-state-work ()
-  "Prompt for STATE_WORK. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "STATE_WORK: "
-              '("⚠ WARNING" "ACTIVE" "PAUSED" "BLOCKED" "WAITING" "ABANDONED" "COMPLETE")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-state-work-initial (initial)
-  "Prompt for STATE_WORK with INITIAL pre-selected."
-  (completing-read
-   "STATE_WORK: "
-   '("ACTIVE" "PAUSED" "BLOCKED" "WAITING" "ABANDONED" "COMPLETE")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'state-work
-  :name 'state-work
-  :label "State: Work"
-  :prompt-fn #'my/manifolding-atlas-prompt-state-work
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "STATE_WORK"))
-  :merge-strategy 'replace
-   :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("STATE_WORK" . "WARNING"))
-                    :post-apply (,(apply-partially
-                                   #'my/manifolding-atlas--clear-state-transcribes
-                                   "state-work")))
-                (let* ((link (my/manifolding-atlas--ensure-ref-note 'state-work val))
-                       (ref-id (my/manifolding-atlas--id-from-link link)))
-                  `(:post-apply (,(apply-partially
-                                   #'my/manifolding-atlas--apply-state-post
-                                   "state-work" val ref-id)))))))
-#+end_src
+* STATE_WORK
+:PROPERTIES:
+:CONTEXTS: file heading task
+:REQUIRED: t
+:KIND: live
+:LIVE: state-work
+:LABEL: State: Work
+:END:
+** ACTIVE
+** PAUSED
+** BLOCKED
+** WAITING
+** ABANDONED
+** COMPLETE

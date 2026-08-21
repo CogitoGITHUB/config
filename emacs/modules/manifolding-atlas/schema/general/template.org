@@ -1,74 +1,9 @@
 #+title:      Template Prompt
 #+priority:   1
 
-* Template
-Why: Attach the note to a body template so its declared properties are
-schema-enforced (TEMPLATE_HASH staleness, required fields). Choose
-"none" for explicitly no template — the property is still written so
-the template can be assigned later from the SPC P update menu.
-Skipping stores WARNING as usual.
-
-** Prompt
-#+begin_src emacs-lisp
-(defconst my/manifolding-atlas-prompt-template--none "none")
-
-(defvar my/manifolding-atlas-prompt-template--deferred nil
-  "When non-nil, defer to the file-level preview chooser.")
-
-(defun my/manifolding-atlas-prompt-template--defer-around (orig &rest args)
-  (let ((my/manifolding-atlas-prompt-template--deferred t))
-    (apply orig args)))
-
-(with-eval-after-load 'manifolding-atlas
-  (dolist (fn '(my/manifolding-atlas-capture-new-file
-                my/manifolding-atlas-capture-task-file))
-    (advice-add fn :around
-                #'my/manifolding-atlas-prompt-template--defer-around)))
-
-(defun my/manifolding-atlas-prompt-template--names ()
-  "Return available template names from templates/files."
-  (condition-case nil
-      (mapcar (lambda (f)
-                (file-name-sans-extension (file-name-nondirectory f)))
-              (directory-files (my/manifolding-atlas-schema--template-dir)
-                               t "\\.org\\'"))
-    (error nil)))
-
-(defun my/manifolding-atlas-prompt-template ()
-  "Prompt for TEMPLATE. Returns \"WARNING\" if skipped, \"none\" for none."
-  (if my/manifolding-atlas-prompt-template--deferred
-      "WARNING"
-    (completing-read "TEMPLATE: "
-                     (append '("⚠ WARNING" "none")
-                             (my/manifolding-atlas-prompt-template--names))
-                     nil t nil nil "⚠ WARNING")))
-
-(defun my/manifolding-atlas-prompt-template--apply (val note)
-  "Post-apply: keep TEMPLATE_HASH in sync with VAL on NOTE."
-  (when note
-    (if (and val
-             (not (member val '("WARNING" my/manifolding-atlas-prompt-template--none))))
-        (my/manifolding-atlas--property-put
-         note "TEMPLATE_HASH"
-         (or (my/manifolding-atlas--capture-file-hash val) "unknown"))
-      (manifolding-atlas-visit note)
-      (org-entry-delete nil "TEMPLATE_HASH")
-      (save-buffer))))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'template
-  :name 'template
-  :label "Template: Body template"
-  :prompt-fn #'my/manifolding-atlas-prompt-template
-  :contexts '(file heading)
-  :read-current-fn (lambda () (org-entry-get nil "TEMPLATE"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              `(:properties (("TEMPLATE" . ,val))
-                :post-apply (,(apply-partially
-                               #'my/manifolding-atlas-prompt-template--apply
-                               val)))))
-#+end_src
+* TEMPLATE
+:PROPERTIES:
+:CONTEXTS: file heading
+:KIND: template
+:LABEL: Template: Body template
+:END:
