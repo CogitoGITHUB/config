@@ -231,17 +231,25 @@ Runs under an independent deep budget so ambient stack depth
      :label label
      :prompt-fn `(lambda () (my/manifolding-atlas-org-prompt--run ',key-sym))
      :contexts contexts
+     ;; Backquoted so PROP is spliced in as a literal, like :prompt-fn and
+     ;; :to-plist below — a plain (lambda () ... prop ...) here would be a
+     ;; real lexical closure over PROP, which breaks the no-lexical-capture
+     ;; contract documented on `my/manifolding-atlas-org-prompt--specs'.
      :read-current-fn
-     (cond ((eq kind 'todo) (lambda () (org-get-todo-state)))
-           ((eq kind 'tags) (lambda () (org-get-tags nil t)))
-           (t (lambda () (org-entry-get nil prop))))
+     (cond ((eq kind 'todo) `(lambda () (org-get-todo-state)))
+           ((eq kind 'tags) `(lambda () (org-get-tags nil t)))
+           (t `(lambda () (org-entry-get nil ,prop))))
      :merge-strategy (if (eq kind 'tags) 'merge 'replace)
      :to-plist
      `(lambda (val _ctx) (my/manifolding-atlas-org-prompt--fragment
                           ,prop ',kind ',plist val)))
+    ;; Registered under a DISTINCT key from the base entry above — this must
+    ;; never reuse KEY-SYM. It previously did, which silently overwrote the
+    ;; file/heading registration for any property with a :TASK-DEFAULT:,
+    ;; making it stop being prompted for outside task context.
     (when (and task-default (memq 'task contexts))
       (my/manifolding-atlas-register-prompt
-       :key key-sym
+       :key (intern (concat (symbol-name key-sym) "--task"))
        :name key-sym
        :label label
        :prompt-fn `(lambda ()
@@ -249,9 +257,9 @@ Runs under an independent deep budget so ambient stack depth
                       ',key-sym ,task-default))
        :contexts '(task)
        :read-current-fn
-       (cond ((eq kind 'todo) (lambda () (org-get-todo-state)))
-             ((eq kind 'tags) (lambda () (org-get-tags nil t)))
-             (t (lambda () (org-entry-get nil prop))))
+       (cond ((eq kind 'todo) `(lambda () (org-get-todo-state)))
+             ((eq kind 'tags) `(lambda () (org-get-tags nil t)))
+             (t `(lambda () (org-entry-get nil ,prop))))
        :merge-strategy (if (eq kind 'tags) 'merge 'replace)
        :to-plist
        `(lambda (val _ctx) (my/manifolding-atlas-org-prompt--fragment
@@ -436,9 +444,14 @@ multi-select kinds."
 
 (defun my/manifolding-atlas-org-prompt--ask
     (file key label kind options plist default)
+  ;; NOTE: `scoped' and `mastering' added — every other option-based kind
+  ;; (property/live/todo/multi/tagopt/mindmap) already got the buffer-style
+  ;; picker; these two were falling through to the minibuffer path even when
+  ;; `my/manifolding-atlas-org-prompt-ui' is `buffer'.
   (if (and (eq my/manifolding-atlas-org-prompt-ui 'buffer)
            file (file-exists-p file)
-           (memq kind '(property live todo multi tagopt mindmap)))
+           (memq kind '(property live todo multi tagopt mindmap
+                        scoped mastering)))
       (let ((choice (my/manifolding-atlas-org-prompt--ask-buffer
                      file kind default)))
         (if (eq kind 'mindmap)
