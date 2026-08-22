@@ -3,7 +3,8 @@
 Architecture: core (engine) → infra (machinery) → domains (capabilities)
 → schema (data language) + templates (generation).
 
-- Entry/config: `atlas.org`, `atlas-ui.org`, `atlas-consult.org` (priority 10)
+- Entry/config: `atlas.org`, `atlas-ui.org` (priority 10). Consult
+  integration RETIRED — selection uses native manifolding-atlas-select.
 - `core/`: vendored engine, filenames `-NN-<name>.org`, order -31..-13 fixed
 - `infra/capture/org-prompts.org`: declarative prompt engine — schema
   outlines (level-1 KEY, level-2+ options incl. variants) auto-register;

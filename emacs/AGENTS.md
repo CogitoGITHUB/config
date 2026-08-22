@@ -19,7 +19,7 @@
 |------|---------|
 | `bootstrap.org` | Boot kernel — tangles to `init.el` / `early-init.el` |
 | `modules/keyboard.org` | Modal keybinding system (hydras, modaled states) |
-| `modules/manifolding-atlas/` | Main notes system (formerly `vulpea`, vendored + loader-managed). Full reference: `modules/manifolding-atlas/README.org` — remastered layout: core/ infra/ domains/ schema/ templates/ |
+| `modules/manifolding-atlas/` | Main notes system (formerly `vulpea`, vendored + loader-managed). Full reference: `modules/manifolding-atlas/README.org` — remastered layout: core/ infra/ domains/ schema/ templates/. Consult integration retired; native select. |
 | `modules/manifolding-atlas/atlas.org` | Main entry/config (engine vendored under `core/`) |
 | `modules/manifolding-atlas/domains/<name>/<name>.org` | Capability domains (mastering, routines, protocols, rules, recipes, schema, …) |
 | `modules/manifolding-atlas/schema/**/*.org` | Prompt/schema definitions (register.org + general/, dictionary/, rules/, recipes/, contacts/, routines/) |

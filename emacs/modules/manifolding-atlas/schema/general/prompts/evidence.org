@@ -1,42 +1,12 @@
 #+title:      Evidence Prompt
 #+priority:   38
 
-* Evidence
-Why: Observations and data points that have materially updated the Architect's model. Not a fact repository — a record of epistemic shifts. A model that never updates is the Architect frozen.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-evidence ()
-  "Prompt for EVIDENCE. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "EVIDENCE: "
-              '("⚠ WARNING" "LOGGED" "UPDATED" "REJECTED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-evidence-initial (initial)
-  "Prompt for EVIDENCE with INITIAL pre-selected."
-  (completing-read
-   "EVIDENCE: "
-   '("LOGGED" "UPDATED" "REJECTED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'evidence
-  :name 'evidence
-  :label "Evidence"
-  :prompt-fn #'my/manifolding-atlas-prompt-evidence
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "EVIDENCE"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("EVIDENCE" . "WARNING")))
-                `(:properties (("EVIDENCE" . ,val))))))
-#+end_src
+* EVIDENCE
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Evidence
+:END:
+** LOGGED
+** UPDATED
+** REJECTED

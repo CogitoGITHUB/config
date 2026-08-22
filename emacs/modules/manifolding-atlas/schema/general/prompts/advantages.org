@@ -1,42 +1,12 @@
 #+title:      Advantages Prompt
 #+priority:   30
 
-* Advantages
-Why: Structural edges, asymmetries, and positional strengths that increase the probability of success. Honest inventory only — what is real versus what is flattering.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-advantages ()
-  "Prompt for ADVANTAGES. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "ADVANTAGES: "
-              '("⚠ WARNING" "VERIFIED" "ASSUMED" "EXPIRED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-advantages-initial (initial)
-  "Prompt for ADVANTAGES with INITIAL pre-selected."
-  (completing-read
-   "ADVANTAGES: "
-   '("VERIFIED" "ASSUMED" "EXPIRED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'advantages
-  :name 'advantages
-  :label "Advantages"
-  :prompt-fn #'my/manifolding-atlas-prompt-advantages
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "ADVANTAGES"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("ADVANTAGES" . "WARNING")))
-                `(:properties (("ADVANTAGES" . ,val))))))
-#+end_src
+* ADVANTAGES
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Advantages
+:END:
+** VERIFIED
+** ASSUMED
+** EXPIRED

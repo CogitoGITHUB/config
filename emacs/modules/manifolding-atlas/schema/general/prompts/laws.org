@@ -1,42 +1,13 @@
 #+title:      Laws Prompt
 #+priority:   27
 
-* Laws
-Why: Codified legal reality within the relevant jurisdiction. External, indifferent to intent, and non-negotiable. The Architect maps the hard walls before designing in the gray zones.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-laws ()
-  "Prompt for LAWS. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "LAWS: "
-              '("⚠ WARNING" "RESEARCHED" "CONFIRMED" "CHANGED" "REVISITED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-laws-initial (initial)
-  "Prompt for LAWS with INITIAL pre-selected."
-  (completing-read
-   "LAWS: "
-   '("RESEARCHED" "CONFIRMED" "CHANGED" "REVISITED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'laws
-  :name 'laws
-  :label "Laws"
-  :prompt-fn #'my/manifolding-atlas-prompt-laws
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "LAWS"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("LAWS" . "WARNING")))
-                `(:properties (("LAWS" . ,val))))))
-#+end_src
+* LAWS
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Laws
+:END:
+** RESEARCHED
+** CONFIRMED
+** CHANGED
+** REVISITED

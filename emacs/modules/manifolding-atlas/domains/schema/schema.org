@@ -32,14 +32,17 @@ Declarative = no src blocks; level-1 KEY heading, level-2 options."
   (let* ((dir (my/manifolding-atlas-schema--prompt-dir))
          (files (directory-files-recursively dir (format "^%s\\.org$" prompt-name))))
     (when files
-      (with-temp-buffer
-        (insert-file-contents (car files))
-        (goto-char (point-min))
-        (when (not (re-search-forward "begin_src" nil t))
-          (let ((spec (car (my/manifolding-atlas-org-prompt--parse
-                            (car files)))))
-            (when spec
-              (cons (nth 0 spec) (nth 1 spec)))))))))
+      (condition-case nil
+          (with-temp-buffer
+            (insert-file-contents (car files))
+            (goto-char (point-min))
+            (when (not (re-search-forward "begin_src" nil t))
+              (let ((spec (car (my/manifolding-atlas-org-prompt--parse
+                                (car files)))))
+                (when spec
+                  (cons (nth 0 spec) (nth 1 spec))))))
+        ;; Engine unavailable/broken → legacy extractors handle it.
+        (error nil)))))
 
 (defun my/manifolding-atlas-schema--extract-choices (prompt-name)
   "Extract allowed values for PROMPT-NAME: level-2 options from a
@@ -155,7 +158,10 @@ Applies to every note in the vault.  Fields are derived from all
          (my/manifolding-atlas-schema--field-from-prompt 'state-validation t)
          (my/manifolding-atlas-schema--field-from-prompt 'state-source t)
          (my/manifolding-atlas-schema--field-from-prompt 'state-dependency)
-         (my/manifolding-atlas-schema--field-from-prompt 'state-checklist))))
+         (my/manifolding-atlas-schema--field-from-prompt 'state-checklist)
+         (my/manifolding-atlas-schema--field-from-prompt 'rules)
+         (my/manifolding-atlas-schema--field-from-prompt 'traps-external)
+         (my/manifolding-atlas-schema--field-from-prompt 'traps-internal))))
 #+end_src
 
 *** Template Schemas

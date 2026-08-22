@@ -1,42 +1,13 @@
 #+title:      Hypotheses Prompt
 #+priority:   39
 
-* Hypotheses
-Why: Open uncertainties with enough structure to be tested. Not todos, not facts — live questions the Architect is actively pursuing. If there is no path to resolution, it is speculation.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-hypotheses ()
-  "Prompt for HYPOTHESES. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "HYPOTHESES: "
-              '("⚠ WARNING" "OPEN" "TESTING" "SUPPORTED" "REJECTED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-hypotheses-initial (initial)
-  "Prompt for HYPOTHESES with INITIAL pre-selected."
-  (completing-read
-   "HYPOTHESES: "
-   '("OPEN" "TESTING" "SUPPORTED" "REJECTED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'hypotheses
-  :name 'hypotheses
-  :label "Hypotheses"
-  :prompt-fn #'my/manifolding-atlas-prompt-hypotheses
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "HYPOTHESES"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("HYPOTHESES" . "WARNING")))
-                `(:properties (("HYPOTHESES" . ,val))))))
-#+end_src
+* HYPOTHESES
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Hypotheses
+:END:
+** OPEN
+** TESTING
+** SUPPORTED
+** REJECTED

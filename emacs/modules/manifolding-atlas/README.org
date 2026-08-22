@@ -14,9 +14,10 @@ loader-managed notes engine over a plain-org vault.
 | schema    | schema/    | the data language: prompt outlines & registries        |
 | templates | templates/ | generation artifacts (files/ + doct declarations)      |
 
-Entry points: =atlas.org= (vault root, DB, autosync, parse advice),
-=atlas-ui.org= (sidebar/outline UI), =atlas-consult.org= (consult
-completion). Loading: manifolding-emacs scans every .org under
+Entry points: =atlas.org= (vault root, DB, autosync, parse advice) and
+=atlas-ui.org= (sidebar/outline UI). Note selection uses the native
+=manifolding-atlas-select= path (consult integration retired). Loading:
+manifolding-emacs scans every .org under
 modules/, sorts by =#+priority:= (lower first — core negatives load
 before everything), and evaluates their elisp blocks.
 

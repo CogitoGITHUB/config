@@ -31,7 +31,7 @@ sweep, instant per-save feedback, and a prompt/template registry audit.
 
 (defvar my/manifolding-atlas-reinforce-audit-allowlist
   '("FILE_NAME" "SUBDIR" "POSITION" "TAG" "ALIAS" "THINKING_TYPES"
-    "MASTERING" "MIND_MAP" "POS" "ETYMOLOGY" "EXAMPLES" "FREQUENCY"
+    "MASTERING" "MIND_MAP" "POS" "ETYMOLOGY" "EXAMPLE" "FREQUENCY"
     "PRONUNCIATION" "REGISTER" "SYNONYMS" "TEMPLATE")
   "Property keys managed outside schemas; excluded from the audit.")
 #+end_src
@@ -41,14 +41,19 @@ sweep, instant per-save feedback, and a prompt/template registry audit.
 (defun my/manifolding-atlas-reinforce-sweep ()
   "Run a full-vault schema sweep and rebuild MISSING PROMPTS."
   (interactive)
-  (condition-case err
-      (progn
-        (my/manifolding-atlas-missing--rebuild-from-health)
-        (setq my/manifolding-atlas-reinforce--last-sweep (float-time))
-        (my/manifolding-atlas-reinforce--audit)
-        (message "Schema sweep complete (%s)"
-                 (format-time-string "%H:%M:%S")))
-    (error (message "Schema sweep failed: %s" err))))
+  ;; Sweeps can fire at arbitrary ambient stack depth (idle inside
+  ;; recursive-edits etc). Carry an independent deep budget so ambient
+  ;; depth is irrelevant.
+  (let ((max-lisp-eval-depth 12000)
+        (max-specpdl-size 12000))
+    (condition-case err
+        (progn
+          (my/manifolding-atlas-missing--rebuild-from-health)
+          (setq my/manifolding-atlas-reinforce--last-sweep (float-time))
+          (my/manifolding-atlas-reinforce--audit)
+          (message "Schema sweep complete (%s)"
+                   (format-time-string "%H:%M:%S")))
+      (error (message "Schema sweep failed: %s" err)))))
 
 (defun my/manifolding-atlas-reinforce--schedule ()
   "Debounce: re-arm the idle sweep timer."
@@ -153,11 +158,17 @@ generated schema is missing or drifted. Silent when clean."
         (template-issues nil))
     (dolist (spec my/manifolding-atlas-prompt-registry)
       (let* ((name (plist-get spec :name))
+             (files (and name
+                         (directory-files-recursively
+                          (my/manifolding-atlas-schema-dir)
+                          (format "^%s\\.org$" name))))
+             (file (car files))
              (key (condition-case nil
                       (my/manifolding-atlas-schema--extract-prop-key name)
                     (error nil))))
         (unless (or (memq name '(position subdir file-name tags todo
                                         schedule deadline properties))
+                    (and file (string-match-p "/prompts/" file))
                     (null key)
                     (member key covered))
           (push key uncovered))))

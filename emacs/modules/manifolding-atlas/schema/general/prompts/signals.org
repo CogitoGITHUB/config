@@ -1,42 +1,12 @@
 #+title:      Signals Prompt
 #+priority:   33
 
-* Signals
-Why: Live leading indicators being actively watched. Not evidence — retrospective. Not hypotheses — open questions. Inputs arriving now that may become either.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-signals ()
-  "Prompt for SIGNALS. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "SIGNALS: "
-              '("⚠ WARNING" "WATCHED" "RESOLVED" "IGNORED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-signals-initial (initial)
-  "Prompt for SIGNALS with INITIAL pre-selected."
-  (completing-read
-   "SIGNALS: "
-   '("WATCHED" "RESOLVED" "IGNORED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'signals
-  :name 'signals
-  :label "Signals"
-  :prompt-fn #'my/manifolding-atlas-prompt-signals
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "SIGNALS"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("SIGNALS" . "WARNING")))
-                `(:properties (("SIGNALS" . ,val))))))
-#+end_src
+* SIGNALS
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Signals
+:END:
+** WATCHED
+** RESOLVED
+** IGNORED

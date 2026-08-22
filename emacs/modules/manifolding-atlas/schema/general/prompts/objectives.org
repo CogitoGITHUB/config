@@ -1,42 +1,14 @@
 #+title:      Objectives Prompt
 #+priority:   21
 
-* Objectives
-Why: Strategic outcomes, not tasks. Results whose existence confirms the deployment succeeded. Each objective should be falsifiable.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-objectives ()
-  "Prompt for OBJECTIVES. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "OBJECTIVES: "
-              '("⚠ WARNING" "DRAFT" "DIRECTING" "ACHIEVED" "REVISED" "DROPPED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-objectives-initial (initial)
-  "Prompt for OBJECTIVES with INITIAL pre-selected."
-  (completing-read
-   "OBJECTIVES: "
-   '("DRAFT" "DIRECTING" "ACHIEVED" "REVISED" "DROPPED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'objectives
-  :name 'objectives
-  :label "Objectives"
-  :prompt-fn #'my/manifolding-atlas-prompt-objectives
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "OBJECTIVES"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("OBJECTIVES" . "WARNING")))
-                `(:properties (("OBJECTIVES" . ,val))))))
-#+end_src
+* OBJECTIVES
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Objectives
+:END:
+** DRAFT
+** DIRECTING
+** ACHIEVED
+** REVISED
+** DROPPED

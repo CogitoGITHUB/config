@@ -79,33 +79,39 @@ Single-symbol callers (like `(my/manifolding-atlas-collect-prompts 'file)`) cont
          result)
     (dolist (spec my/manifolding-atlas-prompt-registry)
       (when (seq-intersection contexts (plist-get spec :contexts) #'eq)
-        (my/manifolding-atlas--show-help (plist-get spec :name))
-        (let (val frag)
-          (setq val (condition-case nil
-                        (funcall (plist-get spec :prompt-fn))
-                      (quit nil)))
-          (setq frag (funcall (plist-get spec :to-plist) val context))
-          (when-let ((v (plist-get frag :tags)))
-            (setq result (plist-put result :tags
-                         (append (plist-get result :tags) v))))
-          (when-let ((v (plist-get frag :properties)))
-            (setq result (plist-put result :properties
-                         (append (plist-get result :properties)
-                                 (cl-remove-if (lambda (p) (string-empty-p (cdr p))) v)))))
-          (when-let ((v (plist-get frag :body)))
-            (setq result (plist-put result :body
-                         (concat (or (plist-get result :body) "") v))))
-          (when-let ((v (plist-get frag :post-apply)))
-            (setq result (plist-put result :post-apply
-                         (append (plist-get result :post-apply) v))))
-          (when-let ((v (plist-get frag :after)))
-            (setq result (plist-put result :after v)))
-          (when-let ((v (plist-get frag :file-name)))
-            (setq result (plist-put result :file-name v)))
-          (when (plist-member frag :todo)
-            (setq result (plist-put result :todo (plist-get frag :todo))
-                  my/manifolding-atlas--creation-todo (plist-get frag :todo))))
-        (my/manifolding-atlas--close-help)))
+        (let ((declared (and (fboundp
+                              'my/manifolding-atlas-org-prompt--declarative-p)
+                             (my/manifolding-atlas-org-prompt--declarative-p
+                              (plist-get spec :key)))))
+          (unless declared
+            (my/manifolding-atlas--show-help (plist-get spec :name)))
+          (let (val frag)
+            (setq val (condition-case nil
+                          (funcall (plist-get spec :prompt-fn))
+                        (quit nil)))
+            (setq frag (funcall (plist-get spec :to-plist) val context))
+            (when-let ((v (plist-get frag :tags)))
+              (setq result (plist-put result :tags
+                           (append (plist-get result :tags) v))))
+            (when-let ((v (plist-get frag :properties)))
+              (setq result (plist-put result :properties
+                           (append (plist-get result :properties)
+                                   (cl-remove-if (lambda (p) (string-empty-p (cdr p))) v)))))
+            (when-let ((v (plist-get frag :body)))
+              (setq result (plist-put result :body
+                           (concat (or (plist-get result :body) "") v))))
+            (when-let ((v (plist-get frag :post-apply)))
+              (setq result (plist-put result :post-apply
+                           (append (plist-get result :post-apply) v))))
+            (when-let ((v (plist-get frag :after)))
+              (setq result (plist-put result :after v)))
+            (when-let ((v (plist-get frag :file-name)))
+              (setq result (plist-put result :file-name v)))
+            (when (plist-member frag :todo)
+              (setq result (plist-put result :todo (plist-get frag :todo))
+                    my/manifolding-atlas--creation-todo (plist-get frag :todo))))
+          (unless declared
+            (my/manifolding-atlas--close-help)))))
     result))
 #+end_src
 

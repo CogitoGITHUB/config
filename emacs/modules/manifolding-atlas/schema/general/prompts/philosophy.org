@@ -1,42 +1,13 @@
 #+title:      Philosophy Prompt
 #+priority:   28
 
-* Philosophy
-Why: The foundational reasoning that authorizes this deployment and defines what the Architect is willing to do. Principle, not preference. If it fails under scrutiny, every decision above it becomes noise.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-philosophy ()
-  "Prompt for PHILOSOPHY. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "PHILOSOPHY: "
-              '("⚠ WARNING" "DEFINED" "STABLE" "REVISED" "ABANDONED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-philosophy-initial (initial)
-  "Prompt for PHILOSOPHY with INITIAL pre-selected."
-  (completing-read
-   "PHILOSOPHY: "
-   '("DEFINED" "STABLE" "REVISED" "ABANDONED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'philosophy
-  :name 'philosophy
-  :label "Philosophy"
-  :prompt-fn #'my/manifolding-atlas-prompt-philosophy
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "PHILOSOPHY"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("PHILOSOPHY" . "WARNING")))
-                `(:properties (("PHILOSOPHY" . ,val))))))
-#+end_src
+* PHILOSOPHY
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Philosophy
+:END:
+** DEFINED
+** STABLE
+** REVISED
+** ABANDONED

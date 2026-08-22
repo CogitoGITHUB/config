@@ -53,13 +53,13 @@
 (defun my/manifolding-atlas-git--push (file)
   "Start async git push for notes directory."
   (setq my/manifolding-atlas-git--pushing t)
-  (let ((default-directory (my/manifolding-atlas-root-dir))
-        (buf (generate-new-buffer " *manifolding-atlas-git-push*"))
-        (proc (make-process :name "manifolding-atlas-git-push"
-                            :buffer buf
-                            :command (list magit-git-executable "push")
-                            :connection-type 'pipe
-                            :noquery t)))
+  (let* ((default-directory (my/manifolding-atlas-root-dir))
+         (buf (generate-new-buffer " *manifolding-atlas-git-push*"))
+         (proc (make-process :name "manifolding-atlas-git-push"
+                             :buffer buf
+                             :command (list magit-git-executable "push")
+                             :connection-type 'pipe
+                             :noquery t)))
     (process-put proc 'file file)
     (set-process-sentinel proc #'my/manifolding-atlas-git--push-sentinel)))
 

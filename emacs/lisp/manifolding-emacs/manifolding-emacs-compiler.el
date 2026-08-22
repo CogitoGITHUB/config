@@ -24,6 +24,14 @@
 ;; doesn't warn about binding it when straight isn't loaded yet.
 (defvar straight-current-profile)
 
+(defcustom manifolding-emacs-lexical-binding t
+  "When non-nil, every module block/package is evaluated with lexical
+binding.  Lexical compilation makes closures capture their environment
+correctly and drastically reduces interpreter stack depth
+\(max-lisp-eval-depth pressure).  Set to nil only to roll back to the
+legacy dynamic-binding behavior."
+  :type 'boolean)
+
 (defun manifolding-emacs-concatenate-source-blocks (file)
   "Populate `manifolding-emacs-packages' from FILE.  Return the list of
 loose (non-package) top-level statements as validated, trimmed
@@ -90,7 +98,9 @@ PACKAGE-NAME as errored instead of propagating to its siblings."
   (condition-case err
       (progn
         (let ((manifolding-emacs--inside-tier2-eval t))
-          (eval (manifolding-emacs-safe-read (format "(progn\n%s\n)" package-string) file)))
+          (eval (manifolding-emacs-safe-read
+                 (format "(progn\n%s\n)" package-string) file)
+                manifolding-emacs-lexical-binding))
         (manifolding-emacs-record-status package-name 'ok file))
     (error
      (manifolding-emacs-record-error :level 'package :file file :package package-name
@@ -132,9 +142,16 @@ still surfaces a real failure instead of swallowing it."
            (loose-forms (manifolding-emacs-concatenate-source-blocks file)))
       (dolist (form-string loose-forms)
         (condition-case err
-            (eval (manifolding-emacs-safe-read (format "(progn\n%s\n)" form-string) file))
-          (error (manifolding-emacs-record-error :level 'part :file file
-                                                   :message (error-message-string err)))))
+            (eval (manifolding-emacs-safe-read
+                   (format "(progn\n%s\n)" form-string) file)
+                  manifolding-emacs-lexical-binding)
+          (error
+           (manifolding-emacs-record-error
+            :level 'part :file file
+            :message (format "%s :: %S"
+                             (error-message-string err)
+                             (substring form-string
+                                        0 (min 120 (length form-string))))))))
       (manifolding-emacs-compile-packages file)
       file)))
 

@@ -1,42 +1,12 @@
 #+title:      Failures Prompt
 #+priority:   37
 
-* Failures
-Why: Retrospective post-mortems only. Not predictions — records. What failed, the exact mechanism of failure, what it cost, and what the Architect updates in response.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-failures ()
-  "Prompt for FAILURES. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "FAILURES: "
-              '("⚠ WARNING" "RECORDED" "ANALYZED" "ACTIVE")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-failures-initial (initial)
-  "Prompt for FAILURES with INITIAL pre-selected."
-  (completing-read
-   "FAILURES: "
-   '("RECORDED" "ANALYZED" "ACTIVE")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'failures
-  :name 'failures
-  :label "Failures"
-  :prompt-fn #'my/manifolding-atlas-prompt-failures
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "FAILURES"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("FAILURES" . "WARNING")))
-                `(:properties (("FAILURES" . ,val))))))
-#+end_src
+* FAILURES
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Failures
+:END:
+** RECORDED
+** ANALYZED
+** ACTIVE

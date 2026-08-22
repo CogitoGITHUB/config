@@ -1,5 +1,6 @@
 #+title: Manifolding Atlas — Declarative Org Prompts
 #+priority: 0
+#+property: header-args:emacs-lisp :lexical t :results silent
 
 Turns plain org outlines into registered prompts. A declarative file has
 a level-1 heading shaped like a PROPERTY_KEY whose level-2 headings are
@@ -19,6 +20,26 @@ Optional drawer metadata under the level-1 heading:
 #+begin_src emacs-lisp
 (require 'manifolding-atlas)
 (require 'cl-lib)
+
+;; Dynamic-binding compilation burns eval depth fast; the picker's
+;; recursive-edit stacks on an already-deep creation chain.
+(setq max-lisp-eval-depth (max max-lisp-eval-depth 6000)
+      max-specpdl-size (max max-specpdl-size 6000))
+
+(defvar my/manifolding-atlas-org-prompt--declarative
+  (make-hash-table :test #'eq)
+  "Registry keys registered from declarative org outlines.")
+
+(defvar my/manifolding-atlas-org-prompt--specs
+  (make-hash-table :test #'eq)
+  "Full spec plists per registry key.
+Lambdas must NOT capture lexical variables — the loader compiles with
+dynamic binding — so deferred prompt functions read their spec from here.")
+
+(defun my/manifolding-atlas-org-prompt--declarative-p (key)
+  "Return non-nil when KEY was registered by the declarative engine."
+  (and (hash-table-p my/manifolding-atlas-org-prompt--declarative)
+       (gethash key my/manifolding-atlas-org-prompt--declarative)))
 #+end_src
 
 * Template helpers
@@ -62,7 +83,8 @@ schema/general/template.org so that file can be pure data).
   "Post-apply: keep TEMPLATE_HASH in sync with VAL on NOTE."
   (when note
     (if (and val
-             (not (member val '("WARNING" my/manifolding-atlas-prompt-template--none))))
+             (not (member val (list "WARNING"
+                                    my/manifolding-atlas-prompt-template--none))))
         (my/manifolding-atlas--property-put
          note "TEMPLATE_HASH"
          (or (my/manifolding-atlas--capture-file-hash val) "unknown"))
@@ -91,10 +113,12 @@ schema/general/template.org so that file can be pure data).
             (when (looking-at "^[ \t]*:PROPERTIES:[ \t]*$")
               (forward-line 1)
               (while (not (or (eobp) (looking-at "^[ \t]*:END:[ \t]*$")))
-                (when (looking-at "^[ \t]*:\\([A-Z-]+\\):[ \t]*\\(.*\\)$")
+                (when (looking-at "^[ \t]*:\\([A-Za-z-]+\\):[ \t]*\\(.*\\)$")
                   (setq plist
                         (plist-put plist
-                                   (intern (concat ":" (match-string 1)))
+                                   (intern (concat ":"
+                                                   (downcase
+                                                    (match-string 1))))
                                    (string-trim (match-string 2)))))
                 (forward-line))
               (forward-line 1)))
@@ -114,11 +138,70 @@ schema/general/template.org so that file can be pure data).
 
 * Registration
 #+begin_src emacs-lisp
+(defun my/manifolding-atlas-org-prompt--schema-files ()
+  "Return all candidate org files under schema/."
+  (directory-files-recursively
+   (my/manifolding-atlas-schema-dir) "\\.org\\'"))
+
 (defun my/manifolding-atlas-org-prompt--register-all ()
-  "Register every declarative prompt found under schema/."
-  (dolist (file (my/manifolding-atlas-org-prompt--schema-files))
-    (dolist (spec (my/manifolding-atlas-org-prompt--parse file))
-      (apply #'my/manifolding-atlas-org-prompt--register file spec))))
+  "Register every declarative prompt found under schema/.
+Idempotent: strips previously registered declarative specs first, so
+repeated reloads/boot timers never duplicate registry entries.
+Per-file/per-spec failures are reported individually instead of
+aborting the whole batch.  Returns number of prompts registered."
+  (let ((count 0) (failures nil))
+    ;; Drop stale declarative specs from earlier registrations.
+    (setq my/manifolding-atlas-prompt-registry
+          (cl-remove-if
+           (lambda (spec)
+             (my/manifolding-atlas-org-prompt--declarative-p
+              (plist-get spec :key)))
+           my/manifolding-atlas-prompt-registry))
+    (dolist (file (my/manifolding-atlas-org-prompt--schema-files))
+      (let ((specs (condition-case err
+                       (my/manifolding-atlas-org-prompt--parse file)
+                     (error
+                      (push (format "%s: parse failed (%s)"
+                                    (file-name-nondirectory file)
+                                    (error-message-string err))
+                            failures)
+                      nil))))
+        (dolist (spec specs)
+          (condition-case err
+              (progn
+                (apply #'my/manifolding-atlas-org-prompt--register
+                       file spec)
+                (setq count (1+ count)))
+            (error
+             (push (format "%s: %s"
+                           (file-name-nondirectory file)
+                           (error-message-string err))
+                   failures))))))
+    (when failures
+      (lwarn 'manifolding-atlas-org-prompts :warning
+             "declarative prompt failures:\n%s"
+             (string-join (nreverse failures) "\n")))
+    count))
+
+(defun my/manifolding-atlas-org-prompt--run (key-sym &optional default)
+  "Invoke declarative prompt KEY-SYM using its stored spec.
+Runs under an independent deep budget so ambient stack depth
+(creation chain, recursive-edits, idle timers) is irrelevant."
+  (let ((spec (gethash key-sym
+                       my/manifolding-atlas-org-prompt--specs)))
+    (if (not spec)
+        (user-error "No declarative spec for %s — reload org-prompts"
+                    key-sym)
+      (let* ((max-lisp-eval-depth 12000)
+             (max-specpdl-size 12000)
+             (file (plist-get spec :file))
+             (key (plist-get spec :key))
+             (label (plist-get spec :label))
+             (kind (plist-get spec :kind))
+             (options (plist-get spec :options))
+             (plist (plist-get spec :plist)))
+        (my/manifolding-atlas-org-prompt--ask
+         file key label kind options plist default)))))
 
 (defun my/manifolding-atlas-org-prompt--register (file key options plist)
   "Register one declarative prompt from FILE: KEY with OPTIONS and PLIST."
@@ -133,46 +216,46 @@ schema/general/template.org so that file can be pure data).
                             (or (plist-get plist :contexts)
                                 "file heading"))))
          (label (or (plist-get plist :label) key))
-         (task-default (plist-get plist :task-default))
-         (make-fn
-          (lambda (&optional default)
-            (lambda ()
-              (my/manifolding-atlas-org-prompt--ask
-               file key label kind options plist default))))
-         (main-fn (funcall make-fn nil)))
-    (defalias (intern (concat "my/manifolding-atlas-prompt-" key-sym))
-              main-fn)
+         (task-default (plist-get plist :task-default)))
+    (puthash key-sym t my/manifolding-atlas-org-prompt--declarative)
+    (puthash key-sym
+             (list :file file :key key :label label :kind kind
+                   :options options :plist plist)
+             my/manifolding-atlas-org-prompt--specs)
+    (defalias (intern (concat "my/manifolding-atlas-prompt-"
+                              (symbol-name key-sym)))
+      `(lambda () (my/manifolding-atlas-org-prompt--run ',key-sym)))
     (my/manifolding-atlas-register-prompt
      :key key-sym
      :name key-sym
      :label label
-     :prompt-fn main-fn
+     :prompt-fn `(lambda () (my/manifolding-atlas-org-prompt--run ',key-sym))
      :contexts contexts
      :read-current-fn
-     (if (eq kind 'todo)
-         (lambda () (org-get-todo-state))
-       (lambda () (org-entry-get nil prop)))
+     (cond ((eq kind 'todo) (lambda () (org-get-todo-state)))
+           ((eq kind 'tags) (lambda () (org-get-tags nil t)))
+           (t (lambda () (org-entry-get nil prop))))
      :merge-strategy (if (eq kind 'tags) 'merge 'replace)
      :to-plist
-     (lambda (val _ctx)
-       (my/manifolding-atlas-org-prompt--fragment
-        prop kind plist val)))
+     `(lambda (val _ctx) (my/manifolding-atlas-org-prompt--fragment
+                          ,prop ',kind ',plist val)))
     (when (and task-default (memq 'task contexts))
       (my/manifolding-atlas-register-prompt
        :key key-sym
        :name key-sym
        :label label
-       :prompt-fn (funcall make-fn task-default)
+       :prompt-fn `(lambda ()
+                     (my/manifolding-atlas-org-prompt--run
+                      ',key-sym ,task-default))
        :contexts '(task)
        :read-current-fn
-       (if (eq kind 'todo)
-           (lambda () (org-get-todo-state))
-         (lambda () (org-entry-get nil prop)))
+       (cond ((eq kind 'todo) (lambda () (org-get-todo-state)))
+             ((eq kind 'tags) (lambda () (org-get-tags nil t)))
+             (t (lambda () (org-entry-get nil prop))))
        :merge-strategy (if (eq kind 'tags) 'merge 'replace)
        :to-plist
-       (lambda (val _ctx)
-         (my/manifolding-atlas-org-prompt--fragment
-          prop kind plist val))))))
+       `(lambda (val _ctx) (my/manifolding-atlas-org-prompt--fragment
+                            ,prop ',kind ',plist val))))))
 #+end_src
 
 * Asking
@@ -214,6 +297,7 @@ schema/general/template.org so that file can be pure data).
                 (string-join
                  (reverse my/manifolding-atlas-org-prompt--buffer-marks) " ")
               title))
+      (my/manifolding-atlas-org-prompt--buffer-finish)
       (exit-recursive-edit))))
 
 (defun my/manifolding-atlas-org-prompt--buffer-mark ()
@@ -232,44 +316,151 @@ schema/general/template.org so that file can be pure data).
   "Cancel selection."
   (interactive)
   (setq my/manifolding-atlas-org-prompt--buffer-result nil)
+  (my/manifolding-atlas-org-prompt--buffer-finish)
   (exit-recursive-edit))
 
 (defvar-local my/manifolding-atlas-org-prompt--this-kind nil)
 
+(defvar my/manifolding-atlas-org-prompt-select-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "RET") #'my/manifolding-atlas-org-prompt--buffer-accept)
+    (define-key map (kbd "<return>") #'my/manifolding-atlas-org-prompt--buffer-accept)
+    (define-key map (kbd "C-c C-c") #'my/manifolding-atlas-org-prompt--buffer-accept)
+    (define-key map (kbd "m") #'my/manifolding-atlas-org-prompt--buffer-mark)
+    (define-key map (kbd "C-c C-k") #'my/manifolding-atlas-org-prompt--buffer-abort)
+    (define-key map (kbd "q") #'my/manifolding-atlas-org-prompt--buffer-abort)
+    map))
+
+(define-minor-mode my/manifolding-atlas-org-prompt-select-mode
+  "Atlas prompt option picker.
+Move anywhere in the outline; RET/C-c C-c selects the option heading
+at point (level 2+, deeper headings are variants), m marks for
+multi-select, C-c C-k/q cancels. Buffer stays editable."
+  :lighter " Atlas-Pick"
+  :keymap my/manifolding-atlas-org-prompt-select-mode-map)
+
+(defun my/manifolding-atlas-org-prompt--buffer-finish ()
+  "Persist option edits, then kill the picker buffer.
+Killing removes its tab/window entirely, mirroring org-capture's
+:kill-buffer behavior.  Content is safe on disk."
+  (when (and buffer-file-name (buffer-modified-p))
+    (save-buffer))
+  (kill-buffer))
+
+;; Emulation-level keymap so picker keys win over modaled states.
+(defvar my/manifolding-atlas-org-prompt--select-on nil)
+(make-variable-buffer-local 'my/manifolding-atlas-org-prompt--select-on)
+
+(defvar my/manifolding-atlas-org-prompt--select-emulation
+  `((my/manifolding-atlas-org-prompt--select-on .
+     ,my/manifolding-atlas-org-prompt-select-mode-map)))
+
+(defun my/manifolding-atlas-org-prompt--emulation-register ()
+  (setq emulation-mode-map-alists
+        (delq 'my/manifolding-atlas-org-prompt--select-emulation
+              emulation-mode-map-alists))
+  (add-to-list 'emulation-mode-map-alists
+               'my/manifolding-atlas-org-prompt--select-emulation))
+
+(with-eval-after-load 'modaled
+  (my/manifolding-atlas-org-prompt--emulation-register))
+
 (defun my/manifolding-atlas-org-prompt--ask-buffer (file kind default)
-  "Open FILE and let the user pick an option with RET. Editable."
-  (setq my/manifolding-atlas-org-prompt--buffer-result nil
-        my/manifolding-atlas-org-prompt--buffer-marks nil)
-  (let ((buf (find-file-noselect file)))
+  "Open FILE capture-style and let the user pick an option.
+Conventions mirror org-capture buffers: C-c C-c accepts the option
+heading at point (RET also works), C-c C-k cancels. m marks for
+multi-select kinds."
+  (setq my/manifolding-atlas-org-prompt--buffer-result nil)
+  (setq my/manifolding-atlas-org-prompt--buffer-marks nil)
+  (let ((buf (condition-case nil
+                 (find-file-noselect file)
+               (error
+                (or (get-file-buffer file)
+                    (let ((b (get-buffer-create
+                              (file-name-nondirectory file))))
+                      (with-current-buffer b
+                        (unless (derived-mode-p 'org-mode) (org-mode)))
+                      b)))))
     (with-current-buffer buf
+      (when (bound-and-true-p org-tree-slide-mode)
+        (org-tree-slide-mode -1))
+      (widen)
+      (when (bound-and-true-p font-lock-mode)
+        (font-lock-mode -1))
       (goto-char (point-min))
-      (when (fboundp 'outline-show-all) (outline-show-all))
+      (when (fboundp 'outline-show-all)
+        (outline-show-all))
+      (goto-char (point-min))
+      (when (re-search-forward "^\\*\\*+ " nil t)
+        (beginning-of-line))
       (when (and default (not (string-empty-p default)))
+        (goto-char (point-min))
         (when (re-search-forward
-               (format "^\\*\\*+ %s[ \t]*$" (regexp-quote default)) nil t)
+               (format "^\\*\\*+ %s[ \t]*$"
+                       (regexp-quote default))
+               nil t)
+          (beginning-of-line)
           (recenter-top-bottom)))
-      (local-set-key (kbd "RET") #'my/manifolding-atlas-org-prompt--buffer-accept)
-      (local-set-key (kbd "<return>") #'my/manifolding-atlas-org-prompt--buffer-accept)
-      (local-set-key (kbd "m") #'my/manifolding-atlas-org-prompt--buffer-mark)
-      (local-set-key (kbd "q") #'my/manifolding-atlas-org-prompt--buffer-abort)
+      (setq my/manifolding-atlas-org-prompt--select-on t)
+      (my/manifolding-atlas-org-prompt-select-mode 1)
       (setq my/manifolding-atlas-org-prompt--this-kind kind))
     (pop-to-buffer buf)
-    (message "RET select · m mark · q cancel")
-    (recursive-edit)
-    (with-current-buffer buf
-      (local-unset-key (kbd "RET"))
-      (local-unset-key (kbd "<return>"))
-      (local-unset-key (kbd "m"))
-      (local-unset-key (kbd "q")))
+    (message "Option picker — RET/C-c C-c select · m mark · C-c C-k/q cancel")
+    (let ((done nil))
+      (while (not done)
+        (condition-case err
+            (progn
+              (recursive-edit)
+              (setq done t))
+          (error
+           (if (and (bufferp buf)
+                    (string-match-p
+                     "max-lisp-eval-depth\\|max-specpdl-size"
+                     (error-message-string err)))
+               (progn
+                 (setq max-lisp-eval-depth
+                       (min 16000 (* 2 max-lisp-eval-depth))
+                       max-specpdl-size
+                       (min 16000 (* 2 max-specpdl-size)))
+                 (with-current-buffer buf
+                   (setq my/manifolding-atlas-org-prompt--select-on t)
+                   (my/manifolding-atlas-org-prompt-select-mode 1))
+                 (message "Raised eval budgets to %d — continuing"
+                          max-lisp-eval-depth))
+             (signal (car err) (cdr err)))))))
+    (when (buffer-live-p buf)
+      (with-current-buffer buf
+        (setq my/manifolding-atlas-org-prompt--select-on nil)
+        (my/manifolding-atlas-org-prompt-select-mode -1)))
     my/manifolding-atlas-org-prompt--buffer-result))
 
 (defun my/manifolding-atlas-org-prompt--ask
     (file key label kind options plist default)
   (if (and (eq my/manifolding-atlas-org-prompt-ui 'buffer)
            file (file-exists-p file)
-           (memq kind '(property live todo multi tagopt)))
-      (or (my/manifolding-atlas-org-prompt--ask-buffer file kind default)
-          (if default default "WARNING"))
+           (memq kind '(property live todo multi tagopt mindmap)))
+      (let ((choice (my/manifolding-atlas-org-prompt--ask-buffer
+                     file kind default)))
+        (if (eq kind 'mindmap)
+            (cond
+             ((and (stringp choice)
+                   (member choice '("parent" "child" "sibling")))
+              (let ((target (manifolding-atlas-select
+                             (pcase choice
+                               ("parent"
+                                "Child to place under this note: ")
+                               ("child"
+                                "Parent for this note: ")
+                               ("sibling"
+                                "Place after this note: "))
+                             :require-match t)))
+                (list :placement choice
+                      :target-id (when target
+                                   (manifolding-atlas-note-id target)))))
+             ((stringp choice)
+              (list :placement "root" :target-id nil))
+             (t "WARNING"))
+          (or choice (if default default "WARNING"))))
     (my/manifolding-atlas-org-prompt--ask-minibuffer
      key label kind options plist default)))
 
@@ -390,6 +581,19 @@ schema/general/template.org so that file can be pure data).
     ('multi
      (when val
        `(:properties ((,key . ,val)))))
+    ('mindmap
+     (if (and val (plistp val))
+         (let ((placement (plist-get val :placement))
+               (target-id (plist-get val :target-id)))
+           (if (string= placement "root")
+               `(:properties ((,key . "WARNING")))
+             (let ((link (my/manifolding-atlas--ensure-ref-note
+                          'mm-placement placement)))
+               `(:properties ((,key . ,(or link placement)))
+                 :post-apply (,(apply-partially
+                                #'mm/--apply-placement
+                                placement target-id))))))
+       `(:properties ((,key . "WARNING")))))
     ('live
      (let ((family (intern
                     (downcase
@@ -412,6 +616,21 @@ schema/general/template.org so that file can be pure data).
 
 * Boot
 #+begin_src emacs-lisp
+(defvar my/manifolding-atlas-org-prompt--boot-timer nil)
+
 (with-eval-after-load 'manifolding-atlas
-  (my/manifolding-atlas-org-prompt--register-all))
+  (when my/manifolding-atlas-org-prompt--boot-timer
+    (cancel-timer my/manifolding-atlas-org-prompt--boot-timer))
+  (setq my/manifolding-atlas-org-prompt--boot-timer
+        (run-with-idle-timer
+   0 nil
+   (lambda ()
+     (condition-case err
+         (let ((n (my/manifolding-atlas-org-prompt--register-all)))
+           (message "org-prompts: registered %d declarative prompts" n)
+           (when (= n 0)
+             (lwarn 'manifolding-atlas-org-prompts
+                    :warning "registered 0 declarative prompts")))
+       (error (lwarn 'manifolding-atlas-org-prompts :error
+                     "registration failed: %s" err))))))
 #+end_src

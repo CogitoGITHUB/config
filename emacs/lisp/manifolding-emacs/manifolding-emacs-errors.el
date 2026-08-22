@@ -67,6 +67,9 @@ manifolding-emacs-compiler.el.  See Commentary above.")
     (push entry manifolding-emacs--boot-errors)
     (when package
       (manifolding-emacs-record-status package 'error file message))
+    (message "manifolding-emacs ERROR %s%s%s: %s"
+             (or file "?") (if line (format ":%s" line) "")
+             (if package (format " [%s]" package) "") message)
     (unless manifolding-emacs--booting
       (display-warning
        'manifolding-emacs
@@ -127,15 +130,51 @@ confusing than useful."
 
 ;;;; Safe reading / part-level wrapping
 
+(defun manifolding-emacs--first-bad-line (string)
+  "Locate the first syntactically broken s-expression in STRING.
+Uses only built-in motion (`forward-sexp', `forward-comment').
+Returns (REL-LINE TEXT) of the offender, or nil when STRING reads
+clean.  REL-LINE is 1-based relative to the start of STRING."
+  (with-temp-buffer
+    (delay-mode-hooks (emacs-lisp-mode))
+    (insert string)
+    (goto-char (point-min))
+    (condition-case nil
+        (progn
+          (while (not (eobp))
+            (forward-comment (point-max))
+            (unless (eobp) (forward-sexp)))
+          nil)
+      (scan-error
+       (list (line-number-at-pos (point))
+             (string-trim
+              (buffer-substring (line-beginning-position)
+                                (line-end-position))))))))
+
 (defun manifolding-emacs-safe-read (string file &optional line)
-  "Read STRING, tagging any read error with FILE/LINE for context."
+  "Read STRING, tagging any read error with FILE/LINE for context.
+Read failures are pinpointed with `manifolding-emacs--first-bad-line'
+so the reported message names the exact line and shows its text,
+instead of a bare \"End of file during parsing\"."
   (condition-case err
       (read string)
     (error
-     (signal 'error
-             (concat (if line (format "Read error in %s:%s" file line)
-                       (format "Read error in %s" file))
-                     ": " (error-message-string err))))))
+     ;; DATA must be a LIST or `error-message-string' prints the
+     ;; useless "peculiar error" instead of the real message.
+     (let ((base (concat (if line
+                             (format "Read error in %s:%s" file line)
+                           (format "Read error in %s" file))
+                         ": "
+                         (error-message-string err))))
+       (signal 'error
+               (list
+                (if-let* ((scan (and (memq (car err)
+                                            '(end-of-file invalid-read-syntax
+                                              scan-error))
+                                     (manifolding-emacs--first-bad-line string))))
+                    (format "%s — bad form at +%d: %s"
+                            base (nth 0 scan) (nth 1 scan))
+                  base)))))))
 
 (defun manifolding-emacs-wrap-in-condition (file part &optional package keyword)
   "Wrap PART's body in `condition-case', baked into the returned code so

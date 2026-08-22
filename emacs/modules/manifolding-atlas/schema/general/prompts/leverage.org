@@ -1,42 +1,13 @@
 #+title:      Leverage Prompt
 #+priority:   31
 
-* Leverage
-Why: Time-sensitive pressure points, information asymmetries, favors owed, and dependency windows that give disproportionate influence. Unlike Advantages, leverage expires.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-leverage ()
-  "Prompt for LEVERAGE. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "LEVERAGE: "
-              '("⚠ WARNING" "TRACKED" "USED" "EXPIRED" "SQUANDERED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-leverage-initial (initial)
-  "Prompt for LEVERAGE with INITIAL pre-selected."
-  (completing-read
-   "LEVERAGE: "
-   '("TRACKED" "USED" "EXPIRED" "SQUANDERED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'leverage
-  :name 'leverage
-  :label "Leverage"
-  :prompt-fn #'my/manifolding-atlas-prompt-leverage
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "LEVERAGE"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("LEVERAGE" . "WARNING")))
-                `(:properties (("LEVERAGE" . ,val))))))
-#+end_src
+* LEVERAGE
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Leverage
+:END:
+** TRACKED
+** USED
+** EXPIRED
+** SQUANDERED

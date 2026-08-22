@@ -1,42 +1,12 @@
 #+title:      Journal Prompt
 #+priority:   24
 
-* Journal
-Why: Stripped observations only. Events, deviations, reactions — no interpretation at write time. The ShapeShifter reports here; the Architect reads later.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-journal ()
-  "Prompt for JOURNAL. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "JOURNAL: "
-              '("⚠ WARNING" "OPEN" "CLOSED" "ROTATED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-journal-initial (initial)
-  "Prompt for JOURNAL with INITIAL pre-selected."
-  (completing-read
-   "JOURNAL: "
-   '("OPEN" "CLOSED" "ROTATED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'journal
-  :name 'journal
-  :label "Journal"
-  :prompt-fn #'my/manifolding-atlas-prompt-journal
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "JOURNAL"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("JOURNAL" . "WARNING")))
-                `(:properties (("JOURNAL" . ,val))))))
-#+end_src
+* JOURNAL
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Journal
+:END:
+** OPEN
+** CLOSED
+** ROTATED

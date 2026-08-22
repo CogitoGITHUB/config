@@ -1,42 +1,12 @@
 #+title:      Sources Prompt
 #+priority:   42
 
-* Sources
-Why: Books, papers, people, and repositories that have proven reliable in this domain. Vetted only — no speculative bookmarks. If you have not returned to it, it does not belong here yet.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-sources ()
-  "Prompt for SOURCES. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "SOURCES: "
-              '("⚠ WARNING" "VETTED" "PENDING" "ARCHIVED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-sources-initial (initial)
-  "Prompt for SOURCES with INITIAL pre-selected."
-  (completing-read
-   "SOURCES: "
-   '("VETTED" "PENDING" "ARCHIVED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'sources
-  :name 'sources
-  :label "Sources"
-  :prompt-fn #'my/manifolding-atlas-prompt-sources
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "SOURCES"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("SOURCES" . "WARNING")))
-                `(:properties (("SOURCES" . ,val))))))
-#+end_src
+* SOURCES
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Sources
+:END:
+** VETTED
+** PENDING
+** ARCHIVED

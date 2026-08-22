@@ -12,14 +12,26 @@
 
 (defun my/manifolding-atlas--fast-level ()
   "Prompt for fast mode level.
-Return 0 (normal), 1 (skip general), 2 (skip all), or 3 (quick, no body)."
-  (let ((c (read-char-choice "Fast: (a)ormal (o)skip general (e)skip all (u)quick, no body [Enter=quick] " '(?a ?o ?e ?u ?\r ?\n))))
-    (setq my/manifolding-atlas--fast-level
-          (pcase c
-            (?a 0)
-            (?o 1)
-            (?e 2)
-            ((or ?u ?\r ?\n) 3)))))
+Return 0 (normal), 1 (skip general), 2 (skip all), or 3 (quick, no body).
+Plain RET means NORMAL — skipping requires an explicit o/e/u."
+  (let* ((c (read-char-choice
+             "Fast: (a)ormal [RET=normal] (o)skip general (e)skip all (u)quick: "
+             '(?a ?o ?e ?u ?\r ?\n))
+            )
+         (level (pcase c
+                  (?a 0)
+                  (?o 1)
+                  (?e 2)
+                  (?u 3)
+                  ((or ?\r ?\n) 0))))
+    (setq my/manifolding-atlas--fast-level level)
+    (message "Fast mode: %s"
+             (pcase level
+               (0 "NORMAL")
+               (1 "SKIP-GENERAL")
+               (2 "SKIP-ALL")
+               (3 "QUICK")))
+    level))
 
 (setq use-dialog-box nil)
 

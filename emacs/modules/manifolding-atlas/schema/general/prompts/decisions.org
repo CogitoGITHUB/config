@@ -1,42 +1,12 @@
 #+title:      Decisions Prompt
 #+priority:   29
 
-* Decisions
-Why: A permanent log of consequential decisions made in this workspace, with reasoning preserved at the time of choice. This file separates design from reaction.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-decisions ()
-  "Prompt for DECISIONS. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "DECISIONS: "
-              '("⚠ WARNING" "RECORDED" "RETAINED" "OVERTURNED")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-decisions-initial (initial)
-  "Prompt for DECISIONS with INITIAL pre-selected."
-  (completing-read
-   "DECISIONS: "
-   '("RECORDED" "RETAINED" "OVERTURNED")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'decisions
-  :name 'decisions
-  :label "Decisions"
-  :prompt-fn #'my/manifolding-atlas-prompt-decisions
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "DECISIONS"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("DECISIONS" . "WARNING")))
-                `(:properties (("DECISIONS" . ,val))))))
-#+end_src
+* DECISIONS
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Decisions
+:END:
+** RECORDED
+** RETAINED
+** OVERTURNED

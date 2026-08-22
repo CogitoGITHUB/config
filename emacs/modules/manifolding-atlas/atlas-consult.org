@@ -1,18 +1,3 @@
-#+TITLE:      Consult Manifolding Atlas
-#+begin_comment
-consult-manifolding-atlas integration: live preview, consult narrowing for manifolding-atlas.
-#+end_comment
-* consult-manifolding-atlas
-:PROPERTIES:
-:CATEGORY: ui
-:END:
-** Config
-#+begin_src emacs-lisp
-;; consult-manifolding-atlas provides consult-manifolding-atlas-find and consult-manifolding-atlas-insert --
-;; drop-in replacements for manifolding-atlas-find / manifolding-atlas-insert with live preview
-;; and consult narrowing.  No configuration required beyond loading.
-;; Bind consult-manifolding-atlas-find and consult-manifolding-atlas-insert in your bindings file.
-(with-eval-after-load 'manifolding-atlas
-  (require 'consult-manifolding-atlas)
-  (consult-manifolding-atlas-mode 1))
-#+end_src
+# REMOVED: consult integration is retired from the Atlas.
+# Native manifolding-atlas-select is used for note selection.
+# Safe to delete this file.

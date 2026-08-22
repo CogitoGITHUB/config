@@ -7,6 +7,12 @@ paths; change them here only.
 
 * Paths
 #+begin_src emacs-lisp
+;; Lexical compilation makes frames cheap, but too-high eval-depth
+;; lets runaway recursion overflow the real C stack before the guard
+;; fires.  4000 is ~2.5x default — generous yet C-safe.
+(setq max-lisp-eval-depth 4000
+      max-specpdl-size 4000)
+
 (defun my/manifolding-atlas-module-dir ()
   "Return the manifolding-atlas module root."
   (expand-file-name "manifolding-atlas/"

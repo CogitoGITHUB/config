@@ -1,42 +1,13 @@
 #+title:      Mastery Prompt
 #+priority:   41
 
-* Mastery
-Why: Honest capability assessment for this deployment context. What is internalized versus surface familiarity. Do not deploy a ShapeShifter beyond its actual capability — only beyond its current one, as a deliberate growth mechanism.
-
-** Default (default WARNING)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-mastery ()
-  "Prompt for MASTERY. Returns \"WARNING\" if skipped."
-  (let ((val (completing-read
-              "MASTERY: "
-              '("⚠ WARNING" "INTERNALIZED" "INTERNALIZING" "FAMILIAR" "UNKNOWN")
-              nil t nil nil "⚠ WARNING")))
-    (if (string-equal val "⚠ WARNING") "WARNING" val)))
-#+end_src
-
-** With initial value
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas-prompt-mastery-initial (initial)
-  "Prompt for MASTERY with INITIAL pre-selected."
-  (completing-read
-   "MASTERY: "
-   '("INTERNALIZED" "INTERNALIZING" "FAMILIAR" "UNKNOWN")
-   nil t nil nil initial))
-#+end_src
-
-** Registration
-#+begin_src emacs-lisp
-(my/manifolding-atlas-register-prompt
-  :key 'mastery
-  :name 'mastery
-  :label "Mastery"
-  :prompt-fn #'my/manifolding-atlas-prompt-mastery
-  :contexts '(file heading task)
-  :read-current-fn (lambda () (org-entry-get nil "MASTERY"))
-  :merge-strategy 'replace
-  :to-plist (lambda (val _ctx)
-              (if (or (null val) (string-equal val "WARNING"))
-                  `(:properties (("MASTERY" . "WARNING")))
-                `(:properties (("MASTERY" . ,val))))))
-#+end_src
+* MASTERY
+:PROPERTIES:
+:CONTEXTS: file heading task
+:KIND: property
+:LABEL: Mastery
+:END:
+** INTERNALIZED
+** INTERNALIZING
+** FAMILIAR
+** UNKNOWN
