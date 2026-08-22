@@ -388,7 +388,7 @@ multi-select kinds."
                               (file-name-nondirectory file))))
                       (with-current-buffer b
                         (unless (derived-mode-p 'org-mode) (org-mode)))
-                      b)))))
+                      b))))))
     (with-current-buffer buf
       (when (bound-and-true-p org-tree-slide-mode)
         (org-tree-slide-mode -1))
@@ -645,5 +645,5 @@ multi-select kinds."
              (lwarn 'manifolding-atlas-org-prompts
                     :warning "registered 0 declarative prompts")))
        (error (lwarn 'manifolding-atlas-org-prompts :error
-                     "registration failed: %s" err))))))
+                     "registration failed: %s" err)))))))
 #+end_src
