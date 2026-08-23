@@ -114,9 +114,31 @@ stale session opened it elsewhere."
             #'my/manifolding-atlas-db-sync--org-file-p)
 
 (defun my/manifolding-atlas-db-sync--list-org-files (dir)
-  "List all tracked files in DIR, extensionless included."
-  (seq-filter #'manifolding-atlas-db-sync--org-file-p
-              (directory-files-recursively (expand-file-name dir) ".*")))
+  "List vault files under DIR: `.org' plus extensionless entries.
+Walks manually instead of `directory-files-recursively' so that:
+- `.git' is never descended into (it is not content), and
+- a directory that vanishes mid-scan (git gc/pack races) is skipped
+  instead of killing the whole poll cycle."
+  (let* ((root (expand-file-name dir))
+         (files nil)
+         (dirs (list root))
+         (seen (make-hash-table :test #'equal)))
+    (while dirs
+      (let ((d (pop dirs)))
+        (when (and (file-directory-p d)
+                   (not (gethash d seen)))
+          (puthash d t seen)
+          ;; "^[^.]" skips dotfiles/dotdirs (.git included) at the source.
+          (let ((listing (ignore-errors (directory-files d t "^[^.]" t))))
+            (dolist (entry listing)
+              (cond
+               ((file-directory-p entry)
+                (unless (string= (file-name-nondirectory entry) ".git")
+                  (push entry dirs)))
+               ((file-regular-p entry)
+                (push entry files))))))))
+    (seq-filter #'manifolding-atlas-db-sync--org-file-p
+                (nreverse files))))
 
 (advice-add 'manifolding-atlas-db-sync--list-org-files :override
             #'my/manifolding-atlas-db-sync--list-org-files)

@@ -315,6 +315,29 @@ to:
 
 if the traditional completing-read interface is preferred.
 
+* The property picker
+
+Every prompt is a live editor, not a question.
+
+| Key     | Action                                                        |
+|---------+---------------------------------------------------------------|
+| m       | apply the option under cursor — again removes it from the note |
+| l       | make it live: create the ref-note and edit its content         |
+| a       | avy-jump straight to any option line                           |
+| RET     | next prompt — refused until something was applied              |
+| q       | skip this prompt (WARNING default)                             |
+| b / B   | step back one · revisit any answered prompt                    |
+| Q / C-g | abort everything — the draft note is deleted                   |
+
+Nothing commits until you mark it.  
+A mistaken mark is un-applied with the same key.  
+Going back never repeats what you already answered.  
+Aborting deletes the draft so nothing half-made survives.
+
+Multi-choice prompts accumulate marks; clearing them all removes the
+property.  Reopened prompts restore their applied value, highlighted
+in bold, so changes are always visible before they become real.
+
 * Schema is data
 
 This is one of the central ideas of Atlas.

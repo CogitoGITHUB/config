@@ -16,6 +16,17 @@ else
   echo "skip: $CFG/.local/cache/splash-test.el missing"
 fi
 
+section "1b. FAST-LEVEL FUNCTION STATE"
+$EMACS --batch --eval "
+(progn
+  (load (expand-file-name \"init.el\" \"/data/data/com.termux/files/home/.config/emacs/\")
+        nil t)
+  (let ((fn (symbol-function 'my/manifolding-atlas--fast-level)))
+    (message \"FAST-FN: %s\"
+             (substring (prin1-to-string fn) 0 150))
+    (message \"FAST-VAR: %s\" my/manifolding-atlas--fast-level)))
+" 2>&1 | grep -E "FAST-|error|Error" | tee -a "$LOG"
+
 section "2. FULL BOOT"
 $EMACS --batch -l "$CFG/init.el" --eval '(message "BOOT-OK")' >> "$LOG" 2>&1
 if grep -q "BOOT-OK" "$LOG"; then

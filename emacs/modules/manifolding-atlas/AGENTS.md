@@ -15,6 +15,15 @@ Architecture: core (engine) → infra (machinery) → domains (capabilities)
   note on top). No recursive-edit anywhere in creation — nesting bugs
   from the old design are structurally impossible. Direct single-shot
   calls (`my/manifolding-atlas-prompt-<key>`) keep a standalone path.
+- Picker grammar (session pickers): `m` apply/un-apply live to disk,
+  `l` upgrade to live ref-note + capture its content, `a` avy-to-option,
+  `RET` advance only when something was applied, `q` skip→WARNING,
+  `b` step back / `B` revisit any answered prompt (applied value
+  restored+highlighted), `Q`/`C-g` abort session and DELETE the draft.
+  Fast modes o/e/u never open UI; fast mode `s` (SELECTION) multi-selects
+  which registry keys fire interactively while the rest answer WARNING
+  silently (`my/manifolding-atlas-org-prompt--custom-set`, includes a
+  Body-Template entry that pre-runs the template chooser).
 - Every prompt file self-heals a first `** WARNING` option (skip
   sentinel, plain text — no emoji anywhere). RET on it = skip; q/C-g
   too. Point lands on WARNING unless :TASK-DEFAULT: exists.

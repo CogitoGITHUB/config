@@ -11,27 +11,31 @@
 0=normal, 1=skip general, 2=skip all, 3=quick (no body).")
 
 (defun my/manifolding-atlas--fast-level ()
-  "Prompt for fast mode level.
-Return 0 (normal), 1 (skip general), 2 (skip all), or 3 (quick, no body).
-Plain RET means NORMAL — skipping requires an explicit o/e/u."
-  (let* ((c (read-char-choice
-             "Fast: (a)ormal [RET=normal] (o)skip general (e)skip all (u)quick: "
-             '(?a ?o ?e ?u ?\r ?\n))
-            )
-         (level (pcase c
-                  (?a 0)
-                  (?o 1)
-                  (?e 2)
-                  (?u 3)
-                  ((or ?\r ?\n) 0))))
-    (setq my/manifolding-atlas--fast-level level)
-    (message "Fast mode: %s"
-             (pcase level
-               (0 "NORMAL")
-               (1 "SKIP-GENERAL")
-               (2 "SKIP-ALL")
-               (3 "QUICK")))
-    level))
+  "Prompt for capture speed.
+Direct letter selection; press ? inside the prompt for a help
+window describing every option.  Always returns a number 0-3."
+  (let* ((ans (read-multiple-choice
+               "Capture speed"
+               '((?a "NORMAL" "every prompt fires — the full interrogation")
+                 (?o "SKIP GENERAL" "specialized prompts still ask; general ones take defaults")
+                 (?e "SKIP ALL" "accept every default — zero questions")
+                 (?u "QUICK" "defaults, and no body capture afterwards")
+                 (?s "SELECTION" "select which properties to customize; everything else gets WARNING")
+                 (?\r "NORMAL" "same as a"))))
+         ;; rmc normally returns (KEY . DESCRIPTION); tolerate a bare
+         ;; key or anything else by normalizing first.
+         (key (if (consp ans) (car ans) ans)))
+    (pcase key
+      (?o (setq my/manifolding-atlas--fast-level 1)
+          (message "Capture mode: SKIP GENERAL") 1)
+      (?e (setq my/manifolding-atlas--fast-level 2)
+          (message "Capture mode: SKIP ALL") 2)
+      (?u (setq my/manifolding-atlas--fast-level 3)
+          (message "Capture mode: QUICK") 3)
+      (?s (setq my/manifolding-atlas--fast-level 4)
+          (message "Capture mode: SELECTION") 4)
+      (_ (setq my/manifolding-atlas--fast-level 0)
+         (message "Capture mode: NORMAL") 0))))
 
 (setq use-dialog-box nil)
 

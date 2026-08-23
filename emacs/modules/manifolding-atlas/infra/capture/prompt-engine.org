@@ -32,27 +32,47 @@ Entries here override the default <name>.org.")
 (defvar my/manifolding-atlas--help-opened nil
   "Non-nil when a help buffer was opened for the current prompt.")
 
+(defvar my/manifolding-atlas--help-buffer nil
+  "The help buffer opened by `my/manifolding-atlas--show-help'.")
+
+(defvar my/manifolding-atlas--help-window-config nil
+  "Window configuration captured before showing help.")
+
 (defun my/manifolding-atlas--show-help (name)
   "Open prompt NAME's help file full-screen with org-tree-slide.
-Search recursively under `properties/' for the file."
+Search recursively under schema/ for the file.  Captures the window
+configuration so `my/manifolding-atlas--close-help' can restore the
+frame exactly, even after a C-g."
   (let* ((file (my/manifolding-atlas--help-file name))
           (properties-dir (expand-file-name "modules/manifolding-atlas/schema/"
                                             user-emacs-directory))
          (path (car (file-expand-wildcards
                      (concat properties-dir "**/" file) t))))
     (when (and path (file-exists-p path))
-      (setq my/manifolding-atlas--help-opened t)
+      (setq my/manifolding-atlas--help-opened t
+            my/manifolding-atlas--help-window-config
+            (current-window-configuration))
       (delete-other-windows)
-      (find-file path)
+      (setq my/manifolding-atlas--help-buffer (find-file path))
       (goto-char (point-min))
       (org-tree-slide-mode 1))))
 
 (defun my/manifolding-atlas--close-help ()
-  "Stop org-tree-slide and kill the help buffer, if one was opened."
+  "Close the help view and restore the pre-help window layout.
+Runs on normal completion AND on quit/unwind — a C-g mid-prompt must
+never strand the user inside the help file."
   (when my/manifolding-atlas--help-opened
     (setq my/manifolding-atlas--help-opened nil)
-    (org-tree-slide-mode -1)
-    (kill-buffer)))
+    (when (buffer-live-p my/manifolding-atlas--help-buffer)
+      (with-current-buffer my/manifolding-atlas--help-buffer
+        (when (bound-and-true-p org-tree-slide-mode)
+          (org-tree-slide-mode -1))
+        (kill-buffer)))
+    (setq my/manifolding-atlas--help-buffer nil)
+    (when my/manifolding-atlas--help-window-config
+      (ignore-errors
+        (set-window-configuration my/manifolding-atlas--help-window-config))
+      (setq my/manifolding-atlas--help-window-config nil))))
 #+end_src
 
 ** TODO State Carrier
@@ -78,6 +98,37 @@ async session instead of blocking during collection.")
 (defvar my/manifolding-atlas-org-prompt--defaults-only nil
   "Bound non-nil by fast collection: no interaction, nothing deferred.")
 
+(defun my/manifolding-atlas-collect--merge-fragment (result frag)
+  "Merge FRAG into accumulating RESULT per the collector's channels."
+  (when-let ((v (plist-get frag :tags)))
+    (setq result (plist-put result :tags
+                            (append (plist-get result :tags) v))))
+  (when-let ((v (plist-get frag :properties)))
+    (setq result (plist-put result :properties
+                            (append (plist-get result :properties)
+                                    (cl-remove-if (lambda (p) (or (null (cdr p))
+                                                                  (string-empty-p (cdr p))))
+                                                  v)))))
+  (when-let ((v (plist-get frag :body)))
+    (setq result (plist-put result :body
+                            (concat (or (plist-get result :body) "") v))))
+  (when-let ((v (plist-get frag :post-apply)))
+    (setq result (plist-put result :post-apply
+                            (append (plist-get result :post-apply) v))))
+  (when-let ((v (plist-get frag :after)))
+    (setq result (plist-put result :after v)))
+  (when-let ((v (plist-get frag :file-name)))
+    (setq result (plist-put result :file-name v)))
+  (when (plist-member frag :todo)
+    (setq result (plist-put result :todo (plist-get frag :todo))
+          my/manifolding-atlas--creation-todo (plist-get frag :todo)))
+  result)
+
+(defvar my/manifolding-atlas-org-prompt--custom-set nil
+  "Registry keys the user chose to customize in SELECTION capture mode.
+Everything else answers silently with WARNING.  Scoped to one
+collect-with-fast run.")
+
 (defun my/manifolding-atlas-collect-prompts (context &rest extra-contexts)
   "Run all registered prompts matching CONTEXT (or any of EXTRA-CONTEXTS).
 When CONTEXT is a list, match prompts whose contexts overlap with it.
@@ -101,9 +152,10 @@ buffer-UI prompts are queued on
                            (boundp 'my/manifolding-atlas-org-prompt--specs)
                            (gethash (my/manifolding-atlas-org-prompt--base-key key)
                                     my/manifolding-atlas-org-prompt--specs)))
+               (quiet my/manifolding-atlas-org-prompt--defaults-only)
                (defer (and dspec
                            my/manifolding-atlas-collect-defer
-                           (not my/manifolding-atlas-org-prompt--defaults-only)
+                           (not quiet)
                            (bound-and-true-p my/manifolding-atlas-org-prompt-ui)
                            (eq my/manifolding-atlas-org-prompt-ui 'buffer)
                            (memq (plist-get dspec :kind)
@@ -111,9 +163,15 @@ buffer-UI prompts are queued on
                                    scoped mastering mindmap))
                            (file-exists-p (plist-get dspec :file))))
                (template-skip (and dspec
-                                   (not my/manifolding-atlas-org-prompt--defaults-only)
-                                   (eq (plist-get dspec :kind) 'template))))
+                                   (not quiet)
+                                   (eq (plist-get dspec :kind) 'template)))
+               (silent (and dspec
+                            quiet
+                            (not (and my/manifolding-atlas-org-prompt--custom-set
+                                      (member key
+                                              my/manifolding-atlas-org-prompt--custom-set)))))
           (cond
+           ;; Interactive-only kinds (TEMPLATE) stand down in capture flows.
            ((or template-skip defer)
             (when defer
               (push (list :spec dspec
@@ -121,39 +179,34 @@ buffer-UI prompts are queued on
                                            (my/manifolding-atlas-org-prompt--base-key key))
                                        nil
                                      (plist-get dspec :task-default)))
-                     deferred-list)))
-            (t
-             (unless declared
-               (my/manifolding-atlas--show-help (plist-get spec :name)))
-            (let (val frag)
-            (setq val (condition-case nil
-                          (funcall (plist-get spec :prompt-fn))
-                        (quit nil)))
-            (setq frag (funcall (plist-get spec :to-plist) val context))
-            (when-let ((v (plist-get frag :tags)))
-              (setq result (plist-put result :tags
-                           (append (plist-get result :tags) v))))
-            (when-let ((v (plist-get frag :properties)))
-              (setq result (plist-put result :properties
-                           (append (plist-get result :properties)
-                                   (cl-remove-if (lambda (p) (or (null (cdr p))
-                                                                 (string-empty-p (cdr p))))
-                                                 v)))))
-            (when-let ((v (plist-get frag :body)))
-              (setq result (plist-put result :body
-                           (concat (or (plist-get result :body) "") v))))
-            (when-let ((v (plist-get frag :post-apply)))
-              (setq result (plist-put result :post-apply
-                           (append (plist-get result :post-apply) v))))
-            (when-let ((v (plist-get frag :after)))
-              (setq result (plist-put result :after v)))
-            (when-let ((v (plist-get frag :file-name)))
-              (setq result (plist-put result :file-name v)))
-            (when (plist-member frag :todo)
-              (setq result (plist-put result :todo (plist-get frag :todo))
-                    my/manifolding-atlas--creation-todo (plist-get frag :todo))))
-          (unless declared
-            (my/manifolding-atlas--close-help)))))))
+                    deferred-list)))
+            ;; Fast modes: declarative prompts answer from their own
+            ;; fragment with the skip sentinel — no UI, ever.
+            (silent
+            (let ((skip-val (pcase (plist-get dspec :kind)
+                              ;; list-valued kinds take nil, not a string
+                              ((or 'tags 'multi) nil)
+                              (_ "WARNING"))))
+              (setq result (my/manifolding-atlas-collect--merge-fragment
+                            result
+                            (my/manifolding-atlas-org-prompt--fragment
+                             (plist-get dspec :key)
+                             (plist-get dspec :kind)
+                             (plist-get dspec :plist)
+                             skip-val)))))
+           (t
+            (unless declared
+              (my/manifolding-atlas--show-help (plist-get spec :name)))
+            ;; C-g here aborts the whole capture by design — but the
+            ;; help view must still be cleaned up and the frame
+            ;; restored before the quit unwinds.
+            (unwind-protect
+                 (let* ((val (funcall (plist-get spec :prompt-fn)))
+                        (frag (funcall (plist-get spec :to-plist) val context)))
+                   (setq result (my/manifolding-atlas-collect--merge-fragment
+                                 result frag)))
+              (unless declared
+                (my/manifolding-atlas--close-help))))))))
     (when deferred-list
       (setq my/manifolding-atlas-org-prompt--deferred
             (append my/manifolding-atlas-org-prompt--deferred
@@ -193,14 +246,58 @@ Temporarily overrides `read-string', `completing-read' and
             (my/manifolding-atlas-org-prompt--defaults-only t))
     (apply #'my/manifolding-atlas-collect-prompts context extra-contexts)))
 
+(defun my/manifolding-atlas-collect--choose-custom (contexts)
+  "Ask which properties to customize for this capture.
+Returns registry KEYS to make interactive.  Selecting the
+Body-Template entry pre-runs the body-template chooser now, so it is
+not asked again at finalize."
+  (let ((cands nil))
+    (dolist (spec my/manifolding-atlas-prompt-registry)
+      (when (seq-intersection contexts (plist-get spec :contexts) #'eq)
+        (let ((key (plist-get spec :key)))
+          (unless (equal key "TEMPLATE")
+            (push (cons (format "%s · %s"
+                                (or (plist-get spec :label) key) key)
+                        key)
+                  cands)))))
+    (push (cons "Body Template · choose the body template now"
+                'body-template)
+          cands)
+    (let* ((picked (completing-read-multiple
+                    "Customize which properties (comma between picks): "
+                    (mapcar #'car cands)))
+           (ids (delq nil
+                      (mapcar (lambda (p) (cdr (assoc p cands))) picked))))
+      (when (memq 'body-template ids)
+        ;; Pre-answer the end-of-flow template chooser.
+        (setq my/manifolding-atlas--chosen-capture
+              (my/manifolding-atlas--choose-capture))
+        (message "Body template locked: %s"
+                 my/manifolding-atlas--chosen-capture))
+      (remq 'body-template ids))))
+
 (defun my/manifolding-atlas-collect-prompts-with-fast (specialized-contexts general-contexts &optional fast-level)
   "Collect prompts using fast mode levels.
 SPECIALIZED-CONTEXTS fire at level 0 and 1, skip at level >= 2.
 GENERAL-CONTEXTS fire only at level 0, skip at level >= 1.
-Returns merged plist with :tags, :properties, :body, :post-apply.
+Level 4 (SELECTION) asks which properties to customize: those fire,
+everything else defaults.  Returns merged plist with :tags,
+:properties, :body, :post-apply.
 When FAST-LEVEL is nil, prompts the user via `my/manifolding-atlas--fast-level'."
   (setq my/manifolding-atlas-org-prompt--deferred nil)
-  (let* ((fast (or fast-level (my/manifolding-atlas--fast-level)))
+  (let* ((fast0 (or fast-level (my/manifolding-atlas--fast-level)))
+         (fast (if (= fast0 4)
+                   (progn
+                     (setq my/manifolding-atlas-org-prompt--custom-set
+                           (my/manifolding-atlas-collect--choose-custom
+                            (append (if (listp specialized-contexts)
+                                        specialized-contexts
+                                      (list specialized-contexts))
+                                    (if (listp general-contexts)
+                                        general-contexts
+                                      (list general-contexts)))))
+                     1)
+                 fast0))
          (my/manifolding-atlas-collect-defer t)
          (spec (if (>= fast 2)
                     (my/manifolding-atlas--collect-default-prompts specialized-contexts)
@@ -208,11 +305,13 @@ When FAST-LEVEL is nil, prompts the user via `my/manifolding-atlas--fast-level'.
          (gen  (if (= fast 0)
                    (my/manifolding-atlas-collect-prompts general-contexts)
                  (my/manifolding-atlas--collect-default-prompts general-contexts))))
-    (list :tags (append (plist-get gen :tags) (plist-get spec :tags))
-          :properties (append (plist-get gen :properties) (plist-get spec :properties))
-          :body (concat (plist-get gen :body) (plist-get spec :body))
-          :post-apply (append (plist-get gen :post-apply) (plist-get spec :post-apply)))))
-#+end_src
+     (let ((merged (list :tags (append (plist-get gen :tags) (plist-get spec :tags))
+                          :properties (append (plist-get gen :properties) (plist-get spec :properties))
+                          :body (concat (plist-get gen :body) (plist-get spec :body))
+                          :post-apply (append (plist-get gen :post-apply) (plist-get spec :post-apply)))))
+       (setq my/manifolding-atlas-org-prompt--custom-set nil)
+       merged)))
+ #+end_src
 
 ** Missing Prompts Management
 

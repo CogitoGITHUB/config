@@ -6,6 +6,16 @@
 :CATEGORY: editing
 :END:
 
+** Todo Vocabulary
+Must match the options in manifolding-atlas/schema/general/todo.org —
+otherwise org-todo rejects the picked state silently.
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  (setq org-todo-keywords
+        '((sequence "TODO" "NEXT" "DOING" "TESTING" "WAIT"
+                    "|" "DONE" "CANCELLED"))))
+#+end_src
+
 ** Links
 #+begin_src emacs-lisp
 (setq org-link-descriptive t)

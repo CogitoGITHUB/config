@@ -317,6 +317,8 @@ Direct single-shot callers only; capture flows defer to async sessions."
 
 (defvar my/manifolding-atlas-org-prompt--buffer-result nil)
 (defvar my/manifolding-atlas-org-prompt--buffer-marks nil)
+(defvar-local my/manifolding-atlas-org-prompt--applied nil
+  "Value currently applied to the target note from this picker.")
 
 (defun my/manifolding-atlas-org-prompt--buffer-refresh-marks ()
   (remove-overlays (point-min) (point-max) 'atlas-mark t)
@@ -331,20 +333,21 @@ Direct single-shot callers only; capture flows defer to async sessions."
           (overlay-put ov 'face 'highlight))))))
 
 (defun my/manifolding-atlas-org-prompt--buffer-accept ()
-  "Accept the option heading at point.
-Inside an async session the value is applied to the target note
-immediately and the next pending prompt opens.  Standalone use
-stores the result and exits the recursive edit."
+  "Advance to the next prompt (session) or accept the value.
+In an async session RET only advances when something has been
+applied with m — an accidental RET can never commit a wrong pick."
   (interactive)
   (if (not (and (org-at-heading-p) (>= (org-outline-level) 2)))
       (message "Point must be on an option heading (level 2 or deeper)")
     (let ((title (my/manifolding-atlas-org-prompt--normalize-choice
                   (org-get-heading t t t t))))
       (if my/manifolding-atlas-org-prompt--session-p
-          (let ((val (my/manifolding-atlas-org-prompt--session-value title))
-                (my/manifolding-atlas--quiet t))
+          (progn
+            (when (and (null my/manifolding-atlas-org-prompt--applied)
+                       (null my/manifolding-atlas-org-prompt--buffer-marks))
+              (user-error "Nothing applied yet — press m on an option first"))
+            (my/manifolding-atlas-org-prompt--session-record-answer)
             (my/manifolding-atlas-org-prompt--buffer-finish)
-            (my/manifolding-atlas-org-prompt--session-apply val)
             (my/manifolding-atlas-org-prompt--session-next))
         (setq my/manifolding-atlas-org-prompt--buffer-result
               (if (and (eq my/manifolding-atlas-org-prompt--this-kind 'multi)
@@ -357,28 +360,197 @@ stores the result and exits the recursive edit."
         (my/manifolding-atlas-org-prompt--buffer-finish)
         (exit-recursive-edit)))))
 
+(defun my/manifolding-atlas-org-prompt--highlight-applied (title)
+  "Overlay the currently applied option, mirroring mark styling."
+  (remove-overlays (point-min) (point-max) 'atlas-applied t)
+  (when title
+    (save-excursion
+      (goto-char (point-min))
+      (when (re-search-forward
+             (format "^\\*\\*+ %s[ \t]*$" (regexp-quote title)) nil t)
+        (let ((ov (make-overlay (line-beginning-position)
+                                (line-end-position))))
+          (overlay-put ov 'atlas-applied t)
+          (overlay-put ov 'face 'bold))))))
+
+(defun my/manifolding-atlas-org-prompt--toggle-apply ()
+  "Apply the option at point to the target note — or remove it when
+it was the one already applied.  Live: every change lands on disk and
+shows in the note window immediately."
+  (let* ((req (plist-get my/manifolding-atlas-org-prompt--session :current))
+         (spec (plist-get req :spec))
+         (kind (plist-get spec :kind))
+         (title (my/manifolding-atlas-org-prompt--normalize-choice
+                 (org-get-heading t t t t)))
+         (collection-kind (memq kind '(multi tags))))
+    (cond
+     (collection-kind
+      (let ((marks (if (member title my/manifolding-atlas-org-prompt--buffer-marks)
+                       (delete title my/manifolding-atlas-org-prompt--buffer-marks)
+                     (cons title my/manifolding-atlas-org-prompt--buffer-marks))))
+        (setq my/manifolding-atlas-org-prompt--buffer-marks marks)
+        (if marks
+            (progn
+              (setq my/manifolding-atlas-org-prompt--applied
+                    (string-join marks " "))
+              (my/manifolding-atlas-org-prompt--session-apply
+               my/manifolding-atlas-org-prompt--applied))
+          (my/manifolding-atlas-org-prompt--session-remove)
+          (setq my/manifolding-atlas-org-prompt--applied nil))
+        (my/manifolding-atlas-org-prompt--highlight-applied
+         my/manifolding-atlas-org-prompt--applied)
+        (message "%s" (or my/manifolding-atlas-org-prompt--applied
+                          "cleared"))))
+     (t
+      (if (and my/manifolding-atlas-org-prompt--applied
+               (string= my/manifolding-atlas-org-prompt--applied title))
+          (progn
+            (my/manifolding-atlas-org-prompt--session-remove)
+            (setq my/manifolding-atlas-org-prompt--applied nil)
+            (my/manifolding-atlas-org-prompt--highlight-applied nil)
+            (message "%s removed from note" title))
+        (my/manifolding-atlas-org-prompt--session-apply title)
+        (setq my/manifolding-atlas-org-prompt--applied title)
+        (my/manifolding-atlas-org-prompt--highlight-applied title)
+        (message "%s → note" title)))))
+
+(defun my/manifolding-atlas-org-prompt--live-finalized ()
+  "After the live-ref capture finalizes, continue remaining prompts."
+  (remove-hook 'org-capture-after-finalize-hook
+               #'my/manifolding-atlas-org-prompt--live-finalized)
+  (when (plist-get my/manifolding-atlas-org-prompt--session :note)
+    (my/manifolding-atlas-org-prompt--session-next)))
+
+(defun my/manifolding-atlas-org-prompt--make-live ()
+  "Upgrade the applied option into a live ref-note property.
+Creates (or reuses) the ref note under admin/refs/FAMILY/, points
+the note's property at it with an id link, then opens the ref note
+in an org-capture buffer.  C-c C-c there saves and continues with
+the rest of the prompts."
+  (interactive)
+  (unless my/manifolding-atlas-org-prompt--session-p
+    (user-error "Only in an active prompt session"))
+  (unless my/manifolding-atlas-org-prompt--applied
+    (user-error "Nothing applied yet — press m first"))
+  (let* ((req (plist-get my/manifolding-atlas-org-prompt--session :current))
+         (spec (plist-get req :spec))
+         (note (plist-get my/manifolding-atlas-org-prompt--session :note))
+         (key (plist-get spec :key))
+         (family (intern
+                  (downcase
+                   (or (plist-get (plist-get req :plist) :live)
+                       (replace-regexp-in-string "_" "-" key)))))
+         (val my/manifolding-atlas-org-prompt--applied)
+         (link (my/manifolding-atlas--ensure-ref-note family val))
+         (ref-id (my/manifolding-atlas--id-from-link link))
+         (ref-note (condition-case nil
+                       (manifolding-atlas-db-get-by-id ref-id)
+                     (error nil)))
+         (ref-path (or (and ref-note (manifolding-atlas-note-path ref-note))
+                       (let ((p (expand-file-name
+                                 (format "admin/refs/%s/%s" family val)
+                                 (my/manifolding-atlas-root-dir))))
+                         (make-directory (file-name-directory p) t)
+                         (unless (file-exists-p p)
+                           (with-temp-file p
+                             (insert (format "* %s\n:PROPERTIES:\n:ID: %s\n:END:\n"
+                                             val ref-id)))
+                           (org-id-add-location ref-id p))
+                         p))))
+    ;; Upgrade the plain value to an id-link on the target note.
+    (let ((my/manifolding-atlas--quiet t))
+      (my/manifolding-atlas-org-prompt--apply-to-note
+       note (list (cons key link)) nil nil))
+    ;; Record the pick, close the picker, then capture ref content.
+    (my/manifolding-atlas-org-prompt--session-record-answer)
+    (my/manifolding-atlas-org-prompt--buffer-finish)
+    (add-hook 'org-capture-after-finalize-hook
+              #'my/manifolding-atlas-org-prompt--live-finalized)
+    (let ((org-capture-templates
+           `(("l" "Live ref note" plain
+              (file+function ,ref-path
+                             (lambda () (goto-char (point-max))))
+              "\n%?\n" :kill-buffer t :unnarrowed t))
+          (org-capture-use-indirect-buffer nil))
+      (org-capture nil "l"))))
+
+(defun my/manifolding-atlas-org-prompt--avy-to-option ()
+  "Select an option line with avy; the cursor lands on it.
+Afterwards use m / l / RET on that line as usual."
+  (interactive)
+  (require 'avy)
+  (avy-with my/manifolding-atlas-org-prompt-avy
+    (let ((r (avy--line (eq current-prefix-arg 4))))
+      (when (and (not (memq r '(t nil))) (eq avy-action #'identity))
+        (goto-char r)
+        (if (and (org-at-heading-p) (>= (org-outline-level) 2))
+            (message "Option: %s"
+                     (my/manifolding-atlas-org-prompt--normalize-choice
+                      (org-get-heading t t t t)))
+          (user-error "Not an option heading"))))))
+
 (defun my/manifolding-atlas-org-prompt--buffer-mark ()
-  "Toggle mark on the option heading at point."
+  "Session: apply/un-apply the option at point live.
+Standalone pickers keep classic multi-mark behavior."
   (interactive)
   (if (not (and (org-at-heading-p) (>= (org-outline-level) 2)))
       (message "Point must be on an option heading")
-    (let ((title (org-get-heading t t t t)))
-      (setq my/manifolding-atlas-org-prompt--buffer-marks
-            (if (member title my/manifolding-atlas-org-prompt--buffer-marks)
-                (delq title my/manifolding-atlas-org-prompt--buffer-marks)
-              (cons title my/manifolding-atlas-org-prompt--buffer-marks)))
-      (my/manifolding-atlas-org-prompt--buffer-refresh-marks))))
+    (if my/manifolding-atlas-org-prompt--session-p
+        (my/manifolding-atlas-org-prompt--toggle-apply)
+      (let ((title (org-get-heading t t t t)))
+        (setq my/manifolding-atlas-org-prompt--buffer-marks
+              (if (member title my/manifolding-atlas-org-prompt--buffer-marks)
+                  (delq title my/manifolding-atlas-org-prompt--buffer-marks)
+                (cons title my/manifolding-atlas-org-prompt--buffer-marks)))
+        (my/manifolding-atlas-org-prompt--buffer-refresh-marks)))))
+
+(defun my/manifolding-atlas-org-prompt--session-cancel ()
+  "Cancel the entire capture: drop every queued prompt and delete
+the draft note file.  The finalizer never runs."
+  (let* ((note (plist-get my/manifolding-atlas-org-prompt--session :note))
+         (file (and note (manifolding-atlas-note-path note))))
+    (setq my/manifolding-atlas-org-prompt--pending-create nil)
+    (my/manifolding-atlas-org-prompt--sweep-pickers)
+    (setq my/manifolding-atlas-org-prompt--session nil)
+    (when (and file (file-exists-p file))
+      (ignore-errors (delete-file file))
+      (message "Capture aborted — %s discarded"
+               (file-name-nondirectory file)))))
+
+(defun my/manifolding-atlas-org-prompt--quit-all ()
+  "C-g / Q in a picker: abort everything.
+In an async session this cancels the capture and deletes the draft.
+Standalone pickers just exit with no result."
+  (interactive)
+  (if my/manifolding-atlas-org-prompt--session-p
+      (progn
+        (my/manifolding-atlas-org-prompt--buffer-finish)
+        (my/manifolding-atlas-org-prompt--session-cancel))
+    (setq my/manifolding-atlas-org-prompt--buffer-result nil)
+    (my/manifolding-atlas-org-prompt--buffer-finish)
+    (exit-recursive-edit)))
 
 (defun my/manifolding-atlas-org-prompt--buffer-abort ()
   "Cancel selection; inside a session skip to the next pending prompt."
   (interactive)
   (if my/manifolding-atlas-org-prompt--session-p
       (let* ((req (plist-get my/manifolding-atlas-org-prompt--session :current))
-             (val (or (plist-get req :default) "WARNING"))
-             (my/manifolding-atlas--quiet t))
+             (prev-applied (or my/manifolding-atlas-org-prompt--applied
+                               (and req (plist-get req :applied-value)))))
+        (when (and req prev-applied)
+          (plist-put req :applied-value prev-applied))
         (my/manifolding-atlas-org-prompt--buffer-finish)
-        (my/manifolding-atlas-org-prompt--session-apply val)
-        (my/manifolding-atlas-org-prompt--session-next))
+        (if prev-applied
+            ;; Revisit-skip: the earlier answer stays untouched.
+            (progn
+              (setq my/manifolding-atlas-org-prompt--applied prev-applied)
+              (my/manifolding-atlas-org-prompt--session-record-answer)
+              (my/manifolding-atlas-org-prompt--session-next))
+          ;; Fresh skip: apply the WARNING sentinel like before.
+          (let ((my/manifolding-atlas--quiet t))
+            (my/manifolding-atlas-org-prompt--session-apply
+             (or (plist-get req :default) "WARNING")))
+          (my/manifolding-atlas-org-prompt--session-next)))
     (setq my/manifolding-atlas-org-prompt--buffer-result nil)
     (my/manifolding-atlas-org-prompt--buffer-finish)
     (exit-recursive-edit)))
@@ -419,10 +591,88 @@ the post-create advice once the note exists."
 
 (defun my/manifolding-atlas-org-prompt--session-begin (queue note finalize)
   "Start answering QUEUE for NOTE; call FINALIZE when drained."
-  (my/manifolding-atlas-org-prompt--sweep-pickers)
   (setq my/manifolding-atlas-org-prompt--session
-        (list :note note :pending queue :finalize finalize))
+        (list :note note :pending queue :answered nil
+              :finalize finalize))
   (my/manifolding-atlas-org-prompt--session-next))
+
+(defun my/manifolding-atlas-org-prompt--session-record-answer ()
+  "Move the session's :current request onto :answered, remembering
+what was applied so revisits can highlight and un-apply correctly.
+Must run while the picker buffer is still current."
+  (let ((req (plist-get my/manifolding-atlas-org-prompt--session :current)))
+    (when req
+      (plist-put req :applied-value
+                 my/manifolding-atlas-org-prompt--applied)
+      (plist-put my/manifolding-atlas-org-prompt--session
+                 :answered
+                 (cons req
+                       (plist-get my/manifolding-atlas-org-prompt--session
+                                  :answered))))))
+
+(defun my/manifolding-atlas-org-prompt--session-reopen (req)
+  "Kill the current picker and reopen the already-answered REQ.
+Restores the applied highlight from the recorded value; RET then
+simply continues forward without re-applying anything."
+  (plist-put my/manifolding-atlas-org-prompt--session :current req)
+  (my/manifolding-atlas-org-prompt--session-open req))
+
+(defun my/manifolding-atlas-org-prompt--session-back ()
+  "Step back to the most recently answered prompt."
+  (interactive)
+  (unless my/manifolding-atlas-org-prompt--session-p
+    (user-error "Only in an active prompt session"))
+  (let ((answered (plist-get my/manifolding-atlas-org-prompt--session
+                             :answered)))
+    (if (null answered)
+        (user-error "Nothing to go back to")
+      (my/manifolding-atlas-org-prompt--buffer-finish)
+      (let ((prev (car answered))
+            (cur (plist-get my/manifolding-atlas-org-prompt--session
+                            :current)))
+        (plist-put my/manifolding-atlas-org-prompt--session
+                   :answered (cdr answered))
+        (when cur
+          (plist-put my/manifolding-atlas-org-prompt--session
+                     :pending
+                     (cons cur
+                           (plist-get my/manifolding-atlas-org-prompt--session
+                                      :pending))))
+        (message "Back to: %s"
+                 (plist-get (plist-get prev :spec) :label))
+        (my/manifolding-atlas-org-prompt--session-reopen prev)))))
+
+(defun my/manifolding-atlas-org-prompt--session-revisit ()
+  "Pick any already-answered prompt and reopen it."
+  (interactive)
+  (unless my/manifolding-atlas-org-prompt--session-p
+    (user-error "Only in an active prompt session"))
+  (let ((answered (plist-get my/manifolding-atlas-org-prompt--session
+                             :answered)))
+    (if (null answered)
+        (user-error "Nothing to revisit yet")
+      (my/manifolding-atlas-org-prompt--buffer-finish)
+      (let* ((cands (mapcar (lambda (req)
+                              (cons (plist-get (plist-get req :spec) :label)
+                                    req))
+                            answered))
+             (choice (completing-read
+                      "Revisit prompt: "
+                      (mapcar #'car cands)
+                      nil t))
+             (req (cdr (assoc choice cands)))
+             (cur (plist-get my/manifolding-atlas-org-prompt--session
+                             :current)))
+        (plist-put my/manifolding-atlas-org-prompt--session
+                   :answered (delq req answered))
+        (when cur
+          (plist-put my/manifolding-atlas-org-prompt--session
+                     :pending
+                     (cons cur
+                           (plist-get my/manifolding-atlas-org-prompt--session
+                                      :pending))))
+        (message "Revisiting: %s" choice)
+        (my/manifolding-atlas-org-prompt--session-reopen req))))
 
 (defun my/manifolding-atlas-org-prompt--session-maybe-start (note &optional finalize)
   "Answer any deferred prompts against NOTE, then call FINALIZE."
@@ -538,16 +788,22 @@ visible while prompts are answered."
           (beginning-of-line)))
       (setq my/manifolding-atlas-org-prompt--buffer-result nil)
       (setq my/manifolding-atlas-org-prompt--buffer-marks nil)
+      ;; Restore what this prompt had applied before, so the bold
+      ;; overlay and un-apply logic work on revisits.
+      (setq my/manifolding-atlas-org-prompt--applied
+            (plist-get req :applied-value))
       (setq my/manifolding-atlas-org-prompt--this-kind
             (plist-get spec :kind))
       (setq my/manifolding-atlas-org-prompt--select-on t)
       (setq my/manifolding-atlas-org-prompt--session-p t)
-      (my/manifolding-atlas-org-prompt-select-mode 1))
+      (my/manifolding-atlas-org-prompt-select-mode 1)
+      (my/manifolding-atlas-org-prompt--highlight-applied
+       my/manifolding-atlas-org-prompt--applied))
     (my/manifolding-atlas-org-prompt--session-display buf)
     (when-let ((win (get-buffer-window buf)))
       (with-selected-window win
         (ignore-errors (recenter-top-bottom))))
-    (message "%s — RET select · m mark · q skip"
+    (message "%s — m apply · l live · a avy · RET next · q skip · b/B back"
              (plist-get spec :label))))
 
 (defun my/manifolding-atlas-org-prompt--session-value (title)
@@ -567,11 +823,12 @@ visible while prompts are answered."
       (or default "WARNING"))
      (t title))))
 
-(defun my/manifolding-atlas-org-prompt--apply-to-note (note props tags todo)
-  "Write PROPS, TAGS and TODO at NOTE's heading in its buffer, then save.
-Afterwards, if the note is displayed (top window during a session),
-scroll it so the freshly written drawer stays visible even when the
-property list outgrows the window."
+(defun my/manifolding-atlas-org-prompt--apply-to-note
+    (note props tags todo &optional remove-props)
+  "Write PROPS, TAGS and TODO at NOTE's heading in its buffer, save,
+then park the note window on the end of the property drawer.
+REMOVE-PROPS lists property keys to delete instead (used when a pick
+is un-applied from the picker)."
   (let* ((file (manifolding-atlas-note-path note))
          (pos (manifolding-atlas-note-pos note))
          (level (manifolding-atlas-note-level note))
@@ -585,10 +842,15 @@ property list outgrows the window."
               (t (goto-char (point-min))))
         (dolist (p props)
           (org-entry-put nil (car p) (cdr p)))
+        (dolist (rk remove-props)
+          (condition-case nil (org-entry-delete nil rk) (error nil)))
         (when tags
           (org-set-tags tags))
-        (when (and todo (not (member todo '("WARNING" ""))))
-          (ignore-errors (org-todo todo)))
+        (cond
+         ((eq todo 'none)
+          (ignore-errors (org-todo 'none)))
+         ((and todo (not (member todo '("WARNING" ""))))
+          (ignore-errors (org-todo todo))))
         ;; Park the view at the end of the property drawer.
         (setq view-target
               (save-excursion
@@ -600,6 +862,26 @@ property list outgrows the window."
       (with-selected-window win
         (goto-char (or view-target (point-min)))
         (recenter -1)))))
+
+(defun my/manifolding-atlas-org-prompt--session-remove ()
+  "Remove the current request's value from the target note.
+The inverse of a pick: scalar properties are deleted, tags are
+cleared, TODO keywords are removed from the heading."
+  (let* ((req (plist-get my/manifolding-atlas-org-prompt--session :current))
+         (spec (plist-get req :spec))
+         (note (plist-get my/manifolding-atlas-org-prompt--session :note))
+         (kind (plist-get spec :kind))
+         (prop (plist-get spec :key)))
+    (when note
+      (let ((my/manifolding-atlas--quiet t))
+        (cond
+         ((eq kind 'todo)
+          (my/manifolding-atlas-org-prompt--apply-to-note note nil nil 'none))
+         ((memq kind '(tags tagopt))
+          (my/manifolding-atlas-org-prompt--apply-to-note note nil nil nil))
+         (t
+          (my/manifolding-atlas-org-prompt--apply-to-note
+           note nil nil nil (list prop))))))))
 
 (defun my/manifolding-atlas-org-prompt--session-apply (val)
   "Apply VAL for the current request directly to the session note."
@@ -616,15 +898,16 @@ property list outgrows the window."
             (tags (plist-get frag :tags))
             (todo (plist-get frag :todo))
             (post (plist-get frag :post-apply)))
-        (when (or props tags todo)
-          (my/manifolding-atlas-org-prompt--apply-to-note
-           note props tags todo))
+        (let ((my/manifolding-atlas--quiet t))
+          (when (or props tags todo)
+            (my/manifolding-atlas-org-prompt--apply-to-note
+             note props tags todo)))
         (dolist (fn post)
           (condition-case err
               (funcall fn note)
             (error
              (message "atlas prompt post-apply: %s"
-                      (error-message-string err)))))))))
+                      (error-message-string err))))))))))
 
 (defvar-local my/manifolding-atlas-org-prompt--this-kind nil)
 
@@ -636,6 +919,12 @@ property list outgrows the window."
     (define-key map (kbd "m") #'my/manifolding-atlas-org-prompt--buffer-mark)
     (define-key map (kbd "C-c C-k") #'my/manifolding-atlas-org-prompt--buffer-abort)
     (define-key map (kbd "q") #'my/manifolding-atlas-org-prompt--buffer-abort)
+    (define-key map (kbd "Q") #'my/manifolding-atlas-org-prompt--quit-all)
+    (define-key map (kbd "C-g") #'my/manifolding-atlas-org-prompt--quit-all)
+    (define-key map "b" #'my/manifolding-atlas-org-prompt--session-back)
+    (define-key map "B" #'my/manifolding-atlas-org-prompt--session-revisit)
+    (define-key map "l" #'my/manifolding-atlas-org-prompt--make-live)
+    (define-key map "a" #'my/manifolding-atlas-org-prompt--avy-to-option)
     map))
 
 (define-minor-mode my/manifolding-atlas-org-prompt-select-mode
