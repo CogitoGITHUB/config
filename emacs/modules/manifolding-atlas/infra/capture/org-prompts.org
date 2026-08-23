@@ -57,6 +57,18 @@ prompt file; selecting it or pressing q stores no real value.")
         ((string-equal val "⚠ WARNING") "WARNING")
         ((string-equal val "⚠ tag-warning") "tag-warning")
         (t val)))
+
+(defvar my/manifolding-atlas--quiet nil
+  "When non-nil, suppress non-error chatter during prompt processing.
+Per-pick \"Wrote ...\"/\"Omitting ...\" spam goes here; errors still
+signal normally.")
+
+(defun my/manifolding-atlas--hush-message (orig fmt &rest args)
+  "Drop `message' output while `my/manifolding-atlas--quiet' is bound."
+  (unless my/manifolding-atlas--quiet
+    (apply orig fmt args)))
+
+(advice-add 'message :around #'my/manifolding-atlas--hush-message)
 #+end_src
 
 * Template helpers
@@ -329,7 +341,8 @@ stores the result and exits the recursive edit."
     (let ((title (my/manifolding-atlas-org-prompt--normalize-choice
                   (org-get-heading t t t t))))
       (if my/manifolding-atlas-org-prompt--session-p
-          (let ((val (my/manifolding-atlas-org-prompt--session-value title)))
+          (let ((val (my/manifolding-atlas-org-prompt--session-value title))
+                (my/manifolding-atlas--quiet t))
             (my/manifolding-atlas-org-prompt--buffer-finish)
             (my/manifolding-atlas-org-prompt--session-apply val)
             (my/manifolding-atlas-org-prompt--session-next))
@@ -361,7 +374,8 @@ stores the result and exits the recursive edit."
   (interactive)
   (if my/manifolding-atlas-org-prompt--session-p
       (let* ((req (plist-get my/manifolding-atlas-org-prompt--session :current))
-             (val (or (plist-get req :default) "WARNING")))
+             (val (or (plist-get req :default) "WARNING"))
+             (my/manifolding-atlas--quiet t))
         (my/manifolding-atlas-org-prompt--buffer-finish)
         (my/manifolding-atlas-org-prompt--session-apply val)
         (my/manifolding-atlas-org-prompt--session-next))
@@ -441,15 +455,16 @@ the post-create advice once the note exists."
   (let* ((note (plist-get my/manifolding-atlas-org-prompt--session :note))
          (finalize (plist-get my/manifolding-atlas-org-prompt--session
                               :finalize)))
-    (my/manifolding-atlas-org-prompt--sweep-pickers)
-    (setq my/manifolding-atlas-org-prompt--session nil)
-    (when (and note
-               (manifolding-atlas-note-path note)
-               (file-exists-p (manifolding-atlas-note-path note)))
-      (delete-other-windows)
-      (set-window-buffer
-       (selected-window)
-       (find-file-noselect (manifolding-atlas-note-path note))))
+    (let ((my/manifolding-atlas--quiet t))
+      (my/manifolding-atlas-org-prompt--sweep-pickers)
+      (setq my/manifolding-atlas-org-prompt--session nil)
+      (when (and note
+                 (manifolding-atlas-note-path note)
+                 (file-exists-p (manifolding-atlas-note-path note)))
+        (delete-other-windows)
+        (set-window-buffer
+         (selected-window)
+         (find-file-noselect (manifolding-atlas-note-path note)))))
     (when finalize (funcall finalize))))
 
 (defun my/manifolding-atlas-org-prompt--ensure-warning-option ()

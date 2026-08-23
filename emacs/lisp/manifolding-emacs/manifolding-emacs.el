@@ -22,10 +22,12 @@
 (require 'manifolding-emacs-splash)
 (require 'manifolding-emacs-doctor)
 
-(defun manifolding-emacs-reload ()
-  "Recompile every Org file, quietly (no splash)."
-  (interactive)
-  (manifolding-emacs-compile-directory))
+(defun manifolding-emacs-reload (&optional force)
+  "Recompile every Org file.
+Unchanged files replay from the content-hash cache.  With FORCE
+\(prefix argument) bypass the cache and recompile everything."
+  (interactive "P")
+  (manifolding-emacs-compile-directory nil force))
 
 (defun manifolding-emacs-reload-current-buffer ()
   "Compile (downloading first if needed) the current Org file."
@@ -67,12 +69,25 @@
 tracking, an idle sweep to surface deferred-load errors early, and
 (optionally) an automatic version freeze if the boot was clean."
   (interactive)
-  (let ((manifolding-emacs--booting t) (fatal nil))
+  (let ((manifolding-emacs--booting t) (fatal nil)
+        (boot-t0 (float-time)))
+    (setq manifolding-emacs-splash--state nil)
     (manifolding-emacs-errors-clear-boot-state)
     (when manifolding-emacs-mode-line-indicator (manifolding-emacs-doctor-indicator-mode 1))
     (condition-case err
         (manifolding-emacs-with-warning-capture
          (let ((buf (manifolding-emacs-show-splash)) (manifolding-emacs--boot-phase :compiling))
+           ;; Immediate feedback: module scan + first compile take a
+           ;; moment — never leave a blank screen wondering.
+           (with-current-buffer buf
+             (let ((inhibit-read-only t)
+                   (org-mode-hook nil))
+               (erase-buffer)
+               (insert (manifolding-emacs-splash--center
+                        "MANIFOLDING-EMACS\n\nreading modules/ …")))
+             (redisplay))
+           (let ((message-log-max nil))
+             (message "Manifolding-Emacs: reading modules/"))
            (manifolding-emacs-compile-directory (manifolding-emacs--splash-progress buf))))
       (error (setq fatal err)))
     (manifolding-emacs-errors-save-log)
@@ -100,8 +115,40 @@ tracking, an idle sweep to surface deferred-load errors early, and
               (local-set-key "T" #'manifolding-emacs-splash-add-all-errors))
              ((manifolding-emacs-warnings-list)
               (insert (propertize "Boot completed with warnings.\n\n" 'face 'warning))
-              (local-set-key "q" #'quit-window))
-             (t (ignore-errors (quit-windows-on buf)) (kill-buffer buf)))))))))
+              (local-set-key "q" #'quit-window)
+              (local-set-key "g"
+                             (lambda () (interactive) (manifolding-emacs-reload))))
+             (t
+              ;; The dashboard must NEVER be able to kill init:
+              ;; any error here is contained and the boot still
+              ;; counts as clean.
+              (condition-case dash-err
+                  (manifolding-emacs-splash-clean-finish
+                   buf (- (float-time) boot-t0))
+                (error
+                 (message "manifolding-emacs: dashboard error %s"
+                          (error-message-string dash-err))))))))))))
+
+(defvar manifolding-emacs--log-buffer-name "*Manifolding-Emacs*"
+  "Buffer receiving loader chatter instead of *Messages*.")
+
+(defun manifolding-emacs--redirect-message (orig fmt &rest args)
+  "Route loader-prefixed chatter into its own buffer.
+Any `message' whose format starts with \"manifolding-emacs:\" is
+appended to `manifolding-emacs--log-buffer-name' and never reaches
+*Messages*.  Errors and warnings keep their normal channels."
+  (if (and (stringp fmt)
+           (string-prefix-p "manifolding-emacs:" fmt))
+      (progn
+        (with-current-buffer (get-buffer-create
+                              manifolding-emacs--log-buffer-name)
+          (let ((inhibit-read-only t))
+            (goto-char (point-max))
+            (insert (apply #'format fmt args) "\n")))
+        nil)
+    (apply orig fmt args)))
+
+(advice-add 'message :around #'manifolding-emacs--redirect-message)
 
 (provide 'manifolding-emacs)
 ;;; manifolding-emacs.el ends here

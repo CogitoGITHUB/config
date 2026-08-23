@@ -40,10 +40,11 @@ template appended — exactly what will land on disk after capture."
     (setq names (cons "none" (my/manifolding-atlas--capture-names)))
     (setq current "none")
     (delete-other-windows)
-    (setq preview-win (split-window-below
-                       (- (floor (* 0.85 (frame-height))))))
-    (when-let ((buf (my/manifolding-atlas--capture-buffer current title note-file)))
-      (set-window-buffer preview-win buf))
+    (setq preview-win (selected-window))
+    (let ((buf (or (my/manifolding-atlas--capture-buffer current title note-file)
+                   (and note-file (file-exists-p note-file)
+                        (find-file-noselect note-file)))))
+      (when buf (set-window-buffer preview-win buf)))
     ;; ── completing-read with live buffer swap ──────────────
     (setq chosen
           (minibuffer-with-setup-hook
@@ -77,7 +78,6 @@ template appended — exactly what will land on disk after capture."
             (completing-read "Body template: " names nil t nil nil "none")))
     ;; ── Cleanup preview ────────────────────────────────────────
     (my/manifolding-atlas--capture-cleanup names)
-    (delete-window preview-win)
     (setq my/manifolding-atlas--chosen-capture
           (if (and chosen
                    (not (string-empty-p chosen))

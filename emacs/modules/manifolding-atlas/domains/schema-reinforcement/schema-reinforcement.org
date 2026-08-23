@@ -50,9 +50,7 @@ sweep, instant per-save feedback, and a prompt/template registry audit.
         (progn
           (my/manifolding-atlas-missing--rebuild-from-health)
           (setq my/manifolding-atlas-reinforce--last-sweep (float-time))
-          (my/manifolding-atlas-reinforce--audit)
-          (message "Schema sweep complete (%s)"
-                   (format-time-string "%H:%M:%S")))
+          (my/manifolding-atlas-reinforce--audit))
       (error (message "Schema sweep failed: %s" err)))))
 
 (defun my/manifolding-atlas-reinforce--schedule ()
@@ -88,18 +86,13 @@ sweep, instant per-save feedback, and a prompt/template registry audit.
 (defvar my/manifolding-atlas-reinforce--guard-timer nil)
 
 (defun my/manifolding-atlas-reinforce--validate-buffer-note ()
-  "Validate the current buffer's note from freshly synced DB data."
+  "Validate the current buffer's note from freshly synced DB data.
+Violations are intentionally silent here — they surface in
+admin/MISSING PROMPTS via the reinforcement sweeps."
   (setq my/manifolding-atlas-reinforce--guard-timer nil)
   (when-let ((id (my/manifolding-atlas-links--current-note-id))
              (note (manifolding-atlas-db-get-by-id id)))
-    (let ((violations (manifolding-atlas-schema-note-violations note)))
-      (when violations
-        (message "Schema: %s violates %d field(s): %s"
-                 (manifolding-atlas-note-title note)
-                 (length violations)
-                 (string-join
-                  (mapcar #'manifolding-atlas-violation-message violations)
-                  "; "))))))
+    (manifolding-atlas-schema-note-violations note)))
 
 (defun my/manifolding-atlas-reinforce--save-guard ()
   "Debounce a validation of the just-saved note.

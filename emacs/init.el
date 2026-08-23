@@ -13,6 +13,13 @@
 
 ;;; Straight.el Bootstrap
 
+;; Echo-area signposts display live but are never logged to
+;; *Messages* (message-log-max nil).
+(defun my/init-note (fmt &rest args)
+  (let ((message-log-max nil)) (apply #'message fmt args)))
+
+(message "[init] straight bootstrap…")
+
 (defvar bootstrap-version)
 
 (let ((bootstrap-file
@@ -22,6 +29,10 @@
       (bootstrap-version 6))
   (when (file-exists-p bootstrap-file)
     (load bootstrap-file nil 'nomessage)))
+
+(my/init-note "[init] straight ready")
+
+(message "[init] straight ready")
 
 
 ;;; Straight Build Load Paths
@@ -53,8 +64,58 @@
         process-environment))
 
 
+;;; Early Appearance
+;; Theme palette + modeline activate BEFORE the splash so startup
+;; renders final from frame one.  Fully guarded: a missing build just
+;; means the modules apply it again later in boot.
+
+(condition-case nil
+    (progn
+      (set-face-attribute 'default nil :foreground "#FFFFFF" :background "#000000")
+      (set-face-attribute 'mode-line nil :foreground "#FFFFFF" :background "#000000" :box nil)
+      (set-face-attribute 'mode-line-inactive nil :foreground "#FFFFFF" :background "#000000" :box nil)
+      (set-face-attribute 'header-line nil :foreground "#FFFFFF" :background "#000000"))
+  (error nil))
+
+(condition-case nil
+    (progn
+      (dolist (pkg '("nerd-icons" "doom-modeline"))
+        (let ((dir (expand-file-name
+                    (concat "straight/build/" pkg "/") user-emacs-directory)))
+          (when (file-directory-p dir) (add-to-list 'load-path dir))))
+      (require 'nerd-icons)
+      (require 'doom-modeline)
+      (setq doom-modeline-icon t
+            doom-modeline-height 28
+            doom-modeline-bar-width 4
+            doom-modeline-minor-modes nil
+            doom-modeline-buffer-encoding nil
+            doom-modeline-percent-position nil)
+      ;; Define the SAME spec modeline.org uses, so the early modeline
+      ;; is identical to the final one.  Enabling the mode WITHOUT this
+      ;; definition trips its mode-hook on the not-yet-defined
+      ;; `my/setup-modeline' and leaves the vanilla modeline up.
+      (doom-modeline-def-segment my-modaled-state
+        "Display modaled state with nerd-icons."
+        (when (bound-and-true-p modaled-state)
+          (pcase modaled-state
+            ("normal"  (nerd-icons-mdicon "nf-md-alpha_n_circle" :face 'doom-modeline-evil-normal-state))
+            ("insert"  (nerd-icons-mdicon "nf-md-alpha_i_circle" :face 'doom-modeline-evil-insert-state))
+            ("visual"  (nerd-icons-mdicon "nf-md-alpha_v_circle" :face 'doom-modeline-evil-visual-state))
+            ("org"     (nerd-icons-mdicon "nf-md-alpha_o_circle" :face 'doom-modeline-evil-operator-state))
+            ("motion"  (nerd-icons-mdicon "nf-md-alpha_m_circle" :face 'doom-modeline-evil-motion-state)))))
+      (doom-modeline-def-modeline 'my-modeline
+        '(bar buffer-position major-mode)
+        '(battery time vcs my-modaled-state))
+      (doom-modeline-mode 1)
+      (doom-modeline-set-modeline 'my-modeline t))
+  (error nil))
+(my/init-note "[init] modeline ready")
+
+
 ;;; Core Packages
 
+(my/init-note "[init] loading org + leaf…")
 (straight-use-package 'org)
 
 (straight-use-package 'leaf)
@@ -62,6 +123,8 @@
 
 (eval-and-compile
   (leaf-keywords-init))
+
+(my/init-note "[init] core ready")
 
 
 ;;; Manifolding-Emacs
@@ -75,6 +138,8 @@
    "lisp/manifolding-emacs/"))
 
 (require 'manifolding-emacs)
+
+(my/init-note "[init] loader ready — booting modules…")
 
 
 ;;; Boot Diagnostics

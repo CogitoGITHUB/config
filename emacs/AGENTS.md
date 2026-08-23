@@ -14,6 +14,14 @@
 - **Schema violations are silent** — `manifolding-atlas-db-schema-validation-action` is `'silent`. Violations tracked via MISSING PROMPTS, never interactive prompts.
 - **Git commit/push:** use `git gg` (alias that adds all, commits, and pushes). Never stage/commit/push manually.
 
+## Startup, Splash & Noise (current era)
+- **Appearance before boot:** `early-init.el` forces white-on-black frame + loads `nerd-icons`/`doom-modeline` early and defines the `my-modeline` spec BEFORE the boot (mirrored in `bootstrap.org`). Enabling doom-modeline without defining that spec trips its mode-hook on undefined `my/setup-modeline` → vanilla modeline all boot.
+- **Splash/dashboard:** `*Manifolding-Emacs*` buffer during boot: progress bar + per-file basename + grouped errors. Keys after clean boot: `g` reload · `m` MISSING PROMPTS · `t` expand module TODOs · `p` push vault · `G` magit-status. Boot-duration sparkline history: `.local/cache/manifolding-boot-times`.
+- **Compile cache:** `.local/cache/module-cache/<sha256>.cache.el`, keyed on file contents + lexical-binding + `manifolding-emacs-cache-salt`. Unchanged modules replay serialized eval units instead of re-parsing org. **Bump the salt whenever compiler semantics change.** Force full recompile: `C-u M-x manifolding-emacs-reload`. Cache replay errors auto-fall back to fresh compile.
+- **Message silence (by design):** `early-init.el` installs a global noise filter (`my/message-noise-regexp`) on `message` / `display-warning` / `lwarn` — known-harmless chatter never displays or logs. `[init] …` signposts use `my/init-note` = display-only, never logged to `*Messages*`. Loader chatter (`manifolding-emacs:` prefix) routes into `*Manifolding-Emacs*`. A janitor wipes `*Messages*` ~20s after init. recentf autosave timer canceled (its C-level "Wrote" can't be advised). Only real errors surface.
+- **Wheel bindings:** modaled states bind `<wheel-up>/<wheel-down>` scroll + `C-<wheel-up/down>` text-scale. Key syntax for modifier+special events is `C-<event>` — NOT `<C-event>` (`key-valid-p` rejects the latter).
+- **Declarative prompt engine:** schema outlines auto-register via `infra/capture/org-prompts.org`; every prompt file self-heals a first `** WARNING` option (plain RET = skip). Capture flows are ASYNC (note created first; prompts replay in a bottom strip applying each pick directly). No recursive-edit in creation paths.
+
 ## Key Files
 | File | Purpose |
 |------|---------|

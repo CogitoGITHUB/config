@@ -113,6 +113,178 @@ currently knows about."
     (when-let* ((package-string (manifolding-emacs-build-package file package-name)))
       (manifolding-emacs--eval-package-string package-name package-string file))))
 
+;;; Compile Cache
+;; Content-hash cache: parse each Org module ONCE per version, replay
+;; the exact same eval units from a serialized cache afterwards.  The
+;; cache stores the ordered PARTS (loose forms + package bodies) that
+;; compile-file would have produced, so evaluation semantics — per-part
+;; isolation included — are byte-identical to a fresh compile.
+
+(defconst manifolding-emacs-cache-salt "3"
+  "Bump to invalidate every cached module after loader changes.")
+
+(defun manifolding-emacs-cache-dir ()
+  (expand-file-name "module-cache/"
+                    (expand-file-name ".local/cache/" user-emacs-directory)))
+
+(defun manifolding-emacs-cache-path (key)
+  (expand-file-name (concat key ".cache.el")
+                    (manifolding-emacs-cache-dir)))
+
+(defun manifolding-emacs-cache-key (file)
+  (secure-hash
+   'sha256
+   (concat manifolding-emacs-cache-salt "\0"
+           (or (condition-case nil
+                   (with-temp-buffer
+                     (insert-file-contents-literally file)
+                     (buffer-string))
+                 (error ""))
+               "")
+           "\0" (symbol-name manifolding-emacs-lexical-binding))))
+
+(defun manifolding-emacs--cache-read (path)
+  (condition-case nil
+      (car (read-from-string
+            (with-temp-buffer
+              (insert-file-contents path)
+              (buffer-string))))
+    (error nil)))
+
+(defun manifolding-emacs--cache-write (path data)
+  (make-directory (file-name-directory path) t)
+  ;; print-length/print-level MUST be nil here: a bound value would
+  ;; truncate the serialized parts and silently corrupt the entry.
+  (let ((print-length nil)
+        (print-level nil))
+    (with-temp-file path
+      (insert ";; manifolding-emacs module cache\n"
+              (prin1-to-string data)))))
+
+(defun manifolding-emacs--extract-parts (file)
+  "Return (PARTS . PROFILE) mirroring compile-file's eval units.
+PARTS is an ordered list of (:kind part|package [:name N] :body S):
+all loose forms in document order, followed by package bodies."
+  (let* ((manifolding-emacs-packages nil)
+         (profile (manifolding-emacs-file-profile file))
+         (straight-current-profile
+          (or profile (and (boundp 'straight-current-profile)
+                           straight-current-profile)))
+         (loose-forms (manifolding-emacs-concatenate-source-blocks file))
+         (parts (mapcar (lambda (s) (list :kind 'part :body s))
+                        loose-forms))
+         (package-parts nil))
+    (dolist (package-name
+             (manifolding-emacs-plist-keys manifolding-emacs-packages))
+      (when-let* ((package-string
+                   (manifolding-emacs-build-package file package-name)))
+        (push (list :kind 'package :name package-name :body package-string)
+              package-parts)))
+    (cons (append parts (nreverse package-parts)) profile)))
+
+(defun manifolding-emacs--eval-parts (file parts profile &optional signal-error)
+  "Evaluate PARTS with the same isolation compile-file provides.
+When SIGNAL-ERROR is non-nil, the first part error is recorded AND
+re-signaled, so callers can fall back to a fresh compile."
+  (let ((straight-current-profile
+         (or profile (and (boundp 'straight-current-profile)
+                          straight-current-profile))))
+    (dolist (part parts)
+      (let* ((is-package (eq (plist-get part :kind) 'package))
+             (body (plist-get part :body)))
+        (condition-case err
+            (progn
+              (let ((manifolding-emacs--inside-tier2-eval t))
+                (eval (manifolding-emacs-safe-read
+                       (format "(progn\n%s\n)" body) file)
+                      manifolding-emacs-lexical-binding))
+              (when is-package
+                (manifolding-emacs-record-status
+                 (plist-get part :name) 'ok file)))
+          (error
+           (if is-package
+               (manifolding-emacs-record-error
+                :level 'package :file file
+                :package (plist-get part :name)
+                :line 1
+                :message (error-message-string err))
+             (manifolding-emacs-record-error
+              :level 'part :file file
+              :message (format "%s :: %S"
+                               (error-message-string err)
+                               (substring body 0 (min 120 (length body)))))))
+           (when signal-error
+             (signal (car err) (cdr err))))))))
+
+(defun manifolding-emacs-compile-file-cached (file &optional force)
+  "Compile FILE through the content-hash cache.
+FORCE non-nil skips the cache and refreshes the entry.  Returns FILE,
+or nil when the file is disabled."
+  (unless (file-exists-p file)
+    (error "File to compile does not exist: %s" file))
+  (if (manifolding-emacs-file-disabled-p file)
+      (progn
+        (message "manifolding-emacs: skipping disabled file %s"
+                 (file-name-nondirectory file))
+        nil)
+    (let* ((key (manifolding-emacs-cache-key file))
+           (path (manifolding-emacs-cache-path key))
+           (cached (and (not force)
+                        (file-exists-p path)
+                        (manifolding-emacs--cache-read path)))
+           (parts (plist-get cached :parts))
+           (profile (plist-get cached :profile)))
+      (if (and (consp parts) cached)
+          (condition-case replay-err
+              (progn
+                (manifolding-emacs--eval-parts file parts profile 'signal)
+                file)
+            (error
+             ;; Corrupt/stale entry: drop it and fall back to a fresh
+             ;; compile so the session can never inherit a broken cache.
+             (ignore-errors (delete-file path))
+             (message "manifolding-emacs: cache fallback for %s (%s)"
+                      (file-name-nondirectory file)
+                      (error-message-string replay-err))
+             (pcase-let* ((`(,fparts . ,fprofile)
+                           (manifolding-emacs--extract-parts file)))
+               (condition-case nil
+                   (manifolding-emacs--cache-write
+                    path (list :version manifolding-emacs-cache-salt
+                               :profile fprofile :parts fparts))
+                 (error nil))
+               (manifolding-emacs--eval-parts file fparts fprofile)
+               file)))
+        (pcase-let* ((`(,parts . ,profile)
+                      (manifolding-emacs--extract-parts file)))
+          (condition-case nil
+              (manifolding-emacs--cache-write
+               path (list :version manifolding-emacs-cache-salt
+                          :profile profile
+                          :parts parts))
+            (error nil))
+          (manifolding-emacs--eval-parts file parts profile)
+          file)))))
+
+(defun manifolding-emacs-compile-file (file)
+  "Compile FILE.  Returns FILE, or nil if skipped (disabled).
+Does NOT itself catch errors escaping extraction — callers handle
+that.  Always bypasses the cache: this entry point means \"the user
+just touched this file\"."
+  (unless (file-exists-p file)
+    (error "File to compile does not exist: %s" file))
+  (if (manifolding-emacs-file-disabled-p file)
+      (progn
+        (message "manifolding-emacs: skipping disabled file %s"
+                 (file-name-nondirectory file))
+        nil)
+    (message "manifolding-emacs: compiling %s"
+             (file-name-nondirectory file))
+    (pcase-let* ((`(,parts . ,profile)
+                  (manifolding-emacs--extract-parts file)))
+      (manifolding-emacs--eval-parts file parts profile)
+      file)))
+
 (defun manifolding-emacs-recompile-package (file package-name)
   "Re-extract FILE and (re-)eval only PACKAGE-NAME, leaving every other
 package in FILE untouched.  Used by `manifolding-emacs-doctor'."
@@ -125,39 +297,10 @@ package in FILE untouched.  Used by `manifolding-emacs-doctor'."
                         (plist-get (manifolding-emacs-package-status package-name) :status)))
       (user-error "No such package `%s' in %s" package-name file))))
 
-(defun manifolding-emacs-compile-file (file)
-  "Compile FILE.  Returns FILE, or nil if skipped (disabled).  Does NOT
-itself catch errors escaping extraction — that's
-`manifolding-emacs-compile-directory''s job (tier: file), so calling
-this directly (e.g. from `manifolding-emacs-reload-current-buffer')
-still surfaces a real failure instead of swallowing it."
-  (unless (file-exists-p file) (error "File to compile does not exist: %s" file))
-  (if (manifolding-emacs-file-disabled-p file)
-      (progn (message "manifolding-emacs: skipping disabled file %s" file) nil)
-    (message "manifolding-emacs: compiling %s" file)
-    (let* ((manifolding-emacs-packages nil)
-           (profile (manifolding-emacs-file-profile file))
-           (straight-current-profile
-            (or profile (and (boundp 'straight-current-profile) straight-current-profile)))
-           (loose-forms (manifolding-emacs-concatenate-source-blocks file)))
-      (dolist (form-string loose-forms)
-        (condition-case err
-            (eval (manifolding-emacs-safe-read
-                   (format "(progn\n%s\n)" form-string) file)
-                  manifolding-emacs-lexical-binding)
-          (error
-           (manifolding-emacs-record-error
-            :level 'part :file file
-            :message (format "%s :: %S"
-                             (error-message-string err)
-                             (substring form-string
-                                        0 (min 120 (length form-string))))))))
-      (manifolding-emacs-compile-packages file)
-      file)))
-
-(defun manifolding-emacs-compile-directory (&optional progress-fn)
-  "Compile every Org file under the active Org directory.  If
-PROGRESS-FN is given, call it with (CURRENT TOTAL FILE) before
+(defun manifolding-emacs-compile-directory (&optional progress-fn force)
+  "Compile every Org file under the active Org directory.
+Unchanged files replay from the content-hash cache; FORCE bypasses it.
+If PROGRESS-FN is given, call it with (CURRENT TOTAL FILE) before
 compiling each file — used to drive a splash screen without this file
 knowing anything about UI."
   (let* ((files (manifolding-emacs-get-files "^[^#]*\\.org$" (manifolding-emacs-get-org-directory)))
@@ -168,9 +311,10 @@ knowing anything about UI."
       (when-let* ((remote-plist (manifolding-emacs-file-remote file)))
         (manifolding-emacs-pull-remote-file remote-plist))
       (condition-case err
-          (when-let* ((output (manifolding-emacs-compile-file file))) (push output compiled))
+          (when-let* ((output (manifolding-emacs-compile-file-cached file force)))
+            (push output compiled))
         (error (manifolding-emacs-record-error :level 'file :file file
-                                                 :message (error-message-string err)))))
+                                               :message (error-message-string err)))))
     (nreverse compiled)))
 
 (defun manifolding-emacs-aggregate-directory (output-file)

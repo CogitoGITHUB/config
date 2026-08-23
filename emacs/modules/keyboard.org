@@ -20,6 +20,13 @@
 :STRAIGHT: (modaled :type git :host github :repo "DCsunset/modaled")
 :END:
 
+* ACE-WINDOW — Quick Window Jump #emacs-package
+:PROPERTIES:
+:PACKAGE:  ace-window
+:STRAIGHT: (ace-window :type git :host github :repo "abo-abo/ace-window")
+:CATEGORY: keyboard
+:END:
+
 * Custom Commands
 ** Navigation
 #+begin_src emacs-lisp
@@ -212,7 +219,11 @@
 (modaled-define-keys
   :states '("normal" "visual" "org" "motion" "vterm" "dired")
   :bind
-  `(("P" . ace-window)
+  `(("<wheel-up>"   . scroll-down-command)
+    ("<wheel-down>" . scroll-up-command)
+    ("C-<wheel-up>"   . text-scale-increase)
+    ("C-<wheel-down>" . text-scale-decrease)
+    ("P" . ace-window)
     ("T" . centaur-tabs-ace-jump)
     ("H" . tab-bar-switch-to-prev-tab)
     ("S" . tab-bar-switch-to-next-tab)

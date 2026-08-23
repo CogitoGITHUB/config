@@ -33,9 +33,7 @@
         (log (my/manifolding-atlas-git--push-log)))
     (setq my/manifolding-atlas-git--pushing nil)
     (if (= 0 (process-exit-status proc))
-        (progn
-          (my/manifolding-atlas-git--refresh file)
-          (message "✓ notes pushed"))
+        (my/manifolding-atlas-git--refresh file)
       (with-temp-buffer
         (insert (format "=== push failed at %s ===\n"
                         (format-time-string "%Y-%m-%d %H:%M:%S")))
@@ -136,7 +134,7 @@ rename path so any mutation in the notes dir is committed automatically."
         (progn
           (call-process magit-git-executable nil nil nil "add" "--all")
           (if (= 0 (call-process magit-git-executable nil nil nil "diff" "--cached" "--quiet"))
-              (message "Git: nothing new to commit for %s" rel)
+              nil
             (if (= 0 (call-process magit-git-executable nil nil nil "commit" "-m"
                                      (format "auto: %s [%s]"
                                              rel

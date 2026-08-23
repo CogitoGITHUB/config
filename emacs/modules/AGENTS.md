@@ -78,3 +78,6 @@ Example:
 - `use-short-answers t` is in `bootstrap.org`
 - No `(provide ...)` or `(require ...)` needed — manifolding-emacs handles this
 - No blank line after headings at any level in `.org` files
+- **Compile cache:** modules are content-hash cached (`.local/cache/module-cache/`). Unchanged files skip org parsing entirely on boot/reload. `C-u M-x manifolding-emacs-reload` forces full recompile. If you change loader semantics, bump `manifolding-emacs-cache-salt`.
+- **Message silence:** a global filter in `early-init.el` suppresses known chatter on `message`/`display-warning`/`lwarn`. Don't fight it — if YOUR new module prints something that vanishes, it matched the noise regexp; pick a different wording or extend `my/message-noise-regexp` deliberately.
+- **Load auxiliary `.el` quietly:** `(load f nil 'no-message)` — never bare `load`, or "Loading …done" clutters `*Messages*`.

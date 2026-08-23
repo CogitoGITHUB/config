@@ -6,7 +6,7 @@
 :PROPERTIES:
 :ID:       7e3a9c2f-1b4d-4f8e-ad27-3c6e9b2f4a1d
 :PACKAGE:  citar
-:STRAIGHT: (citar :type git :host github :repo "emacs-citar/citar")
+:STRAIGHT: (citar :type git :host github :repo "emacs-citar/citar" :files ("citar*.el"))
 :CATEGORY: bibliography
 :END:
 

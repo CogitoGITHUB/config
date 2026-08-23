@@ -25,7 +25,7 @@ Delegates to the central module path helper."
 (with-eval-after-load 'org-capture
   (require 'doct)
   (dolist (f (directory-files (my/capture-directory) t "\\.el$"))
-    (load f))
+    (load f nil 'no-message))
   (setq org-capture-templates
         (append (when (boundp 'my/capture-manifolding-atlas) my/capture-manifolding-atlas)
                 (when (boundp 'my/capture-tasks)  my/capture-tasks))))
@@ -37,7 +37,8 @@ Delegates to the central module path helper."
 :CATEGORY: editing
 :END:
 #+begin_src emacs-lisp
-(setq yas-snippet-dirs
-      (list (expand-file-name "snippets/" (my/templates-directory))))
+(let ((snippets-dir (expand-file-name "snippets/" (my/templates-directory))))
+  (make-directory snippets-dir t)
+  (setq yas-snippet-dirs (list snippets-dir)))
 (yas-global-mode 1)
 #+end_src

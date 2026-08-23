@@ -55,4 +55,5 @@
 ** Activate
 #+begin_src emacs-lisp
 (doom-modeline-mode 1)
+(doom-modeline-set-modeline 'my-modeline t)
 #+end_src
