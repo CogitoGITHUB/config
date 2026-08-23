@@ -358,7 +358,7 @@ applied with m — an accidental RET can never commit a wrong pick."
                    " ")
                 title))
         (my/manifolding-atlas-org-prompt--buffer-finish)
-        (exit-recursive-edit)))))
+        (exit-recursive-edit))))
 
 (defun my/manifolding-atlas-org-prompt--highlight-applied (title)
   "Overlay the currently applied option, mirroring mark styling."
@@ -412,7 +412,7 @@ shows in the note window immediately."
         (my/manifolding-atlas-org-prompt--session-apply title)
         (setq my/manifolding-atlas-org-prompt--applied title)
         (my/manifolding-atlas-org-prompt--highlight-applied title)
-        (message "%s → note" title)))))
+        (message "%s → note" title))))))
 
 (defun my/manifolding-atlas-org-prompt--live-finalized ()
   "After the live-ref capture finalizes, continue remaining prompts."
@@ -1097,9 +1097,9 @@ multi-select kinds."
                   (format "%s: " label)
                   (cons "WARNING" options)
                   nil t nil nil (or default "WARNING"))))
-        (if (string-equal val "WARNING")
-            (if default default "WARNING")
-          val)))))
+         (if (string-equal val "WARNING")
+             (if default default "WARNING")
+             val)))))))
 #+end_src
 
 * Fragments

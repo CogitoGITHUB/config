@@ -94,17 +94,26 @@ strings, in file order."
 
 (defun manifolding-emacs--eval-package-string (package-name package-string file)
   "Read and eval PACKAGE-STRING in isolation: a failure marks
-PACKAGE-NAME as errored instead of propagating to its siblings."
+PACKAGE-NAME as errored instead of propagating to its siblings.
+On failure, prints the exact error, the file, and a snippet of the
+failing code so you never have to guess."
   (condition-case err
       (progn
         (let ((manifolding-emacs--inside-tier2-eval t))
           (eval (manifolding-emacs-safe-read
-                 (format "(progn\n%s\n)" package-string) file)
-                manifolding-emacs-lexical-binding))
+                  (format "(progn\n%s\n)" package-string) file)
+                 manifolding-emacs-lexical-binding))
         (manifolding-emacs-record-status package-name 'ok file))
     (error
-     (manifolding-emacs-record-error :level 'package :file file :package package-name
-                                      :message (error-message-string err)))))
+     (let ((snippet (if (> (length package-string) 200)
+                        (concat (substring package-string 0 200) "…")
+                      package-string)))
+       (message "manifolding-emacs ERROR [%s] %s\n  Code: %s"
+                package-name (error-message-string err) snippet)
+       (manifolding-emacs-record-error
+        :level 'package :file file :package package-name
+        :message (format "%s\n  Code: %s"
+                         (error-message-string err) snippet))))))
 
 (defun manifolding-emacs-compile-packages (file)
   "Build and individually eval every package `manifolding-emacs-packages'
@@ -185,13 +194,26 @@ all loose forms in document order, followed by package bodies."
 (defun manifolding-emacs--eval-parts (file parts profile &optional signal-error)
   "Evaluate PARTS with the same isolation compile-file provides.
 When SIGNAL-ERROR is non-nil, the first part error is recorded AND
-re-signaled, so callers can fall back to a fresh compile."
+re-signaled, so callers can fall back to a fresh compile.
+Every failure prints: file, function name (when detectable),
+the exact error, and a code snippet — immediately."
   (let ((straight-current-profile
          (or profile (and (boundp 'straight-current-profile)
                           straight-current-profile))))
     (dolist (part parts)
       (let* ((is-package (eq (plist-get part :kind) 'package))
-             (body (plist-get part :body)))
+             (body (plist-get part :body))
+             ;; Detect the primary defun name for better error labels
+             (fn-name (and (string-match
+                            "^(defun[ \t]+\\([^ \t\n)+]+\\)" body)
+                           (match-string 1 body)))
+             (label (or fn-name
+                        (and is-package
+                             (plist-get part :name))
+                        "anonymous form"))
+             (snippet (if (> (length body) 200)
+                          (concat (substring body 0 200) "…")
+                        body)))
         (condition-case err
             (progn
               (let ((manifolding-emacs--inside-tier2-eval t))
@@ -202,19 +224,27 @@ re-signaled, so callers can fall back to a fresh compile."
                 (manifolding-emacs-record-status
                  (plist-get part :name) 'ok file)))
           (error
-           (if is-package
+           (let ((msg (error-message-string err)))
+             ;; Paren issues get an actionable hint
+             (when (string-match-p
+                    "End of file during parsing\\|Unbalanced\\|containing"
+                    msg)
+               (setq msg (concat msg
+                                 "\n  → LIKELY PAREN ISSUE. Run: sh ~/.config/emacs/paren-scan.sh")))
+             (message "manifolding-emacs ERROR [%s] %s\n  → %s\n  Code: %s"
+                      label file msg snippet)
+             (if is-package
+                 (manifolding-emacs-record-error
+                  :level 'package :file file
+                  :package (plist-get part :name)
+                  :line 1
+                  :message (format "%s: %s" label msg))
                (manifolding-emacs-record-error
-                :level 'package :file file
-                :package (plist-get part :name)
-                :line 1
-                :message (error-message-string err))
-             (manifolding-emacs-record-error
-              :level 'part :file file
-              :message (format "%s :: %S"
-                               (error-message-string err)
-                               (substring body 0 (min 120 (length body)))))))
+                :level 'part :file file
+                :message (format "%s: %s\n  Code: %s"
+                                 label msg snippet))))
            (when signal-error
-             (signal (car err) (cdr err))))))))
+             (signal (car err) (cdr err)))))))))
 
 (defun manifolding-emacs-compile-file-cached (file &optional force)
   "Compile FILE through the content-hash cache.

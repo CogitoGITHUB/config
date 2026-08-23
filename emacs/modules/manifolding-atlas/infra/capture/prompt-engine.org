@@ -165,12 +165,12 @@ buffer-UI prompts are queued on
                (template-skip (and dspec
                                    (not quiet)
                                    (eq (plist-get dspec :kind) 'template)))
-               (silent (and dspec
-                            quiet
-                            (not (and my/manifolding-atlas-org-prompt--custom-set
-                                      (member key
-                                              my/manifolding-atlas-org-prompt--custom-set)))))
-          (cond
+                (silent (and dspec
+                             quiet
+                             (not (and my/manifolding-atlas-org-prompt--custom-set
+                                       (member key
+                                               my/manifolding-atlas-org-prompt--custom-set))))))
+           (cond
            ;; Interactive-only kinds (TEMPLATE) stand down in capture flows.
            ((or template-skip defer)
             (when defer

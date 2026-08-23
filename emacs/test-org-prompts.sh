@@ -7,6 +7,13 @@ LOG="$HOME/emacs-doctor.log"
 
 section() { printf '\n\033[1;36m== %s ==\033[0m\n' "$*"; }
 
+section "0. PAREN SCAN (instant)"
+if [ -f "$CFG/paren-scan.sh" ]; then
+  sh "$CFG/paren-scan.sh" 2>&1 | tee -a "$LOG"
+else
+  echo "skip: $CFG/paren-scan.sh missing"
+fi
+
 : > "$LOG"
 
 section "1. SPLASH MODULE SELF-TEST"

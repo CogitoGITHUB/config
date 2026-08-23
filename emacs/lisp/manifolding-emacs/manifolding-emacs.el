@@ -96,6 +96,17 @@ tracking, an idle sweep to surface deferred-load errors early, and
       (manifolding-emacs-doctor-schedule-idle-sweep))
     (message "manifolding-emacs: %s%d error(s), %d warning(s)" (if fatal "BOOT THREW - " "")
              (length (manifolding-emacs-errors-list)) (length (manifolding-emacs-warnings-list)))
+    ;; Paren-issue detector: if any error mentions parsing/unbalanced,
+    ;; tell the user exactly what to do.
+    (when (seq-some
+           (lambda (e)
+             (and (manifolding-emacs-error-entry-p e)
+                  (manifolding-emacs-error-entry-message e)
+                  (string-match-p
+                   "End of file during parsing\\|Unbalanced\\|paren"
+                   (manifolding-emacs-error-entry-message e))))
+           (manifolding-emacs-errors-list))
+      (message "⚠ PAREN ISSUES DETECTED — run: sh ~/.config/emacs/paren-scan.sh"))
     (let ((buf (get-buffer "*Manifolding-Emacs*")))
       (when (buffer-live-p buf)
         (with-current-buffer buf
