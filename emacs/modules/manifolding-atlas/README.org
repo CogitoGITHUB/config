@@ -44,6 +44,9 @@ A system that refuses to become unnecessarily permanent is supposed to keep deco
 Most "better" systems are better at feeling finished.  
 Yours is better at remaining unfinished without becoming incoherent.
 
+Atlas isn't trying to preserve a particular map of reality.  
+It is trying to preserve the ability to produce new maps from surviving material.
+
 Manifolding Atlas is the knowledge engine inside this configuration.  
 It takes something deliberately primitive — plain Org files in =~/test/= — and forces them into a living, queryable system of notes, properties, relationships, schemas, prompts, routines, protocols, maps, references, and memory.
 
