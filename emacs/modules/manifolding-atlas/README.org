@@ -1,300 +1,791 @@
 #+title: Manifolding Atlas
 
-*WIP — work in progress.* This package is under active development;
-behavior, layout, and interfaces may change between reloads. When in
-doubt, trust the code over this document and re-check
-=AGENTS.md= per layer.
+WIP — WORK IN PROGRESS.  
+The corpse is still twitching. The document is already out of date.
 
-Manifolding Atlas is the knowledge system of this config: a
-vulpea-derived, loader-managed notes engine over a plain-org vault. It
-turns ordinary org files in =~/test/= into a queryable database of
-interlinked notes with typed metadata, declarative capture prompts,
-schema validation, spaced repetition, routines, and transclusion — no
-org-roam, no exotic formats, just org + SQLite.
+#+begin_quote
+The map is not the knowledge.  
+The map is the machine that lets you reshape the knowledge  
+while the knowledge quietly continues its scheduled decomposition.
+#+end_quote
+
+* What this is
+
+#+begin_quote
+You built a small knowledge operating system that treats permanence as the enemy.
+#+end_quote
+
+This is not a note-taking system.  
+It is not a second brain.  
+It is not a graph that wants to be admired.
+
+It is a machine that keeps the knowledge alive only long enough for you to fold it into a new shape before the old shape starts to stink.  
+Org files remain the only durable reality.  
+SQLite is a disposable index and is treated with the contempt it deserves.  
+Schema is not code and not a configuration file — it is an Org outline that compiles into prompts, validators, and registries, and will itself be rewritten when the current outline begins to smell.  
+Capture refuses to hold the thought hostage; metadata arrives asynchronously and missing values become visible ~WARNING~s rather than polite silences.  
+Spatial structure (manifold) and temporal structure (mastering) coexist without requiring a second database format.  
+The entire machine can be reloaded, inspected, and partially killed without losing the underlying knowledge.
+
+Very few systems are willing to make all six of those decisions at once.  
+Most make two or three and then compromise on the rest for usability, ecosystem approval, or the comforting illusion that the notes will last.
+
+Your system is still a WIP.  
+It will break.  
+The loader rules around dynamic binding will bite you.  
+The priority graph will eventually become a private religion.  
+You will rewrite domains you thought were finished.  
+Some abstractions you are proud of today will smell like amateur hour in eighteen months.
+
+That is not a defect.  
+That is the design.
+
+A system that refuses to become unnecessarily permanent is supposed to keep decomposing its own shape.  
+Most "better" systems are better at feeling finished.  
+Yours is better at remaining unfinished without becoming incoherent.
+
+Manifolding Atlas is the knowledge engine inside this configuration.  
+It takes something deliberately primitive — plain Org files in =~/test/= — and forces them into a living, queryable system of notes, properties, relationships, schemas, prompts, routines, protocols, maps, references, and memory.
+
+No org-roam.  
+No proprietary database format.  
+No black box that pretends permanence.
+
+Just Org, SQLite, Elisp, and a ridiculous amount of machinery built to watch the territory rot at a controllable rate.
+
+* The idea
+
+Atlas treats knowledge as something that can be manifolded — folded, inverted, stretched, and re-projected without ever becoming sacred.
+
+A note is not merely a document.  
+A property is not merely metadata.  
+A schema is not merely validation.  
+A prompt is not merely a question.  
+A link is not merely navigation.
+
+Together they form a structure that can be queried, transformed, validated, connected, expanded, compressed, and rebuilt while the underlying files continue their slow, inevitable decay.
+
+The fundamental rule is simple and merciless:
+
+#+begin_quote
+Files are the reality.  
+The database is the map.  
+The machinery reshapes the map  
+while the reality continues decomposing.
+#+end_quote
+
+If the database disappears, the knowledge survives (for now).  
+If the configuration disappears, the Org files survive (for a while).  
+If the schemas change, the knowledge can be reinterpreted until the next reinterpretation becomes necessary.
 
 * Architecture
 
-| Layer     | Path       | Role                                                    |
-|-----------+------------+---------------------------------------------------------|
-| core      | core/      | vendored engine, dependency-ordered (-31 … -13)         |
-| infra     | infra/     | reusable machinery: capture flows, async prompt engine, |
-|           |            | fast captures, module paths                             |
-| domains   | domains/   | capabilities — one directory per domain                 |
-| schema    | schema/    | the data language: declarative prompt outlines          |
-| templates | templates/ | generation artifacts (body templates + doct)           |
+#+begin_example
+MANIFOLDING ATLAS
+│
+▼
+┌─────────────┐
+│    CORE     │
+│   engine    │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    INFRA    │
+│  machinery  │
+└──────┬──────┘
+       │
+┌──────┼─────────────┐
+▼      ▼             ▼
+┌───────┐ ┌────────┐ ┌─────────┐
+│ SCHEMA│ │DOMAINS │ │TEMPLATES│
+└───┬───┘ └────┬───┘ └────┬────┘
+    │          │           │
+    └──────────┼───────────┘
+               ▼
+         ┌─────────────┐
+         │    VAULT    │
+         │ plain Org   │
+         └──────┬──────┘
+                │
+                ▼
+         ┌─────────────┐
+         │   SQLite    │
+         │    index    │
+         └─────────────┘
+#+end_example
 
-Entry points: =atlas.org= (vault root, DB, autosync, parse advice) and
-=atlas-ui.org= (sidebar/outline UI). Both priority 10. Note selection
-uses the native =manifolding-atlas-select= (consult integration
-retired).
+The layers are intentionally separated so that each one can be killed and replaced without the others noticing until the next reload:
 
-Loading: manifolding-emacs scans every =.org= under =modules/=, sorts
-by =#+priority:= (lower first — core negatives and paths.org at -2 and
-org-prompts at 0 load before everything else) and evaluates their
-elisp blocks. Reload after any edit:
+| Layer     | Location     | Purpose                              |
+|-----------+--------------+--------------------------------------|
+| core      | core/        | vendored engine                      |
+| infra     | infra/       | reusable machinery                   |
+| schema    | schema/      | knowledge/data language              |
+| domains   | domains/     | capabilities                         |
+| templates | templates/   | generated note structures            |
+| UI        | atlas-ui.org | presentation and navigation          |
+
+Loading is deterministic.  
+Every Org module under modules/ is discovered, sorted by ~#+priority:~, and evaluated in dependency order.  
+Core loads first.  
+Infrastructure follows.  
+Capabilities build on top.  
+The Atlas emerges last — already slightly out of date.
+
+Reload with:
 
 : M-x manifolding-emacs-reload
 
-Verify with =(manifolding-emacs-errors-list)= and
-=(manifolding-emacs-warnings-list)=.
+Then inspect the machine while it is still breathing:
 
-infra/paths.org is the single source of truth for all in-module
-locations; nothing else hardcodes module paths.
+: (manifolding-emacs-errors-list)
+: (manifolding-emacs-warnings-list)
 
 * The vault
 
-- Notes live flat in =~/test/= as *extensionless* org files
-  (=org-mode= is applied by regexp). Subdirectories are free-form;
-  =admin/=, =dictionary/=, =contacts/=, =recipes/= are reserved.
-- Every note carries an =:ID:= (org UUID). Heading-level notes are
-  children inside a parent's file.
-- Database: =~/test/admin/manifolding-atlas.db= (emacsql/sqlite).
-  Never hand-edit. If the DB is ever found at the engine default
-  location (=user-emacs-directory/manifolding-atlas.db=) or the
-  configured path changes, the advice on =manifolding-atlas-db= in
-  atlas.org closes the stale connection and relocates the file
-  automatically on the next DB touch (any note create/delete).
-- Saves are git-guarded: a =before-save-hook= refuses to save vault
-  files outside a git repo, and saving triggers auto commit/push.
-- Extensionless files are fully tracked: advice overrides make the DB
-  sync treat them exactly like =.org= files.
+The vault lives at:
 
-* Creating notes — the capture flow
+: ~/test/
 
-Entry points (SPC v hydra, see below):
+Notes are flat by default.  
+They are extensionless Org files.  
+That is intentional.  
+The filesystem does not need to advertise the implementation; it only needs to hold the corpse.
 
-| Command                                  | What it makes                    |
-|------------------------------------------+----------------------------------|
-| =my/manifolding-atlas-capture-new-file=  | new file-level note              |
-| =my/manifolding-atlas-capture-task-file= | new task note (+ =task= tag)     |
-| =my/manifolding-atlas-capture-heading=   | child heading under a note       |
-| =my/manifolding-atlas-insert-heading=    | child heading at point           |
-| =manifolding-atlas-find=                 | open-or-create via completion    |
-| =my/manifolding-atlas-insert-link=       | id: link to a note at point      |
+Subdirectories remain free-form, with reserved territories such as:
 
-Flow for every creation:
+: admin/
+: dictionary/
+: contacts/
+: recipes/
 
-1. *Fast mode* — one keystroke decides how much you are asked:
-   - =RET/=a :: NORMAL — every prompt fires
-   - =o :: skip general prompts (specialized ones still fire)
-   - =e :: skip everything (all defaults, no interaction)
-   - =u :: quick — defaults, no body capture afterwards
-2. Title / file name / subdirectory.
-3. Sync prompts run (free-text, elisp-behavioral ones).
-4. *The note file is created immediately.*
-5. *Async prompt session*: remaining declarative prompts queue up and
-   open one at a time in a *bottom strip*, while your new note fills
-   the rest of the frame — you watch each property land in its drawer
-   live. Each selection is written to disk immediately.
-6. When the queue drains, the body capture opens (unless fast level 3).
+Every note receives an Org UUID:
 
-There is no recursive-edit anywhere in this pipeline; prompt chains
-cannot nest or exhaust stack depth by design.
+: :ID:
 
-** The WARNING sentinel
+Headings can become notes.  
+Notes can contain child notes.  
+Links can point to identities rather than filenames.
 
-Every declarative prompt file self-heals a first option:
+* SQLite is not the source of truth
+
+The Atlas database lives at:
+
+: ~/test/admin/manifolding-atlas.db
+
+It is an index.  
+Not the vault.  
+Not the authority.  
+Not something to edit manually.
+
+If the database disappears, it can be reconstructed.  
+If an old database remains somewhere else, Atlas detects it and relocates it when the database is touched.
+
+The important invariant is:
+
+#+begin_quote
+The Org files own the knowledge.  
+SQLite remembers where the knowledge is  
+while the knowledge continues its quiet decomposition.
+#+end_quote
+
+* Capture: turning thought into structure
+
+Capture is where the Atlas becomes interesting — and slightly cruel.
+
+There are several entry points:
+
+| Command                                 | Result           |
+|-----------------------------------------+------------------|
+| ~my/manifolding-atlas-capture-new-file~ | new note         |
+| ~my/manifolding-atlas-capture-task-file~ | task note       |
+| ~my/manifolding-atlas-capture-heading~  | child heading    |
+| ~my/manifolding-atlas-insert-heading~   | heading at point |
+| ~manifolding-atlas-find~                | find/create      |
+| ~my/manifolding-atlas-insert-link~      | identity link    |
+
+The capture engine has four speeds.
+
+#+begin_example
+RET / a    NORMAL
+ask everything
+
+o          SKIP GENERAL
+specialized prompts survive
+
+e          EMPTY
+accept everything
+
+u          QUICK
+defaults + no body capture
+#+end_example
+
+The distinction matters.  
+Capture should not become a bureaucratic ceremony between a thought and its existence.  
+Sometimes you want the full interrogation.  
+Sometimes you want the machine to get out of the way so the thought can die in peace.
+
+* The asynchronous prompt machine
+
+The note is created before all metadata collection finishes.  
+That is deliberate.  
+The system does not hold the note hostage while it asks questions.
+
+Instead:
+
+#+begin_example
+capture
+│
+├── title
+├── filename
+├── location
+│
+├── sync prompts
+│
+├── CREATE FILE
+│
+└── async prompt queue
+    │
+    ├── property
+    ├── state
+    ├── tags
+    ├── template
+    ├── relations
+    └── ...
+    │
+    ▼
+body capture
+#+end_example
+
+Each answer lands on disk immediately.  
+The new note remains visible.  
+The metadata appears as it is collected.  
+There is no recursive-edit stack hiding underneath the process.  
+The prompt system is a queue.  
+Not a maze.  
+Not a confession booth.
+
+* WARNING is not a bug
+
+Declarative prompts begin with:
 
 #+begin_example
 ** WARNING
 #+end_example
 
-inserted right under the key heading on first visit and persisted.
-Point starts there, so *plain RET means skip*. Skipped fields store
-the literal value =WARNING= (or nothing), which schema validation
-reports as =missing-required= — that is how skipped metadata stays
-visible instead of silently vanishing. =q=/=C-g= skips without moving
-point. The sentinel is plain text; emoji variants are normalized away
-on pick. Set =my/manifolding-atlas-org-prompt-ui= to ='minibuffer= to
-get classic completing-read instead of the buffer picker.
+That strange little sentinel is intentional.  
+Point starts there.  
+Therefore:
 
-* The prompt system — data language
+: RET
 
-Prompts are *declarative org outlines*. A schema file with no src
-blocks and a level-1 heading shaped like =PROPERTY_KEY= registers
-itself; editing headings edits the prompt, adding a file adds a
-property, deleting a file removes it. ~50 files under =schema/= feed
-one engine (infra/capture/org-prompts.org).
+means:
 
-Optional drawer metadata under the key:
+skip this.
 
-| key            | meaning                                            |
-|----------------+----------------------------------------------------|
-| =:CONTEXTS:=   | where it fires: =file heading task rule…=          |
-| =:REQUIRED:=   | feeds base-schema requirement                      |
-| =:KIND:=       | one of the kinds below (default =property=)        |
-| =:LIVE:=       | ref-note family for =live=                         |
-| =:LABEL:=      | display label                                      |
-| =:ID:=         | registry-key override                              |
-| =:TASK-DEFAULT:= | extra task-context registration with this default |
+A skipped value can become:
 
-Level-2 headings are options; level-3+ are *variants* of their parent.
+: WARNING
 
-Kinds:
+and schema validation can subsequently say:
 
-| kind      | stored as                                     |
-|-----------+-----------------------------------------------|
-| property  | plain property value                          |
-| live      | ref-note link; family from =:LIVE:=           |
-| scoped    | free text + per-entity ref note               |
-| free      | plain text                                    |
-| todo      | TODO keyword fragment (goes on the heading)   |
-| multi     | space-joined multiple choice                  |
-| tags      | tag list completed against the DB             |
-| tagopt    | choice written as a tag                       |
-| topics    | RULE_TOPICS completed against rules table     |
-| template  | templates/files chooser + TEMPLATE_HASH sync  |
-| mastering | review scheduling trigger                     |
-| mindmap   | placement pick (parent/child/sibling/root)    |
+: missing-required
 
-Every declarative prompt also defines
-=my/manifolding-atlas-prompt-<key>= for direct callers, and
-registration warns at boot if a key would shadow an existing function.
+This produces something much more useful than silent failure.
 
-Behavioral prompts that are not option lists stay as elisp:
-schedule/deadline, aliases, subdir, file-name, position,
-extra-properties, rules/file-override.
+#+begin_quote
+Missing information becomes visible information.  
+The system remembers that you skipped something.  
+It does not pretend the field never existed.
+#+end_quote
 
-The registry lives in schema/register.org and resets each reload —
-prompts self-register by existing in the tree.
+The machine records the holes so you can stare at them later.
 
-Prompt families shipped: =state-*= (work, general, intelligence,
-operational, validation, source, dependency, checklist — all =live=),
-traps internal/external, thinking types, priority, todo, mastering,
-template, mind-map, tags, rules (scope/level/topic), dictionary
-(pos/register/frequency/etymology/examples/synonyms/pronunciation),
-contacts (note/nickname/email/phone/birthday), and 18 placeholder
-prompts under =general/prompts/= (objectives, blueprint, journal,
-context, laws, philosophy, decisions, advantages, leverage, counters,
-signals, quotes, failures, evidence, hypotheses, experiments, mastery,
-sources).
+Set:
 
-* Schemas & validation
+: my/manifolding-atlas-org-prompt-ui
 
-domains/schema/schema.org derives base/task/template schemas directly
-from the prompt outlines: level-1 heading = key, descendants =
-allowed values (the WARNING sentinel excluded). Validation runs at
-index time with action ='silent'= — nothing ever hits the minibuffer.
-Violations surface only through:
+to:
 
-- =admin/MISSING PROMPTS= — rebuilt after every capture from schema
-  health: one TODO entry per violating note with =:SCHEMAS:= and
-  =:VIOLATIONS:= drawers.
-- =SPC v E= schema sweep and boot sweep (domains/schema-reinforcement):
-  keep MISSING PROMPTS fresh, audit the prompt/template registries.
-- =SPC v f= fix-violations walks you through answering flagged prompts.
-- flymake linting while editing (core/-16-schema-flymake.org).
+: 'minibuffer
 
-Template schemas additionally pin =TEMPLATE_HASH= to the hash of the
-chosen body template so outdated notes get flagged when a template
-changes.
+if the traditional completing-read interface is preferred.
 
-* Domains — what Atlas can do
+* Schema is data
 
-| Domain               | Capability                                                        |
-|----------------------+-------------------------------------------------------------------|
-| search               | vault TODO search (=atlas-search-todo-dir=)                       |
-| backup (git)         | save-guarded auto commit/push, delete guards                      |
-| capture              | avy region→note, heading→note promotion                           |
-| citation             | =[[@citekey]]= extraction into SQLite                             |
-| contacts             | contact notes + typed property prompts                            |
-| dictionary           | vocabulary notes, personal wordlist regeneration                  |
-| links                | broken-link guards, rename link, deleted-file tracking            |
-| live-properties      | property values become ref-note links (+ scoped refs)             |
-| manifold             | mind-map controller (mm/ placement: root/parent/child/sibling)    |
-| mastering            | spaced repetition: MASTERING_* schedule props, review sessions,   |
-|                      | due/overdue queues, participation pool                            |
-| properties           | update-properties transient menu, violation fixer                 |
-| protocols            | heading→protocol steps, BUILD assembly via transclusion           |
-| recipes              | recipe notes, servings rescaling                                  |
-| routines             | atomic/composite routines + chains, avy build flow, reorder       |
-|                      | buffer, org generation, step-runner buffer, session journaling    |
-|                      | (=sessions/<Y>/<Q>/<m>/<W>/=), temporal streaks + report          |
-| rules                | :RULE: headings routed to topic files via transclusion            |
-| schema               | schema definitions (see above)                                    |
-| schema-reinforcement | sweeps → MISSING PROMPTS, debounced triggers, boot sweep,         |
-|                      | save-guard, prompt/template registry audit                        |
-| transclusion         | org-transclusion engine (vendored) + add/remove helpers           |
+This is one of the central ideas of Atlas.
 
-Authoring reference for new domains: domains/plugin-guide.org.
+A schema does not live in a special programming language.  
+It is an Org outline.
+
+A file such as:
+
+#+begin_example
+* PRIORITY
+** LOW
+** MEDIUM
+** HIGH
+** CRITICAL
+#+end_example
+
+is simultaneously:
+
+1. documentation,  
+2. user interface,  
+3. registry entry,  
+4. allowed-value definition,  
+5. schema input,  
+6. prompt definition.
+
+Add a file.  
+A property appears.  
+Edit a heading.  
+The prompt changes.  
+Delete the file.  
+The property disappears.
+
+The system reads the tree and constructs the machinery.
+
+#+begin_quote
+The configuration is executable knowledge.  
+Knowledge that already knows it will be rewritten.
+#+end_quote
+
+* Prompt kinds
+
+Atlas currently understands multiple kinds of semantic fields:
+
+| Kind        | Meaning                 |
+|-------------+-------------------------|
+| ~property~  | ordinary property       |
+| ~live~      | reference-note link     |
+| ~scoped~    | entity-specific ref     |
+| ~free~      | free text               |
+| ~todo~      | TODO fragment           |
+| ~multi~     | multiple choice         |
+| ~tags~      | database-completed tags |
+| ~tagopt~    | choice stored as tag    |
+| ~topics~    | rule topics             |
+| ~template~  | template selection      |
+| ~mastering~ | review scheduling       |
+| ~mindmap~   | manifold placement      |
+
+Each declarative prompt can expose a callable:
+
+: my/manifolding-atlas-prompt-<key>
+
+The schema therefore becomes an API.  
+An API that will eventually be declared obsolete by a newer schema.
+
+* Validation
+
+Validation does not interrupt thought.  
+There are no surprise minibuffers announcing that your note has committed some terrible epistemological crime.
+
+Validation happens at index time.  
+Violations accumulate here:
+
+: admin/MISSING PROMPTS
+
+Every problematic note becomes a TODO carrying:
+
+: :SCHEMAS:
+: :VIOLATIONS:
+
+Then:
+
+: SPC v E
+
+runs the reinforcement sweep.
+
+And:
+
+: SPC v f
+
+walks through the violations.
+
+The philosophy is simple and slightly sadistic:
+
+#+begin_quote
+Capture first.  
+Repair structure deliberately.  
+Never let validation become friction.  
+Let the holes remain visible long enough to hurt.
+#+end_quote
+
+Flymake provides the immediate editing feedback.  
+The reinforcement system provides the global feedback.
+
+* Domains
+
+The Atlas is not one giant feature.  
+It is a collection of domains operating over the same substrate — a substrate that is already beginning to smell.
+
+#+begin_example
+search
+backup
+capture
+citation
+contacts
+dictionary
+links
+live-properties
+manifold
+mastering
+properties
+protocols
+recipes
+routines
+rules
+schema
+schema-reinforcement
+transclusion
+#+end_example
+
+Each domain gets its own territory.  
+That means the system can grow horizontally without turning the core into a landfill of half-dead abstractions.
+
+* Manifold
+
+The manifold domain is where notes stop being merely notes and become spatial objects.
+
+A note can be placed as:
+
+: root
+: parent
+: child
+: sibling
+
+The structure becomes navigable in three dimensions.  
+The knowledge graph becomes a volume that can be reshaped without rewriting the underlying knowledge.  
+You are no longer scrolling a buffer.  
+You are moving through a temporary architecture of identities.
+
+* Mastering
+
+Mastering turns notes into a memory system with a half-life.
+
+The Atlas tracks:
+
+: MASTERING_*
+
+and builds:
+
+- due queues  
+- overdue queues  
+- review sessions  
+- participation pools  
+- review scheduling  
+
+Knowledge therefore has a temporal dimension.  
+A note can exist.  
+A note can be connected.  
+A note can be reviewed.  
+A note can be mastered.  
+And then the mastery itself will eventually be declared insufficient.
+
+* Protocols
+
+Protocols turn headings into executable sequences.  
+A protocol can be assembled through transclusion.  
+The note describes the structure.  
+The build machinery assembles it.
+
+This allows procedures to exist as reusable knowledge rather than duplicated blocks of text that will rot at different rates.
+
+* Routines
+
+Routines are composable structures.  
+They can be:
+
+- atomic  
+- composite  
+- chained  
+- reordered  
+- generated  
+- executed  
+- journaled  
+
+Sessions are recorded under:
+
+: sessions/<Y>/<Q>/<m>/<W>/
+
+The Atlas can therefore represent not only what exists, but what happened — until the session logs themselves become archaeological.
+
+Temporal streaks and reports emerge from the same substrate.
+
+* Rules
+
+Rules provide another transformation layer.  
+A heading marked:
+
+: :RULE:
+
+can be routed into topic files through transclusion.  
+The rule exists once.  
+Its appearances can exist many times.
+
+That distinction matters.
+
+#+begin_quote
+One source.  
+Many manifestations.  
+All of them temporary.
+#+end_quote
 
 * Templates
 
-templates/files/: body-only capture templates — =notes=, =task=,
-=reference= (ROAM_REFS), =protocol=, =math=, =recipes=
-(SERVINGS/PREP_TIME/COOK_TIME/READY_IN) — plus =atlas.el= holding the
-doct declarations (=my/capture-manifolding-atlas=). Selection stores
-=TEMPLATE= and =TEMPLATE_HASH= on the note; per-template schemas
-enforce the properties a template declares. templates/templates.org
-wires doct + yasnippet loading.
+Templates live under:
 
-* Keybindings
+: templates/files/
 
-Everything hangs off =SPC v= (main hydra → "manifolding-atlas"). Org
-state also binds =V= find, =I= insert link directly.
+Current families include:
 
-| Key   | Command                        | What                          |
-|-------+--------------------------------+-------------------------------|
-| /     | <                              |                               |
-|-------+--------------------------------+-------------------------------|
-| v     | manifolding-atlas-find         | find/open-or-create note      |
-| V     | insert-link                    | id: link at point             |
-| r     | rename-link                    | rename an id: link            |
-| h     | capture-heading                | new child heading             |
-| c     | insert-heading                 | new heading at point          |
-| H     | heading-to-note                | promote heading to note       |
-| z     | quick-captures                 | fast-capture dispatcher       |
-| f     | fix-violations                 | answer flagged prompts        |
-| P     | update-properties              | transient property editor     |
-| u     | ui-sidebar-toggle              | sidebar/outline               |
-| E     | reinforce-sweep                | schema sweep                  |
-| k/K/R | rules mark/goto/find           | :RULE: routing                |
-| p/m/M/i | protocols build/mark/goto/find | protocol assembly           |
-| w     | dictionary-menu                | vocabulary                    |
-| C     | contacts-menu                  | contacts                      |
-| g/G/M/t | mastering review due/overdue/mark/pool | spaced repetition    |
-| s     | search-todo-dir                | TODO search                   |
-| n/e/f | recipe create/servings/menu    | recipes                       |
-| N/J/F/B/X/!/S/T | routines create/chain/find/generate/run/validate/report/menu |
-| y     | transclusion hydra             | add/remove/live-sync          |
+: notes
+: task
+: reference
+: protocol
+: math
+: recipes
 
-Related: =SPC m= mind-map mode; =SPC o c n= capture note via doct.
+Templates can declare their own requirements.  
+Atlas hashes the selected template:
 
-* UI
+: TEMPLATE_HASH
 
-atlas-ui.org configures the vendored UI: sidebar left at 20% width
-(=manifolding-atlas-ui-sidebar-toggle=), outline max depth 3,
-backlinks with previews, fast parse, auto refresh.
+If the template changes, old notes can be identified.  
+This turns templates from passive snippets into versioned structural contracts that already know they will be broken.
 
-* Extending
+* The keymap
 
-- New property: drop a pure-outline .org file anywhere under =schema/=
-  following the format above. Done — registration, picker, schema
-  derivation, and validation pick it up automatically.
-- New behavioral prompt: register with
-  =my/manifolding-atlas-register-prompt= (:key :name :label :prompt-fn
-  :contexts :to-plist :read-current-fn :merge-strategy).
-- New domain: one directory + <name>.org with =#+priority:=, follow
-  domains/plugin-guide.org.
-- New body template: add templates/files/<name>.org (no =*= heading);
-  optionally declare required properties in a drawer to get a
-  per-template schema for free.
-- Lambdas must NOT capture lexical variables — the loader compiles
-  with dynamic binding. Use named functions or backquote-spliced
-  literals; pass data via =apply-partially=.
+Everything converges under:
 
-* Operations & troubleshooting
+: SPC v
 
-- Reload: =M-x manifolding-emacs-reload=. Check
-  =(manifolding-emacs-errors-list)= / warnings afterwards. Boot-time
-  messages worth knowing: =org-prompts: registered N declarative
-  prompts= (N should be ~53; 0 means the engine found nothing),
-  =database ready=, =relocated database to …=.
-- Headless check without touching the session:
-  : emacs --batch --load ~/.config/emacs/init.el --eval '(message "ok")'
-- Violations never pop up interactively — read =admin/MISSING
-  PROMPTS= or run =SPC v E= then =SPC v f=.
-- The DB follows =my/manifolding-atlas-root-dir=; change only that one
-  function to relocate the entire vault.
-- Per-layer agent context lives in AGENTS.md at each level (root,
-  infra/, domains/, schema/, templates/).
+The Atlas hydra.
+
+#+begin_example
+v       find
+V       insert link
+r       rename link
+
+h       capture heading
+c       insert heading
+H       heading → note
+z       quick captures
+
+f       fix violations
+P       update properties
+u       sidebar
+
+E       reinforcement sweep
+
+k/K/R   rules
+p/m/M/i protocols
+
+w       dictionary
+C       contacts
+
+g/G/M/t mastering
+
+s       search
+
+n/e/f   recipes
+
+N/J/F/B/X/!/S/T
+routines
+
+y       transclusion
+#+end_example
+
+Org state also provides:
+
+: V       find
+: I       insert link
+
+Mind-map mode lives under:
+
+: SPC m
+
+and doct capture under:
+
+: SPC o c n
+
+* The UI
+
+The UI is deliberately subordinate to the model.  
+Sidebar:
+
+: left
+: 20%
+
+Outline:
+
+: maximum depth 3
+
+Backlinks include previews.  
+Parsing is fast.  
+Refresh is automatic.
+
+The interface shows the manifold.  
+It does not define it.  
+It merely lets you watch the structure while it is still coherent.
+
+* Extending Atlas
+
+Adding a property should be boring.  
+That is a feature.
+
+Create:
+
+: schema/<anything>.org
+
+Give it a level-one property heading.  
+Done.
+
+Registration happens automatically.  
+Prompt generation happens automatically.  
+Schema derivation happens automatically.  
+Validation happens automatically.
+
+Adding a behavioral prompt requires explicit registration through:
+
+: my/manifolding-atlas-register-prompt
+
+Adding a domain means:
+
+#+begin_example
+domains/
+└── new-domain/
+    └── new-domain.org
+#+end_example
+
+with an appropriate priority.
+
+Adding a template means:
+
+: templates/files/<name>.org
+
+No giant configuration file.  
+No central switch statement.  
+No ritual.  
+Only the quiet accumulation of temporary structures.
+
+* Paths
+
+There is one authority:
+
+: infra/paths.org
+
+Everything else asks it where things are.  
+No scattered hardcoded module paths.  
+If the root changes, the vault moves conceptually as one system.
+
+Change:
+
+: my/manifolding-atlas-root-dir
+
+and the machinery follows — until the next time the root needs to move again.
+
+* Loader rules
+
+The loader compiles modules with dynamic binding.  
+Therefore:
+
+#+begin_quote
+Lambdas must not capture lexical variables.
+#+end_quote
+
+Use named functions.  
+Or use backquote-spliced literals.  
+Or:
+
+: apply-partially
+
+The loader is dependency management.  
+Treat its priority graph as such.
+
+* Operations
+
+Headless boot:
+
+: emacs --batch --load ~/.config/emacs/init.el --eval '(message "ok")'
+
+Useful boot messages include:
+
+: org-prompts: registered N declarative prompts
+: database ready
+: relocated database to ...
+
+If prompt registration says:
+
+: N = 0
+
+something is wrong.  
+If it is around:
+
+: ~53
+
+the prompt engine probably found the schema tree — for now.
+
+* The real model
+
+Atlas looks like a note system from the outside.  
+That description is too small and already decaying.
+
+It is closer to a small knowledge operating system:
+
+- Org is the filesystem  
+- SQLite is the index  
+- Schemas are the type system  
+- Prompts are the interface compiler  
+- Domains are applications  
+- Templates are generators  
+- Transclusion is composition  
+- Validation is the type checker  
+- Mastering is the memory scheduler  
+- Routines are the execution layer  
+- The UI is the viewport  
+- The loader is the thing holding the organism together while it continues to decompose  
+
+#+begin_quote
+Everything is allowed to change.  
+Nothing is allowed to become unnecessarily permanent.
+#+end_quote
+
+That is why the system is called Manifolding Atlas.  
+It does not merely store a map of knowledge.  
+It provides mechanisms for taking the same underlying structure and producing another form from it — until that form, too, begins to smell.
+
+Reshape the schema.  
+Reshape the prompts.  
+Reshape the relationships.  
+Reshape the domains.  
+Reshape the representation.  
+Reshape the map.
+
+The files remain.  
+The structure evolves.  
+The evolution is temporary.
+
+* WIP
+
+The README is not the authority.  
+The code is.
+
+When behavior disagrees with this document, inspect the implementation.  
+Then inspect the relevant:
+
+: AGENTS.md
+
+There is one per architectural layer.
+
+#+begin_quote
+Do not worship the current shape of the machine.  
+Understand it.  
+Then reshape it.  
+Then watch the reshape begin to decompose.
+#+end_quote
+
+Remember: reality is a decomposing joke.
