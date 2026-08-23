@@ -182,17 +182,20 @@ Always use the configured method instead."
 
 (manifolding-atlas-db-autosync-mode +1)
 
-;; Ensure the database file exists immediately after boot and surface
-;; any initialization failure loudly instead of failing lazily later.
+;; Ensure the database exists shortly after boot, but late enough that
+;; the initial full-vault index never competes with startup. The first
+;; connection parses the whole vault and can block for a while.
 (with-eval-after-load 'manifolding-atlas
   (run-with-idle-timer
-   2 nil
+   15 nil
    (lambda ()
+     (message "Manifolding Atlas: opening database (may pause briefly)...")
      (condition-case err
          (progn
            (manifolding-atlas-db)
            (message "Manifolding Atlas: database ready (%s)"
-                    (file-name-nondirectory manifolding-atlas-db-location)))
+                    (file-name-nondirectory
+                     manifolding-atlas-db-location)))
        (error (lwarn 'manifolding-atlas :error
                      "database init failed: %s"
                      (error-message-string err)))))))

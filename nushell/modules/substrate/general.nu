@@ -8,7 +8,9 @@ $env.config = {
     }
 
     rm: {
-        always_trash: true
+        # always_trash requires a nu build with `trash_support`;
+        # this binary does not have it.
+        always_trash: false
     }
 
     table: {

@@ -61,9 +61,6 @@ error_symbol = "[🥀](bold #FFFFFF)"
 [cmd_duration]
 disabled = true
 
-[battery]
-disabled = true
-
 [memory_usage]
 disabled = true
 

@@ -13,19 +13,3 @@
 ** Guix
 #+begin_src scheme ~/.config/guix/Operating-System/user-space/root/editors/emacs-packages/ui/popup.scm
 #+end_src
-
-* POPUP-KILL-RING — Browse Kill Ring in a Popup Menu #emacs-package
-:PROPERTIES:
-:ID:       9a4f2b1e-7c3d-4e8a-bc12-3d7f9a2e1c5b
-:PACKAGE:  popup-kill-ring
-:CATEGORY: ui
-:END:
-
-** Guix
-#+begin_src scheme ~/.config/guix/Operating-System/user-space/root/editors/emacs-packages/ui/popup-kill-ring.scm
-#+end_src
-
-** Config
-#+begin_src emacs-lisp
-(global-set-key (kbd "M-y") #'popup-kill-ring)
-#+end_src

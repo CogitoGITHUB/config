@@ -109,16 +109,22 @@ buffer-UI prompts are queued on
                            (memq (plist-get dspec :kind)
                                  '(property live todo multi tagopt
                                    scoped mastering mindmap))
-                           (file-exists-p (plist-get dspec :file)))))
-          (if defer
+                           (file-exists-p (plist-get dspec :file))))
+               (template-skip (and dspec
+                                   (not my/manifolding-atlas-org-prompt--defaults-only)
+                                   (eq (plist-get dspec :kind) 'template))))
+          (cond
+           ((or template-skip defer)
+            (when defer
               (push (list :spec dspec
                           :default (if (eq key
                                            (my/manifolding-atlas-org-prompt--base-key key))
                                        nil
                                      (plist-get dspec :task-default)))
-                    deferred-list)
-            (unless declared
-              (my/manifolding-atlas--show-help (plist-get spec :name)))
+                     deferred-list)))
+            (t
+             (unless declared
+               (my/manifolding-atlas--show-help (plist-get spec :name)))
             (let (val frag)
             (setq val (condition-case nil
                           (funcall (plist-get spec :prompt-fn))
@@ -147,7 +153,7 @@ buffer-UI prompts are queued on
               (setq result (plist-put result :todo (plist-get frag :todo))
                     my/manifolding-atlas--creation-todo (plist-get frag :todo))))
           (unless declared
-            (my/manifolding-atlas--close-help))))))
+            (my/manifolding-atlas--close-help)))))))
     (when deferred-list
       (setq my/manifolding-atlas-org-prompt--deferred
             (append my/manifolding-atlas-org-prompt--deferred

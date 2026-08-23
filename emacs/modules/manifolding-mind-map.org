@@ -4,6 +4,20 @@ Web-based mind map / graph UI for manifolding-atlas notes.
 Forked from org-roam-ui, ported to use manifolding-atlas DB.
 #+end_comment
 
+* SIMPLE-HTTPD — Tiny Web Server
+:PROPERTIES:
+:PACKAGE:  simple-httpd
+:STRAIGHT: (simple-httpd :type git :host github :repo "skeeto/emacs-web-server")
+:CATEGORY: notes
+:END:
+
+* WEBSOCKET — Websocket Client
+:PROPERTIES:
+:PACKAGE:  websocket
+:STRAIGHT: (websocket :type git :host github :repo "ahyatt/emacs-websocket")
+:CATEGORY: notes
+:END:
+
 * Manifolding Mind Map
 :PROPERTIES:
 :CATEGORY: notes

@@ -395,8 +395,17 @@ the post-create advice once the note exists."
                 nil))
   (setq my/manifolding-atlas-org-prompt--deferred nil))
 
+(defun my/manifolding-atlas-org-prompt--sweep-pickers ()
+  "Kill every leftover picker buffer from this or an interrupted session."
+  (dolist (buf (buffer-list))
+    (when (and (buffer-live-p buf)
+               (buffer-local-value
+                'my/manifolding-atlas-org-prompt--session-p buf))
+      (condition-case nil (kill-buffer buf) (error nil)))))
+
 (defun my/manifolding-atlas-org-prompt--session-begin (queue note finalize)
   "Start answering QUEUE for NOTE; call FINALIZE when drained."
+  (my/manifolding-atlas-org-prompt--sweep-pickers)
   (setq my/manifolding-atlas-org-prompt--session
         (list :note note :pending queue :finalize finalize))
   (my/manifolding-atlas-org-prompt--session-next))
@@ -428,10 +437,19 @@ the post-create advice once the note exists."
       (my/manifolding-atlas-org-prompt--session-open (car queue)))))
 
 (defun my/manifolding-atlas-org-prompt--session-finish ()
-  "Drained the queue: drop the session and run its finalizer."
-  (let ((finalize (plist-get my/manifolding-atlas-org-prompt--session
-                             :finalize)))
+  "Drained the queue: clean up, restore the frame, run the finalizer."
+  (let* ((note (plist-get my/manifolding-atlas-org-prompt--session :note))
+         (finalize (plist-get my/manifolding-atlas-org-prompt--session
+                              :finalize)))
+    (my/manifolding-atlas-org-prompt--sweep-pickers)
     (setq my/manifolding-atlas-org-prompt--session nil)
+    (when (and note
+               (manifolding-atlas-note-path note)
+               (file-exists-p (manifolding-atlas-note-path note)))
+      (delete-other-windows)
+      (set-window-buffer
+       (selected-window)
+       (find-file-noselect (manifolding-atlas-note-path note))))
     (when finalize (funcall finalize))))
 
 (defun my/manifolding-atlas-org-prompt--ensure-warning-option ()
@@ -471,7 +489,7 @@ visible while prompts are answered."
       (delete-other-windows)
       (set-window-buffer (selected-window) note-buf)
       (let ((win (split-window-below
-                  (- (max 8 (min 16 (floor (* 0.30 (frame-height)))))))))
+                  (- (max 10 (floor (* 0.60 (frame-height))))))))
         (set-window-buffer win buf)
         (select-window win)))))
 
