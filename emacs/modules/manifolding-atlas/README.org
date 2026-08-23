@@ -145,6 +145,39 @@ Then inspect the machine while it is still breathing:
 : (manifolding-emacs-errors-list)
 : (manifolding-emacs-warnings-list)
 
+* The boot screen
+
+The palette and modeline load before anything else.  
+The first frame is already yours.
+
+During boot a progress screen shows the file being compiled, the
+percentage, and grouped errors as they appear.
+
+When the boot is clean it flashes:
+
+: CLEAN BOOT
+
+and becomes a dashboard:
+
+#+begin_example
+MANIFOLDING ATLAS — READY
+
+boot 38.4s  ▂▃▅▂▁▃
+
+modules compiled · errors 0 · warnings 0
+vault notes: 412 · missing prompts: 7
+git: master · 5 minutes ago · ↑2
+
+[g] reload    [m] missing prompts    [t] module TODOs
+[p] push      [G] magit              [q] dismiss
+#+end_example
+
+The sparkline remembers your last boots  
+in .local/cache/manifolding-boot-times.
+
+A boot with errors keeps the full report instead — clickable,
+fileable to TODO.
+
 * The vault
 
 The vault lives at:
@@ -208,7 +241,7 @@ There are several entry points:
 | ~manifolding-atlas-find~                | find/create      |
 | ~my/manifolding-atlas-insert-link~      | identity link    |
 
-The capture engine has four speeds.
+The capture engine has five speeds.
 
 #+begin_example
 RET / a    NORMAL
@@ -217,8 +250,12 @@ ask everything
 o          SKIP GENERAL
 specialized prompts survive
 
-e          EMPTY
-accept everything
+e          SKIP ALL
+accept everything, zero questions
+
+s          SELECTION
+pick which properties to customize;
+everything else gets WARNING
 
 u          QUICK
 defaults + no body capture
