@@ -9,6 +9,7 @@
 :LIVE: state-operational
 :LABEL: State: Operational
 :END:
+** WARNING
 ** PLANNED
 ** IN_PROGRESS
 ** DEPLOYED

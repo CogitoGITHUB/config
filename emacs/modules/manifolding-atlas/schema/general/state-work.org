@@ -9,6 +9,7 @@
 :LIVE: state-work
 :LABEL: State: Work
 :END:
+** WARNING
 ** ACTIVE
 ** PAUSED
 ** BLOCKED

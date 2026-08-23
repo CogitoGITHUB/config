@@ -8,6 +8,7 @@
 :LIVE: state-checklist
 :LABEL: State: Checklist
 :END:
+** WARNING
 ** CHECKLIST
 ** REVIEWING
 ** MASTERED

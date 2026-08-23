@@ -41,6 +41,58 @@ Change only this path to relocate the entire vault."
 
 (require 'manifolding-atlas)
 
+(defvar my/manifolding-atlas-db--location-used nil
+  "Location used when the current DB connection was opened.")
+
+(defvar my/manifolding-atlas-db--guard-inside nil
+  "Re-entrancy latch for `my/manifolding-atlas-db-location-guard'.
+Nested `(manifolding-atlas-db)' calls made during init must never
+trigger another close/reopen cycle.")
+
+(defun my/manifolding-atlas-db--relocate-legacy ()
+  "Move a default-location DB to `manifolding-atlas-db-location'.
+Runs before every connection attempt; cheap no-op once relocated.
+Guarantees the vault DB always lives beside the notes even if a
+stale session opened it elsewhere."
+  (let ((legacy (expand-file-name "manifolding-atlas.db"
+                                  user-emacs-directory))
+        (target manifolding-atlas-db-location))
+    (when (and (file-exists-p legacy)
+               (not (file-exists-p target))
+               (not (equal (expand-file-name legacy)
+                           (expand-file-name target))))
+      (make-directory (file-name-directory target) t)
+      (condition-case err
+          (progn
+            (manifolding-atlas-db-close)
+            (rename-file legacy target nil)
+            (message "Manifolding Atlas: relocated database to %s"
+                     target))
+        (error
+         (lwarn 'manifolding-atlas :warning
+                "database relocation failed: %s"
+                (error-message-string err)))))))
+
+(defun my/manifolding-atlas-db-location-guard (orig)
+  "Reconnect when `manifolding-atlas-db-location' changed under us."
+  (unless my/manifolding-atlas-db--guard-inside
+    (let ((my/manifolding-atlas-db--guard-inside t))
+      (my/manifolding-atlas-db--relocate-legacy)
+      (when (and manifolding-atlas-db--connection
+                 (not (equal my/manifolding-atlas-db--location-used
+                             manifolding-atlas-db-location)))
+        (manifolding-atlas-db-close))
+      (when (or (null manifolding-atlas-db--connection)
+                (not (equal my/manifolding-atlas-db--location-used
+                            manifolding-atlas-db-location)))
+        (funcall orig)
+        (setq my/manifolding-atlas-db--location-used
+              manifolding-atlas-db-location))))
+  (funcall orig))
+
+(advice-add 'manifolding-atlas-db :around
+            #'my/manifolding-atlas-db-location-guard)
+
 (defun my/manifolding-atlas-db-sync--fswatch-sentinel (proc event)
   (unless (or (string-match-p "hangup\\|finished" event)
               (process-live-p proc))

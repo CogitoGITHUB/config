@@ -7,6 +7,7 @@
 :KIND: property
 :LABEL: Sources
 :END:
+** WARNING
 ** VETTED
 ** PENDING
 ** ARCHIVED

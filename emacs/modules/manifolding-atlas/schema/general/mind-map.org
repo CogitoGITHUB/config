@@ -7,6 +7,7 @@
 :KIND: mindmap
 :LABEL: Mind Map
 :END:
+** WARNING
 ** parent
 ** child
 ** sibling

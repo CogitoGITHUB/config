@@ -16,9 +16,19 @@
 
 ** Config
 #+begin_src emacs-lisp
+(defun my/org-fancy-priorities-defer ()
+  "Enable org-fancy-priorities once the buffer settles.
+Enabling from inside `org-mode-hook' force-fontifies while org's
+font-lock setup is still incomplete and can abort visiting the file."
+  (run-with-idle-timer
+   0 nil
+   (lambda ()
+     (when (derived-mode-p 'org-mode)
+       (ignore-errors (org-fancy-priorities-mode 1))))))
+
 (leaf org-fancy-priorities
   :hook
-  (org-mode-hook        . org-fancy-priorities-mode)
+  (org-mode-hook        . my/org-fancy-priorities-defer)
   (org-agenda-mode-hook . org-fancy-priorities-mode)
   :custom
   (org-fancy-priorities-list . '((?A . "🌹")

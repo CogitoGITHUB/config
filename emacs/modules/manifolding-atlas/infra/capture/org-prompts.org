@@ -40,6 +40,23 @@ dynamic binding — so deferred prompt functions read their spec from here.")
   "Return non-nil when KEY was registered by the declarative engine."
   (and (hash-table-p my/manifolding-atlas-org-prompt--declarative)
        (gethash key my/manifolding-atlas-org-prompt--declarative)))
+
+(defvar my/manifolding-atlas-org-prompt--deferred nil
+  "Entries queued during collection for the async buffer-picker session.
+Each entry is (:spec SPEC :default DEFAULT); consumed by
+`my/manifolding-atlas-org-prompt-run-deferred'.")
+
+(defconst my/manifolding-atlas-prompt-warning "WARNING"
+  "Sentinel option meaning \"prompt skipped\".
+Auto-inserted as the first level-2 heading of every declarative
+prompt file; selecting it or pressing q stores no real value.")
+
+(defun my/manifolding-atlas-org-prompt--normalize-choice (val)
+  "Map legacy emoji sentinels in VAL to their plain equivalents."
+  (cond ((null val) val)
+        ((string-equal val "⚠ WARNING") "WARNING")
+        ((string-equal val "⚠ tag-warning") "tag-warning")
+        (t val)))
 #+end_src
 
 * Template helpers
@@ -70,14 +87,17 @@ schema/general/template.org so that file can be pure data).
                                t "\\.org\\'"))
     (error nil)))
 
-(defun my/manifolding-atlas-prompt-template ()
-  "Prompt for TEMPLATE. Returns \"WARNING\" if skipped, \"none\" for none."
+(defun my/manifolding-atlas-prompt-template--choose ()
+  "Ask for TEMPLATE. Returns \"WARNING\" if skipped, \"none\" for none.
+Named with the double dash suffix: registering the declarative
+TEMPLATE prompt defaliases `my/manifolding-atlas-prompt-template',
+so the chooser must live under a non-colliding name."
   (if my/manifolding-atlas-prompt-template--deferred
       "WARNING"
     (completing-read "TEMPLATE: "
-                     (append '("⚠ WARNING" "none")
+                     (append '("WARNING" "none")
                              (my/manifolding-atlas-prompt-template--names))
-                     nil t nil nil "⚠ WARNING")))
+                     nil t nil nil "WARNING")))
 
 (defun my/manifolding-atlas-prompt-template--apply (val note)
   "Post-apply: keep TEMPLATE_HASH in sync with VAL on NOTE."
@@ -185,16 +205,13 @@ aborting the whole batch.  Returns number of prompts registered."
 
 (defun my/manifolding-atlas-org-prompt--run (key-sym &optional default)
   "Invoke declarative prompt KEY-SYM using its stored spec.
-Runs under an independent deep budget so ambient stack depth
-(creation chain, recursive-edits, idle timers) is irrelevant."
+Direct single-shot callers only; capture flows defer to async sessions."
   (let ((spec (gethash key-sym
                        my/manifolding-atlas-org-prompt--specs)))
     (if (not spec)
         (user-error "No declarative spec for %s — reload org-prompts"
                     key-sym)
-      (let* ((max-lisp-eval-depth 12000)
-             (max-specpdl-size 12000)
-             (file (plist-get spec :file))
+      (let* ((file (plist-get spec :file))
              (key (plist-get spec :key))
              (label (plist-get spec :label))
              (kind (plist-get spec :kind))
@@ -220,11 +237,19 @@ Runs under an independent deep budget so ambient stack depth
     (puthash key-sym t my/manifolding-atlas-org-prompt--declarative)
     (puthash key-sym
              (list :file file :key key :label label :kind kind
-                   :options options :plist plist)
+                   :options options :plist plist
+                   :task-default task-default)
              my/manifolding-atlas-org-prompt--specs)
-    (defalias (intern (concat "my/manifolding-atlas-prompt-"
-                              (symbol-name key-sym)))
-      `(lambda () (my/manifolding-atlas-org-prompt--run ',key-sym)))
+    (let ((fn (intern (concat "my/manifolding-atlas-prompt-"
+                              (symbol-name key-sym)))))
+      (when (and (fboundp fn)
+                 (not (get fn 'my/manifolding-atlas-declarative)))
+        (lwarn 'manifolding-atlas-org-prompts :warning
+               "declarative prompt %s shadows existing function %s"
+               key-sym fn))
+      (defalias fn
+        `(lambda () (my/manifolding-atlas-org-prompt--run ',key-sym)))
+      (put fn 'my/manifolding-atlas-declarative t))
     (my/manifolding-atlas-register-prompt
      :key key-sym
      :name key-sym
@@ -294,19 +319,30 @@ Runs under an independent deep budget so ambient stack depth
           (overlay-put ov 'face 'highlight))))))
 
 (defun my/manifolding-atlas-org-prompt--buffer-accept ()
-  "Accept the option heading at point."
+  "Accept the option heading at point.
+Inside an async session the value is applied to the target note
+immediately and the next pending prompt opens.  Standalone use
+stores the result and exits the recursive edit."
   (interactive)
   (if (not (and (org-at-heading-p) (>= (org-outline-level) 2)))
       (message "Point must be on an option heading (level 2 or deeper)")
-    (let* ((title (org-get-heading t t t t))
-           (multi (eq my/manifolding-atlas-org-prompt--this-kind 'multi)))
-      (setq my/manifolding-atlas-org-prompt--buffer-result
-            (if (and multi my/manifolding-atlas-org-prompt--buffer-marks)
-                (string-join
-                 (reverse my/manifolding-atlas-org-prompt--buffer-marks) " ")
-              title))
-      (my/manifolding-atlas-org-prompt--buffer-finish)
-      (exit-recursive-edit))))
+    (let ((title (my/manifolding-atlas-org-prompt--normalize-choice
+                  (org-get-heading t t t t))))
+      (if my/manifolding-atlas-org-prompt--session-p
+          (let ((val (my/manifolding-atlas-org-prompt--session-value title)))
+            (my/manifolding-atlas-org-prompt--buffer-finish)
+            (my/manifolding-atlas-org-prompt--session-apply val)
+            (my/manifolding-atlas-org-prompt--session-next))
+        (setq my/manifolding-atlas-org-prompt--buffer-result
+              (if (and (eq my/manifolding-atlas-org-prompt--this-kind 'multi)
+                       my/manifolding-atlas-org-prompt--buffer-marks)
+                  (string-join
+                   (mapcar #'my/manifolding-atlas-org-prompt--normalize-choice
+                           (reverse my/manifolding-atlas-org-prompt--buffer-marks))
+                   " ")
+                title))
+        (my/manifolding-atlas-org-prompt--buffer-finish)
+        (exit-recursive-edit)))))
 
 (defun my/manifolding-atlas-org-prompt--buffer-mark ()
   "Toggle mark on the option heading at point."
@@ -321,11 +357,226 @@ Runs under an independent deep budget so ambient stack depth
       (my/manifolding-atlas-org-prompt--buffer-refresh-marks))))
 
 (defun my/manifolding-atlas-org-prompt--buffer-abort ()
-  "Cancel selection."
+  "Cancel selection; inside a session skip to the next pending prompt."
   (interactive)
-  (setq my/manifolding-atlas-org-prompt--buffer-result nil)
-  (my/manifolding-atlas-org-prompt--buffer-finish)
-  (exit-recursive-edit))
+  (if my/manifolding-atlas-org-prompt--session-p
+      (let* ((req (plist-get my/manifolding-atlas-org-prompt--session :current))
+             (val (or (plist-get req :default) "WARNING")))
+        (my/manifolding-atlas-org-prompt--buffer-finish)
+        (my/manifolding-atlas-org-prompt--session-apply val)
+        (my/manifolding-atlas-org-prompt--session-next))
+    (setq my/manifolding-atlas-org-prompt--buffer-result nil)
+    (my/manifolding-atlas-org-prompt--buffer-finish)
+    (exit-recursive-edit)))
+
+(defvar my/manifolding-atlas-org-prompt--session nil
+  "Active async session plist: :pending, :current, :note, :finalize.")
+
+(defvar my/manifolding-atlas-org-prompt--pending-create nil
+  "Parked deferred prompts awaiting note creation in default-function flows.")
+
+(defvar-local my/manifolding-atlas-org-prompt--session-p nil
+  "Non-nil in picker buffers driven by an async session.")
+
+(defun my/manifolding-atlas-org-prompt--base-key (key)
+  "Return the declarative spec key behind registry KEY."
+  (if (string-suffix-p "--task" (symbol-name key))
+      (intern (substring (symbol-name key) 0 -6))
+    key))
+
+(defun my/manifolding-atlas-org-prompt--park-deferred ()
+  "Move the deferred queue into the pending-create parking list.
+Used by creation paths where the note does not exist yet when prompts
+are collected (default-function flows); the parked queue is started by
+the post-create advice once the note exists."
+  (setq my/manifolding-atlas-org-prompt--pending-create
+        (append my/manifolding-atlas-org-prompt--pending-create
+                my/manifolding-atlas-org-prompt--deferred
+                nil))
+  (setq my/manifolding-atlas-org-prompt--deferred nil))
+
+(defun my/manifolding-atlas-org-prompt--session-begin (queue note finalize)
+  "Start answering QUEUE for NOTE; call FINALIZE when drained."
+  (setq my/manifolding-atlas-org-prompt--session
+        (list :note note :pending queue :finalize finalize))
+  (my/manifolding-atlas-org-prompt--session-next))
+
+(defun my/manifolding-atlas-org-prompt--session-maybe-start (note &optional finalize)
+  "Answer any deferred prompts against NOTE, then call FINALIZE."
+  (let ((queue my/manifolding-atlas-org-prompt--deferred))
+    (setq my/manifolding-atlas-org-prompt--deferred nil)
+    (if queue
+        (my/manifolding-atlas-org-prompt--session-begin queue note finalize)
+      (when finalize (funcall finalize)))))
+
+(defun my/manifolding-atlas-org-prompt--session-start-parked (note &optional finalize)
+  "Answer parked prompts against NOTE, then call FINALIZE."
+  (let ((queue my/manifolding-atlas-org-prompt--pending-create))
+    (setq my/manifolding-atlas-org-prompt--pending-create nil)
+    (if queue
+        (my/manifolding-atlas-org-prompt--session-begin queue note finalize)
+      (when finalize (funcall finalize)))))
+
+(defun my/manifolding-atlas-org-prompt--session-next ()
+  (let ((queue (plist-get my/manifolding-atlas-org-prompt--session :pending)))
+    (if (null queue)
+        (my/manifolding-atlas-org-prompt--session-finish)
+      (plist-put my/manifolding-atlas-org-prompt--session
+                 :pending (cdr queue))
+      (plist-put my/manifolding-atlas-org-prompt--session
+                 :current (car queue))
+      (my/manifolding-atlas-org-prompt--session-open (car queue)))))
+
+(defun my/manifolding-atlas-org-prompt--session-finish ()
+  "Drained the queue: drop the session and run its finalizer."
+  (let ((finalize (plist-get my/manifolding-atlas-org-prompt--session
+                             :finalize)))
+    (setq my/manifolding-atlas-org-prompt--session nil)
+    (when finalize (funcall finalize))))
+
+(defun my/manifolding-atlas-org-prompt--ensure-warning-option ()
+  "Ensure a first `** WARNING' option exists under the prompt key.
+Inserts it right after the level-1 key heading (past its property
+drawer) when missing, leaving point on that heading.  The buffer is
+persisted by `my/manifolding-atlas-org-prompt--buffer-finish', so each
+prompt file self-heals permanently on first visit."
+  (goto-char (point-min))
+  (if (re-search-forward "^\\*\\*+ WARNING[ \t]*$" nil t)
+      (beginning-of-line)
+    (goto-char (point-min))
+    (when (re-search-forward "^\\* \\([^ \t\n][^\n]*\\)[ \t]*$" nil t)
+      (beginning-of-line)
+      (forward-line 1)
+      (when (looking-at "^[ \t]*:PROPERTIES:[ \t]*$")
+        (while (and (not (eobp))
+                    (not (looking-at "^[ \t]*:END:[ \t]*$")))
+          (forward-line 1))
+        (forward-line 1))
+      (insert "** WARNING\n")
+      (forward-line -1))))
+
+(defun my/manifolding-atlas-org-prompt--session-display (buf)
+  "Show picker BUF in a bottom strip beneath the session's note.
+The note fills the rest of the frame so applied properties are
+visible while prompts are answered."
+  (let* ((note (plist-get my/manifolding-atlas-org-prompt--session :note))
+         (note-buf (and note
+                        (manifolding-atlas-note-path note)
+                        (condition-case nil
+                            (find-file-noselect
+                             (manifolding-atlas-note-path note))
+                          (error nil)))))
+    (if (not (buffer-live-p note-buf))
+        (pop-to-buffer buf)
+      (delete-other-windows)
+      (set-window-buffer (selected-window) note-buf)
+      (let ((win (split-window-below
+                  (- (max 8 (min 16 (floor (* 0.30 (frame-height)))))))))
+        (set-window-buffer win buf)
+        (select-window win)))))
+
+(defun my/manifolding-atlas-org-prompt--session-open (req)
+  "Display the prompt file for REQ and arm the picker."
+  (let* ((spec (plist-get req :spec))
+         (file (plist-get spec :file))
+         (default (plist-get req :default))
+         (buf (condition-case nil
+                  (find-file-noselect file)
+                (error
+                 (or (get-file-buffer file)
+                     (with-current-buffer
+                         (get-buffer-create (file-name-nondirectory file))
+                       (unless (derived-mode-p 'org-mode)
+                         (ignore-errors (org-mode)))
+                       (current-buffer)))))))
+    (with-current-buffer buf
+      (when (bound-and-true-p org-tree-slide-mode)
+        (org-tree-slide-mode -1))
+      (widen)
+      (outline-show-all)
+      (my/manifolding-atlas-org-prompt--ensure-warning-option)
+      (goto-char (point-min))
+      (if (and default (not (string-empty-p default)))
+          (when (re-search-forward
+                 (format "^\\*\\*+ %s[ \t]*$" (regexp-quote default))
+                 nil t)
+            (beginning-of-line))
+        (when (re-search-forward "^\\*\\*+ WARNING[ \t]*$" nil t)
+          (beginning-of-line)))
+      (setq my/manifolding-atlas-org-prompt--buffer-result nil)
+      (setq my/manifolding-atlas-org-prompt--buffer-marks nil)
+      (setq my/manifolding-atlas-org-prompt--this-kind
+            (plist-get spec :kind))
+      (setq my/manifolding-atlas-org-prompt--select-on t)
+      (setq my/manifolding-atlas-org-prompt--session-p t)
+      (my/manifolding-atlas-org-prompt-select-mode 1))
+    (my/manifolding-atlas-org-prompt--session-display buf)
+    (when-let ((win (get-buffer-window buf)))
+      (with-selected-window win
+        (ignore-errors (recenter-top-bottom))))
+    (message "%s — RET select · m mark · q skip"
+             (plist-get spec :label))))
+
+(defun my/manifolding-atlas-org-prompt--session-value (title)
+  "Return the effective value for picking TITLE in the current request."
+  (let* ((req (plist-get my/manifolding-atlas-org-prompt--session :current))
+         (spec (plist-get req :spec))
+         (default (plist-get req :default)))
+    (cond
+     ((and (eq (plist-get spec :kind) 'multi)
+           title
+           my/manifolding-atlas-org-prompt--buffer-marks)
+      (string-join
+       (mapcar #'my/manifolding-atlas-org-prompt--normalize-choice
+               (reverse my/manifolding-atlas-org-prompt--buffer-marks))
+       " "))
+     ((null title)
+      (or default "WARNING"))
+     (t title))))
+
+(defun my/manifolding-atlas-org-prompt--apply-to-note (note props tags todo)
+  "Write PROPS, TAGS and TODO at NOTE's heading in its buffer, then save."
+  (let ((file (manifolding-atlas-note-path note))
+        (pos (manifolding-atlas-note-pos note))
+        (level (manifolding-atlas-note-level note)))
+    (with-current-buffer (find-file-noselect file)
+      (save-excursion
+        (cond ((and level (> level 0) pos)
+               (goto-char pos)
+               (org-back-to-heading t))
+              (t (goto-char (point-min))))
+        (dolist (p props)
+          (org-entry-put nil (car p) (cdr p)))
+        (when tags
+          (org-set-tags tags))
+        (when (and todo (not (member todo '("WARNING" ""))))
+          (ignore-errors (org-todo todo)))
+        (save-buffer)))))
+
+(defun my/manifolding-atlas-org-prompt--session-apply (val)
+  "Apply VAL for the current request directly to the session note."
+  (let* ((req (plist-get my/manifolding-atlas-org-prompt--session :current))
+         (spec (plist-get req :spec))
+         (note (plist-get my/manifolding-atlas-org-prompt--session :note))
+         (frag (my/manifolding-atlas-org-prompt--fragment
+                (plist-get spec :key)
+                (plist-get spec :kind)
+                (plist-get spec :plist)
+                val)))
+    (when (and note frag)
+      (let ((props (plist-get frag :properties))
+            (tags (plist-get frag :tags))
+            (todo (plist-get frag :todo))
+            (post (plist-get frag :post-apply)))
+        (when (or props tags todo)
+          (my/manifolding-atlas-org-prompt--apply-to-note
+           note props tags todo))
+        (dolist (fn post)
+          (condition-case err
+              (funcall fn note)
+            (error
+             (message "atlas prompt post-apply: %s"
+                      (error-message-string err)))))))))
 
 (defvar-local my/manifolding-atlas-org-prompt--this-kind nil)
 
@@ -393,11 +644,7 @@ multi-select kinds."
       (when (bound-and-true-p org-tree-slide-mode)
         (org-tree-slide-mode -1))
       (widen)
-      (when (bound-and-true-p font-lock-mode)
-        (font-lock-mode -1))
-      (goto-char (point-min))
-      (when (fboundp 'outline-show-all)
-        (outline-show-all))
+      (outline-show-all)
       (goto-char (point-min))
       (when (re-search-forward "^\\*\\*+ " nil t)
         (beginning-of-line))
@@ -407,35 +654,15 @@ multi-select kinds."
                (format "^\\*\\*+ %s[ \t]*$"
                        (regexp-quote default))
                nil t)
-          (beginning-of-line)
-          (recenter-top-bottom)))
+          (beginning-of-line)))
       (setq my/manifolding-atlas-org-prompt--select-on t)
+      (setq my/manifolding-atlas-org-prompt--session-p nil)
       (my/manifolding-atlas-org-prompt-select-mode 1)
       (setq my/manifolding-atlas-org-prompt--this-kind kind))
     (pop-to-buffer buf)
+    (ignore-errors (recenter-top-bottom))
     (message "Option picker — RET/C-c C-c select · m mark · C-c C-k/q cancel")
-    (let ((done nil))
-      (while (not done)
-        (condition-case err
-            (progn
-              (recursive-edit)
-              (setq done t))
-          (error
-           (if (and (bufferp buf)
-                    (string-match-p
-                     "max-lisp-eval-depth\\|max-specpdl-size"
-                     (error-message-string err)))
-               (progn
-                 (setq max-lisp-eval-depth
-                       (min 16000 (* 2 max-lisp-eval-depth))
-                       max-specpdl-size
-                       (min 16000 (* 2 max-specpdl-size)))
-                 (with-current-buffer buf
-                   (setq my/manifolding-atlas-org-prompt--select-on t)
-                   (my/manifolding-atlas-org-prompt-select-mode 1))
-                 (message "Raised eval budgets to %d — continuing"
-                          max-lisp-eval-depth))
-             (signal (car err) (cdr err)))))))
+    (recursive-edit)
     (when (buffer-live-p buf)
       (with-current-buffer buf
         (setq my/manifolding-atlas-org-prompt--select-on nil)
@@ -481,11 +708,11 @@ multi-select kinds."
     (key label kind options plist default)
   (pcase kind
     ('template
-     (my/manifolding-atlas-prompt-template))
+      (my/manifolding-atlas-prompt-template--choose))
     ('free
-     (let ((val (read-string (format "%s: " label) nil nil
-                             (or default "⚠ WARNING"))))
-       (if (string-empty-p val) "WARNING" val)))
+      (let ((val (read-string (format "%s: " label) nil nil
+                              (or default "WARNING"))))
+        (if (string-empty-p val) "WARNING" val)))
     ('topics
      (let* ((current (org-entry-get nil key))
             (known (mapcar #'car
@@ -498,44 +725,44 @@ multi-select kinds."
                    "Topics (comma-sep, first=primary, blank=universal): "
                    known nil nil nil nil defaults)
                   " ")))
-    ('tags
-     (let* ((db-tags (condition-case nil
-                         (manifolding-atlas-db-query-tags)
-                       (error nil)))
-            (cands (append '("⚠ tag-warning") options db-tags))
-            (input (completing-read
-                    "Tags (comma-separated, ⚠ tag-warning skips): "
-                    cands nil nil nil nil "⚠ tag-warning")))
-       (if (or (string-empty-p input)
-               (string= input "⚠ tag-warning"))
-           '("tag-warning")
-         (delete-dups
-          (cl-remove-if #'string-empty-p
-                        (split-string input "[ \t]*,[ \t]*" t))))))
+     ('tags
+      (let* ((db-tags (condition-case nil
+                          (manifolding-atlas-db-query-tags)
+                        (error nil)))
+             (cands (append '("tag-warning") options db-tags))
+             (input (completing-read
+                     "Tags (comma-separated, tag-warning skips): "
+                     cands nil nil nil nil "tag-warning")))
+        (if (or (string-empty-p input)
+                (string= input "tag-warning"))
+            '("tag-warning")
+          (delete-dups
+           (cl-remove-if #'string-empty-p
+                         (split-string input "[ \t]*,[ \t]*" t))))))
     ('multi
-     (let* ((raw (completing-read-multiple
-                  (format "%s (comma-separated, blank = skip): " label)
-                  (cons "⚠ WARNING" options) nil nil))
-            (vals (delete-dups
-                   (cl-remove-if
-                    (lambda (v)
-                      (or (string-empty-p v)
-                          (string-equal v "⚠ WARNING")))
-                    raw))))
-       (if vals (string-join vals " ") "WARNING")))
+      (let* ((raw (completing-read-multiple
+                   (format "%s (comma-separated, blank = skip): " label)
+                   (cons "WARNING" options) nil nil))
+             (vals (delete-dups
+                    (cl-remove-if
+                     (lambda (v)
+                       (or (string-empty-p v)
+                           (string-equal v "WARNING")))
+                     raw))))
+        (if vals (string-join vals " ") "WARNING")))
     ('tagopt
-     (let ((sentinel (or default "auto")))
-       (completing-read (format "%s: " label)
-                        (cons sentinel options)
-                        nil t nil nil sentinel)))
-    (_
-     (let ((val (completing-read
-                 (format "%s: " label)
-                 (cons "⚠ WARNING" options)
-                 nil t nil nil (or default "⚠ WARNING"))))
-       (if (string-equal val "⚠ WARNING")
-           (if default default "WARNING")
-         val)))))
+      (let ((sentinel (or default "auto")))
+        (completing-read (format "%s: " label)
+                         (cons sentinel options)
+                         nil t nil nil sentinel)))
+     (_
+      (let ((val (completing-read
+                  (format "%s: " label)
+                  (cons "WARNING" options)
+                  nil t nil nil (or default "WARNING"))))
+        (if (string-equal val "WARNING")
+            (if default default "WARNING")
+          val)))))
 #+end_src
 
 * Fragments
@@ -587,10 +814,11 @@ multi-select kinds."
                                  (or (plist-get plist :live) key)))
                         key val)))))
     ('template
-     `(:properties (("TEMPLATE" . ,val))
-       :post-apply (,(apply-partially
-                      #'my/manifolding-atlas-prompt-template--apply
-                      val))))
+     (let ((v (or val "WARNING")))
+       `(:properties (("TEMPLATE" . ,v))
+         :post-apply (,(apply-partially
+                        #'my/manifolding-atlas-prompt-template--apply
+                        v)))))
     ('multi
      (when val
        `(:properties ((,key . ,val)))))

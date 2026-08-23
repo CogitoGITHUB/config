@@ -7,6 +7,7 @@
 :KIND: property
 :LABEL: Journal
 :END:
+** WARNING
 ** OPEN
 ** CLOSED
 ** ROTATED

@@ -7,6 +7,7 @@
 :KIND: property
 :LABEL: Blueprint
 :END:
+** WARNING
 ** DRAFT
 ** STABLE
 ** CHANGED

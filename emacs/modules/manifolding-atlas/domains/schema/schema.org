@@ -46,8 +46,13 @@ Declarative = no src blocks; level-1 KEY heading, level-2 options."
 
 (defun my/manifolding-atlas-schema--extract-choices (prompt-name)
   "Extract allowed values for PROMPT-NAME: level-2 options from a
-declarative file, else legacy regex over elisp lists (WARNING excluded)."
-  (or (cdr (my/manifolding-atlas-schema--outline-spec prompt-name))
+declarative file (WARNING sentinel excluded), else legacy regex over
+elisp lists (WARNING excluded)."
+  (or (let ((choices (cdr (my/manifolding-atlas-schema--outline-spec
+                           prompt-name))))
+        (when choices
+          (cl-remove-if (lambda (s) (string-match-p "WARNING" s))
+                        choices)))
       (let* ((dir (my/manifolding-atlas-schema--prompt-dir))
              (files (directory-files-recursively
                      dir (format "^%s\\.org$" prompt-name))))
@@ -233,13 +238,14 @@ TODO and PRIORITY from their prompt files.
 
 *** Index-time Validation Action
 
-Warning — indexed notes that violate an applicable schema emit a
-non-blocking lwarn warning naming each violation. Violations are also
-tracked via MISSING PROMPTS (`my/manifolding-atlas-missing--rebuild-from-health').
+Silent — indexed notes that violate an applicable schema emit no
+messages; violations surface only through MISSING PROMPTS
+(`my/manifolding-atlas-missing--rebuild-from-health') and the
+schema-reinforcement sweeps.
 
 #+begin_src emacs-lisp
 (with-eval-after-load 'manifolding-atlas
-  (setq manifolding-atlas-db-schema-validation-action 'warning))
+  (setq manifolding-atlas-db-schema-validation-action 'silent))
 #+end_src
 
 

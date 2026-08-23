@@ -59,6 +59,8 @@ instead of `my/manifolding-atlas-root-dir'.")
                  (fname (concat subdir slug))
                  (prompts (my/manifolding-atlas-collect-prompts-with-fast '() '(file))))
             (setq my/manifolding-atlas--pending-post-apply (plist-get prompts :post-apply))
+            (when (fboundp 'my/manifolding-atlas-org-prompt--park-deferred)
+              (my/manifolding-atlas-org-prompt--park-deferred))
             (list
              :file-name  fname
              :tags       (plist-get prompts :tags)

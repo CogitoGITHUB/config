@@ -9,6 +9,7 @@
 :LIVE: state-source
 :LABEL: State: Source
 :END:
+** WARNING
 ** UNSOURCED
 ** PARTIAL
 ** SOURCED

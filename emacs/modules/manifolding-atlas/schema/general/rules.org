@@ -7,6 +7,7 @@
 :KIND: property
 :LABEL: Rules
 :END:
+** WARNING
 ** DRAFT
 ** RATIFIED
 ** AMENDED

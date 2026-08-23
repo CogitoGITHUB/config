@@ -9,6 +9,7 @@
 :LIVE: state-intelligence
 :LABEL: State: Intelligence
 :END:
+** WARNING
 ** UNVERIFIED
 ** CONFIRMED
 ** CONTESTED

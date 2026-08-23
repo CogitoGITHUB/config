@@ -183,15 +183,26 @@ queryable via `manifolding-atlas-note-properties' and the manifolding-atlas SQL 
     (setq my/manifolding-atlas--new-note note))
   note)
 
+(defun my/manifolding-atlas--open-capture-new-note (note)
+  "Finalizer for parked prompt sessions: open capture for NOTE."
+  (my/manifolding-atlas--open-capture-for-note note))
+
 (defun my/manifolding-atlas-find-advice (original-fn &rest args)
   "Wrap `manifolding-atlas-find' to open org-capture for newly created notes.
 The `:filter-return' advice on `manifolding-atlas-create' `setq's the global
 `my/manifolding-atlas--new-note' so `org-capture-after-finalize-hook' can
-access it later for the \"Open file?\" prompt."
+access it later for the \"Open file?\" prompt.
+Parked deferred prompts from the default-function collection run as an
+async session against the new note before capture opens."
   (setq my/manifolding-atlas--new-note nil)
   (let* ((result (apply original-fn args)))
     (when my/manifolding-atlas--new-note
-      (my/manifolding-atlas--open-capture-for-note my/manifolding-atlas--new-note))
+      (if (fboundp 'my/manifolding-atlas-org-prompt--session-start-parked)
+          (my/manifolding-atlas-org-prompt--session-start-parked
+           my/manifolding-atlas--new-note
+           (apply-partially #'my/manifolding-atlas--open-capture-new-note
+                            my/manifolding-atlas--new-note))
+        (my/manifolding-atlas--open-capture-for-note my/manifolding-atlas--new-note)))
     result))
 
 (with-eval-after-load 'manifolding-atlas

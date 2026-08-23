@@ -14,6 +14,22 @@ that file so you fill in the body.  Put your =doct= declarations in
 ;; Use the helpers below as the :file / :function value in doct entries.
 ;; Declare your template list here as e.g.:
 ;;   (defvar my/capture-manifolding-atlas (doct `(("Manifolding Atlas" :keys "n" ...))))
+;; -- finalizers (named so the async session can call them later) --------
+(defun my/manifolding-atlas--finish-file-capture (note fname fast)
+  "Tail of file captures: open NOTE per FAST mode."
+  (if (= fast 3)
+      (when (y-or-n-p (format "Open %s? " (file-name-nondirectory fname)))
+        (find-file (expand-file-name fname (my/manifolding-atlas-root-dir))))
+    (my/manifolding-atlas--open-capture-for-note note)))
+
+(defun my/manifolding-atlas--finish-heading-capture (note fast &optional skip-open-prompt)
+  "Tail of heading captures: open NOTE per FAST mode."
+  (if (= fast 3)
+      (when (y-or-n-p (format "Open %s? " (manifolding-atlas-note-title note)))
+        (find-file (manifolding-atlas-note-path note)))
+    (when skip-open-prompt
+      (setq my/manifolding-atlas--skip-open-prompt t))
+    (my/manifolding-atlas--open-capture-for-note note)))
 ;; -- file-level helpers ------------------------------------------------
 (defun my/manifolding-atlas-capture-new-file ()
   "Prompt for title, subdir and tags; create the note; open capture for body."
@@ -35,10 +51,9 @@ that file so you fill in the body.  Put your =doct= declarations in
                    (plist-get prompts :body))))
     (dolist (fn (plist-get prompts :post-apply))
       (funcall fn note))
-    (if (= fast 3)
-        (when (y-or-n-p (format "Open %s? " (file-name-nondirectory fname)))
-          (find-file (expand-file-name fname (my/manifolding-atlas-root-dir))))
-      (my/manifolding-atlas--open-capture-for-note note))))
+    (my/manifolding-atlas-org-prompt--session-maybe-start
+     note (apply-partially #'my/manifolding-atlas--finish-file-capture
+                           note fname fast))))
 
 (defun my/manifolding-atlas--create-file-wrapper (title fname tags properties body)
   (let ((manifolding-atlas-create-default-function (lambda (_) '())))
@@ -66,11 +81,10 @@ that file so you fill in the body.  Put your =doct= declarations in
                    (plist-get prompts :body))))
     (dolist (fn (plist-get prompts :post-apply))
       (funcall fn note))
-    (if (= fast 3)
-        (when (y-or-n-p (format "Open %s? " (file-name-nondirectory fname)))
-          (find-file (expand-file-name fname (my/manifolding-atlas-root-dir))))
-      (my/manifolding-atlas--open-capture-for-note note))))
-;; -- heading helper ----------------------------------------------------
+    (my/manifolding-atlas-org-prompt--session-maybe-start
+     note (apply-partially #'my/manifolding-atlas--finish-file-capture
+                           note fname fast))))
+
 (defun my/manifolding-atlas-capture-heading ()
   "Select a parent note, create a heading under it, then open via org-capture."
   (interactive)
@@ -89,7 +103,8 @@ that file so you fill in the body.  Put your =doct= declarations in
                      (manifolding-atlas-select "Parent note: " :require-match t))))
     (setq title (read-string "Heading title: "))
     (setq prompts (if (> fast 0) (my/manifolding-atlas--collect-default-prompts 'heading)
-                     (my/manifolding-atlas-collect-prompts 'heading)))
+                     (let ((my/manifolding-atlas-collect-defer t))
+                       (my/manifolding-atlas-collect-prompts 'heading))))
     (setq my/manifolding-atlas--pending-post-apply nil)
     (setq note (manifolding-atlas-create title nil
                               :parent parent
@@ -100,10 +115,9 @@ that file so you fill in the body.  Put your =doct= declarations in
       (error "manifolding-atlas-create returned %S (expected a manifolding-atlas-note)" note))
     (dolist (fn (plist-get prompts :post-apply))
       (funcall fn note))
-    (if (= fast 3)
-        (when (y-or-n-p (format "Open %s? " (manifolding-atlas-note-title note)))
-          (find-file (manifolding-atlas-note-path note)))
-      (my/manifolding-atlas--open-capture-for-note note))))
+    (my/manifolding-atlas-org-prompt--session-maybe-start
+     note (apply-partially #'my/manifolding-atlas--finish-heading-capture
+                           note fast))))
 ;; -- insert heading in current buffer -----------------------------------
 (defun my/manifolding-atlas-insert-heading (title)
   "Insert a manifolding-atlas heading at point in the current buffer.
@@ -116,19 +130,17 @@ at point, or a child of the file if point is at file level."
     (setq id (my/manifolding-atlas-links--current-note-id))
     (setq parent-note (manifolding-atlas-db-get-by-id id))
     (setq prompts (if (> fast 0) (my/manifolding-atlas--collect-default-prompts 'heading)
-                     (my/manifolding-atlas-collect-prompts 'heading)))
+                     (let ((my/manifolding-atlas-collect-defer t))
+                       (my/manifolding-atlas-collect-prompts 'heading))))
     (setq my/manifolding-atlas--pending-post-apply nil)
     (setq note (manifolding-atlas-create title nil
-                              :parent parent-note
+                               :parent parent-note
                               :tags (plist-get prompts :tags)
                               :properties (plist-get prompts :properties)
                               :after (plist-get prompts :after)))
     (dolist (fn (plist-get prompts :post-apply))
       (funcall fn note))
-    (if (= fast 3)
-        (when (y-or-n-p (format "Open %s? " (manifolding-atlas-note-title note)))
-          (find-file (manifolding-atlas-note-path note)))
-      (progn
-        (setq my/manifolding-atlas--skip-open-prompt t)
-        (my/manifolding-atlas--open-capture-for-note note)))))
+    (my/manifolding-atlas-org-prompt--session-maybe-start
+     note (apply-partially #'my/manifolding-atlas--finish-heading-capture
+                           note fast t))))
 #+end_src

@@ -71,21 +71,55 @@ advice on `manifolding-atlas--format-note-content'.")
 ** Collector
 
 #+begin_src emacs-lisp
+(defvar my/manifolding-atlas-collect-defer nil
+  "When non-nil, buffer-UI declarative prompts are deferred into an
+async session instead of blocking during collection.")
+
+(defvar my/manifolding-atlas-org-prompt--defaults-only nil
+  "Bound non-nil by fast collection: no interaction, nothing deferred.")
+
 (defun my/manifolding-atlas-collect-prompts (context &rest extra-contexts)
   "Run all registered prompts matching CONTEXT (or any of EXTRA-CONTEXTS).
 When CONTEXT is a list, match prompts whose contexts overlap with it.
-Single-symbol callers (like `(my/manifolding-atlas-collect-prompts 'file)`) continue working."
+Single-symbol callers (like `(my/manifolding-atlas-collect-prompts 'file)`) continue working.
+When `my/manifolding-atlas-collect-defer' is non-nil, declarative
+buffer-UI prompts are queued on
+`my/manifolding-atlas-org-prompt--deferred' and answered later by
+`my/manifolding-atlas-org-prompt--session-maybe-start'."
   (let* ((contexts (if (listp context) context (cons context extra-contexts)))
-         result)
+         result
+         deferred-list)
     (dolist (spec my/manifolding-atlas-prompt-registry)
       (when (seq-intersection contexts (plist-get spec :contexts) #'eq)
-        (let ((declared (and (fboundp
-                              'my/manifolding-atlas-org-prompt--declarative-p)
-                             (my/manifolding-atlas-org-prompt--declarative-p
-                              (plist-get spec :key)))))
-          (unless declared
-            (my/manifolding-atlas--show-help (plist-get spec :name)))
-          (let (val frag)
+        (let* ((key (plist-get spec :key))
+               (declared (and (fboundp
+                               'my/manifolding-atlas-org-prompt--declarative-p)
+                              (my/manifolding-atlas-org-prompt--declarative-p
+                               key)))
+               (dspec (and declared
+                           (fboundp 'my/manifolding-atlas-org-prompt--base-key)
+                           (boundp 'my/manifolding-atlas-org-prompt--specs)
+                           (gethash (my/manifolding-atlas-org-prompt--base-key key)
+                                    my/manifolding-atlas-org-prompt--specs)))
+               (defer (and dspec
+                           my/manifolding-atlas-collect-defer
+                           (not my/manifolding-atlas-org-prompt--defaults-only)
+                           (bound-and-true-p my/manifolding-atlas-org-prompt-ui)
+                           (eq my/manifolding-atlas-org-prompt-ui 'buffer)
+                           (memq (plist-get dspec :kind)
+                                 '(property live todo multi tagopt
+                                   scoped mastering mindmap))
+                           (file-exists-p (plist-get dspec :file)))))
+          (if defer
+              (push (list :spec dspec
+                          :default (if (eq key
+                                           (my/manifolding-atlas-org-prompt--base-key key))
+                                       nil
+                                     (plist-get dspec :task-default)))
+                    deferred-list)
+            (unless declared
+              (my/manifolding-atlas--show-help (plist-get spec :name)))
+            (let (val frag)
             (setq val (condition-case nil
                           (funcall (plist-get spec :prompt-fn))
                         (quit nil)))
@@ -96,7 +130,9 @@ Single-symbol callers (like `(my/manifolding-atlas-collect-prompts 'file)`) cont
             (when-let ((v (plist-get frag :properties)))
               (setq result (plist-put result :properties
                            (append (plist-get result :properties)
-                                   (cl-remove-if (lambda (p) (string-empty-p (cdr p))) v)))))
+                                   (cl-remove-if (lambda (p) (or (null (cdr p))
+                                                                 (string-empty-p (cdr p))))
+                                                 v)))))
             (when-let ((v (plist-get frag :body)))
               (setq result (plist-put result :body
                            (concat (or (plist-get result :body) "") v))))
@@ -111,7 +147,12 @@ Single-symbol callers (like `(my/manifolding-atlas-collect-prompts 'file)`) cont
               (setq result (plist-put result :todo (plist-get frag :todo))
                     my/manifolding-atlas--creation-todo (plist-get frag :todo))))
           (unless declared
-            (my/manifolding-atlas--close-help)))))
+            (my/manifolding-atlas--close-help))))))
+    (when deferred-list
+      (setq my/manifolding-atlas-org-prompt--deferred
+            (append my/manifolding-atlas-org-prompt--deferred
+                    (nreverse deferred-list)
+                    nil)))
     result))
 #+end_src
 
@@ -142,7 +183,8 @@ Temporarily overrides `read-string', `completing-read' and
 `read-char-choice' to return their default/skip values."
   (cl-letf (((symbol-function 'read-string) #'my/manifolding-atlas--fast-read-string)
             ((symbol-function 'completing-read) #'my/manifolding-atlas--fast-completing-read)
-            ((symbol-function 'read-char-choice) #'my/manifolding-atlas--fast-read-char-choice))
+            ((symbol-function 'read-char-choice) #'my/manifolding-atlas--fast-read-char-choice)
+            (my/manifolding-atlas-org-prompt--defaults-only t))
     (apply #'my/manifolding-atlas-collect-prompts context extra-contexts)))
 
 (defun my/manifolding-atlas-collect-prompts-with-fast (specialized-contexts general-contexts &optional fast-level)
@@ -151,9 +193,11 @@ SPECIALIZED-CONTEXTS fire at level 0 and 1, skip at level >= 2.
 GENERAL-CONTEXTS fire only at level 0, skip at level >= 1.
 Returns merged plist with :tags, :properties, :body, :post-apply.
 When FAST-LEVEL is nil, prompts the user via `my/manifolding-atlas--fast-level'."
+  (setq my/manifolding-atlas-org-prompt--deferred nil)
   (let* ((fast (or fast-level (my/manifolding-atlas--fast-level)))
+         (my/manifolding-atlas-collect-defer t)
          (spec (if (>= fast 2)
-                   (my/manifolding-atlas--collect-default-prompts specialized-contexts)
+                    (my/manifolding-atlas--collect-default-prompts specialized-contexts)
                  (my/manifolding-atlas-collect-prompts specialized-contexts)))
          (gen  (if (= fast 0)
                    (my/manifolding-atlas-collect-prompts general-contexts)

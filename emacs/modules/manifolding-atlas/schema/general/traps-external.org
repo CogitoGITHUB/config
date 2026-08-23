@@ -7,6 +7,7 @@
 :KIND: property
 :LABEL: Traps External
 :END:
+** WARNING
 ** DESIGNED
 ** SPRUNG
 ** RETIRED
