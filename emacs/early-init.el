@@ -4,23 +4,31 @@
 ;; Known-harmless chatter never reaches the echo area or *Messages*.
 ;; Errors are untouched.  Installed before anything else loads.
 (defvar my/message-noise-regexp
-  (concat "^\\(?:"
-          "Omitting\\.\\.\\.\\|Nothing to omit\\|Omitted [0-9]+ lines? in "
-          "\\|Cleaning up the recentf list\\|Wrote .*/recentf\\|Loading .*/recentf"
-          "\\|Formats have changed, recompiling\\|Updating buffer list"
-          "\\|^Commands: m, u,"
-          "\\|Function provided is already compiled"
-          "\\|\\[yas\\] \\|Prepared just-in-time loading of snippets"
-          "\\|Package cl is deprecated"
-          "\\|ad-handle-definition:"
-          "\\|ATTENTION: org-noter"
-          "\\|transient-define-prefix: .*setup-children"
-          "\\|‘incf’ is an obsolete alias\\| is an obsolete alias"
-          "\\|attempt to open-code ‘anonymous lambda’"
-          "\\|deprecated positional arguments to ‘define-minor-mode’"
-          "\\|Manifolding Atlas: opening database\\|Manifolding Atlas: database ready"
-          "\\|For information about GNU Emacs"
-          "\\)"))
+  (mapconcat
+   #'identity
+   '("Omitting\\.\\.\\."
+     "Nothing to omit"
+     "Omitted [0-9]+ lines? in "
+     "Cleaning up the recentf list"
+     "Wrote .*/recentf"
+     "Loading .*/recentf"
+     "Formats have changed, recompiling"
+     "Updating buffer list"
+     "Commands: m, u,"
+     "Function provided is already compiled"
+     "\\[yas\\] "
+     "Prepared just-in-time loading of snippets"
+     "Package cl is deprecated"
+     "ad-handle-definition:"
+     "ATTENTION: org-noter"
+     "setup-children.*:class must also"
+     " is an obsolete alias"
+     "open-code ‘anonymous lambda’"
+     "deprecated positional arguments to ‘define-minor-mode’"
+     "Manifolding Atlas: opening database"
+     "Manifolding Atlas: database ready"
+     "For information about GNU Emacs")
+   "\\|"))
 
 (defun my/quiet-message-filter (orig fmt &rest args)
   (let ((text (ignore-errors

@@ -18,7 +18,7 @@
 (defun my/init-note (fmt &rest args)
   (let ((message-log-max nil)) (apply #'message fmt args)))
 
-(message "[init] straight bootstrap…")
+(my/init-note "[init] straight bootstrap…")
 
 (defvar bootstrap-version)
 
@@ -31,8 +31,6 @@
     (load bootstrap-file nil 'nomessage)))
 
 (my/init-note "[init] straight ready")
-
-(message "[init] straight ready")
 
 
 ;;; Straight Build Load Paths

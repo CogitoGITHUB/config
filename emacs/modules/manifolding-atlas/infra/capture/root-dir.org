@@ -17,10 +17,12 @@ Returns the relative path from ROOT as a directory name (with trailing slash),
 or \"\" if ROOT itself is selected (Enter at root prompt).
 Type \".\" or press Enter for root level; select or type a subdirectory name."
   (let* ((root (expand-file-name (or root (my/manifolding-atlas-root-dir))))
-         (dirs (cl-loop for f in (directory-files root nil "^[^.]" t)
-                         when (and (file-directory-p (expand-file-name f root))
-                                   (not (member f '("admin" "dictionary" "contacts" "recipes"))))
-                         collect f))
+          (dirs (cl-loop for f in (directory-files root nil "^[^.]" t)
+                          when (and (file-directory-p (expand-file-name f root))
+                                    (not (member f '("admin" "dictionary"
+                                                     "contacts" "recipes"
+                                                     "ictionary"))))
+                          collect f))
          (candidates (cons "." dirs))
          (choice (completing-read (or prompt "Subdirectory: ") candidates nil nil nil nil ".")))
     (if (string-equal choice ".")

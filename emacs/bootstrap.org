@@ -64,23 +64,31 @@ Known-harmless chatter never reaches the echo area or *Messages*.
 Filters message / display-warning / lwarn. Errors are untouched.
 #+begin_src emacs-lisp
 (defvar my/message-noise-regexp
-  (concat "^\\(?:"
-          "Omitting\\.\\.\\.\\|Nothing to omit\\|Omitted [0-9]+ lines? in "
-          "\\|Cleaning up the recentf list\\|Wrote .*/recentf\\|Loading .*/recentf"
-          "\\|Formats have changed, recompiling\\|Updating buffer list"
-          "\\|^Commands: m, u,"
-          "\\|Function provided is already compiled"
-          "\\|\\[yas\\] \\|Prepared just-in-time loading of snippets"
-          "\\|Package cl is deprecated"
-          "\\|ad-handle-definition:"
-          "\\|ATTENTION: org-noter"
-          "\\|transient-define-prefix: .*setup-children"
-          "\\|‘incf’ is an obsolete alias\\| is an obsolete alias"
-          "\\|attempt to open-code ‘anonymous lambda’"
-          "\\|deprecated positional arguments to ‘define-minor-mode’"
-          "\\|Manifolding Atlas: opening database\\|Manifolding Atlas: database ready"
-          "\\|For information about GNU Emacs"
-          "\\)"))
+  (mapconcat
+   #'identity
+   '("Omitting\\.\\.\\."
+     "Nothing to omit"
+     "Omitted [0-9]+ lines? in "
+     "Cleaning up the recentf list"
+     "Wrote .*/recentf"
+     "Loading .*/recentf"
+     "Formats have changed, recompiling"
+     "Updating buffer list"
+     "Commands: m, u,"
+     "Function provided is already compiled"
+     "\\[yas\\] "
+     "Prepared just-in-time loading of snippets"
+     "Package cl is deprecated"
+     "ad-handle-definition:"
+     "ATTENTION: org-noter"
+     "setup-children.*:class must also"
+     " is an obsolete alias"
+     "open-code ‘anonymous lambda’"
+     "deprecated positional arguments to ‘define-minor-mode’"
+     "Manifolding Atlas: opening database"
+     "Manifolding Atlas: database ready"
+     "For information about GNU Emacs")
+   "\\|"))
 
 (defun my/quiet-message-filter (orig fmt &rest args)
   (let ((text (ignore-errors
@@ -172,7 +180,7 @@ Must be here — loading straight.el must happen before any straight-use-package
 (defun my/init-note (fmt &rest args)
   (let ((message-log-max nil)) (apply #'message fmt args)))
 
-(message "[init] straight bootstrap…")
+(my/init-note "[init] straight bootstrap…")
 (defvar bootstrap-version)
 (let ((bootstrap-file
        (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))

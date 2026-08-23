@@ -101,6 +101,11 @@
     (avy-goto-char-timer)
     (forward-char 1)
     (kill-region start (point))))
+(defun my/ibuffer-avy-visit ()
+  "Avy-jump to an ibuffer entry line and visit its buffer."
+  (interactive)
+  (avy-goto-char-timer)
+  (ibuffer-visit-buffer))
 #+end_src
 * Setup
 ** Requires
@@ -154,6 +159,9 @@
 (modaled-define-state "presentation"
   :lighter "[PRE]"
   :cursor-type 'bar)
+(modaled-define-state "ibuffer"
+  :lighter "[IBF]"
+  :cursor-type 'box)
 (add-hook 'org-tree-slide-play-hook
           (lambda () (modaled-set-state "presentation")))
 (add-hook 'org-tree-slide-stop-hook
@@ -168,9 +176,9 @@
          ((derived-mode-p 'org-mode)    "org")
          ((derived-mode-p 'dired-mode)  "dired")
          ((derived-mode-p 'vterm-mode)  "vterm")
-          ((derived-mode-p 'ibuffer-mode) nil)
-          ((derived-mode-p 'magit-mode)  nil)
-          ((derived-mode-p 'vundo-mode)  nil)
+         ((derived-mode-p 'ibuffer-mode) "ibuffer")
+         ((derived-mode-p 'magit-mode)  nil)
+         ((derived-mode-p 'vundo-mode)  nil)
          ((buffer-local-value 'buffer-read-only (current-buffer)) "motion")
          (t "normal"))))
 (modaled-setup)
@@ -380,6 +388,27 @@
     ("a"    . my/dired-avy-open-file)
     ("."    . dired-omit-mode)
     ("SPC"  . my/main-hydra/body)))
+#+end_src
+** Ibuffer
+#+begin_src emacs-lisp
+(modaled-define-keys
+  :states '("ibuffer")
+  :bind
+  `(("<escape>" . my/normal-state)
+    ("ESC"      . my/normal-state)
+    ("SPC"      . my/main-hydra/body)
+    ("n" . ibuffer-forward-line)
+    ("s" . ibuffer-backward-line)
+    ("a" . my/ibuffer-avy-visit)
+    ("t" . ibuffer-visit-buffer)
+    ("o" . ibuffer-visit-buffer-other-window)
+    ("g" . ibuffer-update)
+    ("q" . ibuffer-quit)
+    ("m" . ibuffer-toggle-marks)
+    ("d" . ibuffer-mark-for-delete)
+    ("u" . ibuffer-unmark-forward)
+    ("S" . ibuffer-do-save)
+    ("/" . ibuffer-filter-by-mode)))
 #+end_src
 ** Motion
 #+begin_src emacs-lisp
