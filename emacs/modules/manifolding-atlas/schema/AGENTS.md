@@ -31,11 +31,14 @@ placement (parent/child/sibling/root) then note-target select, stored as
 mm-placement ref link + mm/--apply-placement post-apply. Every declarative
 prompt also defines my/manifolding-atlas-prompt-<key> for direct callers.
 
-Selection UI (default): prompts open their own org file in a normal
-editable buffer — navigate/fold/edit freely, RET on any option heading
-(level 2 or deeper: level-3+ headings are VARIANTS of the parent option)
-selects that heading's title, m marks for multi, q cancels to WARNING.
-Set my/manifolding-atlas-org-prompt-ui to 'minibuffer for completing-read.
+Selection UI (default): prompts open their own org file in a bottom
+strip (note stays on top). A `** WARNING` heading is auto-inserted as
+the first option on first visit and persisted; point starts there, so
+plain RET = skip. RET on any option heading (level 2 or deeper:
+level-3+ headings are VARIANTS of the parent option) selects it, m
+marks for multi, q/C-g skip. Sentinel is plain `WARNING` — emoji
+variants are normalized away on pick. Set
+my/manifolding-atlas-org-prompt-ui ='minibuffer restores completing-read.
 Options therefore include every descendant heading of the key.
 
 Converted to declarative: all state-* (live), priority, todo, thinking,
@@ -63,7 +66,8 @@ domains/schema/schema.org and domains/routines/routines.org
 
 ## Legacy: general prompt conventions
 
-- Default value: "⚠ WARNING" (user can skip by accepting default)
+- Default value: "WARNING" (user can skip by accepting default; plain
+  text only — no emoji sentinels anywhere)
 - :to-plist returns nil when WARNING selected (no property set)
 - Each file registers exactly one prompt
 - Priority 1 for most files, 5-6 for state files

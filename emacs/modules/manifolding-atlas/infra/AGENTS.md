@@ -3,11 +3,15 @@
 paths.org: single source of truth for in-module locations
 (module/schema/templates/files/fast). Every other file delegates here.
 
-capture/: entry-points (create flows), infrastructure (choose-capture),
-heading-format (* Title advice), link-utilities, note-creation (fast mode),
-prompt-engine (registry, collectors, MISSING PROMPTS rebuild), org-prompts
-(declarative outline→prompt engine + buffer picker + template helpers),
-root-dir (subdir prompt), skeleton-preview (template preview +
+capture/: entry-points (create flows — create note first, then async
+prompt session applies picks to the note; finalizers are named fns,
+no closures: loader compiles dynamically), infrastructure
+(choose-capture), heading-format (* Title advice), link-utilities,
+note-creation (fast mode), prompt-engine (registry, collectors with
+defer/defaults-only flags, MISSING PROMPTS rebuild), org-prompts
+(declarative outline→prompt engine + ASYNC session picker + WARNING
+auto-insert + template helpers under `--choose` names), root-dir
+(subdir prompt), skeleton-preview (template preview +
 capture-path/hash), vault-queries (children-of etc).
 
 fast/: dispatcher hydra auto-discovers sibling org files; journal/todo/

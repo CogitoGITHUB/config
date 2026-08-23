@@ -8,8 +8,18 @@ Architecture: core (engine) → infra (machinery) → domains (capabilities)
 - `core/`: vendored engine, filenames `-NN-<name>.org`, order -31..-13 fixed
 - `infra/capture/org-prompts.org`: declarative prompt engine — schema
   outlines (level-1 KEY, level-2+ options incl. variants) auto-register;
-  buffer-based picker (RET select / m mark / q cancel), 11 kinds; see
-  schema/AGENTS.md for the format spec
+  11 kinds; see schema/AGENTS.md for the format spec
+- Capture flows are ASYNC: collector queues buffer-UI prompts
+  (`my/manifolding-atlas-collect-defer`), note is created first, then a
+  session applies each pick directly to the note (bottom-strip picker,
+  note on top). No recursive-edit anywhere in creation — nesting bugs
+  from the old design are structurally impossible. Direct single-shot
+  calls (`my/manifolding-atlas-prompt-<key>`) keep a standalone path.
+- Every prompt file self-heals a first `** WARNING` option (skip
+  sentinel, plain text — no emoji anywhere). RET on it = skip; q/C-g
+  too. Point lands on WARNING unless :TASK-DEFAULT: exists.
+- Registration warns at boot if a declarative key shadows an existing
+  function (`my/manifolding-atlas-prompt-template` collision class).
 - `domains/schema-reinforcement/schema-reinforcement.org`: sweeps keep
   MISSING PROMPTS fresh, index action = warning, registry audit
 - `domains/routines/routines.org`: chains + session journaling +
@@ -31,6 +41,13 @@ Architecture: core (engine) → infra (machinery) → domains (capabilities)
 Conventions unchanged: `my/` namespace, no comments in src blocks, no blank
 line after headings, extensionless vault notes in `~/test/`, DB never
 hand-edited, reload via `M-x manifolding-emacs-reload`.
+
+DB location: `~/test/admin/manifolding-atlas.db`, enforced by the
+`manifolding-atlas-db` advice in atlas.org — a stale connection or a DB
+left at the engine default (`user-emacs-directory/manifolding-atlas.db`)
+is closed and relocated automatically on the next DB touch (any note
+create/delete). Schema validation action is `'silent`: violations never
+hit the minibuffer; MISSING PROMPTS + sweeps are the only surface.
 
 Path helpers: infra/paths.org is the single source of truth for every
 in-module location (module/schema/templates/files/fast dirs) — nothing
