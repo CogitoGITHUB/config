@@ -715,6 +715,21 @@ Headless boot:
 
 : emacs --batch --load ~/.config/emacs/init.el --eval '(message "ok")'
 
+Reload:
+
+: M-x manifolding-emacs-reload
+
+Unchanged modules replay from a content-hash cache under
+.local/cache/module-cache/. Force everything:
+
+: C-u M-x manifolding-emacs-reload
+
+The machine is quiet by design.  
+Chatter — recentf, yasnippet, third-party warnings, save spam, the
+loader's own progress lines — is filtered or routed elsewhere in
+early-init and the loader.  
+Errors are the only voice it has left.
+
 Useful boot messages include:
 
 : org-prompts: registered N declarative prompts
