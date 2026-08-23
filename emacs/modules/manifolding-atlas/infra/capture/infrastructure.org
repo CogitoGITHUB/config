@@ -119,7 +119,12 @@ When TEMPLATE is \"\" (empty), skip template selection and use empty body."
                   ,file
                   (lambda ()
                     (goto-char (point-max))
-                    (skip-chars-backward " \t\n")))
+                    ;; Keep the trailing newline after :END: — the body
+                    ;; templates supply their own leading blank line,
+                    ;; which must survive as visible separation.
+                    (when (and (> (point-max) (point-min))
+                               (not (eq (char-before) ?\n)))
+                      (insert "\n"))))
                  ,tmpl
                  :kill-buffer t
                  :unnarrowed t)))

@@ -607,7 +607,9 @@ quarter/season, or year for the matching temporal contexts)."
 *** Heading Collection
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--collect-headings-avy ()
-  "Select headings via avy-goto-line. C-g finishes collection."
+  "Select headings via avy-goto-line. C-g finishes collection.
+Created IDs are saved to disk immediately so SOURCE references never
+dangle."
   (require 'avy)
   (let ((collected nil))
     (while (condition-case nil
@@ -615,37 +617,70 @@ quarter/season, or year for the matching temporal contexts)."
                  (avy-goto-line)
                  (unless (org-at-heading-p) (user-error "Not a heading"))
                  (org-id-get-create)
+                 ;; Persist the new ID now — the routine will reference
+                 ;; it from another file the moment collection ends.
+                 (when buffer-file-name
+                   (ignore-errors (save-buffer)))
                  (push (cons (org-id-get) (org-get-heading t t t t)) collected)
                  (message "Added: %s. C-g to finish" (cdr (car collected)))
                  t)
              (quit nil)))
     (nreverse collected)))
+
+(defun my/manifolding-atlas-routines--collect-vault ()
+  "Select entries vault-wide via completing-read, repeatable.
+Empty input finishes. Returns (id . title) conses in pick order."
+  (let* ((notes (manifolding-atlas-db-query))
+         (candidates (mapcar (lambda (n)
+                               (cons (manifolding-atlas-note-title n)
+                                     (manifolding-atlas-note-id n)))
+                             notes))
+         (picked nil)
+         (done nil))
+    (while (not done)
+      (let* ((prompt (format "Entry %d (empty input finishes): "
+                             (1+ (length picked))))
+             (choice (completing-read prompt
+                                      (mapcar #'car candidates)
+                                      nil nil)))
+        (if (string-empty-p choice)
+            (setq done t)
+          (let ((id (cdr (assoc choice candidates))))
+            (when (and id (not (member id picked)))
+              (push (cons id choice) picked)))))))
+    (nreverse picked))
+
+(defun my/manifolding-atlas-routines--collect ()
+  "Ask for an entry source and collect (id . title) items.
+b = avy over the current buffer, v = vault-wide selection."
+  (pcase (read-char-choice
+          "Collect entries from: b=avy this buffer v=vault notes: "
+          '(?b ?v))
+    (?b (my/manifolding-atlas-routines--collect-headings-avy))
+    (?v (my/manifolding-atlas-routines--collect-vault))
+    (_ nil)))
 #+end_src
 
 *** Reorder Buffer
 #+begin_src emacs-lisp
-(defvar my/manifolding-atlas-routines--reorder-result nil)
-
 (defun my/manifolding-atlas-routines--reorder-finish ()
   (interactive)
   (let ((items nil))
     (goto-char (point-min))
     (while (re-search-forward "^- \\(.*\\) :: id:\\([[:alnum:]-]+\\)[[:space:]]*$" nil t)
       (push (cons (match-string 2) (match-string 1)) items))
-    (setq my/manifolding-atlas-routines--reorder-result (nreverse items))
     (kill-buffer)
-    (exit-recursive-edit)))
+    (throw 'routines-reorder (nreverse items))))
 
 (defun my/manifolding-atlas-routines--reorder-abort ()
   (interactive)
-  (setq my/manifolding-atlas-routines--reorder-result nil)
   (kill-buffer)
-  (exit-recursive-edit))
+  (throw 'routines-reorder nil))
 
 (defun my/manifolding-atlas-routines--reorder (items)
   "Let the user reorder ITEMS ((id . title) conses) in a dedicated buffer.
-Returns the reordered list, or nil when aborted."
-  (setq my/manifolding-atlas-routines--reorder-result nil)
+Returns the reordered list, or nil when aborted.  Uses a throw across
+the recursive-edit, so an unexpected quit can never strand the session."
   (let ((buf (get-buffer-create "*routines-reorder*")))
     (with-current-buffer buf
       (erase-buffer)
@@ -659,8 +694,41 @@ Returns the reordered list, or nil when aborted."
       (local-set-key (kbd "C-c C-k") #'my/manifolding-atlas-routines--reorder-abort))
     (pop-to-buffer buf)
     (message "Reorder entries, then C-c C-c")
-    (recursive-edit)
-    my/manifolding-atlas-routines--reorder-result))
+    (catch 'routines-reorder
+      (recursive-edit))))
+#+end_src
+
+*** Mastering Bridge
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-routines--mastery-status (sid)
+  "Return (BADGE . DUE-P) for SID from mastering_schedule.
+BADGE is nil when the note is not in the review pool."
+  (condition-case nil
+      (when (fboundp 'my/manifolding-atlas-mastering--today-int)
+        (let ((row (car (emacsql (manifolding-atlas-db)
+                           [:select [next-rev n suspend] :from mastering_schedule
+                            :where (= note-id $s1)] sid))))
+          (when row
+            (let* ((next (nth 0 row))
+                   (n (nth 1 row))
+                   (suspend (nth 2 row))
+                   (today (my/manifolding-atlas-mastering--today-int)))
+              (cond
+               ((= suspend 1) (cons "suspended" nil))
+               ((<= next today)
+                (cons (if (> n 0) "DUE" "LEARN") t))
+               (t (cons (format "in %dd" (- next today)) nil)))))))
+    (error nil)))
+
+(defun my/manifolding-atlas-routines--grade-step (sid)
+  "Grade SID through the mastering algorithm (learn-before-practice)."
+  (when (fboundp 'my/manifolding-atlas-mastering--review-algorithm)
+    (let* ((g (read-char-choice "Learn: n=next f=fail: " '(?n ?f)))
+           (success (eq g ?n)))
+      (my/manifolding-atlas-mastering--update
+       sid success
+       (my/manifolding-atlas-mastering--review-algorithm sid success))
+      (message "Mastering updated: %s" (if success "next" "fail")))))
 #+end_src
 
 *** Creation
@@ -684,8 +752,8 @@ Returns the reordered list, or nil when aborted."
                   (append props `(("ROUTINE_DOMAIN" . ,domain)))))
          (props (if (equal temporal "WARNING") props
                   (append props `(("ROUTINE_TEMPORAL" . ,temporal))))))
-    (message "Select source headings. C-g when done.")
-    (let* ((collected (my/manifolding-atlas-routines--collect-headings-avy))
+    (message "Select source headings. b=avy this buffer, v=vault notes.")
+    (let* ((collected (my/manifolding-atlas-routines--collect))
            (ordered (my/manifolding-atlas-routines--reorder collected))
            (details (my/manifolding-atlas-routines--prompt-details ordered)))
       (unless details (user-error "No entries selected"))
@@ -887,16 +955,20 @@ nested routines render fully."
 
 *** Run Session
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-routines--display-step (buf step total title sid)
+(defun my/manifolding-atlas-routines--display-step (buf step total title sid badge)
   (with-current-buffer buf
     (let ((inhibit-read-only t))
       (erase-buffer)
       (insert (format "[%d/%d] %s\n\n" step total title))
+      (when badge
+        (insert (format "mastering: %s\n" badge)))
       (insert (format "[[id:%s][open]]\n" sid)))))
 
 (defun my/manifolding-atlas-routines-run (&optional routine)
   "Execute ROUTINE (or prompt for one) step by step in a review buffer.
-At the end, offer to journal the session."
+Steps that are in the mastering pool show their review status; due
+steps can be graded with r (learn) before being practiced.  At the
+end, offer to journal the session."
   (interactive)
   (let* ((routine (or routine
                       (my/manifolding-atlas-routines--select-routine-interactive
@@ -907,6 +979,7 @@ At the end, offer to journal the session."
           (total (length entries))
           (done 0)
           (skipped 0)
+          (learned 0)
           (step 0)
           (results nil))
       (with-current-buffer buf
@@ -917,24 +990,45 @@ At the end, offer to journal the session."
         (dolist (entry entries)
           (let* ((sid (nth 0 entry))
                  (stitle (nth 1 entry))
-                 (snote (manifolding-atlas-db-get-by-id sid)))
+                 (snote (manifolding-atlas-db-get-by-id sid))
+                 (mastery (my/manifolding-atlas-routines--mastery-status sid))
+                 (badge (car mastery))
+                 (due-p (cdr mastery)))
             (setq step (1+ step))
-            (my/manifolding-atlas-routines--display-step buf step total stitle sid)
-            (let ((choice (read-char-choice
-                           (format "[%d/%d] %s — d=done s=skip o=open q=quit: "
-                                   step total stitle)
-                           '(?d ?s ?o ?q))))
+            (my/manifolding-atlas-routines--display-step
+             buf step total stitle sid badge)
+            (let* ((choices (if due-p '(?l ?r ?d ?s ?o ?q) '(?d ?s ?o ?q)))
+                   (prompt
+                    (concat (format "[%d/%d] %s%s — "
+                                    step total stitle
+                                    (if badge (format " [%s]" badge) ""))
+                            (if due-p
+                                "l=learn+done r=review-only d=done s=skip o=open q=quit: "
+                              "d=done s=skip o=open q=quit: ")))
+                   (choice (read-char-choice prompt choices)))
               (pcase choice
+                (?l (setq done (1+ done) learned (1+ learned))
+                    (push (list sid stitle 'done) results)
+                    (my/manifolding-atlas-routines--grade-step sid))
+                (?r (my/manifolding-atlas-routines--grade-step sid)
+                    (message "Reviewed without marking practice."))
                 (?d (setq done (1+ done))
                     (push (list sid stitle 'done) results))
                 (?s (setq skipped (1+ skipped))
                     (push (list sid stitle 'skip) results))
                 (?o (when snote
                       (find-file (manifolding-atlas-note-path snote))
-                      (let ((g (read-char-choice
-                                "d=done s=skip q=quit session: "
-                                '(?d ?s ?q))))
+                      (let* ((g-choices (if due-p '(?l ?r ?d ?s ?q)
+                                          '(?d ?s ?q)))
+                             (g (read-char-choice
+                                 (if due-p
+                                     "l=learn d=done s=skip q=quit session: "
+                                   "d=done s=skip q=quit session: ")
+                                 g-choices)))
                         (pcase g
+                          (?l (setq done (1+ done) learned (1+ learned))
+                              (push (list sid stitle 'done) results)
+                              (my/manifolding-atlas-routines--grade-step sid))
                           (?d (setq done (1+ done))
                               (push (list sid stitle 'done) results))
                           (?s (setq skipped (1+ skipped))
@@ -943,12 +1037,107 @@ At the end, offer to journal the session."
                 (?q (throw 'routines-quit nil)))))))
       (kill-buffer buf)
       (when (and results
-                 (y-or-n-p (format "Log session (%d done / %d skipped)? "
-                                   done skipped)))
+                 (y-or-n-p (format "Log session (%d done / %d skipped / %d learned)? "
+                                   done skipped learned)))
         (my/manifolding-atlas-routines--session-create
          routine (nreverse results) done skipped))
-      (message "Routine finished: %d done, %d skipped, %d remaining"
-               done skipped (- total done skipped)))))
+      (message "Routine finished: %d done, %d skipped, %d learned"
+               done skipped learned))))
+#+end_src
+
+*** Add Entry & Due Reviews
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-routines-add-entry (&optional routine)
+  "Append an entry to ROUTINE (or prompt for one).
+Source is the heading at point when in a vault note, else a
+vault-wide selection.  Regenerates the rendered file afterwards."
+  (interactive)
+  (let* ((routine (or routine
+                      (my/manifolding-atlas-routines--select-routine-interactive
+                       "Add entry to routine: ")))
+         (sid (if (and (derived-mode-p 'org-mode)
+                       (org-at-heading-p)
+                       (buffer-file-name)
+                       (file-in-directory-p
+                        (buffer-file-name)
+                        (my/manifolding-atlas-root-dir)))
+                  (progn (org-id-get-create)
+                         (when buffer-file-name (save-buffer))
+                         (cons (org-id-get) (org-get-heading t t t t)))
+                (let* ((notes (manifolding-atlas-db-query))
+                       (cands (mapcar (lambda (n)
+                                        (cons (manifolding-atlas-note-title n)
+                                              (manifolding-atlas-note-id n)))
+                                      notes))
+                       (choice (completing-read "Entry note: "
+                                                (mapcar #'car cands) nil t)))
+                  (cons (cdr (assoc choice cands)) choice))))
+         (existing (my/manifolding-atlas-routines--entries-org routine))
+         (next-order (1+ (or (car (sort (mapcar (lambda (e) (nth 2 e)) existing)
+                                        #'>))
+                             0))))
+    (my/manifolding-atlas-routines--write-entries
+     routine (list (list (car sid) (cdr sid) nil nil)))
+    ;; write-entries assigns sequential orders; force the next one.
+    (with-current-buffer (find-file-noselect
+                          (manifolding-atlas-note-path routine))
+      (goto-char (point-max))
+      (when (re-search-backward ":ROUTINE_ORDER: [0-9]+" nil t)
+        (let ((inhibit-read-only t))
+          (delete-region (match-beginning 0) (match-end 0))
+          (insert (format ":ROUTINE_ORDER: %d" next-order))))
+      (save-buffer))
+    (let ((note routine))
+      (my/manifolding-atlas-routines-generate note)
+      (message "Entry added to %s" (manifolding-atlas-note-title routine)))
+    routine))
+
+(defun my/manifolding-atlas-routines-due-reviews ()
+  "Create or refresh the \"Due Reviews\" composite routine from
+today's due mastering notes.  Stable ID across refreshes; renders
+like any other routine and appears in streaks/report."
+  (interactive)
+  (let ((ids (my/manifolding-atlas-mastering--due-note-ids)))
+    (when (null ids) (user-error "Nothing due today"))
+    (let* ((title "Due Reviews")
+           ;; Reuse an existing Due Reviews routine if present.
+           (rows (emacsql (manifolding-atlas-db)
+                          [:select [routines:note-id notes:title]
+                           :from routines
+                           :inner :join notes :on (= routines:note-id notes:id)]))
+           (rid (cl-loop for row in rows
+                         when (string-equal (cadr row) title)
+                         return (car row)))
+           (note (if rid
+                     (manifolding-atlas-db-get-by-id rid)
+                   (my/manifolding-atlas--create-file-wrapper
+                    title
+                    (concat "routines/due-reviews")
+                    '("routine")
+                    '(("ROUTINE_TYPE" . "composite"))
+                    "")))
+           (items (mapcar (lambda (id)
+                            (let ((n (manifolding-atlas-db-get-by-id id)))
+                              (cons id (if n (manifolding-atlas-note-title n)
+                                         id))))
+                          ids))
+           (ordered (my/manifolding-atlas-routines--reorder items))
+           (details (my/manifolding-atlas-routines--prompt-details ordered)))
+      (unless details (user-error "Aborted"))
+      ;; Clear previous entry headings before rewriting.
+      (with-current-buffer (find-file-noselect
+                            (manifolding-atlas-note-path note))
+        (goto-char (point-min))
+        (while (re-search-forward "^\\*\\* " nil t)
+          (org-back-to-heading t)
+          (let ((beg (point)))
+            (org-end-of-subtree t t)
+            (delete-region beg (point))))
+        (save-buffer))
+      (my/manifolding-atlas-routines--write-entries note details)
+      (my/manifolding-atlas-routines-generate note)
+      (message "Due Reviews refreshed (%d entries)" (length details))
+      note)))
 #+end_src
 
 *** Menu
@@ -957,11 +1146,13 @@ At the end, offer to journal the session."
   "Routines actions."
   [["Create"
     ("r" "New routine" my/manifolding-atlas-routines-create)
-    ("c" "New chain" my/manifolding-atlas-routines-chain-create)]
+    ("c" "New chain" my/manifolding-atlas-routines-chain-create)
+    ("a" "Add entry" my/manifolding-atlas-routines-add-entry)]
    ["Use"
     ("f" "Find routine" my/manifolding-atlas-routines-find)
     ("g" "Generate" my/manifolding-atlas-routines-generate)
-    ("x" "Run" my/manifolding-atlas-routines-run)]
+    ("x" "Run" my/manifolding-atlas-routines-run)
+    ("d" "Due reviews" my/manifolding-atlas-routines-due-reviews)]
    ["Check"
     ("v" "Validate all" my/manifolding-atlas-routines-validate)
     ("s" "Stats report" my/manifolding-atlas-routines-report)]])

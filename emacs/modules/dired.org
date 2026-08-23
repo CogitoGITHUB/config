@@ -43,6 +43,26 @@
             (lambda (&rest _)
               (when olivetti-mode
                 (olivetti-set-buffer-windows))))
+
+;; ── Deleting a file kills its visiting buffers, silently ────────────
+;; No "Kill buffer of X, too?" prompts — in dired or anywhere else.
+(setq dired-clean-up-buffers-too t)
+
+(defun my/delete-file-kill-visiting-buffers (file &rest _)
+  "After DELETE-FILE, silently kill every buffer visiting FILE."
+  (when (and (stringp file)
+             (not (string-match-p "/\\.git/" file)))
+    (let ((target (ignore-errors (expand-file-name file))))
+      (when target
+        (dolist (buf (buffer-list))
+          (when (buffer-live-p buf)
+            (let ((bf (buffer-local-value 'buffer-file-name buf)))
+              (when (and bf (string= bf target))
+                (with-current-buffer buf
+                  (set-buffer-modified-p nil))
+                (ignore-errors (kill-buffer buf))))))))))
+
+(advice-add 'delete-file :after #'my/delete-file-kill-visiting-buffers)
 #+end_src
 
 * Diff HL — Git status in dired

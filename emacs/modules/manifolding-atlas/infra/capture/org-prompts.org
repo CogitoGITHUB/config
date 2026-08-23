@@ -568,11 +568,16 @@ visible while prompts are answered."
      (t title))))
 
 (defun my/manifolding-atlas-org-prompt--apply-to-note (note props tags todo)
-  "Write PROPS, TAGS and TODO at NOTE's heading in its buffer, then save."
-  (let ((file (manifolding-atlas-note-path note))
-        (pos (manifolding-atlas-note-pos note))
-        (level (manifolding-atlas-note-level note)))
-    (with-current-buffer (find-file-noselect file)
+  "Write PROPS, TAGS and TODO at NOTE's heading in its buffer, then save.
+Afterwards, if the note is displayed (top window during a session),
+scroll it so the freshly written drawer stays visible even when the
+property list outgrows the window."
+  (let* ((file (manifolding-atlas-note-path note))
+         (pos (manifolding-atlas-note-pos note))
+         (level (manifolding-atlas-note-level note))
+         (buf (find-file-noselect file))
+         view-target)
+    (with-current-buffer buf
       (save-excursion
         (cond ((and level (> level 0) pos)
                (goto-char pos)
@@ -584,7 +589,17 @@ visible while prompts are answered."
           (org-set-tags tags))
         (when (and todo (not (member todo '("WARNING" ""))))
           (ignore-errors (org-todo todo)))
-        (save-buffer)))))
+        ;; Park the view at the end of the property drawer.
+        (setq view-target
+              (save-excursion
+                (if (re-search-forward "^:END:[ \t]*$" nil t)
+                    (line-beginning-position)
+                  (point))))
+        (save-buffer)))
+    (when-let ((win (get-buffer-window buf t)))
+      (with-selected-window win
+        (goto-char (or view-target (point-min)))
+        (recenter -1)))))
 
 (defun my/manifolding-atlas-org-prompt--session-apply (val)
   "Apply VAL for the current request directly to the session note."
