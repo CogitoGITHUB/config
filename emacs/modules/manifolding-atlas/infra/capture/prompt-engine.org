@@ -17,6 +17,7 @@ prompt file calls ~my/manifolding-atlas-register-prompt~.
 A few prompt names don't match their filename
 (e.g. `scheduled` lives in `schedule.org` with `deadline`).
 
+*** Name mapping and state
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-prompt-help-map
   '((scheduled . "schedule.org")
@@ -37,12 +38,14 @@ Entries here override the default <name>.org.")
 
 (defvar my/manifolding-atlas--help-window-config nil
   "Window configuration captured before showing help.")
-
+#+end_src
+*** Show help
+Captures the window configuration so close-help can restore the
+frame exactly, even after a C-g mid-prompt.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--show-help (name)
   "Open prompt NAME's help file full-screen with org-tree-slide.
-Search recursively under schema/ for the file.  Captures the window
-configuration so `my/manifolding-atlas--close-help' can restore the
-frame exactly, even after a C-g."
+Search recursively under schema/ for the file."
   (let* ((file (my/manifolding-atlas--help-file name))
           (properties-dir (expand-file-name "modules/manifolding-atlas/schema/"
                                             user-emacs-directory))
@@ -56,11 +59,13 @@ frame exactly, even after a C-g."
       (setq my/manifolding-atlas--help-buffer (find-file path))
       (goto-char (point-min))
       (org-tree-slide-mode 1))))
-
+#+end_src
+*** Close help
+Runs on normal completion AND on quit/unwind — a C-g mid-prompt
+must never strand the user inside the help file.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--close-help ()
-  "Close the help view and restore the pre-help window layout.
-Runs on normal completion AND on quit/unwind — a C-g mid-prompt must
-never strand the user inside the help file."
+  "Close the help view and restore the pre-help window layout."
   (when my/manifolding-atlas--help-opened
     (setq my/manifolding-atlas--help-opened nil)
     (when (buffer-live-p my/manifolding-atlas--help-buffer)
@@ -106,12 +111,28 @@ async session instead of blocking during collection.")
 Merges a single prompt's output fragment into the accumulating result
 plist across all channels: tags, properties, body, post-apply hooks,
 advice, file-name, and TODO state.
+
+**** List channels
+Tags and post-apply hooks accumulate by appending.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-collect--merge-fragment (result frag)
-  "Merge FRAG into accumulating RESULT per the collector's channels."
+(defun my/manifolding-atlas-collect--merge-list-channels (result frag)
+  "Append FRAG's :tags and :post-apply onto RESULT."
   (when-let ((v (plist-get frag :tags)))
     (setq result (plist-put result :tags
                             (append (plist-get result :tags) v))))
+  (when-let ((v (plist-get frag :post-apply)))
+    (setq result (plist-put result :post-apply
+                            (append (plist-get result :post-apply) v))))
+  result)
+#+end_src
+**** Merger dispatch
+Empty property values are dropped; :todo also feeds the creation
+carrier consumed by heading-format.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--merge-fragment (result frag)
+  "Merge FRAG into accumulating RESULT per the collector's channels."
+  (setq result (my/manifolding-atlas-collect--merge-list-channels
+                result frag))
   (when-let ((v (plist-get frag :properties)))
     (setq result (plist-put result :properties
                             (append (plist-get result :properties)
@@ -121,9 +142,6 @@ advice, file-name, and TODO state.
   (when-let ((v (plist-get frag :body)))
     (setq result (plist-put result :body
                             (concat (or (plist-get result :body) "") v))))
-  (when-let ((v (plist-get frag :post-apply)))
-    (setq result (plist-put result :post-apply
-                            (append (plist-get result :post-apply) v))))
   (when-let ((v (plist-get frag :after)))
     (setq result (plist-put result :after v)))
   (when-let ((v (plist-get frag :file-name)))
@@ -141,11 +159,81 @@ else answers silently with WARNING. Scoped to one collect-with-fast run.
 (defvar my/manifolding-atlas-org-prompt--custom-set nil)
 #+end_src
 
+*** Spec resolution
+Bridges the collector to the declarative engine without hard
+requires — every hook is checked before use.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--dspec-for (key)
+  "Return the declarative spec behind registry KEY, or nil."
+  (and (fboundp 'my/manifolding-atlas-org-prompt--declarative-p)
+       (my/manifolding-atlas-org-prompt--declarative-p key)
+       (fboundp 'my/manifolding-atlas-org-prompt--base-key)
+       (boundp 'my/manifolding-atlas-org-prompt--specs)
+       (gethash (my/manifolding-atlas-org-prompt--base-key key)
+                my/manifolding-atlas-org-prompt--specs)))
+#+end_src
+*** Defer predicate
+Buffer-UI kinds queue for the async session when collection runs
+deferred; everything else stays synchronous.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--defer-p (dspec)
+  "Non-nil when declarative DSPEC should queue for the async session."
+  (and dspec
+       my/manifolding-atlas-collect-defer
+       (not my/manifolding-atlas-org-prompt--defaults-only)
+       (bound-and-true-p my/manifolding-atlas-org-prompt-ui)
+       (eq my/manifolding-atlas-org-prompt-ui 'buffer)
+       (memq (plist-get dspec :kind)
+             '(property live todo multi tagopt
+               scoped mastering mindmap))
+       (file-exists-p (plist-get dspec :file))))
+#+end_src
+*** Deferred queue entry
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--queue-deferred (key dspec deferred-list)
+  "Queue KEY's DSPEC for the async session; return new DEFERRED-LIST."
+  (cons (list :spec dspec
+              :default (if (eq key
+                               (my/manifolding-atlas-org-prompt--base-key key))
+                           nil
+                         (plist-get dspec :task-default)))
+        deferred-list))
+#+end_src
+*** Silent answer
+Fast modes get their skip fragment straight from the declarative
+engine — list-valued kinds take nil, never a string sentinel.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--silent-fragment (dspec)
+  "Return the skip fragment for declarative DSPEC."
+  (let ((skip-val (pcase (plist-get dspec :kind)
+                    ((or 'tags 'multi) nil)
+                    (_ "WARNING"))))
+    (my/manifolding-atlas-org-prompt--fragment
+     (plist-get dspec :key)
+     (plist-get dspec :kind)
+     (plist-get dspec :plist)
+     skip-val)))
+#+end_src
+*** Interactive run
+Help shows only for hand-written prompts. C-g here aborts the whole
+capture by design — but the help view must still be cleaned up and
+the frame restored before the quit unwinds.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--run-interactive (spec context declared)
+  "Run SPEC's prompt against CONTEXT; DECLARED suppresses help."
+  (unless declared
+    (my/manifolding-atlas--show-help (plist-get spec :name)))
+  (unwind-protect
+      (funcall (plist-get spec :to-plist)
+               (funcall (plist-get spec :prompt-fn))
+               context)
+    (unless declared
+      (my/manifolding-atlas--close-help))))
+#+end_src
 *** Main collector
 Iterates the registry, matching each spec against the requested
-contexts. Declarative buffer-UI prompts get deferred when
-`my/manifolding-atlas-collect-defer' is bound; fast-mode declarative
-prompts answer silently; everything else runs its prompt-fn directly.
+contexts and dispatching per classification: defer, silent, or
+interactive.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-collect-prompts (context &rest extra-contexts)
   "Run all registered prompts matching CONTEXT (or any of EXTRA-CONTEXTS).
@@ -165,66 +253,33 @@ buffer-UI prompts are queued on
                                'my/manifolding-atlas-org-prompt--declarative-p)
                               (my/manifolding-atlas-org-prompt--declarative-p
                                key)))
-               (dspec (and declared
-                           (fboundp 'my/manifolding-atlas-org-prompt--base-key)
-                           (boundp 'my/manifolding-atlas-org-prompt--specs)
-                           (gethash (my/manifolding-atlas-org-prompt--base-key key)
-                                    my/manifolding-atlas-org-prompt--specs)))
+               (dspec (my/manifolding-atlas-collect--dspec-for key))
                (quiet my/manifolding-atlas-org-prompt--defaults-only)
-               (defer (and dspec
-                           my/manifolding-atlas-collect-defer
-                           (not quiet)
-                           (bound-and-true-p my/manifolding-atlas-org-prompt-ui)
-                           (eq my/manifolding-atlas-org-prompt-ui 'buffer)
-                           (memq (plist-get dspec :kind)
-                                 '(property live todo multi tagopt
-                                   scoped mastering mindmap))
-                           (file-exists-p (plist-get dspec :file))))
+               (defer (my/manifolding-atlas-collect--defer-p dspec))
                (template-skip (and dspec
                                    (not quiet)
                                    (eq (plist-get dspec :kind) 'template)))
-                (silent (and dspec
-                             quiet
-                             (not (and my/manifolding-atlas-org-prompt--custom-set
-                                       (member key
-                                               my/manifolding-atlas-org-prompt--custom-set))))))
-            (cond
-           ;; Interactive-only kinds (TEMPLATE) stand down in capture flows.
-           ((or template-skip defer)
-            (when defer
-              (push (list :spec dspec
-                          :default (if (eq key
-                                           (my/manifolding-atlas-org-prompt--base-key key))
-                                       nil
-                                     (plist-get dspec :task-default)))
-                    deferred-list)))
-            ;; Fast modes: declarative prompts answer from their own
-            ;; fragment with the skip sentinel — no UI, ever.
-            (silent
-            (let ((skip-val (pcase (plist-get dspec :kind)
-                              ;; list-valued kinds take nil, not a string
-                              ((or 'tags 'multi) nil)
-                              (_ "WARNING"))))
-              (setq result (my/manifolding-atlas-collect--merge-fragment
-                            result
-                            (my/manifolding-atlas-org-prompt--fragment
-                             (plist-get dspec :key)
-                             (plist-get dspec :kind)
-                             (plist-get dspec :plist)
-                             skip-val)))))
-           (t
-            (unless declared
-              (my/manifolding-atlas--show-help (plist-get spec :name)))
-            ;; C-g here aborts the whole capture by design — but the
-            ;; help view must still be cleaned up and the frame
-            ;; restored before the quit unwinds.
-            (unwind-protect
-                 (let* ((val (funcall (plist-get spec :prompt-fn)))
-                        (frag (funcall (plist-get spec :to-plist) val context)))
-                   (setq result (my/manifolding-atlas-collect--merge-fragment
-                                 result frag)))
-              (unless declared
-                (my/manifolding-atlas--close-help))))))))
+               (silent (and dspec
+                            quiet
+                            (not (and my/manifolding-atlas-org-prompt--custom-set
+                                      (member key
+                                              my/manifolding-atlas-org-prompt--custom-set)))))
+               (frag (cond
+                      ;; Interactive-only kinds (TEMPLATE) stand down in capture flows.
+                      ((or template-skip defer)
+                       (when defer
+                         (setq deferred-list
+                               (my/manifolding-atlas-collect--queue-deferred
+                                key dspec deferred-list)))
+                       nil)
+                      (silent
+                       (my/manifolding-atlas-collect--silent-fragment dspec))
+                      (t
+                       (my/manifolding-atlas-collect--run-interactive
+                        spec context declared)))))
+          (when frag
+            (setq result (my/manifolding-atlas-collect--merge-fragment
+                          result frag))))))
     (when deferred-list
       (setq my/manifolding-atlas-org-prompt--deferred
             (append my/manifolding-atlas-org-prompt--deferred
@@ -239,6 +294,7 @@ When fast mode is active, all prompts return their "skip" defaults
 (e.g. "WARNING" for state prompts) without user interaction.
 This function temporarily overrides input primitives to achieve that.
 
+*** Input primitive overrides
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--fast-read-string (prompt &optional initial-input history default-value _inherit)
   "Return DEFAULT-VALUE or INITIAL-INPUT or empty — no prompt."
@@ -253,7 +309,9 @@ This function temporarily overrides input primitives to achieve that.
 (defun my/manifolding-atlas--fast-read-char-choice (prompt chars &optional _inhibit-keyboard-quit)
   "Return \\r or first char — maps to skip/default in all prompt functions."
   (if (memq ?\r chars) ?\r (car chars)))
-
+#+end_src
+*** Defaults-only collection
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--collect-default-prompts (context &rest extra-contexts)
   "Like `my/manifolding-atlas-collect-prompts' but all prompts return defaults.
 Temporarily overrides `read-string', `completing-read' and
@@ -263,12 +321,13 @@ Temporarily overrides `read-string', `completing-read' and
             ((symbol-function 'read-char-choice) #'my/manifolding-atlas--fast-read-char-choice)
             (my/manifolding-atlas-org-prompt--defaults-only t))
     (apply #'my/manifolding-atlas-collect-prompts context extra-contexts)))
-
-(defun my/manifolding-atlas-collect--choose-custom (contexts)
-  "Ask which properties to customize for this capture.
-Returns registry KEYS to make interactive.  Selecting the
-Body-Template entry pre-runs the body-template chooser now, so it is
-not asked again at finalize."
+#+end_src
+*** SELECTION candidates
+The fallback list mirrors the registry; TEMPLATE is replaced by a
+body-template entry that locks the choice immediately.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--custom-candidates (contexts)
+  "Return (LABEL . KEY) candidates for CONTEXTS."
   (let ((cands nil))
     (dolist (spec my/manifolding-atlas-prompt-registry)
       (when (seq-intersection contexts (plist-get spec :contexts) #'eq)
@@ -280,8 +339,20 @@ not asked again at finalize."
                   cands)))))
     (push (cons "Body Template · choose the body template now"
                 'body-template)
-          cands)
-    (let* ((picked (completing-read-multiple
+          cands)))
+#+end_src
+*** SELECTION chooser
+Opens the same transient toggle menu as the properties update command
+\(SPC P), scoped to CONTEXTS. Returns registry KEYS to make interactive.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--choose-custom (contexts)
+  "Ask which properties to customize for this capture.
+The menu's body-template entry pre-runs the template chooser now,
+so it is not asked again at finalize."
+  (if (fboundp 'my/manifolding-atlas-select-properties-menu)
+      (my/manifolding-atlas-select-properties-menu contexts)
+    (let* ((cands (my/manifolding-atlas-collect--custom-candidates contexts))
+           (picked (completing-read-multiple
                     "Customize which properties (comma between picks): "
                     (mapcar #'car cands)))
            (ids (delq nil
@@ -293,7 +364,24 @@ not asked again at finalize."
         (message "Body template locked: %s"
                  my/manifolding-atlas--chosen-capture))
       (remq 'body-template ids))))
-
+#+end_src
+*** SELECTION fast level
+Level 4 collapses to level 1 with the chosen keys made interactive.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--selection-fast-level (specialized-contexts general-contexts)
+  "Ask which keys fire; store them and return effective level 1."
+  (setq my/manifolding-atlas-org-prompt--custom-set
+        (my/manifolding-atlas-collect--choose-custom
+         (append (if (listp specialized-contexts)
+                     specialized-contexts
+                   (list specialized-contexts))
+                 (if (listp general-contexts)
+                     general-contexts
+                   (list general-contexts)))))
+  1)
+#+end_src
+*** Fast dispatch
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-collect-prompts-with-fast (specialized-contexts general-contexts &optional fast-level)
   "Collect prompts using fast mode levels.
 SPECIALIZED-CONTEXTS fire at level 0 and 1, skip at level >= 2.
@@ -305,16 +393,8 @@ When FAST-LEVEL is nil, prompts the user via `my/manifolding-atlas--fast-level'.
   (setq my/manifolding-atlas-org-prompt--deferred nil)
   (let* ((fast0 (or fast-level (my/manifolding-atlas--fast-level)))
          (fast (if (= fast0 4)
-                   (progn
-                     (setq my/manifolding-atlas-org-prompt--custom-set
-                           (my/manifolding-atlas-collect--choose-custom
-                            (append (if (listp specialized-contexts)
-                                        specialized-contexts
-                                      (list specialized-contexts))
-                                    (if (listp general-contexts)
-                                        general-contexts
-                                      (list general-contexts)))))
-                     1)
+                   (my/manifolding-atlas-collect--selection-fast-level
+                    specialized-contexts general-contexts)
                  fast0))
          (my/manifolding-atlas-collect-defer t)
          (spec (if (>= fast 2)
@@ -336,6 +416,7 @@ When FAST-LEVEL is nil, prompts the user via `my/manifolding-atlas--fast-level'.
 Manages MISSING PROMPTS — an auto-generated file tracking notes whose
 state prompts were skipped (set to WARNING).
 
+*** Path and file bootstrap
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-missing--file "admin/MISSING PROMPTS"
   "Filename for tracking notes with WARNING state properties.")
@@ -357,15 +438,14 @@ state prompts were skipped (set to WARNING).
         (insert "#+DESCRIPTION: Auto-generated - notes with unanswered state prompts.\n")
         (insert "#+STARTUP: overview\n\n")))
     path))
-
-(defun my/manifolding-atlas-missing--rebuild-from-health ()
-  "Rebuild MISSING PROMPTS from schema health data.
-Lists all notes with schema violations, grouped by schema.
-Each entry includes violation details in the property drawer."
-  (interactive)
-  (let ((path (my/manifolding-atlas-missing--path))
-        (by-id (make-hash-table :test #'equal)))
-    (make-directory (file-name-directory path) t)
+#+end_src
+*** Health aggregation
+Violations from every schema collapse into one entry per note so a
+note failing three schemas appears once with all of them listed.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-missing--aggregate-health ()
+  "Return violation entries aggregated by note id."
+  (let ((by-id (make-hash-table :test #'equal)))
     (dolist (health (manifolding-atlas-schema-collection-health))
       (let ((schema-name (manifolding-atlas-schema-health-schema health)))
         (dolist (pair (manifolding-atlas-schema-health-invalid-notes health))
@@ -388,30 +468,48 @@ Each entry includes violation details in the property drawer."
                        by-id))))))
     (let (entries)
       (maphash (lambda (_id plist) (push plist entries)) by-id)
-      (if entries
-          (with-temp-file path
-            (insert "#+TITLE: MISSING PROMPTS\n")
-            (insert "#+AUTHOR: Shape\n")
-            (insert "#+DESCRIPTION: Auto-generated - notes with schema violations.\n")
-            (insert "#+STARTUP: overview\n\n")
-            (dolist (entry (nreverse entries))
-              (insert (format "* TODO [[id:%s][%s]]\n"
-                              (plist-get entry :id)
-                              (plist-get entry :title)))
-              (insert "  :PROPERTIES:\n")
-              (insert (format "  :CREATED:       %s\n"
-                              (format-time-string "<%Y-%m-%d %a>")))
-              (insert (format "  :SCHEMAS:       %s\n"
-                              (string-join (plist-get entry :schemas) ", ")))
-              (let ((vs (plist-get entry :violations)))
-                (when vs
-                  (insert (format "  :VIOLATIONS:    %s\n"
-                                  (string-join
-                                   (mapcar #'manifolding-atlas-violation-message vs)
-                                   "; ")))))
-              (insert "  :END:\n\n")))
-        (when (file-exists-p path)
-          (delete-file path))))))
+      (nreverse entries))))
+#+end_src
+*** Health file writer
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-missing--write-entries (path entries)
+  "Write ENTRIES as TODO headings to PATH; delete the file when empty."
+  (if entries
+      (with-temp-file path
+        (insert "#+TITLE: MISSING PROMPTS\n")
+        (insert "#+AUTHOR: Shape\n")
+        (insert "#+DESCRIPTION: Auto-generated - notes with schema violations.\n")
+        (insert "#+STARTUP: overview\n\n")
+        (dolist (entry entries)
+          (insert (format "* TODO [[id:%s][%s]]\n"
+                          (plist-get entry :id)
+                          (plist-get entry :title)))
+          (insert "  :PROPERTIES:\n")
+          (insert (format "  :CREATED:       %s\n"
+                          (format-time-string "<%Y-%m-%d %a>")))
+          (insert (format "  :SCHEMAS:       %s\n"
+                          (string-join (plist-get entry :schemas) ", ")))
+          (let ((vs (plist-get entry :violations)))
+            (when vs
+              (insert (format "  :VIOLATIONS:    %s\n"
+                              (string-join
+                               (mapcar #'manifolding-atlas-violation-message vs)
+                               "; ")))))
+          (insert "  :END:\n\n")))
+    (when (file-exists-p path)
+      (delete-file path))))
+#+end_src
+*** Rebuild command
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-missing--rebuild-from-health ()
+  "Rebuild MISSING PROMPTS from schema health data.
+Lists all notes with schema violations, grouped by schema.
+Each entry includes violation details in the property drawer."
+  (interactive)
+  (let ((path (my/manifolding-atlas-missing--path)))
+    (make-directory (file-name-directory path) t)
+    (my/manifolding-atlas-missing--write-entries
+     path (my/manifolding-atlas-missing--aggregate-health))))
 
 (defun my/manifolding-atlas--post-sync (_property _value _note)
   "No-op.  Schema health replaces per-property MISSING PROMPTS sync."
@@ -420,12 +518,17 @@ Each entry includes violation details in the property drawer."
 
 ** Rebuild & Hooks
 
+*** Finalize hook and retry timer
 #+begin_src emacs-lisp
 (add-hook 'org-capture-after-finalize-hook #'my/manifolding-atlas-missing--rebuild-from-health)
 
 (defvar my/manifolding-atlas-missing--startup-timer nil
   "Timer handle for retrying startup rebuild until DB is ready.")
-
+#+end_src
+*** Startup rebuild with DB retry
+Retries on a 5s idle timer until the database actually has notes,
+then cancels itself.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-missing--startup-rebuild ()
   "Run rebuild-from-health if manifolding-atlas DB has notes; retry later if not."
   (condition-case nil

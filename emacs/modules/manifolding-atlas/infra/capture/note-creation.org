@@ -8,7 +8,8 @@
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas--fast-level 0
   "Fast mode level for current creation.
-0=normal, 1=skip general, 2=skip all, 3=quick (no body).")
+0=normal, 1=skip general, 2=skip all, 3=quick (no body),
+4=selection (pick which properties to customize).")
 #+end_src
 
 ** Fast mode level menu
@@ -74,5 +75,5 @@ instead of `my/manifolding-atlas-root-dir'.")
              :file-name  fname
              :tags       (plist-get prompts :tags)
              :properties (plist-get prompts :properties)
-             :body       (plist-get prompts :body)))))))
+             :body       (plist-get prompts :body))))))
 #+end_src

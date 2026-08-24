@@ -19,9 +19,7 @@ variables — =apply-partially= with named functions is the safe pattern.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--finish-file-capture (note fname fast)
   "Tail of file captures: open NOTE per FAST mode."
-  (if (= fast 3)
-      (when (y-or-n-p (format "Open %s? " (file-name-nondirectory fname)))
-        (find-file (expand-file-name fname (my/manifolding-atlas-root-dir))))
+  (unless (= fast 3)
     (my/manifolding-atlas--open-capture-for-note note)))
 #+end_src
 
@@ -29,9 +27,7 @@ variables — =apply-partially= with named functions is the safe pattern.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--finish-heading-capture (note fast &optional skip-open-prompt)
   "Tail of heading captures: open NOTE per FAST mode."
-  (if (= fast 3)
-      (when (y-or-n-p (format "Open %s? " (manifolding-atlas-note-title note)))
-        (find-file (manifolding-atlas-note-path note)))
+  (unless (= fast 3)
     (when skip-open-prompt
       (setq my/manifolding-atlas--skip-open-prompt t))
     (my/manifolding-atlas--open-capture-for-note note)))

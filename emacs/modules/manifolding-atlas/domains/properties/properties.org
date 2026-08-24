@@ -292,6 +292,54 @@ Toggle each property with its key letter, then confirm with C-c C-c."
     ("C-c C-c" "Confirm" my/manifolding-atlas--update-confirm)
     ("C-c C-k" "Cancel"  my/manifolding-atlas--update-cancel)]])
 #+end_src
+*** Capture SELECTION Menu
+The capture SELECTION speed reuses the exact toggle UI of the
+properties update menu, but no note exists yet — so the confirm
+suffix only records the chosen keys instead of running prompts.
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas--selection-result nil
+  "Keys picked in the capture SELECTION transient menu.")
+
+(transient-define-suffix my/manifolding-atlas--selection-confirm ()
+  "Record the toggled keys and leave the SELECTION menu."
+  (interactive)
+  (setq my/manifolding-atlas--selection-result
+        (reverse my/manifolding-atlas--selected-keys)
+        my/manifolding-atlas--selected-keys nil))
+
+(transient-define-suffix my/manifolding-atlas--selection-body-template ()
+  "Pre-run the body template chooser during capture SELECTION.
+Locks the choice now so it is not asked again at finalize."
+  (interactive)
+  (when (fboundp 'my/manifolding-atlas--choose-capture)
+    (setq my/manifolding-atlas--chosen-capture
+          (my/manifolding-atlas--choose-capture))
+    (message "Body template locked: %s"
+             (or my/manifolding-atlas--chosen-capture "none"))))
+
+(transient-define-prefix my/manifolding-atlas--select-properties-menu ()
+  "Select which properties to customize during capture.
+Same toggle grid as the properties update menu: letter keys toggle,
+RET/C-c C-c confirms, C-c C-k cancels."
+  ["Properties"
+   :setup-children my/manifolding-atlas--update-children]
+  [["Actions"
+    ("C-c C-c" "Confirm" my/manifolding-atlas--selection-confirm)
+    ("t"       "Choose body template now" my/manifolding-atlas--selection-body-template)
+    ("C-c C-k" "Cancel"  my/manifolding-atlas--update-cancel)]])
+
+(defun my/manifolding-atlas-select-properties-menu (contexts)
+  "Open the properties-update transient menu in capture SELECTION mode.
+CONTEXTS limits which registered prompts are offered.  Blocks until
+the menu exits; returns the list of :key symbols the user toggled."
+  (setq my/manifolding-atlas--current-note nil
+        my/manifolding-atlas--current-context 'file
+        my/manifolding-atlas--current-contexts contexts
+        my/manifolding-atlas--selected-keys nil
+        my/manifolding-atlas--selection-result nil)
+  (my/manifolding-atlas--select-properties-menu)
+  my/manifolding-atlas--selection-result)
+#+end_src
 *** Fragment Applier
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--set-file-property (key value strategy)

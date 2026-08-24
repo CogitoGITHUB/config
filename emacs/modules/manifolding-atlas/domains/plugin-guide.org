@@ -1761,7 +1761,7 @@ This config uses a hybrid approach:
 (manifolding-atlas-meta-set note "STATUS" "active")
 
 ;; Batch set
-(manifolding-atlas-meta-set-batch note '((\"status\" . \"active\") (\"priority\" . 1)))
+(manifolding-atlas-meta-set-batch note '(("status" . "active") ("priority" . 1)))
 
 ;; Remove metadata
 (manifolding-atlas-meta-remove note "STATUS")

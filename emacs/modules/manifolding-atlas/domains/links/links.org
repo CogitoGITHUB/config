@@ -262,7 +262,7 @@ DIRECTION is either incoming or outgoing — recorded in the entry."
       (insert "  :END:\n")
       (insert "  [[elisp:(my/manifolding-atlas-links-restore)][Restore from Git]]\n")
       (save-buffer)
-      (kill-buffer (current-buffer))))))
+      (kill-buffer (current-buffer)))))
 #+end_src
 
 *** Broken-Links Guard

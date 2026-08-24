@@ -9,6 +9,10 @@
 ;; (manifolding-atlas-utils-link-make-string note "Custom Description")
 ;; => "[[id:abc123][Custom Description]]"
 ;; Passing nil as description falls back to the note title.
+#+end_src
+** Subtree Extraction
+Turns a heading into a full note and leaves an id: link behind.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-extract-subtree ()
   "Extract the heading at point into a new manifolding-atlas note.
 Prompts for a subdirectory, creates the note with the subtree
@@ -35,6 +39,9 @@ id: link to the new note."
           (end (progn (org-end-of-subtree t t) (point))))
       (delete-region beg end))
     (insert (manifolding-atlas-utils-link-make-string note) "\n")))
+#+end_src
+** Copy Link
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-copy-link ()
   "Select a note and copy an id: link to it to the kill ring."
   (interactive)
@@ -44,6 +51,11 @@ id: link to the new note."
                 note (unless (string-empty-p raw) raw))))
     (kill-new link)
     (message "Copied: %s" link)))
+#+end_src
+** Insert Link
+Existing titles reuse their note; new titles run the full creation
+flow and open capture for the body.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-insert-link ()
   "Prompt for title, look up or create a note, then insert an id: link.
 If a note with that title exists, use it.  Otherwise create a new one
@@ -61,6 +73,9 @@ buffer for body editing."
     (insert link)
     (when my/manifolding-atlas--new-note
       (my/manifolding-atlas--open-capture-for-note note))))
+#+end_src
+** Rename Link
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-rename-link ()
   "Rename the description of an id: link at point."
   (interactive)

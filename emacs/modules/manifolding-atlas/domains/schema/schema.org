@@ -217,7 +217,7 @@ changes.
                               ,(lambda (val _note)
                                  (cond ((equal val "WARNING") "missing-required")
                                        ((null val) "missing-required")
-                                       (t t))))))))))
+                                       (t t)))))))))
 #+end_src
 
 *** Task Schema

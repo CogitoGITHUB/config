@@ -358,5 +358,5 @@ DELETED-ID, or nil."
       (my/manifolding-atlas-links--cleanup-empty-admin-files)
       (message "Restored %s. Entry removed from deleted-files." restored-file)
       (when (y-or-n-p (format "Open restored file %s? " restored-file))
-        (find-file (expand-file-name restored-file (my/manifolding-atlas-root-dir))))))))
+        (find-file (expand-file-name restored-file (my/manifolding-atlas-root-dir)))))))
 #+end_src
