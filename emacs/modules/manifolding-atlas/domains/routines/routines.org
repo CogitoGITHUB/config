@@ -18,6 +18,9 @@ org. Chains are routines whose sources are themselves routines.
 #+end_src
 
 *** Vocabulary Constants
+Three axes define every routine: its type (atomic/composite/chain),
+its life domain (SELF-CARE through CUSTOM), and its temporal rhythm
+(HOUR through YEARLY, plus day-parts and seasons).
 #+begin_src emacs-lisp
 (defconst my/manifolding-atlas-routines--types
   '("atomic" "composite" "chain"))
@@ -38,6 +41,9 @@ org. Chains are routines whose sources are themselves routines.
 #+end_src
 
 *** State
+Three directories: routine notes live under =routines/=, rendered
+files go to =routines/generated/=, and session journals nest into
+=sessions/<Y>/<Q>/<m>/<W>/= at the vault root.
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-routines-directory
   (expand-file-name "routines/" (my/manifolding-atlas-root-dir))
@@ -69,6 +75,9 @@ organized with the same year/quarter/month/week nesting as the journal.")
 #+end_src
 
 *** Database Tables
+Three tables: =routines= indexes routine notes by type/domain/temporal,
+=routine_entries= maps entry headings to their parent routine with
+ordering, and =routine_sessions= journals each run with done/skip counts.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--ensure-tables ()
   (emacsql (manifolding-atlas-db)
@@ -103,6 +112,10 @@ organized with the same year/quarter/month/week nesting as the journal.")
 #+end_src
 
 *** DB Extractor
+Indexes ROUTINE_* properties from NOTE-DATA. Routine notes land in
+=routines=; entry headings carrying ROUTINE_ID, SOURCE and
+ROUTINE_ORDER land in =routine_entries=. Session notes with SESSION_OF
+and SESSION_DATE land in =routine_sessions=.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--extract (_ctx note-data)
   "Index ROUTINE_* properties from NOTE-DATA.
@@ -165,6 +178,9 @@ SOURCE and ROUTINE_ORDER land in `routine_entries'."
 #+end_src
 
 *** Schema
+Two schemas: =routine= requires ROUTINE_TYPE/DOMAIN/TEMPORAL on notes
+tagged =routine= (but not =session=); =routines-session= requires the
+SESSION_* properties on notes tagged =session=.
 #+begin_src emacs-lisp
 (manifolding-atlas-schema-define
  'routine
@@ -218,13 +234,23 @@ SOURCE and ROUTINE_ORDER land in `routine_entries'."
 #+end_src
 
 *** Entry Writing
+Entries are appended as child headings with SOURCE, ROUTINE_ID and
+ROUTINE_ORDER properties. Optional group labels (Warm-Up through
+Recovery) and workout prescriptions (=3x10 @20kg /180s=) are parsed
+into WORKOUT_* properties.
+
+**** Prescription format
 #+begin_src emacs-lisp
 (defconst my/manifolding-atlas-routines--groups
   '("Warm-Up" "Main" "Accessory" "Conditioning" "Cooldown" "Recovery"))
 
 (defconst my/manifolding-atlas-routines--rx-regexp
   "\\`\\s-*\\([0-9]+\\)\\s-*x\\s-*\\([0-9]+\\)\\(?:\\s-*@\\s-*\\([^/]+?\\)\\)?\\(?:\\s*/\\s-*\\([0-9]+\\)\\s-*s?\\)?\\s-*\\'")
+#+end_src
 
+**** Entry insertion
+Dual-writes: org drawer properties plus immediate routine_entries rows.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--entry-insert-row (eid rid source order group)
   "Insert one routine_entries row immediately; tolerate FK timing."
   (condition-case nil
@@ -232,7 +258,10 @@ SOURCE and ROUTINE_ORDER land in `routine_entries'."
         [:insert :into routine_entries :values $v1]
         (vector eid rid source order group))
     (error nil)))
+#+end_src
 
+**** Group and prescription prompts
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--prompt-details (items)
   "Annotate reordered ITEMS with optional group and prescription.
 ITEMS are (id . title) conses; returns (id title group rx) lists."
@@ -293,6 +322,9 @@ Dual-writes: org drawer properties plus immediate routine_entries rows."
 #+end_src
 
 *** Queries
+Entries are read from the DB index first (fast), falling back to a
+direct org scan when unsynced. Workout detail always reads live from
+the routine file.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines-all ()
   "Return list of all routine notes known to the DB."
@@ -416,6 +448,9 @@ unsynced); workout detail is read live from the routine file."
 #+end_src
 
 *** Session Journaling
+Each run creates or updates a session note under
+=sessions/<Y>/<Q>/<m>/<W>/<date>-<slug>= with per-step results.
+Idempotent per day: same routine + date rewrites in place, preserving ID.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--dateint-days (int)
   "Convert YYYYMMDD INT to org day-number."
@@ -516,6 +551,11 @@ newest first."
                        routine-id)))
     (if limit (seq-take rows limit) rows)))
 
+*** Streaks
+Temporal-aware streak counting: the period unit derives from the
+routine's TEMPORAL property. A streak survives if the current or
+previous period has a session.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--streak-unit (temporal)
   "Map TEMPORAL context to a streak period unit."
   (pcase temporal
@@ -564,6 +604,10 @@ quarter/season, or year for the matching temporal contexts)."
               buckets (cdr buckets))))
     streak))
 
+*** Report
+Per-routine compliance: last session, streak, last-7-days count.
+Opens =*routines-report*= in an org buffer.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines-report ()
   "Show per-routine compliance: last session, streak, last-7-days count."
   (interactive)
@@ -605,6 +649,8 @@ quarter/season, or year for the matching temporal contexts)."
 #+end_src
 
 *** Heading Collection
+Select headings via avy-goto-line. C-g finishes collection. Each
+selected heading gets an ID created if missing, saved immediately.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--collect-headings-avy ()
   "Select headings via avy-goto-line. C-g finishes collection.
@@ -662,6 +708,9 @@ b = avy over the current buffer, v = vault-wide selection."
 #+end_src
 
 *** Reorder Buffer
+Dedicated buffer for reordering entries — move lines, then C-c C-c
+confirms or C-c C-k aborts. Uses a throw across the recursive-edit
+so an unexpected quit can never strand the session.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--reorder-finish ()
   (interactive)
@@ -732,6 +781,9 @@ BADGE is nil when the note is not in the review pool."
 #+end_src
 
 *** Creation
+Creates an atomic or composite routine from interactively selected
+headings. Entry source: b = avy over the current buffer, v = vault-wide
+selection via completing-read.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines-create ()
   "Create an atomic or composite routine from interactively selected headings."
@@ -813,6 +865,10 @@ BADGE is nil when the note is not in the review pool."
 #+end_src
 
 *** Generation
+Renders the routine's entries as transcluded headings in a generated
+org file under routines/generated/. Preserves the existing ID and TODO
+state across regenerations. Chain members are transcluded through
+their generated files' heading IDs so nested routines render fully.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--generated-index ()
   "Alist (routine-source-id . generated-heading-id) scanned from disk."
@@ -901,6 +957,9 @@ nested routines render fully."
 #+end_src
 
 *** Validation
+Validates all routines and reports: unresolvable sources, duplicate or
+non-contiguous ROUTINE_ORDER values, and chain members that are not
+themselves routines.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines-validate ()
   "Validate all routines and report problems."
@@ -954,6 +1013,10 @@ nested routines render fully."
 #+end_src
 
 *** Run Session
+Step-by-step execution in a review buffer. Steps that are in the
+mastering pool show their review status; due steps can be graded with
+l (learn) or r (review-only) before being practiced. At the end, offers
+to journal the session.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--display-step (buf step total title sid badge)
   (with-current-buffer buf

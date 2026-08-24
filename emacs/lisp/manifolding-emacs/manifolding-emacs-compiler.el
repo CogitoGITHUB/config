@@ -192,25 +192,31 @@ all loose forms in document order, followed by package bodies."
     (cons (append parts (nreverse package-parts)) profile)))
 
 (defun manifolding-emacs--eval-parts (file parts profile &optional signal-error)
-  "Evaluate PARTS with the same isolation compile-file provides.
-When SIGNAL-ERROR is non-nil, the first part error is recorded AND
-re-signaled, so callers can fall back to a fresh compile.
-Every failure prints: file, function name (when detectable),
-the exact error, and a code snippet — immediately."
+  "Evaluate PARTS with isolation. Reports failures with full context:
+file, detected function name, exact error message, code snippet.
+Detects silent swallowing: if PARTS is empty for a non-trivial file,
+something broke during extraction."
+  ;; Zero-forms detection: non-empty CODE file but zero parts = extraction failure.
+  ;; Data-only files (schema outlines, templates, docs) legitimately have no elisp.
+  (when (and (null parts)
+             (> (or (nth 7 (file-attributes file)) 0) 10)
+             (string-match-p "/infra/\\|/domains/" file))
+    (message "manifolding-emacs ERROR [%s]: ZERO forms extracted — likely paren imbalance or nested begin_src"
+             (file-name-nondirectory file))
+    (manifolding-emacs-record-error
+     :level 'file :file file
+     :message "ZERO forms extracted — likely paren imbalance or nested begin_src markers"))
   (let ((straight-current-profile
          (or profile (and (boundp 'straight-current-profile)
                           straight-current-profile))))
     (dolist (part parts)
       (let* ((is-package (eq (plist-get part :kind) 'package))
              (body (plist-get part :body))
-             ;; Detect the primary defun name for better error labels
-             (fn-name (and (string-match
-                            "^(defun[ \t]+\\([^ \t\n)+]+\\)" body)
+             (fn-name (and (string-match "^(defun[ \t]+\\([^ \t\n)+]+\\)" body)
                            (match-string 1 body)))
              (label (or fn-name
-                        (and is-package
-                             (plist-get part :name))
-                        "anonymous form"))
+                        (and is-package (plist-get part :name))
+                        "anonymous"))
              (snippet (if (> (length body) 200)
                           (concat (substring body 0 200) "…")
                         body)))
@@ -222,34 +228,47 @@ the exact error, and a code snippet — immediately."
                       manifolding-emacs-lexical-binding))
               (when is-package
                 (manifolding-emacs-record-status
-                 (plist-get part :name) 'ok file)))
+                 (plist-get part :name) 'ok file))
+              (when (and fn-name (not (fboundp (intern fn-name))))
+                (message "manifolding-emacs WARNING [%s]: %s defined but VOID"
+                         file fn-name)
+                (manifolding-emacs-record-error
+                 :level 'part :file file
+                 :message (format "%s defined but VOID — nested inside another form" fn-name)))
+              )
           (error
-           (let ((msg (error-message-string err)))
-             ;; Paren issues get an actionable hint
-             (when (string-match-p
-                    "End of file during parsing\\|Unbalanced\\|containing"
-                    msg)
-               (setq msg (concat msg
-                                 "\n  → LIKELY PAREN ISSUE. Run: sh ~/.config/emacs/paren-scan.sh")))
-             (message "manifolding-emacs ERROR [%s] %s\n  → %s\n  Code: %s"
-                      label file msg snippet)
-             (if is-package
-                 (manifolding-emacs-record-error
-                  :level 'package :file file
-                  :package (plist-get part :name)
-                  :line 1
-                  :message (format "%s: %s" label msg))
-               (manifolding-emacs-record-error
-                :level 'part :file file
-                :message (format "%s: %s\n  Code: %s"
-                                 label msg snippet))))
+           (message "manifolding-emacs ERROR [%s] %s: %s\n  Code: %s"
+                    label file (error-message-string err) snippet)
+           (manifolding-emacs-record-error
+            :level (if is-package 'package 'part)
+            :file file
+            :package (and is-package (plist-get part :name))
+            :message (format "%s: %s" label (error-message-string err)))
            (when signal-error
              (signal (car err) (cdr err)))))))))
 
-(defun manifolding-emacs-compile-file-cached (file &optional force)
-  "Compile FILE through the content-hash cache.
-FORCE non-nil skips the cache and refreshes the entry.  Returns FILE,
-or nil when the file is disabled."
+(defun manifolding-emacs--cache-validate (data)
+  "Return t when DATA is a well-formed cache entry.
+Checks: plist with :parts list of non-empty plists having :kind and
+:body strings.  Catches corruption from truncated serialization,
+wrong-version entries, or hand-edited cache files."
+  (and (listp data)
+       (plist-get data :parts)
+       (consp (plist-get data :parts))
+       (stringp manifolding-emacs-cache-salt)
+       (equal (plist-get data :version) manifolding-emacs-cache-salt)
+       (cl-every
+        (lambda (p)
+          (and (listp p)
+               (plist-get p :kind)
+               (plist-get p :body)
+               (stringp (plist-get p :body))
+               (> (length (plist-get p :body)) 0)))
+        (plist-get data :parts))))
+
+(defun manifolding-emacs-compile-file-cached (file &optional _force)
+  "Compile FILE fresh. Always re-extracts and re-evaluates.
+Returns FILE, or nil when the file is disabled."
   (unless (file-exists-p file)
     (error "File to compile does not exist: %s" file))
   (if (manifolding-emacs-file-disabled-p file)
@@ -257,44 +276,10 @@ or nil when the file is disabled."
         (message "manifolding-emacs: skipping disabled file %s"
                  (file-name-nondirectory file))
         nil)
-    (let* ((key (manifolding-emacs-cache-key file))
-           (path (manifolding-emacs-cache-path key))
-           (cached (and (not force)
-                        (file-exists-p path)
-                        (manifolding-emacs--cache-read path)))
-           (parts (plist-get cached :parts))
-           (profile (plist-get cached :profile)))
-      (if (and (consp parts) cached)
-          (condition-case replay-err
-              (progn
-                (manifolding-emacs--eval-parts file parts profile 'signal)
-                file)
-            (error
-             ;; Corrupt/stale entry: drop it and fall back to a fresh
-             ;; compile so the session can never inherit a broken cache.
-             (ignore-errors (delete-file path))
-             (message "manifolding-emacs: cache fallback for %s (%s)"
-                      (file-name-nondirectory file)
-                      (error-message-string replay-err))
-             (pcase-let* ((`(,fparts . ,fprofile)
-                           (manifolding-emacs--extract-parts file)))
-               (condition-case nil
-                   (manifolding-emacs--cache-write
-                    path (list :version manifolding-emacs-cache-salt
-                               :profile fprofile :parts fparts))
-                 (error nil))
-               (manifolding-emacs--eval-parts file fparts fprofile)
-               file)))
-        (pcase-let* ((`(,parts . ,profile)
-                      (manifolding-emacs--extract-parts file)))
-          (condition-case nil
-              (manifolding-emacs--cache-write
-               path (list :version manifolding-emacs-cache-salt
-                          :profile profile
-                          :parts parts))
-            (error nil))
-          (manifolding-emacs--eval-parts file parts profile)
-          file)))))
+    (pcase-let* ((`(,parts . ,profile)
+                  (manifolding-emacs--extract-parts file)))
+      (manifolding-emacs--eval-parts file parts profile)
+      file)))
 
 (defun manifolding-emacs-compile-file (file)
   "Compile FILE.  Returns FILE, or nil if skipped (disabled).
@@ -334,7 +319,8 @@ If PROGRESS-FN is given, call it with (CURRENT TOTAL FILE) before
 compiling each file — used to drive a splash screen without this file
 knowing anything about UI."
   (let* ((files (manifolding-emacs-get-files "^[^#]*\\.org$" (manifolding-emacs-get-org-directory)))
-         (compiled '()) (current 0) (total (length files)))
+         (compiled '()) (current 0) (total (length files))
+         (paren-errors 0) (void-errors 0))
     (dolist (file files)
       (setq current (1+ current))
       (when progress-fn (funcall progress-fn current total file))
@@ -343,8 +329,22 @@ knowing anything about UI."
       (condition-case err
           (when-let* ((output (manifolding-emacs-compile-file-cached file force)))
             (push output compiled))
-        (error (manifolding-emacs-record-error :level 'file :file file
-                                               :message (error-message-string err)))))
+        (error
+         (let ((msg (error-message-string err)))
+           (when (string-match-p "End of file\\|Unbalanced\\|parsing" msg)
+             (setq paren-errors (1+ paren-errors)))
+           (when (string-match-p "VOID" msg)
+             (setq void-errors (1+ void-errors)))
+           (manifolding-emacs-record-error :level 'file :file file
+                                           :message msg)))))
+    ;; Actionable post-compile summary
+    (cond
+     ((> paren-errors 0)
+      (message "manifolding-emacs: %d paren error(s) — run: sh ~/.config/emacs/paren-scan.sh"
+               paren-errors))
+     ((> void-errors 0)
+      (message "manifolding-emacs: %d void function(s) — check nesting in listed files"
+               void-errors)))
     (nreverse compiled)))
 
 (defun manifolding-emacs-aggregate-directory (output-file)

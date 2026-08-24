@@ -72,6 +72,17 @@ Example:
 
 `with-eval-after-load` is NOT needed inside `:config:` blocks — leaf's `:config` already runs after `require`. Using it is redundant but harmless.
 
+## Literate Authoring Rules
+
+- **One concern per heading, one heading per block.** A `leaf` form for one package is one heading. An interactive command is one heading. Never merge unrelated setup into one block.
+- **Blocks stay under ~15–20 lines.** If a block grows past that, decompose into helper functions each deserving their own heading.
+- **Every heading gets substantive prose before code** — why it exists, not what the code obviously does.
+- **Granularity = error isolation.** Each heading maps to a unit that can fail independently and be meaningfully reported by the three-tier error system.
+- **No mixed concerns in one block.** Package install is its own heading; hooks/keybindings/functions are child headings underneath.
+- **When in doubt, over-split.** A 3-line block with one sentence of prose is a correctly-sized unit.
+
+Full rules: see root `AGENTS.md` → Literate Org-Mode Authoring.
+
 ## Rules
 - `global-auto-revert-mode 1` is in `bootstrap.org` — don't duplicate
 - `inhibit-startup-screen t` is in `bootstrap.org`

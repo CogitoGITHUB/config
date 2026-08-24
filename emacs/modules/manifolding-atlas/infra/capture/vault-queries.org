@@ -5,6 +5,7 @@
 :CATEGORY: editing
 :END:
 ** Relationship Queries
+Parent/child/source lookups via SOURCE and PARENT properties.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-children-of (note)
   "Return list of manifolding-atlas notes whose :SOURCE: property is NOTE's ID."
@@ -24,6 +25,8 @@
     (manifolding-atlas-db-get-by-id source-id)))
 #+end_src
 ** Vault Health
+Reports dead links, orphan notes, isolated notes and title collisions
+in a single *manifolding-atlas-health* buffer.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-check-vault ()
   "Report dead links, orphan notes, isolated notes and title collisions."

@@ -9,11 +9,16 @@
 (defvar my/manifolding-atlas--fast-level 0
   "Fast mode level for current creation.
 0=normal, 1=skip general, 2=skip all, 3=quick (no body).")
+#+end_src
 
-(defun my/manifolding-atlas--fast-level ()
-  "Prompt for capture speed.
+** Fast mode level menu
 Direct letter selection; press ? inside the prompt for a help
-window describing every option.  Always returns a number 0-3."
+window describing every option. Always returns a number 0-3.
+SELECTION (s) asks which properties to customize; everything
+else gets WARNING.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--fast-level ()
+  "Prompt for capture speed."
   (let* ((ans (read-multiple-choice
                "Capture speed"
                '((?a "NORMAL" "every prompt fires — the full interrogation")

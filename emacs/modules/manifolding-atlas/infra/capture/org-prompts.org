@@ -17,54 +17,74 @@ Optional drawer metadata under the level-1 heading:
 :TASK-DEFAULT: <value>           (extra task-context registration default)
 
 * Requires
+
+** Libraries and eval depth
+Dynamic-binding compilation burns eval depth fast; the picker's
+recursive-edit stacks on an already-deep creation chain.
 #+begin_src emacs-lisp
 (require 'manifolding-atlas)
 (require 'cl-lib)
-
-;; Dynamic-binding compilation burns eval depth fast; the picker's
-;; recursive-edit stacks on an already-deep creation chain.
 (setq max-lisp-eval-depth (max max-lisp-eval-depth 6000)
       max-specpdl-size (max max-specpdl-size 6000))
+#+end_src
 
+** Declarative prompt registries
+Two hash tables back the declarative engine: one tracks which keys
+were registered from org outlines, the other stores full spec plists.
+Lambdas must NOT capture lexical variables — the loader compiles with
+dynamic binding — so deferred prompt functions read their spec from
+the specs table instead of closing over it.
+#+begin_src emacs-lisp
 (defvar my/manifolding-atlas-org-prompt--declarative
   (make-hash-table :test #'eq)
   "Registry keys registered from declarative org outlines.")
 
 (defvar my/manifolding-atlas-org-prompt--specs
   (make-hash-table :test #'eq)
-  "Full spec plists per registry key.
-Lambdas must NOT capture lexical variables — the loader compiles with
-dynamic binding — so deferred prompt functions read their spec from here.")
+  "Full spec plists per registry key.")
+#+end_src
 
+** Declarative predicate
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--declarative-p (key)
   "Return non-nil when KEY was registered by the declarative engine."
   (and (hash-table-p my/manifolding-atlas-org-prompt--declarative)
        (gethash key my/manifolding-atlas-org-prompt--declarative)))
+#+end_src
 
-(defvar my/manifolding-atlas-org-prompt--deferred nil
-  "Entries queued during collection for the async buffer-picker session.
-Each entry is (:spec SPEC :default DEFAULT); consumed by
-`my/manifolding-atlas-org-prompt-run-deferred'.")
+** Deferred prompt queue
+Entries queued during collection for the async buffer-picker session.
+Each entry is (:spec SPEC :default DEFAULT).
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas-org-prompt--deferred nil)
+#+end_src
 
-(defconst my/manifolding-atlas-prompt-warning "WARNING"
-  "Sentinel option meaning \"prompt skipped\".
+** WARNING sentinel
 Auto-inserted as the first level-2 heading of every declarative
-prompt file; selecting it or pressing q stores no real value.")
+prompt file; selecting it or pressing q stores no real value.
+#+begin_src emacs-lisp
+(defconst my/manifolding-atlas-prompt-warning "WARNING"
+  "Sentinel option meaning \"prompt skipped\".")
+#+end_src
 
+** Choice normalization
+Maps legacy emoji sentinels to their plain equivalents.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--normalize-choice (val)
-  "Map legacy emoji sentinels in VAL to their plain equivalents."
   (cond ((null val) val)
         ((string-equal val "⚠ WARNING") "WARNING")
         ((string-equal val "⚠ tag-warning") "tag-warning")
         (t val)))
+#+end_src
 
-(defvar my/manifolding-atlas--quiet nil
-  "When non-nil, suppress non-error chatter during prompt processing.
-Per-pick \"Wrote ...\"/\"Omitting ...\" spam goes here; errors still
-signal normally.")
+** Message hush
+Suppresses non-error chatter during prompt processing. Per-pick
+"Wrote ..."/"Omitting ..." spam goes here; errors still signal
+normally.
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas--quiet nil)
 
 (defun my/manifolding-atlas--hush-message (orig fmt &rest args)
-  "Drop `message' output while `my/manifolding-atlas--quiet' is bound."
   (unless my/manifolding-atlas--quiet
     (apply orig fmt args)))
 
@@ -74,6 +94,10 @@ signal normally.")
 * Template helpers
 Shared by the KIND template declarative prompt (moved from
 schema/general/template.org so that file can be pure data).
+
+** Deferral mechanism
+When capture-new-file or capture-task-file runs, TEMPLATE selection
+defers to the file-level preview chooser via this around-advice.
 #+begin_src emacs-lisp
 (defconst my/manifolding-atlas-prompt-template--none "none")
 
@@ -89,7 +113,10 @@ schema/general/template.org so that file can be pure data).
                 my/manifolding-atlas-capture-task-file))
     (advice-add fn :around
                 #'my/manifolding-atlas-prompt-template--defer-around)))
+#+end_src
 
+** Template names and chooser
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-prompt-template--names ()
   "Return available template names from templates/files."
   (condition-case nil
@@ -110,7 +137,10 @@ so the chooser must live under a non-colliding name."
                      (append '("WARNING" "none")
                              (my/manifolding-atlas-prompt-template--names))
                      nil t nil nil "WARNING")))
+#+end_src
 
+** TEMPLATE_HASH sync
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-prompt-template--apply (val note)
   "Post-apply: keep TEMPLATE_HASH in sync with VAL on NOTE."
   (when note
@@ -169,12 +199,21 @@ so the chooser must live under a non-colliding name."
 #+end_src
 
 * Registration
+
+** Schema file discovery
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--schema-files ()
   "Return all candidate org files under schema/."
   (directory-files-recursively
    (my/manifolding-atlas-schema-dir) "\\.org\\'"))
+#+end_src
 
+** Batch registration
+Idempotent: strips previously registered declarative specs first, so
+repeated reloads/boot timers never duplicate registry entries.
+Per-file/per-spec failures are reported individually instead of
+aborting the whole batch.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--register-all ()
   "Register every declarative prompt found under schema/.
 Idempotent: strips previously registered declarative specs first, so
@@ -212,9 +251,13 @@ aborting the whole batch.  Returns number of prompts registered."
     (when failures
       (lwarn 'manifolding-atlas-org-prompts :warning
              "declarative prompt failures:\n%s"
-             (string-join (nreverse failures) "\n")))
+              (string-join (nreverse failures) "\n")))
     count))
+#+end_src
 
+** Prompt invocation
+Direct single-shot callers only; capture flows defer to async sessions.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--run (key-sym &optional default)
   "Invoke declarative prompt KEY-SYM using its stored spec.
 Direct single-shot callers only; capture flows defer to async sessions."
@@ -314,7 +357,8 @@ Direct single-shot callers only; capture flows defer to async sessions."
   :type '(choice (const :tag "File buffer" buffer)
                  (const :tag "Minibuffer" minibuffer))
   :group 'manifolding-atlas)
-
+#+end_src
+#+begin_src emacs-lisp
 (defvar my/manifolding-atlas-org-prompt--buffer-result nil)
 (defvar my/manifolding-atlas-org-prompt--buffer-marks nil)
 (defvar-local my/manifolding-atlas-org-prompt--applied nil
@@ -331,6 +375,8 @@ Direct single-shot callers only; capture flows defer to async sessions."
                                 (line-end-position))))
           (overlay-put ov 'atlas-mark t)
           (overlay-put ov 'face 'highlight))))))
+#+end_src
+#+begin_src emacs-lisp
 
 (defun my/manifolding-atlas-org-prompt--buffer-accept ()
   "Advance to the next prompt (session) or accept the value.
@@ -358,7 +404,9 @@ applied with m — an accidental RET can never commit a wrong pick."
                    " ")
                 title))
         (my/manifolding-atlas-org-prompt--buffer-finish)
-        (exit-recursive-edit))))
+        (exit-recursive-edit)))))
+#+end_src
+#+begin_src emacs-lisp
 
 (defun my/manifolding-atlas-org-prompt--highlight-applied (title)
   "Overlay the currently applied option, mirroring mark styling."
@@ -372,6 +420,8 @@ applied with m — an accidental RET can never commit a wrong pick."
                                 (line-end-position))))
           (overlay-put ov 'atlas-applied t)
           (overlay-put ov 'face 'bold))))))
+#+end_src
+#+begin_src emacs-lisp
 
 (defun my/manifolding-atlas-org-prompt--toggle-apply ()
   "Apply the option at point to the target note — or remove it when

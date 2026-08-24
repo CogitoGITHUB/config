@@ -96,17 +96,27 @@ tracking, an idle sweep to surface deferred-load errors early, and
       (manifolding-emacs-doctor-schedule-idle-sweep))
     (message "manifolding-emacs: %s%d error(s), %d warning(s)" (if fatal "BOOT THREW - " "")
              (length (manifolding-emacs-errors-list)) (length (manifolding-emacs-warnings-list)))
+    ;; Void-defun sweep: verify critical functions actually exist.
+    ;; Catches "balanced but wrongly nested" paren bugs where defuns
+    ;; end up inside other forms instead of at top level.
+    (dolist (check
+             '(("my/manifolding-atlas-org-prompt--ask" . "org-prompts.org")
+               ("my/manifolding-atlas-collect-prompts" . "prompt-engine.org")
+               ("my/manifolding-atlas-routines-run" . "routines.org")
+               ("modaled-define-keys" . "keyboard.org (via modaled)")))
+      (unless (fboundp (intern (car check)))
+        (message "⚠ CRITICAL: %s is VOID — check %s for paren/nesting issues"
+                 (car check) (cdr check))))
     ;; Paren-issue detector: if any error mentions parsing/unbalanced,
-    ;; tell the user exactly what to do.
-    (when (seq-some
-           (lambda (e)
-             (and (manifolding-emacs-error-entry-p e)
-                  (manifolding-emacs-error-entry-message e)
-                  (string-match-p
-                   "End of file during parsing\\|Unbalanced\\|paren"
-                   (manifolding-emacs-error-entry-message e))))
-           (manifolding-emacs-errors-list))
-      (message "⚠ PAREN ISSUES DETECTED — run: sh ~/.config/emacs/paren-scan.sh"))
+    ;; tell the user exactly what happened — no external tools needed.
+    (dolist (e (manifolding-emacs-errors-list))
+      (when (and (manifolding-emacs-error-entry-p e)
+                 (manifolding-emacs-error-entry-message e)
+                 (string-match-p
+                  "UNBALANCED PARENS\\|End of file during parsing"
+                  (manifolding-emacs-error-entry-message e)))
+        (message
+         "⚠ UNBALANCED PARENS — the error above shows the exact function and position. Fix the extra/missing closer and reload.")))
     (let ((buf (get-buffer "*Manifolding-Emacs*")))
       (when (buffer-live-p buf)
         (with-current-buffer buf

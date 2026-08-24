@@ -47,6 +47,8 @@ of this mapping is a reasonable future upgrade, not required now."
 #+end_src
 
 * Database Table
+Bookkeeping table keyed by note-id: topics, primary-topic, origin,
+and routed-files per rule note.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-rules--ensure-table ()
   "Create the rules bookkeeping table if it does not exist."

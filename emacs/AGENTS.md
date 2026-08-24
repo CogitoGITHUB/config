@@ -6,7 +6,23 @@
 - **Package method:** `leaf` — declarations use `:PACKAGE:` + `:STRAIGHT:` in org PROPERTIES drawers. `manifolding-emacs` generates `(leaf PACKAGE :straight (...) :require t :init ... :config ...)`.
 - **Load order:** `modules/*.org` sorted by `#+priority:` (default 10, lower = earlier).
 
+## Literate Org-Mode Authoring
+
+The document is the primary artifact; code is subordinate. Every unit of behavior gets its own heading, its own prose, and its own small block.
+
+- **One concern per heading, one heading per block.** A `leaf` form for one package is one heading. An interactive command is one heading. Never merge unrelated setup into one block.
+- **Blocks stay under ~15–20 lines.** If a block grows past that, decompose into helper functions each deserving their own heading. Genuinely atomic data (alists, tables) can stay larger but say so explicitly.
+- **Every heading gets substantive prose before code** — why it exists, not what the code obviously does.
+- **Metadata goes in `:PROPERTIES:` drawers or heading keywords**, never comments inside src blocks.
+- **Match existing per-file conventions** before inventing new structure. Mirror heading depth, property usage, and priority numbering from 2–3 nearby files.
+- **Granularity = error isolation.** Each heading maps to a unit that can fail independently and be meaningfully reported by the three-tier error system.
+- **Split a file when its outline outgrows one screen.** Propose the split before writing.
+- **Tangled `.el` files are build outputs.** Never reference them as source of truth.
+- **No mixed concerns in one block.** Package install is its own heading; hooks/keybindings/functions are child headings underneath.
+- **When in doubt, over-split.** A 3-line block with one sentence of prose is a correctly-sized unit.
+
 ## Conventions
+
 - **Namespace:** `my/` for user code, `my/manifolding-atlas--` for internal plugin functions.
 - **No comments in code** — don't add explanatory comments to source blocks.
 - **No blank line after headings** at any level in `.org` files.

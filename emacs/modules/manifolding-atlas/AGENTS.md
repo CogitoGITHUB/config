@@ -62,3 +62,4 @@ Path helpers: infra/paths.org is the single source of truth for every
 in-module location (module/schema/templates/files/fast dirs) — nothing
 else hardcodes modules/manifolding-atlas paths.
 Keybindings: SPC v hydra in modules/keyboard.org.
+Literate authoring rules: see `modules/AGENTS.md` → Literate Authoring Rules.

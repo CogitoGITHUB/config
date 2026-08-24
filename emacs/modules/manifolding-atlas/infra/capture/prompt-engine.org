@@ -90,6 +90,9 @@ advice on `manifolding-atlas--format-note-content'.")
 
 ** Collector
 
+*** State variables
+Tracks whether collection should defer buffer-UI prompts into async
+sessions, and whether fast mode has suppressed all interaction.
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-collect-defer nil
   "When non-nil, buffer-UI declarative prompts are deferred into an
@@ -97,7 +100,13 @@ async session instead of blocking during collection.")
 
 (defvar my/manifolding-atlas-org-prompt--defaults-only nil
   "Bound non-nil by fast collection: no interaction, nothing deferred.")
+#+end_src
 
+*** Fragment merger
+Merges a single prompt's output fragment into the accumulating result
+plist across all channels: tags, properties, body, post-apply hooks,
+advice, file-name, and TODO state.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-collect--merge-fragment (result frag)
   "Merge FRAG into accumulating RESULT per the collector's channels."
   (when-let ((v (plist-get frag :tags)))
@@ -123,12 +132,21 @@ async session instead of blocking during collection.")
     (setq result (plist-put result :todo (plist-get frag :todo))
           my/manifolding-atlas--creation-todo (plist-get frag :todo)))
   result)
+#+end_src
 
-(defvar my/manifolding-atlas-org-prompt--custom-set nil
-  "Registry keys the user chose to customize in SELECTION capture mode.
-Everything else answers silently with WARNING.  Scoped to one
-collect-with-fast run.")
+*** SELECTION mode custom set
+Registry keys chosen by the user in SELECTION capture mode. Everything
+else answers silently with WARNING. Scoped to one collect-with-fast run.
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas-org-prompt--custom-set nil)
+#+end_src
 
+*** Main collector
+Iterates the registry, matching each spec against the requested
+contexts. Declarative buffer-UI prompts get deferred when
+`my/manifolding-atlas-collect-defer' is bound; fast-mode declarative
+prompts answer silently; everything else runs its prompt-fn directly.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-collect-prompts (context &rest extra-contexts)
   "Run all registered prompts matching CONTEXT (or any of EXTRA-CONTEXTS).
 When CONTEXT is a list, match prompts whose contexts overlap with it.
@@ -170,7 +188,7 @@ buffer-UI prompts are queued on
                              (not (and my/manifolding-atlas-org-prompt--custom-set
                                        (member key
                                                my/manifolding-atlas-org-prompt--custom-set))))))
-           (cond
+            (cond
            ;; Interactive-only kinds (TEMPLATE) stand down in capture flows.
            ((or template-skip defer)
             (when defer

@@ -16,6 +16,9 @@ sweep, instant per-save feedback, and a prompt/template registry audit.
 #+end_src
 
 *** State
+Debounced idle timer for scheduled sweeps, last-sweep timestamp,
+idle delay (15s after vault activity), boot delay (30s after start),
+and an allowlist of property keys managed outside schemas.
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-reinforce--timer nil
   "Debounced idle timer handle for scheduled sweeps.")
@@ -37,6 +40,9 @@ sweep, instant per-save feedback, and a prompt/template registry audit.
 #+end_src
 
 *** Sweep
+Full-vault schema sweep: rebuilds MISSING PROMPTS from collection
+health, runs the registry audit, and reports failures. Carries an
+independent deep budget so ambient stack depth is irrelevant.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-reinforce-sweep ()
   "Run a full-vault schema sweep and rebuild MISSING PROMPTS."
@@ -74,6 +80,7 @@ sweep, instant per-save feedback, and a prompt/template registry audit.
 #+end_src
 
 *** Boot Sweep
+One-shot idle sweep 30s after boot to surface deferred-load errors early.
 #+begin_src emacs-lisp
 (with-eval-after-load 'manifolding-atlas
   (run-with-idle-timer my/manifolding-atlas-reinforce-boot-delay
@@ -82,6 +89,9 @@ sweep, instant per-save feedback, and a prompt/template registry audit.
 #+end_src
 
 *** Save Guard
+After saving a vault note, debounces 3s so fswatch has synced fresh
+state into the DB, then grades the saved note. Violations surface in
+MISSING PROMPTS via the sweeps — never as minibuffer spam.
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-reinforce--guard-timer nil)
 
@@ -116,6 +126,7 @@ the DB and we grade fresh data, not pre-save state."
 #+end_src
 
 *** Vault Buffer Hook
+Enables save guard and debounced sweeps in vault note buffers only.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-reinforce--enable-in-vault ()
   "Enable save guard and debounced sweeps in vault note buffers."
@@ -132,6 +143,8 @@ the DB and we grade fresh data, not pre-save state."
 #+end_src
 
 *** Registry Audit
+Warns about prompts not covered by any schema and templates whose
+generated schema is missing or drifted. Silent when clean.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-reinforce--schema-field-keys ()
   "Return all property keys covered by registered schemas."

@@ -10,8 +10,7 @@ be both a rule and a protocol step.
 
 *** Dependencies
 #+begin_src emacs-lisp
-;;; manifolding-atlas-protocols.el --- Protocol assembly for manifolding-atlas v2 -*- lexical-binding: t; -*-
-
+;;; manifolding-atlas-protocols.el --- Protocol assembly -*- lexical-binding: t; -*-
 (require 'manifolding-atlas)
 (require 'manifolding-atlas-db)
 (require 'avy)
@@ -20,6 +19,8 @@ be both a rule and a protocol step.
 #+end_src
 
 *** State
+Protocol topic-index files live under =protocols/= in the vault.
+Optional topic→filename overrides fall back to =protocols-<topic>.org=.
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-protocols--protocols-directory
   (expand-file-name "protocols/" (my/manifolding-atlas-root-dir))
@@ -34,6 +35,8 @@ Topics not present here fall back to `protocols-<topic>.org'."
 #+end_src
 
 *** Database Table
+Bookkeeping table keyed by note-id with topics, primary-topic, order,
+level, and routed-files for fast protocol queries.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-protocols--ensure-table ()
   "Create the protocols bookkeeping table if it does not exist."
@@ -50,6 +53,8 @@ Topics not present here fall back to `protocols-<topic>.org'."
 #+end_src
 
 *** DB Extractor
+Records protocol bookkeeping (topics, order, level, routed files) for
+notes carrying a PROTOCOL property.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-protocols--extract (_ctx note-data)
   "Record protocol bookkeeping for NOTE-DATA if it is a protocol step."
@@ -81,6 +86,8 @@ Topics not present here fall back to `protocols-<topic>.org'."
 #+end_src
 
 *** Schema
+Requires PROTOCOL_TOPICS, PROTOCOL_ORDER and PROTOCOL_LEVEL on notes
+with a PROTOCOL property.
 #+begin_src emacs-lisp
 (manifolding-atlas-schema-define
  'protocol
@@ -104,6 +111,9 @@ Topics not present here fall back to `protocols-<topic>.org'."
 #+end_src
 
 *** Routing Engine
+Routes protocol steps to topic-indexed files. Topics not in the
+override map fall back to =protocols-<topic>.org=.
+
 **** Resolve destination file for a topic
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-protocols--default-file-for-topic (topic)

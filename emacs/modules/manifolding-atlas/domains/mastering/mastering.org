@@ -44,6 +44,9 @@ Spaced-repetition review for manifolding-atlas notes. Each note is a reviewable 
 #+end_src
 
 *** Date Helpers
+Date arithmetic respects `my/manifolding-atlas-mastering--day-start-hour`
+(a new review day begins at 3 AM by default). Dates are (year month day)
+lists internally, YYYYMMDD integers in the DB.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--round-items (list)
   "Round all items in LIST to 2 decimal places."
@@ -102,6 +105,10 @@ OFFSET is days from today."
 #+end_src
 
 *** Algorithm
+SM-2 variant: proto intervals (0,1,2 days) for first successes, then
+synolon-scaled intervals. Failures apply amnesia (0.5 multiplier) with
+a 7-day cap. Anagnosis (3-streak) boosts plus/minus; lethe (2 fails)
+resets the interval.
 #+begin_src emacs-lisp
 (cl-defun my/manifolding-atlas-mastering--next-mastering
     (&key mastering success epignosis agnoia anagnosis c-successes c-failures lethe)
@@ -147,6 +154,9 @@ OFFSET is days from today."
 #+end_src
 
 *** Database Table
+Single =mastering_schedule= table keyed by note-id with the full SM-2
+state: next/last review dates, success/fail counters, plus/minus/synolon
+scores, and a suspend flag.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--ensure-table ()
   "Create mastering_schedule table if it does not exist."
@@ -170,6 +180,9 @@ OFFSET is days from today."
 #+end_src
 
 *** DB Extractor
+Indexes MASTERING_* properties from NOTE-DATA into mastering_schedule.
+Initializes a default schedule when MASTERING is set but schedule
+properties are missing, so REVIEW/SUSPEND notes are never dropped.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--extract (ctx note-data)
   "Extract MASTERING_* properties from NOTE-DATA into mastering_schedule.
@@ -212,6 +225,8 @@ properties are missing, so REVIEW/SUSPEND notes are never dropped."
 #+end_src
 
 *** Schedule Property Write
+Writes schedule properties for NOTE-ID back to its org drawer after
+each review, keeping the file-level state in sync with the DB.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--write-schedule-props
     (note-id next-rev-int n success c-succ c-fails t-succ t-fails score)
@@ -337,6 +352,8 @@ properties are missing, so REVIEW/SUSPEND notes are never dropped."
 #+end_src
 
 *** Due Queries
+Due = next-rev ≤ today and not suspended. Overdue additionally requires
+at least one prior review (n > 0).
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--due-note-ids ()
   "Return note IDs due for review today."
@@ -362,6 +379,9 @@ properties are missing, so REVIEW/SUSPEND notes are never dropped."
 #+end_src
 
 *** Review Session
+Sequential review in a dedicated buffer. Each note shows its title and
+an open link; grading with n/f/s runs the algorithm and dual-writes the
+schedule table and org drawer.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--display-note (id)
   "Display note ID in review buffer."
@@ -429,6 +449,8 @@ properties are missing, so REVIEW/SUSPEND notes are never dropped."
 #+end_src
 
 *** Commands
+Interactive entry points: review due, review overdue, mark current note
+reviewed/failed, and toggle participation in the review pool.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering-review ()
   "Start mastering review session for due notes."
