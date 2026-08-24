@@ -488,7 +488,7 @@ the rest of the prompts."
          (key (plist-get spec :key))
          (family (intern
                   (downcase
-                   (or (plist-get (plist-get req :plist) :live)
+                   (or (plist-get (plist-get spec :plist) :live)
                        (replace-regexp-in-string "_" "-" key)))))
          (val my/manifolding-atlas-org-prompt--applied)
          (link (my/manifolding-atlas--ensure-ref-note family val))
@@ -589,17 +589,22 @@ Standalone pickers just exit with no result."
                                (and req (plist-get req :applied-value)))))
         (when (and req prev-applied)
           (plist-put req :applied-value prev-applied))
-        (my/manifolding-atlas-org-prompt--buffer-finish)
+        ;; Record/apply BEFORE killing the picker buffer: both
+        ;; `--session-record-answer' and `--session-apply' read the
+        ;; buffer-local `--applied' value and must run while the
+        ;; picker buffer is still current (see their docstrings).
         (if prev-applied
             ;; Revisit-skip: the earlier answer stays untouched.
             (progn
               (setq my/manifolding-atlas-org-prompt--applied prev-applied)
               (my/manifolding-atlas-org-prompt--session-record-answer)
+              (my/manifolding-atlas-org-prompt--buffer-finish)
               (my/manifolding-atlas-org-prompt--session-next))
           ;; Fresh skip: apply the WARNING sentinel like before.
           (let ((my/manifolding-atlas--quiet t))
             (my/manifolding-atlas-org-prompt--session-apply
              (or (plist-get req :default) "WARNING")))
+          (my/manifolding-atlas-org-prompt--buffer-finish)
           (my/manifolding-atlas-org-prompt--session-next)))
     (setq my/manifolding-atlas-org-prompt--buffer-result nil)
     (my/manifolding-atlas-org-prompt--buffer-finish)
@@ -1112,7 +1117,7 @@ multi-select kinds."
                    "Topics (comma-sep, first=primary, blank=universal): "
                    known nil nil nil nil defaults)
                   " ")))
-     ('tags
+    ('tags
       (let* ((db-tags (condition-case nil
                           (manifolding-atlas-db-query-tags)
                         (error nil)))
@@ -1142,14 +1147,14 @@ multi-select kinds."
         (completing-read (format "%s: " label)
                          (cons sentinel options)
                          nil t nil nil sentinel)))
-     (_
+    (_
       (let ((val (completing-read
                   (format "%s: " label)
                   (cons "WARNING" options)
                   nil t nil nil (or default "WARNING"))))
-         (if (string-equal val "WARNING")
-             (if default default "WARNING")
-             val)))))))
+        (if (string-equal val "WARNING")
+            (if default default "WARNING")
+          val)))))
 #+end_src
 
 * Fragments
