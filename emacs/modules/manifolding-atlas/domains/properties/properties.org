@@ -40,6 +40,8 @@ the menu adapts to the note's kind.  Otherwise return the base
     (if specialized specialized (list base))))
 #+end_src
 *** Prompt Lookup
+
+**** Context-aware spec lookup
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--update-prompt-spec (key)
   "Find prompt spec with KEY matching the current note context."
@@ -49,10 +51,13 @@ the menu adapts to the note's kind.  Otherwise return the base
                     my/manifolding-atlas--current-contexts
                     (plist-get s :contexts) #'eq)))
             my/manifolding-atlas-prompt-registry))
+#+end_src
 
+**** Menu line formatting
+Strips Org link brackets so values stay readable; WARNING stays visible.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--clean-display-val (val)
-  "Return clean display for property value VAL.
-Strips Org link brackets, keeps WARNING visible."
+  "Return clean display for property value VAL."
   (cond
    ((null val) "—")
    ((string-empty-p val) "—")
@@ -78,6 +83,8 @@ Strips Org link brackets, keeps WARNING visible."
     (format "[%s] %-15s %s" mark short display)))
 #+end_src
 *** Dynamic Suffixes
+
+**** Key map and toggle command
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas--update-key-map nil
   "Alist mapping transient key chars to prompt :key symbols.")
@@ -95,44 +102,73 @@ Strips Org link brackets, keeps WARNING visible."
             (push prompt-key my/manifolding-atlas--selected-keys))
           (transient-setup 'my/manifolding-atlas--update-properties-menu)))
     (error (message "Toggle error: %s" err))))
+#+end_src
+
+**** Suffix grid builder
+DESC strings are computed fresh each time the menu opens.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--update-build-children (prompts)
+  "Build transient suffix specs for PROMPTS, filling the key map."
+  (let ((keys "abcdefghijklmnopqrstuvwxyz")
+        (idx 0)
+        children)
+    (setq my/manifolding-atlas--update-key-map nil)
+    (dolist (spec (reverse prompts))
+      (when (< idx (length keys))
+        (let ((k (aref keys idx))
+              (prompt-key (plist-get spec :key)))
+          (push (cons k prompt-key) my/manifolding-atlas--update-key-map)
+          (push (list (char-to-string k)
+                      (my/manifolding-atlas--update-format-prompt prompt-key)
+                      'my/manifolding-atlas--toggle-prompt)
+                children)
+          (setq idx (1+ idx)))))
+    (nreverse children)))
 
 (defun my/manifolding-atlas--update-children (&optional _)
   "Build suffix entries from the prompt registry for the current context.
 Uses `transient-parse-suffixes' to convert shorthand (KEY DESC CMD)
-suffix specs to the internal format expected by `transient--init-suffix.'
-DESC is a pre-computed string (computed fresh each time the menu opens)."
+suffix specs to the internal format expected by `transient--init-suffix.'"
   (condition-case err
-      (let* ((prompts (seq-filter
-                       (lambda (s)
-                         (let ((k (plist-get s :key)))
-                           (and (not (memq k '(position)))
-                                (plist-get s :read-current-fn)
-                                (plist-get s :prompt-fn)
-                                (seq-intersection
-                                 my/manifolding-atlas--current-contexts
-                                 (plist-get s :contexts) #'eq))))
-                       my/manifolding-atlas-prompt-registry))
-             (keys "abcdefghijklmnopqrstuvwxyz")
-             (idx 0)
-             children)
-        (setq my/manifolding-atlas--update-key-map nil)
-        (dolist (spec (reverse prompts))
-          (when (< idx (length keys))
-            (let ((k (aref keys idx))
-                  (prompt-key (plist-get spec :key)))
-              (push (cons k prompt-key) my/manifolding-atlas--update-key-map)
-              (push (list (char-to-string k)
-                          (my/manifolding-atlas--update-format-prompt prompt-key)
-                          'my/manifolding-atlas--toggle-prompt)
-                    children)
-              (setq idx (1+ idx)))))
-        (transient-parse-suffixes 'my/manifolding-atlas--update-properties-menu
-                                  (nreverse children)))
+      (let ((prompts (seq-filter
+                      (lambda (s)
+                        (let ((k (plist-get s :key)))
+                          (and (not (memq k '(position)))
+                               (plist-get s :read-current-fn)
+                               (plist-get s :prompt-fn)
+                               (seq-intersection
+                                my/manifolding-atlas--current-contexts
+                                (plist-get s :contexts) #'eq))))
+                      my/manifolding-atlas-prompt-registry)))
+        (transient-parse-suffixes
+         'my/manifolding-atlas--update-properties-menu
+         (my/manifolding-atlas--update-build-children prompts)))
     (error
      (message "Update children error: %s" err)
      nil)))
 #+end_src
 *** Confirm / Cancel
+
+**** Per-key prompt run
+WARNING answers count as "unchanged" and apply nothing.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--run-update-key (key)
+  "Run prompt KEY against the current context and apply its fragment."
+  (let (spec val frag)
+    (setq spec (my/manifolding-atlas--update-prompt-spec key))
+    (setq val (condition-case nil
+                 (funcall (plist-get spec :prompt-fn))
+               (quit nil)))
+    ;; skip the WARNING sentinel — user didn't change anything
+    (when (and (stringp val) (string-equal val "WARNING"))
+      (setq val nil))
+    (setq frag (funcall (plist-get spec :to-plist) val
+                        my/manifolding-atlas--current-context))
+    (when frag
+      (my/manifolding-atlas--apply-fragment frag spec))))
+#+end_src
+
+**** Confirm and cancel suffixes
 #+begin_src emacs-lisp
 (transient-define-suffix my/manifolding-atlas--update-confirm ()
   "Run all selected prompts and apply changes."
@@ -140,18 +176,7 @@ DESC is a pre-computed string (computed fresh each time the menu opens)."
   (let ((keys my/manifolding-atlas--selected-keys))
     (setq my/manifolding-atlas--selected-keys nil)
     (dolist (key keys)
-      (let (spec val frag)
-        (setq spec (my/manifolding-atlas--update-prompt-spec key))
-        (setq val (condition-case nil
-                     (funcall (plist-get spec :prompt-fn))
-                   (quit nil)))
-        ;; skip the WARNING sentinel — user didn't change anything
-        (when (and (stringp val) (string-equal val "WARNING"))
-          (setq val nil))
-        (setq frag (funcall (plist-get spec :to-plist) val
-                            my/manifolding-atlas--current-context))
-        (when frag
-          (my/manifolding-atlas--apply-fragment frag spec))))
+      (my/manifolding-atlas--run-update-key key))
     (when (fboundp 'my/manifolding-atlas--add-live-transcludes)
       (my/manifolding-atlas--add-live-transcludes my/manifolding-atlas--current-note))
     (save-buffer)
@@ -166,20 +191,26 @@ DESC is a pre-computed string (computed fresh each time the menu opens)."
   (message "Update cancelled."))
 #+end_src
 *** Buffer Note Helper
+
+**** Point-based lookup
+Walks up to the enclosing heading if the cursor is in the
+body/drawer, so it targets exactly the note you are on.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--note-at-point ()
-  "Return the manifolding-atlas note for the heading under (or enclosing) point.
-Walks up to the enclosing heading if the cursor is in the body/drawer,
-so it targets exactly the note you are on."
+  "Return the manifolding-atlas note for the heading under (or enclosing) point."
   (let (id)
     (unless (org-at-heading-p)
       (ignore-errors (org-back-to-heading t)))
     (setq id (org-entry-get nil "ID"))
     (and id (manifolding-atlas-db-get-by-id id))))
+#+end_src
 
+**** Buffer fallback
+Prefers the note under the cursor, falls back to the deepest note at
+or before point in the file.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--buffer-note ()
-  "Return the manifolding-atlas note for the current buffer, or nil.
-Prefers the note under the cursor, falls back to the buffer's file."
+  "Return the manifolding-atlas note for the current buffer, or nil."
   (or (my/manifolding-atlas--note-at-point)
       (when-let ((file (buffer-file-name))
                  (notes (manifolding-atlas-db-query-by-file-path (file-truename file))))
@@ -197,7 +228,27 @@ Schema validation reads from the description list (meta), but we store
 state values in the property drawer.  This advice makes validation fall
 back to the property drawer when no description list value exists.
 
+**** Drawer value resolution
+Visits the note's file only when the current buffer isn't already it.
 #+begin_src emacs-lisp
+(defun my/manifolding-atlas--drawer-value-for-note (note key)
+  "Return KEY's drawer value for NOTE from whichever buffer holds it."
+  (let* ((file (manifolding-atlas-note-path note)))
+    (if (and (buffer-file-name)
+             (equal (file-truename (buffer-file-name))
+                    (file-truename file)))
+        ;; current buffer is already the note's file
+        (save-excursion
+          (when-let ((pos (manifolding-atlas-note-pos note)))
+            (ignore-errors (goto-char pos)))
+          (org-entry-get nil key))
+      ;; visit the note's file
+      (with-current-buffer (find-file-noselect file)
+        (save-excursion
+          (when-let ((pos (manifolding-atlas-note-pos note)))
+            (ignore-errors (goto-char pos)))
+          (org-entry-get nil key))))))
+
 (defun my/manifolding-atlas--meta-get-fallback (orig-fun note prop &optional type)
   "Fall back to the property drawer when the description list has no value for PROP.
 Skips non-string types to avoid interfering with note/link resolution."
@@ -205,20 +256,7 @@ Skips non-string types to avoid interfering with note/link resolution."
       (when (memq type '(nil string))
         (when-let* ((file (manifolding-atlas-note-path note))
                     (key (if (symbolp prop) (symbol-name prop) prop))
-                    (val (if (and (buffer-file-name)
-                                 (equal (file-truename (buffer-file-name))
-                                        (file-truename file)))
-                             ;; current buffer is already the note's file
-                             (save-excursion
-                               (when-let ((pos (manifolding-atlas-note-pos note)))
-                                 (ignore-errors (goto-char pos)))
-                               (org-entry-get nil key))
-                           ;; visit the note's file
-                           (with-current-buffer (find-file-noselect file)
-                             (save-excursion
-                               (when-let ((pos (manifolding-atlas-note-pos note)))
-                                 (ignore-errors (goto-char pos)))
-                               (org-entry-get nil key))))))
+                    (val (my/manifolding-atlas--drawer-value-for-note note key)))
           (unless (string-empty-p val)
             (list val))))))
 
@@ -226,27 +264,27 @@ Skips non-string types to avoid interfering with note/link resolution."
 #+end_src
 *** Fix Violations Suffix
 
+**** Schema field collection
+Builds the key→field lookup from every schema applicable to NOTE.
 #+begin_src emacs-lisp :lexical t
-(defun my/manifolding-atlas--fix-violations ()
-  "Prompt for each missing or WARNING-valued schema field.
-Writes the value to the property drawer only; the
-`manifolding-atlas-note-meta-get-list' advice makes schema validation fall back
-to the property drawer when no description-list value exists."
-  (interactive)
-  (let* ((prompted 0)
-         (note (my/manifolding-atlas--buffer-note))
-         all-fields schema-keys field-lookup)
-    (unless note
-      (user-error "Not in a manifolding-atlas note buffer"))
-    ;; Collect all schema fields and build a key→field lookup
-    (setq all-fields
-          (cl-loop for name in (manifolding-atlas-schema-applicable note)
-                   append (manifolding-atlas-schema-fields (manifolding-atlas-schema-get name))))
-    (setq field-lookup (make-hash-table :test 'equal))
+(defun my/manifolding-atlas--schema-field-lookup (note)
+  "Return (ALL-FIELDS . LOOKUP) for all schema fields of NOTE."
+  (let ((all-fields
+         (cl-loop for name in (manifolding-atlas-schema-applicable note)
+                  append (manifolding-atlas-schema-fields (manifolding-atlas-schema-get name))))
+        (lookup (make-hash-table :test 'equal)))
     (dolist (f all-fields)
-      (puthash (plist-get f :key) f field-lookup))
-    (setq schema-keys (hash-table-keys field-lookup))
-    ;; Fix schema fields (missing or WARNING)
+      (puthash (plist-get f :key) f lookup))
+    (cons all-fields lookup)))
+#+end_src
+
+**** Schema field repair
+Prompts once per missing or WARNING-valued field; one-of fields get
+completion, free fields get read-string.
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--fix-schema-fields (schema-keys field-lookup)
+  "Prompt for each missing/WARNING schema field. Returns count fixed."
+  (let ((prompted 0))
     (dolist (key schema-keys)
       (let* ((val (org-entry-get nil key))
              (field (gethash key field-lookup)))
@@ -261,8 +299,16 @@ to the property drawer when no description-list value exists."
                   (org-entry-put nil key new-val)
                   (setq prompted (1+ prompted))))
             (quit nil)))))
-    ;; Fix any remaining property-drawer entries with WARNING
-    ;; (non-schema properties left from the old sentinel system)
+    prompted))
+#+end_src
+
+**** Legacy WARNING property repair
+Non-schema properties still carrying the old sentinel get one last
+chance before being left visible.
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--fix-warning-props (schema-keys)
+  "Prompt for non-schema drawer entries with WARNING values."
+  (let ((prompted 0))
     (dolist (pair (org-entry-properties nil 'standard))
       (let* ((key (car pair))
              (val (cdr pair)))
@@ -275,6 +321,27 @@ to the property drawer when no description-list value exists."
                   (org-entry-put nil key new-val)
                   (setq prompted (1+ prompted))))
             (quit nil)))))
+    prompted))
+#+end_src
+
+**** Fix violations command
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--fix-violations ()
+  "Prompt for each missing or WARNING-valued schema field.
+Writes the value to the property drawer only; the
+`manifolding-atlas-note-meta-get-list' advice makes schema validation fall back
+to the property drawer when no description-list value exists."
+  (interactive)
+  (let* ((note (my/manifolding-atlas--buffer-note))
+         (fields-and-lookup (my/manifolding-atlas--schema-field-lookup note))
+         (all-fields (car fields-and-lookup))
+         (field-lookup (cdr fields-and-lookup))
+         (schema-keys (hash-table-keys field-lookup))
+         prompted)
+    (unless note
+      (user-error "Not in a manifolding-atlas note buffer"))
+    (setq prompted (my/manifolding-atlas--fix-schema-fields schema-keys field-lookup))
+    (setq prompted (+ prompted (my/manifolding-atlas--fix-warning-props schema-keys)))
     (save-buffer)
     (message "Updated %d properties in drawer." prompted)))
 ;; Clear stale transient property from old transient-define-suffix;
@@ -296,6 +363,8 @@ Toggle each property with its key letter, then confirm with C-c C-c."
 The capture SELECTION speed reuses the exact toggle UI of the
 properties update menu, but no note exists yet — so the confirm
 suffix only records the chosen keys instead of running prompts.
+
+**** SELECTION state and suffixes
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas--selection-result nil
   "Keys picked in the capture SELECTION transient menu.")
@@ -316,7 +385,10 @@ Locks the choice now so it is not asked again at finalize."
           (my/manifolding-atlas--choose-capture))
     (message "Body template locked: %s"
              (or my/manifolding-atlas--chosen-capture "none"))))
+#+end_src
 
+**** SELECTION prefix and entry point
+#+begin_src emacs-lisp
 (transient-define-prefix my/manifolding-atlas--select-properties-menu ()
   "Select which properties to customize during capture.
 Same toggle grid as the properties update menu: letter keys toggle,
@@ -341,6 +413,8 @@ the menu exits; returns the list of :key symbols the user toggled."
   my/manifolding-atlas--selection-result)
 #+end_src
 *** Fragment Applier
+
+**** File-level property writer
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--set-file-property (key value strategy)
   "Set KEY to VALUE in the file-level property drawer using STRATEGY."
@@ -363,7 +437,33 @@ the menu exits; returns the list of :key symbols the user toggled."
         (insert ":PROPERTIES:\n")
         (insert (format ":%s: %s\n" key value))
         (insert ":END:\n")))))
+#+end_src
 
+**** TODO fragment handling
+A nil/empty TODO strips the keyword from the heading.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--apply-todo-fragment (todo)
+  "Apply or clear the TODO keyword per fragment value TODO."
+  (if (and (stringp todo) (not (string-empty-p todo)))
+      (progn
+        (org-todo todo)
+        (org-entry-delete nil "TODO"))
+    (save-excursion
+      (org-back-to-heading t)
+      (org-entry-delete nil "TODO")
+      (let ((case-fold-search nil))
+        (looking-at org-complex-heading-regexp)
+        (replace-match
+         (concat (match-string 1) " " (match-string 4)
+                 (when (match-string 5)
+                   (concat " " (match-string 5))))
+         t t)))))
+#+end_src
+
+**** Fragment application
+Dispatches a prompt's output plist across todo/tags/properties/body/
+post-apply, honoring heading vs file-level notes.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--apply-fragment (frag spec)
   "Apply FRAG plist from SPEC to the current buffer."
   (let ((strategy (or (plist-get spec :merge-strategy) 'replace))
@@ -373,21 +473,7 @@ the menu exits; returns the list of :key symbols the user toggled."
       (unless at-heading
         (setq at-heading (ignore-errors (org-next-visible-heading 1) t))))
     (when (plist-member frag :todo)
-      (let ((todo (plist-get frag :todo)))
-        (if (and (stringp todo) (not (string-empty-p todo)))
-            (progn
-              (org-todo todo)
-              (org-entry-delete nil "TODO"))
-          (save-excursion
-            (org-back-to-heading t)
-            (org-entry-delete nil "TODO")
-            (let ((case-fold-search nil))
-              (looking-at org-complex-heading-regexp)
-              (replace-match
-               (concat (match-string 1) " " (match-string 4)
-                       (when (match-string 5)
-                         (concat " " (match-string 5))))
-               t t))))))
+      (my/manifolding-atlas--apply-todo-fragment (plist-get frag :todo)))
     (when-let ((tags (plist-get frag :tags)))
       (if at-heading
           (pcase strategy
@@ -417,20 +503,24 @@ the menu exits; returns the list of :key symbols the user toggled."
           (when file (find-file file)))))))
 #+end_src
 *** Main Command
+
+**** Context file resolution
+Works from a note buffer and from dired (file under the cursor).
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--context-file ()
-  "Return the note file for the current context, or nil.
-Works from a note buffer and from dired (file under the cursor)."
+  "Return the note file for the current context, or nil."
   (or (buffer-file-name)
       (and (derived-mode-p 'dired-mode)
            (ignore-errors (dired-get-file-for-visit)))))
+#+end_src
 
+**** On-demand indexing
+If the DB has no row for the file (sync lag), re-index and re-query
+so the menu always opens on the note you are actually on.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--index-ensure-note ()
   "Return the note for the current buffer, indexing the file on demand.
-Prefers the note under the cursor; if the DB has no row for the file
-(sync lag), calls `manifolding-atlas-db-update-file' and re-queries so the menu
-always opens on the note you are actually on.  From dired, resolves
-the file under the cursor first."
+From dired, resolves the file under the cursor first."
   (or (my/manifolding-atlas--note-at-point)
       (when-let ((file (my/manifolding-atlas--context-file)))
         (condition-case nil
@@ -439,7 +529,10 @@ the file under the cursor first."
               (or (my/manifolding-atlas--note-at-point)
                   (car (manifolding-atlas-db-query-by-file-path (file-truename file)))))
           (error nil)))))
+#+end_src
 
+**** Update properties command
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-update-properties ()
   "Update properties on an existing manifolding-atlas note.
 When called interactively, check for schema violations first and offer

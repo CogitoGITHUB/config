@@ -71,6 +71,44 @@ excluding the property drawer."
 #+end_src
 
 **** Main command — heading → file
+
+***** Body transplant
+Replaces the freshly created note's default body with the extracted
+heading content, parking after the property drawer.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--transplant-body (note body)
+  "Write BODY as NOTE's content, replacing any default."
+  (manifolding-atlas-visit note)
+  (goto-char (point-min))
+  (when (looking-at ":PROPERTIES:")
+    (re-search-forward "^:END:" nil t)
+    (forward-line 1))
+  (end-of-line)
+  (forward-line 1)
+  (delete-region (point) (point-max))
+  (insert body)
+  (save-buffer))
+#+end_src
+
+***** Backlink-or-delete finisher
+Works in the original buffer: either leaves an id: link where the
+heading was, or deletes it outright.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--finish-heading-extraction (note title)
+  "Ask whether to leave a backlink to NOTE or delete the heading at point."
+  (org-back-to-heading t)
+  (if (string= (read-answer "Insert backlink? "
+                  '(("yes" ?y "insert backlink")
+                    ("no"  ?n "delete heading without link")))
+               "yes")
+      (let* ((desc (read-string "Description (blank = title): "))
+             (link-desc (unless (string-empty-p desc) desc)))
+        (my/manifolding-atlas--replace-heading-with-link
+         (manifolding-atlas-note-id note) (or link-desc title)))
+    (my/manifolding-atlas--delete-heading)))
+#+end_src
+
+***** Extraction command
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-heading-to-note ()
   "Extract the org heading at point into its own manifolding-atlas note file.
@@ -92,29 +130,11 @@ Prompts for backlink — yes inserts a link, no deletes the heading."
     (when (and note heading-id)
       (my/manifolding-atlas--property-put note "SOURCE" heading-id))
     ;; Replace the default body with the extracted heading content
-    (manifolding-atlas-visit note)
-    (goto-char (point-min))
-    (when (looking-at ":PROPERTIES:")
-      (re-search-forward "^:END:" nil t)
-      (forward-line 1))
-    (end-of-line)
-    (forward-line 1)
-    (delete-region (point) (point-max))
-    (insert body)
-    (save-buffer)
+    (my/manifolding-atlas--transplant-body note body)
     ;; Backlink or delete — work in the original buffer
     (with-current-buffer original-buffer
       (save-excursion
-        (org-back-to-heading t)
-        (if (string= (read-answer "Insert backlink? "
-                        '(("yes" ?y "insert backlink")
-                          ("no"  ?n "delete heading without link")))
-                     "yes")
-            (let* ((desc (read-string "Description (blank = title): "))
-                   (link-desc (unless (string-empty-p desc) desc)))
-              (my/manifolding-atlas--replace-heading-with-link
-               (manifolding-atlas-note-id note) (or link-desc title)))
-          (my/manifolding-atlas--delete-heading))))
+        (my/manifolding-atlas--finish-heading-extraction note title)))
     (message "Extracted → %s" (manifolding-atlas-note-title note))))
 #+end_src
 *** Installation

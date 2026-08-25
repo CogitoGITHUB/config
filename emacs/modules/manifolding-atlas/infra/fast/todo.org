@@ -5,6 +5,8 @@ Quickly add a TODO item using org-capture.  Simple mode finishes
 immediately; capture mode opens the buffer with cursor ready.
 
 * Core
+
+** Template selection
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-quick-todo--templates-dir ()
   "Directory with fast-capture template files."
@@ -29,7 +31,12 @@ immediately; capture mode opens the buffer with cursor ready.
            (expand-file-name (concat choice ".org")
                              (my/manifolding-atlas-quick-todo--templates-dir)))
           (string-trim (buffer-string)))))))
+#+end_src
 
+** Quick todo command
+Simple mode finishes immediately; capture mode opens the buffer with
+cursor ready.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-quick-todo ()
   (interactive)
   (let* ((mode (let ((c (read-char "Mode: (s)imple (c)apture [C]: ")))

@@ -25,6 +25,8 @@ from that date onward; ~DEADLINE~ appears as due.  Enter org timestamps like
 #+end_src
 
 ** Registration
+
+*** Scheduled registration
 #+begin_src emacs-lisp
 (my/manifolding-atlas-register-prompt
   :key 'scheduled
@@ -40,7 +42,10 @@ from that date onward; ~DEADLINE~ appears as due.  Enter org timestamps like
                       `(:post-apply (,(apply-partially #'my/manifolding-atlas--heading-schedule-apply val)))
                     `(:properties (("SCHEDULED" . ,val))))
                 `(:properties (("SCHEDULED" . "WARNING"))))))
+#+end_src
 
+*** Deadline registration
+#+begin_src emacs-lisp
 (my/manifolding-atlas-register-prompt
   :key 'deadline
   :name 'deadline

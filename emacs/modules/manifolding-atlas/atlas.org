@@ -25,6 +25,8 @@ Change only this path to relocate the entire vault."
 #+end_src
 
 * Manifolding Atlas Bootstrap
+
+** Engine configuration and require
 #+begin_src emacs-lisp
 (setq manifolding-atlas-db-location
       (expand-file-name "admin/manifolding-atlas.db"
@@ -48,12 +50,15 @@ Change only this path to relocate the entire vault."
   "Re-entrancy latch for `my/manifolding-atlas-db-location-guard'.
 Nested `(manifolding-atlas-db)' calls made during init must never
 trigger another close/reopen cycle.")
+#+end_src
 
+** DB relocation guard
+Guarantees the vault DB always lives beside the notes even if a
+stale session opened it elsewhere.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-db--relocate-legacy ()
   "Move a default-location DB to `manifolding-atlas-db-location'.
-Runs before every connection attempt; cheap no-op once relocated.
-Guarantees the vault DB always lives beside the notes even if a
-stale session opened it elsewhere."
+Runs before every connection attempt; cheap no-op once relocated."
   (let ((legacy (expand-file-name "manifolding-atlas.db"
                                   user-emacs-directory))
         (target manifolding-atlas-db-location))
@@ -92,7 +97,11 @@ stale session opened it elsewhere."
 
 (advice-add 'manifolding-atlas-db :around
             #'my/manifolding-atlas-db-location-guard)
+#+end_src
 
+** Sync overrides: fswatch sentinel and file predicate
+Tracks `.org' files AND extensionless vault files.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-db-sync--fswatch-sentinel (proc event)
   (unless (or (string-match-p "hangup\\|finished" event)
               (process-live-p proc))
@@ -112,13 +121,16 @@ stale session opened it elsewhere."
 
 (advice-add 'manifolding-atlas-db-sync--org-file-p :override
             #'my/manifolding-atlas-db-sync--org-file-p)
+#+end_src
 
-(defun my/manifolding-atlas-db-sync--list-org-files (dir)
-  "List vault files under DIR: `.org' plus extensionless entries.
+** Sync override: race-safe directory walk
 Walks manually instead of `directory-files-recursively' so that:
-- `.git' is never descended into (it is not content), and
-- a directory that vanishes mid-scan (git gc/pack races) is skipped
-  instead of killing the whole poll cycle."
+`.git' is never descended into (it is not content), and a directory
+that vanishes mid-scan (git gc/pack races) is skipped instead of
+killing the whole poll cycle.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-db-sync--list-org-files (dir)
+  "List vault files under DIR: `.org' plus extensionless entries."
   (let* ((root (expand-file-name dir))
          (files nil)
          (dirs (list root))
@@ -152,12 +164,15 @@ Walks manually instead of `directory-files-recursively' so that:
 
 (advice-add 'manifolding-atlas-db-sync--scan-files-async :override
             #'my/manifolding-atlas-db-sync--scan-files-async)
+#+end_src
 
-(defun my/manifolding-atlas-db--parse-file (path)
-  "Parse PATH honoring `manifolding-atlas-db-parse-method'.
+** Sync override: parse method
 Manifolding Atlas forces non-'.org' files (extensionless vault notes) through
 `find-file', which trips over org-transclusion's read-only buffers.
-Always use the configured method instead."
+Always use the configured method instead.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-db--parse-file (path)
+  "Parse PATH honoring `manifolding-atlas-db-parse-method'."
   (let* ((manifolding-atlas-db--active-parse-method
           manifolding-atlas-db-parse-method)
          (method manifolding-atlas-db-parse-method))
@@ -203,10 +218,13 @@ Always use the configured method instead."
             #'my/manifolding-atlas-db--parse-file)
 
 (manifolding-atlas-db-autosync-mode +1)
+#+end_src
 
-;; Ensure the database exists shortly after boot, but late enough that
-;; the initial full-vault index never competes with startup. The first
-;; connection parses the whole vault and can block for a while.
+** Deferred database open
+Ensure the database exists shortly after boot, but late enough that
+the initial full-vault index never competes with startup. The first
+connection parses the whole vault and can block for a while.
+#+begin_src emacs-lisp
 (with-eval-after-load 'manifolding-atlas
   (run-with-idle-timer
    15 nil

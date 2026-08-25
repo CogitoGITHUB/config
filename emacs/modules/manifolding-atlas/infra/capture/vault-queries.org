@@ -27,6 +27,17 @@ Parent/child/source lookups via SOURCE and PARENT properties.
 ** Vault Health
 Reports dead links, orphan notes, isolated notes and title collisions
 in a single *manifolding-atlas-health* buffer.
+
+*** Section writers
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--health-section (label entries format-fn)
+  "Insert a LABEL section rendering ENTRIES via FORMAT-FN."
+  (insert (format "\n%s: %d\n" label (length entries)))
+  (dolist (e entries)
+    (insert (funcall format-fn e))))
+#+end_src
+
+*** Health command
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-check-vault ()
   "Report dead links, orphan notes, isolated notes and title collisions."
@@ -41,15 +52,15 @@ in a single *manifolding-atlas-health* buffer.
       (dolist (d dead)
         (insert (format "  %s -> missing %s\n"
                         (manifolding-atlas-note-title (car d)) (cdr d))))
-      (insert (format "\nOrphan notes: %d\n" (length orphans)))
-      (dolist (o orphans)
-        (insert (format "  %s\n" (manifolding-atlas-note-title o))))
-      (insert (format "\nIsolated notes: %d\n" (length isolated)))
-      (dolist (i isolated)
-        (insert (format "  %s\n" (manifolding-atlas-note-title i))))
-      (insert (format "\nTitle collisions: %d\n" (length collisions)))
-      (dolist (c collisions)
-        (insert (format "  \"%s\" -- %d notes\n"
-                        (car c) (length (cdr c)))))
+      (my/manifolding-atlas--health-section
+       "Orphan notes" orphans
+       (lambda (o) (format "  %s\n" (manifolding-atlas-note-title o))))
+      (my/manifolding-atlas--health-section
+       "Isolated notes" isolated
+       (lambda (i) (format "  %s\n" (manifolding-atlas-note-title i))))
+      (my/manifolding-atlas--health-section
+       "Title collisions" collisions
+       (lambda (c) (format "  \"%s\" -- %d notes\n"
+                           (car c) (length (cdr c)))))
       (display-buffer (current-buffer)))))
 #+end_src

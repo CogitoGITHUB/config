@@ -4,6 +4,9 @@
 Fast journal entry capture. Creates a timestamped heading in Journal.org.
 
 * Core
+
+** Date and path resolution
+Journal notes nest into admin/Journal/<Y>/<Q>/<m>/<W>/ like routines.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-quick-journal--date ()
   (format-time-string "%Y-%m-%d" (org-read-date nil t nil "Journal date")))
@@ -20,7 +23,12 @@ Fast journal entry capture. Creates a timestamped heading in Journal.org.
          (file (expand-file-name date dir)))
     `(:dir ,dir :file ,file :year ,year
            :quarter ,quarter :month ,month :week ,week :date ,date)))
+#+end_src
 
+** Journal entry command
+Creates the day note on first touch, then appends a timestamped
+child heading and opens capture.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-quick-journal ()
   (interactive)
   (let* ((date (my/manifolding-atlas-quick-journal--date))

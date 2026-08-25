@@ -612,7 +612,7 @@ C-c C-c there resumes the remaining prompts.
          `(("l" "Live ref note" plain
             (file+function ,ref-path
                            (lambda () (goto-char (point-max))))
-            "\n%?\n" :kill-buffer t :unnarrowed t))
+            "\n%?\n" :kill-buffer t :unnarrowed t)))
         (org-capture-use-indirect-buffer nil))
     (org-capture nil "l")))
 #+end_src

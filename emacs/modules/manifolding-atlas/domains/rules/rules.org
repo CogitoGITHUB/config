@@ -66,6 +66,8 @@ and routed-files per rule note.
 
 * DB Extractor
 Only reads properties — no AST needed, keeps this worker-eligible.
+
+** Extractor
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-rules--extract (_ctx note-data)
   "Record rule bookkeeping (topics, origin) for NOTE-DATA if it is a rule."
@@ -86,7 +88,10 @@ Only reads properties — no AST needed, keeps this worker-eligible.
           [:insert :into rules :values $v1]
           (vector note-id topics-str primary origin ""))))
     note-data))
+#+end_src
 
+** Registration
+#+begin_src emacs-lisp
 (with-eval-after-load 'manifolding-atlas
   (my/manifolding-atlas-rules--ensure-table)
   (manifolding-atlas-db-register-extractor
@@ -157,6 +162,19 @@ nothing. Never duplicates, never touches the source heading.
 #+end_src
 
 ** Route a single rule note (write pointers for every topic)
+
+*** Routed-files recording
+Keeps the DB row current so unmark/goto can rely on it later.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-rules--record-routed (note-id routed)
+  "Store NOTE-ID's comma-joined ROUTED file list in the rules table."
+  (emacsql (manifolding-atlas-db)
+    [:update rules :set [(= routed-files $s1)] :where (= note-id $s2)]
+    (mapconcat #'identity routed ",")
+    note-id))
+#+end_src
+
+*** Routing command
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-rules--route-note (note)
   "Route NOTE (a manifolding-atlas-note already marked RULE: t) to its topic files."
@@ -179,10 +197,7 @@ nothing. Never duplicates, never touches the source heading.
           (my/manifolding-atlas-rules--write-pointer file note-id title)
           (push file routed))))
     ;; record routed files for clean unmarking later
-    (emacsql (manifolding-atlas-db)
-      [:update rules :set [(= routed-files $s1)] :where (= note-id $s2)]
-      (mapconcat #'identity routed ",")
-      note-id)))
+    (my/manifolding-atlas-rules--record-routed note-id routed)))
 #+end_src
 
 ** Route every rule in the vault (manual, on-demand — not on every save)
@@ -217,6 +232,38 @@ Returns \"universal\", \"general\", or \"focused\"."
 
 * Mark / Unmark
 ** Mark current heading as a rule (creation AND retrofit path)
+
+*** Rule property writing
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-rules--apply-rule-props (topics-str file-override)
+  "Write RULE drawer entries; empty TOPICS-STR deletes RULE_TOPICS."
+  (org-entry-put nil "RULE" "t")
+  (if (or (null topics-str) (string-empty-p topics-str))
+      (org-entry-delete nil "RULE_TOPICS")
+    (org-entry-put nil "RULE_TOPICS" topics-str))
+  (if file-override
+      (org-entry-put nil "RULE_FILE" file-override)
+    (org-entry-delete nil "RULE_FILE"))
+  (org-entry-put nil "DRILL_CARD_TYPE" "simple"))
+#+end_src
+
+*** Rule tag application
+Old scope/level/drill tags are stripped before the new set lands.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-rules--apply-rule-tags (scope-tag level-tags)
+  "Replace rule-relevant tags with SCOPE-TAG, LEVEL-TAGS and drill."
+  (let ((current-tags (cl-remove-if
+                       (lambda (tag) (or (member tag my/manifolding-atlas-rules--valid-scopes)
+                                          (string-match-p "^L[0-9]+$" tag)
+                                          (equal tag "drill")))
+                       (org-get-tags nil t))))
+    (org-set-tags (append current-tags
+                          (list scope-tag)
+                          level-tags
+                          (list "drill")))))
+#+end_src
+
+*** Mark command
 #+begin_src emacs-lisp
 ;;;###autoload
 (defun my/manifolding-atlas-rules-mark-as-rule ()
@@ -243,24 +290,8 @@ via the prompt registry in properties/rules/."
          (level-tags (cl-remove-if
                        (lambda (tag) (member tag my/manifolding-atlas-rules--valid-scopes))
                        prompt-tags)))
-    (org-entry-put nil "RULE" "t")
-    (if (or (null topics-str) (string-empty-p topics-str))
-        (org-entry-delete nil "RULE_TOPICS")
-      (org-entry-put nil "RULE_TOPICS" topics-str))
-    (if file-override
-        (org-entry-put nil "RULE_FILE" file-override)
-      (org-entry-delete nil "RULE_FILE"))
-    (org-entry-put nil "DRILL_CARD_TYPE" "simple")
-    ;; Apply tags: remove old scope/level/drill tags, set new ones
-    (let ((current-tags (cl-remove-if
-                          (lambda (tag) (or (member tag my/manifolding-atlas-rules--valid-scopes)
-                                             (string-match-p "^L[0-9]+$" tag)
-                                             (equal tag "drill")))
-                          (org-get-tags nil t))))
-      (org-set-tags (append current-tags
-                            (list scope-tag)
-                            level-tags
-                            (list "drill"))))
+    (my/manifolding-atlas-rules--apply-rule-props topics-str file-override)
+    (my/manifolding-atlas-rules--apply-rule-tags scope-tag level-tags)
     (save-buffer)
     (when-let ((note (my/manifolding-atlas--buffer-note)))
       (my/manifolding-atlas-rules--route-note note))
@@ -297,20 +328,24 @@ via the prompt registry in properties/rules/."
 #+end_src
 
 ** Navigate to routed rule file
+
+*** DB lookup with property fallback
 #+begin_src emacs-lisp
+(defun my/manifolding-atlas-rules--routed-files-for (note-id)
+  "Routed files for NOTE-ID from the DB, recomputed when missing."
+  (let ((routed (caar (emacsql (manifolding-atlas-db)
+                        [:select [routed-files] :from rules
+                         :where (= note-id $s1)]
+                        note-id))))
+    (if (and routed (not (string-empty-p routed)))
+        (split-string routed ",")
+      (my/manifolding-atlas-rules--compute-routed-files))))
+
 (defun my/manifolding-atlas-rules-goto-routed-file ()
   "Open the rule topic file the current heading's rule was routed to."
   (interactive)
   (unless (org-at-heading-p) (org-back-to-heading t))
-  (let* ((note-id (org-id-get))
-         (routed (caar (emacsql (manifolding-atlas-db)
-                        [:select [routed-files] :from rules
-                         :where (= note-id $s1)]
-                        note-id)))
-         (files
-          (if (and routed (not (string-empty-p routed)))
-              (split-string routed ",")
-            (my/manifolding-atlas-rules--compute-routed-files))))
+  (let ((files (my/manifolding-atlas-rules--routed-files-for (org-id-get))))
     (cond
      ((null files)
       (user-error "Not a rule heading"))

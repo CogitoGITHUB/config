@@ -16,15 +16,11 @@ output into heading-based format:
 - Properties drawer and body stay in place
 
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas--headingify-note-content (orig-fn id title &optional head meta tags properties)
-  "Wrap `manifolding-atlas--format-note-content' to produce heading-based notes.
-Injects TODO state from `my/manifolding-atlas--creation-todo' into the heading line."
-  (let (content title-re filetags-re todo)
-    (setq content (funcall orig-fn id title head meta tags properties))
-    (setq title-re "^#\\+title: \\(.*\\)$")
-    (setq filetags-re "^#\\+filetags: :\\(.*\\):$")
-    (setq todo my/manifolding-atlas--creation-todo)
-    (setq my/manifolding-atlas--creation-todo nil)
+(defun my/manifolding-atlas--headingify-content (content todo)
+  "Rewrite file-level `#+title'/`#+filetags' in CONTENT as one heading.
+TODO, when set, prefixes the heading line and is consumed."
+  (let ((title-re "^#\\+title: \\(.*\\)$")
+        (filetags-re "^#\\+filetags: :\\(.*\\):$"))
     (with-temp-buffer
       (insert content)
       (goto-char (point-min))
@@ -45,6 +41,16 @@ Injects TODO state from `my/manifolding-atlas--creation-todo' into the heading l
                 (delete-region (point) (progn (forward-line 1) (point))))
               (buffer-string)))
         content))))
+#+end_src
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--headingify-note-content (orig-fn id title &optional head meta tags properties)
+  "Wrap `manifolding-atlas--format-note-content' to produce heading-based notes.
+Injects TODO state from `my/manifolding-atlas--creation-todo' into the heading line."
+  (let ((todo my/manifolding-atlas--creation-todo))
+    (setq my/manifolding-atlas--creation-todo nil)
+    (my/manifolding-atlas--headingify-content
+     (funcall orig-fn id title head meta tags properties) todo)))
 
 (advice-add 'manifolding-atlas--format-note-content :around #'my/manifolding-atlas--headingify-note-content)
 #+end_src

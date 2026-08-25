@@ -17,7 +17,10 @@
 (defun my/manifolding-atlas--capture-path (name)
   (expand-file-name (format "%s.org" name)
                     (my/manifolding-atlas--capture-dir)))
+#+end_src
 
+** Preview buffer
+#+begin_src emacs-lisp :lexical t
 (defun my/manifolding-atlas--capture-buffer (name &optional title note-file)
   "Return preview buffer for capture template NAME with TITLE.
 When NOTE-FILE is given, prepend its contents to show the full

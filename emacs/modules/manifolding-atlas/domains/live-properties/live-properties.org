@@ -43,6 +43,9 @@ Three ref types: ~'closed~ (shared, deduped), ~'scoped~ (per-entity), ~nil~ (pla
 
 ** Tolerant Drawer Access
 
+*** Drawer region locator
+Finds the property drawer of the heading at point without org's own
+strict parsing — vault notes carry raw transclude lines in drawers.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--drawer-region ()
   (save-excursion
@@ -59,7 +62,10 @@ Three ref types: ~'closed~ (shared, deduped), ~'scoped~ (per-entity), ~nil~ (pla
           (let ((a (line-beginning-position 2)))
             (when (re-search-forward "^:END:[ \t]*$" hend t)
               (cons a (line-beginning-position)))))))))
+#+end_src
 
+*** Drawer read
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--drawer-get (key)
   (save-excursion
     (when-let ((r (my/manifolding-atlas--drawer-region)))
@@ -77,7 +83,10 @@ Three ref types: ~'closed~ (shared, deduped), ~'scoped~ (per-entity), ~nil~ (pla
                 (when (string-equal key (my/manifolding-atlas--key-from-label label))
                   (format "[[id:%s][%s]]"
                           (match-string-no-properties 1) label)))))))))
+#+end_src
 
+*** Drawer write
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--drawer-put (key value)
   (save-excursion
     (let ((r (my/manifolding-atlas--drawer-region)))
@@ -99,7 +108,10 @@ Three ref types: ~'closed~ (shared, deduped), ~'scoped~ (per-entity), ~nil~ (pla
         (forward-line 1)
         (unless (bolp) (insert "\n"))
         (insert (format ":PROPERTIES:\n:%s: %s\n:END:\n" key value))))))
+#+end_src
 
+*** Drawer delete and key conversions
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--drawer-delete (key)
   (save-excursion
     (when-let ((r (my/manifolding-atlas--drawer-region)))
@@ -124,7 +136,12 @@ Three ref types: ~'closed~ (shared, deduped), ~'scoped~ (per-entity), ~nil~ (pla
 (defun my/manifolding-atlas--drawer-insert-point ()
   (when-let ((r (my/manifolding-atlas--drawer-region)))
     (cdr r)))
+#+end_src
 
+*** org-entry fallbacks
+Drawer storage stays transparent: org-entry-get/put fall through to
+the tolerant primitives when the standard paths find nothing.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--org-entry-get-fallback (orig-fn pom property &optional inherit literal-nil)
   (or (funcall orig-fn pom property inherit literal-nil)
       (when (and property
@@ -178,14 +195,14 @@ Three ref types: ~'closed~ (shared, deduped), ~'scoped~ (per-entity), ~nil~ (pla
 
 ** Scoped To-Plist Factory
 
+*** Cross-buffer property writer
+NOTE may live in a different buffer than the one being edited:
+locate its heading by file, level, and pos first.
 #+begin_src emacs-lisp
 (require 'cl)
 
 (defun my/manifolding-atlas--property-put (note key value)
-  "Set property KEY to VALUE in NOTE's file on disk, then save.
-Like `my/manifolding-atlas--drawer-put', but NOTE may live in a different buffer
-than the one currently being edited: locate its heading by file,
-level, and pos before delegating to the drawer primitive."
+  "Set property KEY to VALUE in NOTE's file on disk, then save."
   (let* ((file (manifolding-atlas-note-path note))
          (level (manifolding-atlas-note-level note))
          (pos   (manifolding-atlas-note-pos note)))
@@ -197,7 +214,10 @@ level, and pos before delegating to the drawer primitive."
             (goto-char (point-min)))
           (my/manifolding-atlas--drawer-put key value))
         (save-buffer)))))
+#+end_src
 
+*** Scoped post-apply and factory
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--apply-scoped-post (property-type drawer-key label note)
   (let ((link (my/manifolding-atlas--create-scoped-note
                 property-type label
@@ -239,6 +259,7 @@ level, and pos before delegating to the drawer primitive."
 
 ** Transclude live refs into the owning file
 
+*** Link and anchor helpers
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--ref-link-value (value)
   (when (and (stringp value)
@@ -262,6 +283,34 @@ level, and pos before delegating to the drawer primitive."
     (re-search-forward "^:END:" nil t)
     (forward-line 1))
   (point))
+#+end_src
+
+*** Heading property scan
+Reads plain drawer entries AND in-drawer transclude lines as
+uniform (KEY . VALUE) pairs.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--props-in-region (beg end props)
+  "Collect (KEY . VALUE) pairs between BEG/END into PROPS."
+  (goto-char beg)
+  (while (re-search-forward
+          "^:\\([A-Z][A-Z0-9_]*\\):[[:blank:]]+\\(.*\\)$"
+          end t)
+    (push (cons (match-string-no-properties 1)
+                (match-string-no-properties 2))
+          props))
+  (goto-char beg)
+  (while (re-search-forward
+          "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
+          end t)
+    (let ((key (my/manifolding-atlas--key-from-label
+                (match-string-no-properties 2))))
+      (when key
+        (push (cons key
+                    (format "[[id:%s][%s]]"
+                            (match-string-no-properties 1)
+                            (match-string-no-properties 2)))
+              props))))
+  props)
 
 (defun my/manifolding-atlas--heading-properties ()
   (let (props)
@@ -279,28 +328,14 @@ level, and pos before delegating to the drawer primitive."
         (when (re-search-forward "^:PROPERTIES:" end t)
           (let ((dr-beg (line-beginning-position 2)))
             (when (re-search-forward "^:END:" end t)
-              (let ((dr-end (line-beginning-position)))
-                (goto-char dr-beg)
-                (while (re-search-forward
-                        "^:\\([A-Z][A-Z0-9_]*\\):[[:blank:]]+\\(.*\\)$"
-                        dr-end t)
-                  (push (cons (match-string-no-properties 1)
-                              (match-string-no-properties 2))
-                        props))
-                (goto-char dr-beg)
-                (while (re-search-forward
-                        "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
-                        dr-end t)
-                  (let ((key (my/manifolding-atlas--key-from-label
-                              (match-string-no-properties 2))))
-                    (when key
-                      (push (cons key
-                                  (format "[[id:%s][%s]]"
-                                          (match-string-no-properties 1)
-                                          (match-string-no-properties 2)))
-                            props))))))))))
-      props))
+              (setq props
+                    (my/manifolding-atlas--props-in-region
+                     dr-beg (line-beginning-position) props)))))))
+    props))
+#+end_src
 
+*** Live transclude insertion
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--add-live-transcludes (note)
   (let* ((file (manifolding-atlas-note-path note))
          (level (manifolding-atlas-note-level note))
@@ -335,6 +370,7 @@ level, and pos before delegating to the drawer primitive."
 
 ** State Property Factory (plain value + transclude)
 
+*** Link and type predicates
 #+begin_src emacs-lisp :lexical t
 (defun my/manifolding-atlas--id-from-link (link)
   (when-let ((m (my/manifolding-atlas--ref-link-value link)))
@@ -353,7 +389,50 @@ level, and pos before delegating to the drawer primitive."
     (re-search-forward
      (format "^#\\+transclude:.*\\[\\[id:%s\\]\\[" (regexp-quote id))
      nil t)))
+#+end_src
 
+*** Transclude removal sweep
+Drops stale :property transclude lines of this type, keeping REF-ID,
+and reports which ids were removed for later cleanup.
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--remove-other-type-transcludes (property-type ref-id)
+  "Delete PROPERTY-TYPE transclude lines except REF-ID; return removed ids."
+  (let (removed)
+    (goto-char (point-min))
+    (while (re-search-forward
+            "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[" nil t)
+      (let ((lid (match-string-no-properties 1)))
+        (when (and (my/manifolding-atlas--ref-of-type-p property-type lid)
+                   (not (string-equal lid ref-id)))
+          (push lid removed)
+          (delete-region (line-beginning-position)
+                         (1+ (line-end-position))))))
+    removed))
+#+end_src
+
+*** Transclude insertion
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--insert-property-transclude (property-type drawer-value ref-id)
+  "Insert the :property transclude line for REF-ID if absent."
+  (unless (my/manifolding-atlas--transclude-exists-p ref-id)
+    (goto-char (point-min))
+    (org-back-to-heading t)
+    (end-of-line)
+    (forward-line 1)
+    (when (looking-at "^:PROPERTIES:")
+      (forward-line 1)
+      (re-search-forward "^:END:" nil t)
+      (forward-line 1))
+    (beginning-of-line)
+    (unless (bolp) (insert "\n"))
+    (insert (format "#+transclude: [[id:%s][%s: %s]] :property\n"
+                    ref-id
+                    (my/manifolding-atlas--property-display-name property-type)
+                    drawer-value))))
+#+end_src
+
+*** Refresh orchestration
+#+begin_src emacs-lisp :lexical t
 (defun my/manifolding-atlas--refresh-property-transclude (property-type drawer-value ref-id)
   (let (removed)
     (save-excursion
@@ -361,32 +440,19 @@ level, and pos before delegating to the drawer primitive."
       (my/manifolding-atlas--drawer-delete (my/manifolding-atlas--property-key-from-type property-type))
       (let ((marker (let ((pt (my/manifolding-atlas--drawer-insert-point)))
                       (when pt (copy-marker pt)))))
-        (goto-char (point-min))
-        (while (re-search-forward
-                "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[" nil t)
-          (let ((lid (match-string-no-properties 1)))
-            (when (and (my/manifolding-atlas--ref-of-type-p property-type lid)
-                       (not (string-equal lid ref-id)))
-              (push lid removed)
-              (delete-region (line-beginning-position)
-                             (1+ (line-end-position))))))
-        (unless (my/manifolding-atlas--transclude-exists-p ref-id)
-          (goto-char (or (and (marker-position marker) marker)
-                         (save-excursion
-                           (org-back-to-heading t)
-                           (end-of-line)
-                           (forward-line 1)
-                           (point))))
-          (beginning-of-line)
-          (unless (bolp) (insert "\n"))
-          (insert (format "#+transclude: [[id:%s][%s: %s]] :property\n"
-                          ref-id
-                          (my/manifolding-atlas--property-display-name property-type)
-                          drawer-value))
-          (when marker (set-marker marker nil)))
-        (save-buffer)))
+        (setq removed (my/manifolding-atlas--remove-other-type-transcludes
+                       property-type ref-id))
+        (goto-char (or (and (marker-position marker) marker)
+                       (point-min)))
+        (my/manifolding-atlas--insert-property-transclude
+         property-type drawer-value ref-id)
+        (when marker (set-marker marker nil)))
+      (save-buffer))
     removed))
+#+end_src
 
+*** Ref usage checks and orphan sweep
+#+begin_src emacs-lisp :lexical t
 (defun my/manifolding-atlas--ref-in-use-p (id)
   (let* ((root (my/manifolding-atlas-root-dir))
          (refs-dir (expand-file-name "admin/refs/" root))
@@ -431,14 +497,17 @@ level, and pos before delegating to the drawer primitive."
                 (setq count (1+ (or count 0)))))))))
     (message "my/manifolding-atlas: swept %d orphaned ref%s"
              (or count 0) (if (and count (= count 1)) "" "s"))))
+#+end_src
 
+*** State post-apply
+The state is represented ONLY by an in-drawer #+transclude: line, so
+this drops the plain drawer entry and refreshes that transcription.
+Transclusion rendering is stripped first so the drawer edits see raw
+#+transclude: directives; after-save-hook re-renders them.
+#+begin_src emacs-lisp :lexical t
 (defun my/manifolding-atlas--apply-state-post (property-type drawer-value ref-id note)
   "Post-apply wrapper for a live state property.
-The state is represented ONLY by an in-drawer #+transclude: line, so
-this drops the plain drawer entry and refreshes that transcribe.
-Navigates by NOTE's own path, so it works from any buffer.
-Transclusion rendering is stripped first so the drawer edits see raw
-#+transclude: directives; after-save-hook re-renders them."
+Navigates by NOTE's own path, so it works from any buffer."
   (when-let ((file (manifolding-atlas-note-path note)))
     (with-current-buffer (find-file-noselect file)
       (let ((re-render (bound-and-true-p org-transclusion-mode))
@@ -498,6 +567,7 @@ Transclusion rendering is stripped first so the drawer edits see raw
 
 ** Default Filter — Hide ref notes from manifolding-atlas-find
 
+*** Hidden-path predicate
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--hidden-note-p (path)
   (or (string-prefix-p
@@ -510,7 +580,12 @@ Transclusion rendering is stripped first so the drawer edits see raw
 (setq manifolding-atlas-find-default-filter
       (lambda (note)
         (not (my/manifolding-atlas--hidden-note-p (manifolding-atlas-note-path note)))))
+#+end_src
 
+*** Select filter advice
+User-supplied filters compose with the hidden-path rule instead of
+replacing it.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--select-filter-advice (orig-fn prompt &rest args)
   (let ((orig-filter (plist-get args :filter-fn)))
     (apply orig-fn prompt
@@ -526,6 +601,7 @@ Transclusion rendering is stripped first so the drawer edits see raw
 
 ** Open ref notes in capture by default
 
+*** Capture-style file editor
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--edit-file-in-capture (file)
   (let* ((org-capture-templates
@@ -544,7 +620,12 @@ Transclusion rendering is stripped first so the drawer edits see raw
       (when (eq buf (current-buffer))
         (switch-to-buffer (other-buffer))))
     (org-capture nil "v")))
+#+end_src
 
+*** org-id-open advice
+Clicking an id: link that lives in a property drawer opens the ref
+in capture instead of plain visit.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--open-ref-link (orig-fun id &optional path)
   (if-let* ((_ (org-in-regexp org-link-any-re))
             (start (match-beginning 0))
@@ -561,13 +642,68 @@ Transclusion rendering is stripped first so the drawer edits see raw
 
 ** Index transclude-in-drawer notes
 
+*** Parse tolerance flag
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas--db-parse nil)
 
 (defun my/manifolding-atlas--parse-file-with-tolerance (orig-fn &rest args)
   (let ((my/manifolding-atlas--db-parse t))
     (apply orig-fn args)))
+#+end_src
 
+*** Per-drawer stripping
+Swaps each in-drawer transclude line for a plain `:KEY:` synonym so
+org's parser sees ordinary properties; returns a restore cell.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--strip-one-drawer ()
+  "Strip transclude lines in the drawer at point; return restore cell."
+  (let* ((pbeg (line-beginning-position 2))
+         (pm (save-excursion
+               (if (re-search-forward "^:END:[ \t]*$" nil t)
+                   (copy-marker (line-beginning-position))
+                 nil)))
+         restore)
+    (when pm
+      (goto-char pbeg)
+      (while (re-search-forward "^[^:].*$" pm t)
+        (let* ((text (match-string 0))
+               (m (when (string-match
+                         "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
+                         text)
+                    (let* ((label (match-string-no-properties 2 text))
+                           (key (my/manifolding-atlas--key-from-label label)))
+                      (when key
+                        (list key
+                              (match-string-no-properties 1 text)
+                              label)))))
+               (syn (when m
+                      (format ":%s: [[id:%s][%s]]"
+                              (nth 0 m) (nth 1 m) (nth 2 m)))))
+          (push (cons (point-marker) (cons text syn)) restore)
+          (delete-region (line-beginning-position)
+                         (1+ (line-end-position)))
+          (when syn
+            (insert syn "\n"))))
+      (goto-char pm)
+      (set-marker pm nil))
+    restore))
+#+end_src
+
+*** Restore pass
+Puts the raw transclude lines back exactly where they were.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--restore-stripped-lines (restore)
+  (dolist (cell (nreverse restore))
+    (goto-char (car cell))
+    (when (cddr cell)
+      (delete-region (line-beginning-position)
+                     (1+ (line-end-position))))
+    (insert (cadr cell) "\n")
+    (set-marker (car cell) nil)))
+#+end_src
+
+*** Parser advice wiring
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas--strip-in-drawer-keywords (orig-fn &rest args)
   (if (not my/manifolding-atlas--db-parse)
       (apply orig-fn args)
@@ -577,42 +713,9 @@ Transclusion rendering is stripped first so the drawer edits see raw
         (let (restore)
           (goto-char (point-min))
           (while (re-search-forward "^:PROPERTIES:[ \t]*$" nil t)
-            (let* ((pbeg (line-beginning-position 2))
-                   (pm (save-excursion
-                         (if (re-search-forward "^:END:[ \t]*$" nil t)
-                             (copy-marker (line-beginning-position))
-                           nil))))
-              (when pm
-                (goto-char pbeg)
-                (while (re-search-forward "^[^:].*$" pm t)
-                  (let* ((text (match-string 0))
-                         (m (when (string-match
-                                   "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
-                                   text)
-                              (let* ((label (match-string-no-properties 2 text))
-                                     (key (my/manifolding-atlas--key-from-label label)))
-                                (when key
-                                  (list key
-                                        (match-string-no-properties 1 text)
-                                        label)))))
-                         (syn (when m
-                                (format ":%s: [[id:%s][%s]]"
-                                        (nth 0 m) (nth 1 m) (nth 2 m)))))
-                    (push (cons (point-marker) (cons text syn)) restore)
-                    (delete-region (line-beginning-position)
-                                   (1+ (line-end-position)))
-                    (when syn
-                      (insert syn "\n"))))
-                (goto-char pm)
-                (set-marker pm nil))))
-          (let ((result (apply orig-fn args)))
-            (dolist (cell (nreverse restore))
-              (goto-char (car cell))
-              (when (cddr cell)
-                (delete-region (line-beginning-position)
-                               (1+ (line-end-position))))
-              (insert (cadr cell) "\n")
-              (set-marker (car cell) nil))
+            (setq restore (append (my/manifolding-atlas--strip-one-drawer)
+                                  restore)))          (let ((result (apply orig-fn args)))
+            (my/manifolding-atlas--restore-stripped-lines restore)
             result))))))
 
 (advice-add 'manifolding-atlas-db--parse-file :around #'my/manifolding-atlas--parse-file-with-tolerance)

@@ -55,6 +55,8 @@ level, and routed-files for fast protocol queries.
 *** DB Extractor
 Records protocol bookkeeping (topics, order, level, routed files) for
 notes carrying a PROTOCOL property.
+
+**** Extractor
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-protocols--extract (_ctx note-data)
   "Record protocol bookkeeping for NOTE-DATA if it is a protocol step."
@@ -74,7 +76,10 @@ notes carrying a PROTOCOL property.
           [:insert :into protocols :values $v1]
           (vector note-id topics-str primary order level ""))))
     note-data))
+#+end_src
 
+**** Registration
+#+begin_src emacs-lisp
 (with-eval-after-load 'manifolding-atlas
   (my/manifolding-atlas-protocols--ensure-table)
   (manifolding-atlas-db-register-extractor
@@ -155,6 +160,18 @@ Priority: OVERRIDE > topic-file-map > default."
 #+end_src
 
 **** Route a single protocol step
+
+***** Routed-files recording
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-protocols--record-routed (note-id routed)
+  "Store NOTE-ID's comma-joined ROUTED file list."
+  (emacsql (manifolding-atlas-db)
+    [:update protocols :set [(= routed-files $s1)] :where (= note-id $s2)]
+    (mapconcat #'identity routed ",")
+    note-id))
+#+end_src
+
+***** Routing command
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-protocols--route-note (note)
   "Route NOTE (a manifolding-atlas-note already marked PROTOCOL: t) to its protocol file."
@@ -173,10 +190,7 @@ Priority: OVERRIDE > topic-file-map > default."
         (let ((file (my/manifolding-atlas-protocols--resolve-file topic)))
           (my/manifolding-atlas-protocols--write-pointer file note-id title level)
           (push file routed))))
-    (emacsql (manifolding-atlas-db)
-      [:update protocols :set [(= routed-files $s1)] :where (= note-id $s2)]
-      (mapconcat #'identity routed ",")
-      note-id)))
+    (my/manifolding-atlas-protocols--record-routed note-id routed)))
 #+end_src
 
 **** Route every protocol step
@@ -279,6 +293,8 @@ Only strips protocol-specific properties; preserves :RULE: t if set."
 #+end_src
 
 *** Build — assemble a protocol from multiple headings
+
+**** Avy collection
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-protocols--collect-headings-avy ()
   "Select headings via avy-goto-line. C-g to finish."
@@ -296,7 +312,60 @@ Only strips protocol-specific properties; preserves :RULE: t if set."
                  t)
              (quit nil)))
     (nreverse collected)))
+#+end_src
 
+**** Parent heading creation
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-protocols--create-parent (file title topics-str)
+  "Create the TODO parent heading for a new protocol in FILE; return its ID."
+  (with-current-buffer (find-file-noselect file)
+    (goto-char (point-max))
+    (unless (bolp) (insert "\n"))
+    (insert "* TODO " title "\n")
+    (org-set-property "ID" (org-id-uuid))
+    (org-set-property "PROTOCOL" "t")
+    (org-set-property "PROTOCOL_ORDER" "0")
+    (org-set-property "PROTOCOL_LEVEL" "L1")
+    (when topics-str
+      (org-set-property "PROTOCOL_TOPICS" topics-str))
+    (save-buffer))
+  (with-current-buffer (find-file-noselect file)
+    (goto-char (point-max))
+    (org-back-to-heading t)
+    (org-id-get)))
+#+end_src
+
+**** Step installation
+Tags the source heading with its protocol properties and writes the
+transclusion pointer under the parent in the protocol file.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-protocols--install-step
+    (id heading-title order level topics-str parent-id file)
+  "Mark source heading ID as step ORDER/LEVEL and transclude it under PARENT-ID."
+  (when-let ((marker (org-id-find id t)))
+    (with-current-buffer (marker-buffer marker)
+      (goto-char marker)
+      (org-entry-put nil "PROTOCOL" "t")
+      (org-entry-put nil "PROTOCOL_ORDER" (number-to-string order))
+      (org-entry-put nil "PROTOCOL_LEVEL" level)
+      (when topics-str
+        (org-entry-put nil "PROTOCOL_TOPICS" topics-str))
+      (save-buffer)))
+  ;; Write transclusion pointer under parent heading in protocol file
+  (with-current-buffer (find-file-noselect file)
+    (goto-char (point-min))
+    (when (re-search-forward
+           (format ":ID:\\s-+%s" (regexp-quote parent-id))
+           nil t)
+      (org-end-of-subtree t t)
+      (unless (bolp) (insert "\n"))
+      (insert (format "#+transclude: [[id:%s][%s]] :level %s\n"
+                      id heading-title (substring level 1)))
+      (save-buffer))))
+#+end_src
+
+**** Build command
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-protocols-build ()
   "Assemble a new protocol document from multiple source headings.
 Creates a parent heading in the protocol file and writes transclusion
@@ -318,50 +387,17 @@ pointers for each selected step."
            (order-counter 1))
       (unless (> count 0)
         (user-error "No headings selected"))
-      (let ((parent-id nil))
-        ;; Create parent heading in protocol file
-        (with-current-buffer (find-file-noselect file)
-          (goto-char (point-max))
-          (unless (bolp) (insert "\n"))
-          (insert "* TODO " title "\n")
-          (org-set-property "ID" (org-id-uuid))
-          (org-set-property "PROTOCOL" "t")
-          (org-set-property "PROTOCOL_ORDER" "0")
-          (org-set-property "PROTOCOL_LEVEL" "L1")
-          (when topics-str
-            (org-set-property "PROTOCOL_TOPICS" topics-str))
-          (setq parent-id (org-id-get))
-          (save-buffer))
-        ;; Process each collected heading
+      (let ((parent-id (my/manifolding-atlas-protocols--create-parent
+                        file title topics-str)))
         (dolist (step collected)
           (let* ((id (nth 0 step))
                  (heading-title (nth 1 step))
-                 (order order-counter)
                  (level (completing-read
                          (format "Level for \"%s\" (L1-L10): " heading-title)
                          '("L1" "L2" "L3" "L4" "L5" "L6" "L7" "L8" "L9" "L10")
                          nil t "L1")))
-            ;; Add properties to source heading
-            (when-let ((marker (org-id-find id t)))
-              (with-current-buffer (marker-buffer marker)
-                (goto-char marker)
-                (org-entry-put nil "PROTOCOL" "t")
-                (org-entry-put nil "PROTOCOL_ORDER" (number-to-string order))
-                (org-entry-put nil "PROTOCOL_LEVEL" level)
-                (when topics-str
-                  (org-entry-put nil "PROTOCOL_TOPICS" topics-str))
-                (save-buffer)))
-            ;; Write transclusion pointer under parent heading in protocol file
-            (with-current-buffer (find-file-noselect file)
-              (goto-char (point-min))
-              (when (re-search-forward
-                     (format ":ID:\\s-+%s" (regexp-quote parent-id))
-                     nil t)
-                (org-end-of-subtree t t)
-                (unless (bolp) (insert "\n"))
-                (insert (format "#+transclude: [[id:%s][%s]] :level %s\n"
-                                id heading-title (substring level 1)))
-                (save-buffer)))
+            (my/manifolding-atlas-protocols--install-step
+             id heading-title order-counter level topics-str parent-id file)
             (setq order-counter (1+ order-counter))))
         (message "Built protocol \"%s\" with %d step(s)." title count)))))
 #+end_src

@@ -1104,7 +1104,8 @@ nested routines render fully."
          (file (expand-file-name slug
                                  my/manifolding-atlas-routines-generated-directory))
          (prev (my/manifolding-atlas-routines--previous-render file))
-         (old-id (nth 0 prev)) (old-todo (nth 1 prev))
+         (old-id (nth 0 prev))
+         (old-todo (nth 1 prev))
          (gindex (when (equal rtype "chain")
                    (my/manifolding-atlas-routines--generated-index))))
     (unless entries (user-error "Routine has no entries"))
@@ -1126,7 +1127,7 @@ nested routines render fully."
         (save-buffer))
       (find-file file)
       (message "Generated %s (%d entries)" file (length entries))
-      file))
+      file)))
 #+end_src
 
 *** Validation
@@ -1275,7 +1276,7 @@ recorded for this step.
                    '(done . t))
                   (res (cons res nil))
                   (t nil))))
-      (?q 'quit)))
+      (?q 'quit))))
 #+end_src
 **** Run command
 #+begin_src emacs-lisp
@@ -1314,15 +1315,15 @@ end, offer to journal the session."
                 ('skip (setq skipped (1+ skipped))))
               (when (cdr res) (setq learned (1+ learned)))
               (push (list (nth 0 entry) (nth 1 entry) (car res))
-                    results)))))
-      (kill-buffer buf)
-      (when (and results
-                 (y-or-n-p (format "Log session (%d done / %d skipped / %d learned)? "
-                                   done skipped learned)))
-        (my/manifolding-atlas-routines--session-create
-         routine (nreverse results) done skipped))
-      (message "Routine finished: %d done, %d skipped, %d learned"
-               done skipped learned))))
+                    results)))))))
+        (kill-buffer buf)
+        (when (and results
+                   (y-or-n-p (format "Log session (%d done / %d skipped / %d learned)? "
+                                     done skipped learned)))
+          (my/manifolding-atlas-routines--session-create
+           routine (nreverse results) done skipped))
+        (message "Routine finished: %d done, %d skipped, %d learned"
+                 done skipped learned)))
 #+end_src
 
 *** Add Entry & Due Reviews

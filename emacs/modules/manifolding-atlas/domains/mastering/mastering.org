@@ -47,6 +47,8 @@ Spaced-repetition review for manifolding-atlas notes. Each note is a reviewable 
 Date arithmetic respects `my/manifolding-atlas-mastering--day-start-hour`
 (a new review day begins at 3 AM by default). Dates are (year month day)
 lists internally, YYYYMMDD integers in the DB.
+
+**** Rounding and fuzz
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--round-items (list)
   "Round all items in LIST to 2 decimal places."
@@ -61,7 +63,10 @@ lists internally, YYYYMMDD integers in the DB.
                       (/ (random 1001) 1000.0))
                    my/manifolding-atlas-mastering--interval-fuzz)))
       (* interval (1+ fuzz)))))
+#+end_src
 
+**** Day-aware date arithmetic
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--date (&optional offset)
   "Return current date as (year month day), respecting day-start-hour.
 OFFSET is days from today."
@@ -109,6 +114,8 @@ SM-2 variant: proto intervals (0,1,2 days) for first successes, then
 synolon-scaled intervals. Failures apply amnesia (0.5 multiplier) with
 a 7-day cap. Anagnosis (3-streak) boosts plus/minus; lethe (2 fails)
 resets the interval.
+
+**** Score evolution
 #+begin_src emacs-lisp
 (cl-defun my/manifolding-atlas-mastering--next-mastering
     (&key mastering success epignosis agnoia anagnosis c-successes c-failures lethe)
@@ -132,7 +139,10 @@ resets the interval.
                        (max 0.1 (- neo-plus epignosis))
                      neo-plus)))
     (my/manifolding-atlas-mastering--round-items (list neo-plus neo-minus neo-synolon))))
+#+end_src
 
+**** Interval computation
+#+begin_src emacs-lisp
 (cl-defun my/manifolding-atlas-mastering--next-interval
     (&key last-interval mastering-synolon success successful-reviews
           amnesia proto c-fails lethe)
@@ -183,6 +193,8 @@ scores, and a suspend flag.
 Indexes MASTERING_* properties from NOTE-DATA into mastering_schedule.
 Initializes a default schedule when MASTERING is set but schedule
 properties are missing, so REVIEW/SUSPEND notes are never dropped.
+
+**** Extractor
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--extract (ctx note-data)
   "Extract MASTERING_* properties from NOTE-DATA into mastering_schedule.
@@ -213,7 +225,10 @@ properties are missing, so REVIEW/SUSPEND notes are never dropped."
                 (if (funcall to-int "MASTERING_SYNOLON") (funcall to-int "MASTERING_SYNOLON") 1.3)
                 (if (string-equal mastering "SUSPEND") 1 0))))
     note-data))
+#+end_src
 
+**** Registration
+#+begin_src emacs-lisp
 (with-eval-after-load 'manifolding-atlas
   (my/manifolding-atlas-mastering--ensure-table)
   (manifolding-atlas-db-register-extractor
@@ -227,6 +242,8 @@ properties are missing, so REVIEW/SUSPEND notes are never dropped."
 *** Schedule Property Write
 Writes schedule properties for NOTE-ID back to its org drawer after
 each review, keeping the file-level state in sync with the DB.
+
+**** Drawer writer
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--write-schedule-props
     (note-id next-rev-int n success c-succ c-fails t-succ t-fails score)
@@ -242,16 +259,18 @@ each review, keeping the file-level state in sync with the DB.
               (if (and level (> level 0) pos)
                   (progn (goto-char pos) (org-back-to-heading t))
                 (goto-char (point-min)))
-              (my/manifolding-atlas--drawer-put "MASTERING_NEXT_REV" (number-to-string next-rev-int))
-              (my/manifolding-atlas--drawer-put "MASTERING_LAST_REV" (number-to-string (my/manifolding-atlas-mastering--today-int)))
-              (my/manifolding-atlas--drawer-put "MASTERING_N" (number-to-string n))
-              (my/manifolding-atlas--drawer-put "MASTERING_C_SUCCESS" (number-to-string (if success (1+ c-succ) 0)))
-              (my/manifolding-atlas--drawer-put "MASTERING_C_FAILS" (number-to-string (if success 0 (1+ c-fails))))
-              (my/manifolding-atlas--drawer-put "MASTERING_T_SUCCESS" (number-to-string (if success (1+ t-succ) t-succ)))
-              (my/manifolding-atlas--drawer-put "MASTERING_T_FAILS" (number-to-string (if success t-fails (1+ t-fails))))
-              (my/manifolding-atlas--drawer-put "MASTERING_PLUS" (number-to-string (nth 0 score)))
-              (my/manifolding-atlas--drawer-put "MASTERING_MINUS" (number-to-string (nth 1 score)))
-              (my/manifolding-atlas--drawer-put "MASTERING_SYNOLON" (number-to-string (nth 2 score))))
+              (dolist (pair `(("MASTERING_NEXT_REV" . ,next-rev-int)
+                              ("MASTERING_LAST_REV" . ,(my/manifolding-atlas-mastering--today-int))
+                              ("MASTERING_N" . ,n)
+                              ("MASTERING_C_SUCCESS" . ,(if success (1+ c-succ) 0))
+                              ("MASTERING_C_FAILS" . ,(if success 0 (1+ c-fails)))
+                              ("MASTERING_T_SUCCESS" . ,(if success (1+ t-succ) t-succ))
+                              ("MASTERING_T_FAILS" . ,(if success t-fails (1+ t-fails)))
+                              ("MASTERING_PLUS" . ,(nth 0 score))
+                              ("MASTERING_MINUS" . ,(nth 1 score))
+                              ("MASTERING_SYNOLON" . ,(nth 2 score))))
+                (my/manifolding-atlas--drawer-put
+                 (car pair) (number-to-string (cdr pair)))))
             (save-buffer)))))))
 
 (defun my/manifolding-atlas-mastering--init-schedule (suspend note)
@@ -279,6 +298,8 @@ each review, keeping the file-level state in sync with the DB.
 #+end_src
 
 *** Algorithm Bridge
+
+**** Review algorithm
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--review-algorithm (note-id success)
   "Compute (NEXT-REV MASTERING-SCORE LOG-ALIST) for reviewing NOTE-ID with SUCCESS."
@@ -349,6 +370,11 @@ each review, keeping the file-level state in sync with the DB.
      note-id (my/manifolding-atlas-mastering--date-to-int next-rev) (1+ n)
      success c-succ c-fails t-succ t-fails score)
     next-rev))
+
+(defun my/manifolding-atlas-mastering--apply-grade (id success)
+  "Run the algorithm for ID and dual-write the result."
+  (my/manifolding-atlas-mastering--update id success
+   (my/manifolding-atlas-mastering--review-algorithm id success)))
 #+end_src
 
 *** Due Queries
@@ -382,6 +408,8 @@ at least one prior review (n > 0).
 Sequential review in a dedicated buffer. Each note shows its title and
 an open link; grading with n/f/s runs the algorithm and dual-writes the
 schedule table and org drawer.
+
+**** Note display and suspend toggle
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--display-note (id)
   "Display note ID in review buffer."
@@ -394,6 +422,35 @@ schedule table and org drawer.
         (when note
           (insert (format "[[id:%s][open]]\n" id)))))))
 
+(defun my/manifolding-atlas-mastering--set-suspend (note-id &optional value)
+  "Toggle suspend on NOTE-ID."
+  (let ((v (if value 1 0)))
+    (emacsql (manifolding-atlas-db)
+      [:update mastering_schedule :set suspend = $s2 :where (= note-id $s1)]
+      note-id v)
+    (let ((note (manifolding-atlas-db-get-by-id note-id)))
+      (when note
+        (my/manifolding-atlas--property-put note "MASTERING" (if value "SUSPEND" "REVIEW"))))
+    (message "Suspended")))
+#+end_src
+
+**** Grading prompt handler
+Returns 'quit, 'suspend, or 'open; n/f apply the algorithm immediately.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-mastering--grade-prompt (id)
+  "Ask for a grade on ID's review."
+  (pcase (read-char-choice "n=next f=fail s=suspend o=open q=quit: "
+                           '(?n ?f ?s ?o ?q))
+    (?n (my/manifolding-atlas-mastering--apply-grade id t) nil)
+    (?f (my/manifolding-atlas-mastering--apply-grade id nil) nil)
+    (?s 'suspend)
+    (?o 'open)
+    (?q 'quit)))
+#+end_src
+
+**** Review session loop
+The open action visits the note, then offers an inline re-grade.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--review-session (ids)
   "Review NOTE-IDS in sequence, grading with algorithm."
   (let ((buf (get-buffer-create "*manifolding-atlas-mastering-review*"))
@@ -409,48 +466,32 @@ schedule table and org drawer.
                (title (if note (manifolding-atlas-note-title note) id)))
           (my/manifolding-atlas-mastering--display-note id)
           (message "[%d/%d] %s" (1+ reviewed) total title)
-          (let ((choice (read-char-choice
-                         "n=next f=fail s=suspend o=open q=quit: "
-                         '(?n ?f ?s ?o ?q))))
-            (pcase choice
-              (?n (my/manifolding-atlas-mastering--update id t
-                   (my/manifolding-atlas-mastering--review-algorithm id t)))
-              (?f (my/manifolding-atlas-mastering--update id nil
-                   (my/manifolding-atlas-mastering--review-algorithm id nil)))
-              (?s (my/manifolding-atlas-mastering--set-suspend id 1))
-              (?o (when note
-                    (find-file (manifolding-atlas-note-path note))
-                    (let ((inhibit-read-only t))
-                      (with-current-buffer buf (erase-buffer)))
-                    (when (y-or-n-p "Grade this note? ")
-                      (let ((g (read-char-choice "n=next f=fail s=suspend q=quit: "
-                                                 '(?n ?f ?s ?q))))
-                        (pcase g
-                          (?n (my/manifolding-atlas-mastering--update id t
-                               (my/manifolding-atlas-mastering--review-algorithm id t)))
-                          (?f (my/manifolding-atlas-mastering--update id nil
-                               (my/manifolding-atlas-mastering--review-algorithm id nil)))
-                          (?s (my/manifolding-atlas-mastering--set-suspend id 1))
-                          (?q nil))))))
-              (?q (throw 'mastering-quit nil)))))
+          (let ((action (my/manifolding-atlas-mastering--grade-prompt id)))
+            (cond
+             ((eq action 'quit) (throw 'mastering-quit nil))
+             ((eq action 'suspend)
+              (my/manifolding-atlas-mastering--set-suspend id 1))
+             ((eq action 'open)
+              (when note
+                (find-file (manifolding-atlas-note-path note))
+                (let ((inhibit-read-only t))
+                  (with-current-buffer buf (erase-buffer)))
+                (when (y-or-n-p "Grade this note? ")
+                  (let ((g (read-char-choice "n=next f=fail s=suspend q=quit: "
+                                             '(?n ?f ?s ?q))))
+                    (pcase g
+                      (?n (my/manifolding-atlas-mastering--apply-grade id t))
+                      (?f (my/manifolding-atlas-mastering--apply-grade id nil))
+                      (?s (my/manifolding-atlas-mastering--set-suspend id 1))))))))))
         (cl-incf reviewed)))
     (kill-buffer buf)))
-
-(defun my/manifolding-atlas-mastering--set-suspend (note-id &optional value)
-  "Toggle suspend on NOTE-ID."
-  (let ((v (if value 1 0)))
-    (emacsql (manifolding-atlas-db)
-      [:update mastering_schedule :set suspend = $s2 :where (= note-id $s1)]
-      note-id v)
-    (let ((note (manifolding-atlas-db-get-by-id note-id)))
-      (when note
-        (my/manifolding-atlas--property-put note "MASTERING" (if value "SUSPEND" "REVIEW"))))
-    (message "Suspended")))
 #+end_src
 
 *** Commands
 Interactive entry points: review due, review overdue, mark current note
 reviewed/failed, and toggle participation in the review pool.
+
+**** Session starters
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering-review ()
   "Start mastering review session for due notes."
@@ -467,7 +508,10 @@ reviewed/failed, and toggle participation in the review pool.
     (if (null ids)
         (message "No overdue notes.")
       (my/manifolding-atlas-mastering--review-session ids))))
+#+end_src
 
+**** Current-note commands
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering-mark-review (arg)
   "Mark current note reviewed; with prefix, mark as failed."
   (interactive "P")

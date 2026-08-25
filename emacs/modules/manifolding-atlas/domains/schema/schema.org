@@ -44,6 +44,24 @@ Declarative = no src blocks; level-1 KEY heading, level-2 options."
         ;; Engine unavailable/broken → legacy extractors handle it.
         (error nil)))))
 
+(defun my/manifolding-atlas-schema--legacy-choices (prompt-name)
+  "Legacy regex extraction of choices from elisp prompt PROMPT-NAME."
+  (let* ((dir (my/manifolding-atlas-schema--prompt-dir))
+         (files (directory-files-recursively
+                 dir (format "^%s\\.org$" prompt-name))))
+    (when files
+      (with-temp-buffer
+        (insert-file-contents (car files))
+        (goto-char (point-min))
+        (when (re-search-forward "completing-read" nil t)
+          (condition-case nil
+              (when (re-search-forward "'(\"" nil t)
+                (let ((items (save-excursion
+                               (backward-char 2)
+                               (read (current-buffer)))))
+                  (cl-remove-if (lambda (s) (string-match-p "WARNING" s)) items)))
+            (error nil)))))))
+
 (defun my/manifolding-atlas-schema--extract-choices (prompt-name)
   "Extract allowed values for PROMPT-NAME: level-2 options from a
 declarative file (WARNING sentinel excluded), else legacy regex over
@@ -53,21 +71,7 @@ elisp lists (WARNING excluded)."
         (when choices
           (cl-remove-if (lambda (s) (string-match-p "WARNING" s))
                         choices)))
-      (let* ((dir (my/manifolding-atlas-schema--prompt-dir))
-             (files (directory-files-recursively
-                     dir (format "^%s\\.org$" prompt-name))))
-        (when files
-          (with-temp-buffer
-            (insert-file-contents (car files))
-            (goto-char (point-min))
-            (when (re-search-forward "completing-read" nil t)
-              (condition-case nil
-                  (when (re-search-forward "'(\"" nil t)
-                    (let ((items (save-excursion
-                                   (backward-char 2)
-                                   (read (current-buffer)))))
-                      (cl-remove-if (lambda (s) (string-match-p "WARNING" s)) items)))
-                (error nil))))))))
+      (my/manifolding-atlas-schema--legacy-choices prompt-name)))
 
 (defun my/manifolding-atlas-schema--extract-prop-key (prompt-name)
   "Extract the property drawer key for PROMPT-NAME: level-1 heading of a
@@ -106,21 +110,28 @@ When REQUIRED is non-nil, the field is mandatory."
       ,@(when required '(:required t))
       :validate ,(apply-partially #'my/manifolding-atlas-schema--validate choices))))
 
+(defun my/manifolding-atlas-schema--drawer-keys-in-file (file)
+  "Return property keys declared in FILE's drawer template."
+  (let (keys)
+    (with-temp-buffer
+      (insert-file-contents file)
+      (goto-char (point-min))
+      (when (re-search-forward "^:PROPERTIES:$" nil t)
+        (forward-line)
+        (while (not (looking-at "^:END:$"))
+          (when (looking-at "^:\\([A-Z_]+?\\):[ \t]*$")
+            (push (match-string 1) keys))
+          (forward-line))))
+    keys))
+
 (defun my/manifolding-atlas-schema--template-prop-keys ()
   "Return list of property keys defined in capture template files."
   (let ((template-dir (my/manifolding-atlas-schema--template-dir))
         keys)
     (when (file-directory-p template-dir)
       (dolist (file (directory-files template-dir t "\\.org\\'"))
-        (with-temp-buffer
-          (insert-file-contents file)
-          (goto-char (point-min))
-          (when (re-search-forward "^:PROPERTIES:$" nil t)
-            (forward-line)
-            (while (not (looking-at "^:END:$"))
-              (when (looking-at "^:\\([A-Z_]+?\\):[ \t]*$")
-                (push (match-string 1) keys))
-              (forward-line))))))
+        (setq keys (append (my/manifolding-atlas-schema--drawer-keys-in-file file)
+                           keys))))
     (delete-dups keys)))
 
 (defun my/manifolding-atlas-schema--template-props ()
@@ -130,18 +141,9 @@ When REQUIRED is non-nil, the field is mandatory."
     (when (file-directory-p template-dir)
       (dolist (file (directory-files template-dir t "\\.org\\'"))
         (let* ((name (file-name-sans-extension (file-name-nondirectory file)))
-               keys)
-          (with-temp-buffer
-            (insert-file-contents file)
-            (goto-char (point-min))
-            (when (re-search-forward "^:PROPERTIES:$" nil t)
-              (forward-line)
-              (while (not (looking-at "^:END:$"))
-                (when (looking-at "^:\\([A-Z_]+?\\):[ \t]*$")
-                  (push (match-string 1) keys))
-                (forward-line))))
+               (keys (nreverse (my/manifolding-atlas-schema--drawer-keys-in-file file))))
           (when keys
-            (push (cons name (nreverse keys)) result)))))
+            (push (cons name keys) result)))))
     (nreverse result)))
 #+end_src
 
@@ -178,6 +180,32 @@ the template name.  `TEMPLATE_HASH` is also validated against the
 current template file so outdated notes are flagged when the template
 changes.
 
+**** Field validators
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-schema--required-validator ()
+  "Validator flagging missing or WARNING-valued required fields."
+  (lambda (val _note)
+    (cond ((equal val "WARNING") "missing-required")
+          ((null val) "missing-required")
+          (t t))))
+
+(defun my/manifolding-atlas-schema--hash-validator ()
+  "Validator comparing TEMPLATE_HASH against the current template file."
+  (lambda (val note)
+    (let* ((name (or (car (manifolding-atlas-note-meta-get-list
+                           note 'TEMPLATE 'string))
+                     (cdr (assoc "TEMPLATE"
+                                 (manifolding-atlas-note-properties note)))))
+           (current (if name
+                        (my/manifolding-atlas--capture-file-hash name)
+                      nil)))
+      (cond ((and val current (not (string-equal val current)))
+             "template-outdated")
+            ((null val) "missing-required")
+            (t t)))))
+#+end_src
+
+**** Template schema generation
 #+begin_src emacs-lisp
 (with-eval-after-load 'manifolding-atlas
   (cl-loop for (template-name . keys) in (my/manifolding-atlas-schema--template-props)
@@ -196,28 +224,12 @@ changes.
                `((:key "TEMPLATE_HASH"
                   :type string
                   :required t
-                  :validate
-                  ,(lambda (val note)
-                     (let* ((name (or (car (manifolding-atlas-note-meta-get-list
-                                            note 'TEMPLATE 'string))
-                                      (cdr (assoc "TEMPLATE"
-                                                  (manifolding-atlas-note-properties note)))))
-                            (current (if name
-                                          (my/manifolding-atlas--capture-file-hash name)
-                                        nil)))
-                       (cond ((and val current (not (string-equal val current)))
-                              "template-outdated")
-                             ((null val) "missing-required")
-                             (t t)))))
+                  :validate ,(my/manifolding-atlas-schema--hash-validator))
                  ,@(cl-loop for key in keys
                             collect
                             `(:key ,key :type string
                               :required t
-                              :validate
-                              ,(lambda (val _note)
-                                 (cond ((equal val "WARNING") "missing-required")
-                                       ((null val) "missing-required")
-                                       (t t)))))))))
+                              :validate ,(my/manifolding-atlas-schema--required-validator)))))))
 #+end_src
 
 *** Task Schema
@@ -260,6 +272,45 @@ no longer needed — simply having the property with any value satisfies
 the schema's requirement to *set* the field.  Deleting the property
 leaves the note truly missing that metadata.
 
+**** Per-note sentinel cleanup
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-schema--migrate-note-warnings (level pos)
+  "Clean WARNING sentinels at one heading anchor; return count deleted."
+  (let ((count 0))
+    (when (and level (> level 0) pos)
+      (goto-char pos)
+      (org-back-to-heading t))
+    (dolist (prop '("STATE_WORK" "STATE_GENERAL" "STATE_INTELLIGENCE"
+                    "STATE_OPERATIONAL" "STATE_VALIDATION" "STATE_SOURCE"
+                    "STATE_DEPENDENCY" "STATE_CHECKLIST" "PRIORITY" "TAG"))
+      (let ((val (org-entry-get nil prop)))
+        (when (and val (string-match-p "WARNING" val))
+          (org-entry-delete nil prop)
+          (setq count (1+ count)))))
+    (when (and (org-at-heading-p)
+               (equal (org-get-todo-state) "WARNING"))
+      (org-todo " ")
+      (setq count (1+ count)))
+    count))
+
+(defun my/manifolding-atlas-schema--migrate-file-warnings (file notes)
+  "Delete WARNING-valued properties for NOTES in FILE; return count."
+  (let ((count 0))
+    (with-current-buffer (find-file-noselect file)
+      (dolist (info notes)
+        (setq count
+              (+ count
+                 (my/manifolding-atlas-schema--migrate-note-warnings
+                  (plist-get info :level) (plist-get info :pos)))))
+      (when (buffer-modified-p)
+        (save-buffer))
+      (kill-buffer))
+    count))
+#+end_src
+
+**** Migration command
+Idempotent and safe to run multiple times. Prompts for confirmation
+before making any changes.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-schema-migrate-warnings ()
   "Delete all properties with value \"WARNING\" throughout the vault.
@@ -269,10 +320,7 @@ the property value to track it in MISSING PROMPTS.  Now schema
 validation flags notes that are *missing* the metadata entirely as
 `missing-required` violations, so the sentinel is no longer needed.
 Deleting the WARNING sentinel lets the description-list metadata
-(eg - STATE_WORK :: ACTIVE) become the canonical value.
-
-Idempotent and safe to run multiple times.  Prompts for confirmation
-before making any changes."
+(eg - STATE_WORK :: ACTIVE) become the canonical value."
   (interactive)
   (unless (yes-or-no-p
            "Delete all \"WARNING\" property values throughout the vault? ")
@@ -288,27 +336,9 @@ before making any changes."
                 (gethash file files)))))
     (maphash
      (lambda (file notes)
-       (with-current-buffer (find-file-noselect file)
-         (dolist (info notes)
-           (let ((level (plist-get info :level))
-                 (pos (plist-get info :pos)))
-             (when (and level (> level 0) pos)
-               (goto-char pos)
-               (org-back-to-heading t))
-             (dolist (prop '("STATE_WORK" "STATE_GENERAL" "STATE_INTELLIGENCE"
-                             "STATE_OPERATIONAL" "STATE_VALIDATION" "STATE_SOURCE"
-                             "STATE_DEPENDENCY" "STATE_CHECKLIST" "PRIORITY" "TAG"))
-               (let ((val (org-entry-get nil prop)))
-                 (when (and val (string-match-p "WARNING" val))
-                   (org-entry-delete nil prop)
-                   (setq count (1+ count)))))
-             (when (and (org-at-heading-p)
-                        (equal (org-get-todo-state) "WARNING"))
-               (org-todo " ")
-               (setq count (1+ count)))))
-         (when (buffer-modified-p)
-           (save-buffer))
-         (kill-buffer)))
+       (setq count
+             (+ count (my/manifolding-atlas-schema--migrate-file-warnings
+                       file notes))))
      files)
     (message "Migration complete: deleted %d WARNING property values (existing metadata preserved)." count)))
 #+end_src

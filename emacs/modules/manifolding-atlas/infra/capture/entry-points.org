@@ -38,6 +38,8 @@ variables — =apply-partially= with named functions is the safe pattern.
 Prompts for title, subdir and tags; creates the note; opens capture for body.
 
 ** Entry point
+
+*** Title/subdir prompts and creation
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-capture-new-file ()
   "Prompt for title, subdir and tags; create the note; open capture for body."
@@ -62,7 +64,6 @@ Prompts for title, subdir and tags; creates the note; opens capture for body.
     (my/manifolding-atlas-org-prompt--session-maybe-start
      note (apply-partially #'my/manifolding-atlas--finish-file-capture
                            note fname fast))))
-#+end_src
 
 ** Create file wrapper
 Shadows the default-function so create doesn't double-collect.
@@ -76,6 +77,8 @@ Shadows the default-function so create doesn't double-collect.
 #+end_src
 
 * Task file capture
+
+** Task prompts and creation
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-capture-task-file ()
   "Prompt for task metadata; create the note tagged task; open capture for body."
@@ -99,13 +102,31 @@ Shadows the default-function so create doesn't double-collect.
     (my/manifolding-atlas-org-prompt--session-maybe-start
      note (apply-partially #'my/manifolding-atlas--finish-file-capture
                            note fname fast))))
-#+end_src
 
 * Heading capture
 
 Selects a parent note, creates a child heading under it, then opens via org-capture.
 
 ** Entry point
+
+*** Parent selection helper
+Offers the note at point first, then falls back to search.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-capture--select-parent ()
+  "Pick a parent note: current buffer's note, or search."
+  (let ((buffer-note (my/manifolding-atlas--buffer-note)))
+    (if buffer-note
+        (if (member (read-char-choice
+                     (format "Use \"%s\" as parent? (RET/y=yes, n=search) "
+                             (manifolding-atlas-note-title buffer-note))
+                     '(?y ?n ?\r ?\n))
+                    '(?y ?\r ?\n))
+            buffer-note
+          (manifolding-atlas-select "Parent note: " :require-match t))
+      (manifolding-atlas-select "Parent note: " :require-match t))))
+#+end_src
+
+*** Heading capture command
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-capture-heading ()
   "Select a parent note, create a heading under it, then open via org-capture."
@@ -113,16 +134,7 @@ Selects a parent note, creates a child heading under it, then opens via org-capt
   (let (manifolding-atlas-create-default-function parent title prompts note fast)
     (setq manifolding-atlas-create-default-function (lambda (_) '()))
     (setq fast (my/manifolding-atlas--fast-level))
-    (setq parent (let ((buffer-note (my/manifolding-atlas--buffer-note)))
-                   (if buffer-note
-                       (if (member (read-char-choice
-                                    (format "Use \"%s\" as parent? (RET/y=yes, n=search) "
-                                            (manifolding-atlas-note-title buffer-note))
-                                    '(?y ?n ?\r ?\n))
-                                   '(?y ?\r ?\n))
-                           buffer-note
-                         (manifolding-atlas-select "Parent note: " :require-match t))
-                     (manifolding-atlas-select "Parent note: " :require-match t))))
+    (setq parent (my/manifolding-atlas-capture--select-parent))
     (setq title (read-string "Heading title: "))
     (setq prompts (if (> fast 0) (my/manifolding-atlas--collect-default-prompts 'heading)
                      (let ((my/manifolding-atlas-collect-defer t))

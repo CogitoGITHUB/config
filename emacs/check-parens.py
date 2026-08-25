@@ -6,19 +6,49 @@ ROOT = os.path.expanduser(
     "~/.config/emacs/modules/manifolding-atlas")
 MAX_BLOCK_LINES = 20
 
+# Vendored / doc files: still paren-checked, but never flagged BIG.
+# Their giant single blocks are upstream code or copy-paste examples.
+BIG_EXEMPT = (
+    "/core/",
+    "/transclusion/transclusion.org",
+    "/search/search.org",
+    "/plugin-guide.org",
+    "/contacts/contacts.org",
+)
+
 
 def scan_block(lines):
+    """Return (depth, first_neg_line, first_neg_col, trace).
+
+    first_neg_line/col locate the first unbalanced ')'.
+    trace: [(rel-line-1based, depth-at-EOL)] for every line whose
+    ending depth differs from the previous line's ending depth."""
     depth = 0
+    prev_line_depth = 0
     first_neg_line = None
+    first_neg_col = None
     in_str = False
     in_comment = False
     i = 0
     n = len(lines)
+    line = 1
+    line_start = 0
+    trace = []
     while i < n:
         c = lines[i]
+        if c == "\n":
+            # Newlines always advance the line counter / trace point.
+            # Comments end at EOL — but elisp strings MAY span lines
+            # (multi-line docstrings), so in_str deliberately persists.
+            if depth != prev_line_depth:
+                trace.append((line, depth))
+                prev_line_depth = depth
+            line += 1
+            line_start = i + 1
+            in_comment = False
+            i += 1
+            continue
         if in_comment:
-            if c == "\n":
-                in_comment = False
             i += 1
             continue
         if in_str:
@@ -48,12 +78,16 @@ def scan_block(lines):
         elif c == ")":
             depth -= 1
             if depth < 0 and first_neg_line is None:
-                first_neg_line = i
+                first_neg_line = line
+                first_neg_col = i - line_start + 1
         i += 1
-    return depth, first_neg_line
+    return depth, first_neg_line, first_neg_col, trace
 
 
 def main():
+    argv = sys.argv[1:]
+    show_big = "--big" in argv or "--all" in argv
+
     bad_total = 0
     big_total = 0
     block_total = 0
@@ -63,6 +97,7 @@ def main():
             if fn.endswith(".org"):
                 files.append(os.path.join(dirpath, fn))
     files.sort()
+    big_lines = []
     for path in files:
         rel = os.path.relpath(path, ROOT)
         with open(path, encoding="utf-8") as fh:
@@ -87,25 +122,37 @@ def main():
         for b in blocks:
             block_total += 1
             body = "\n".join(b["code"])
-            depth, neg = scan_block(body)
+            depth, neg, neg_col, trace = scan_block(body)
             if depth != 0 or neg is not None:
                 msg = ("BAD   %s: block @org-line %d => depth %+d"
                        % (rel, b["start"], depth))
                 if neg is not None:
-                    msg += (", first extra ')' ~org-line %d"
-                            % (b["start"] + neg))
+                    msg += (", first extra ')' ~org-line %d col ~%d"
+                            % (b["start"] + neg, neg_col))
                 else:
                     msg += ", never closes"
                 print(msg)
+                for (ln, dp) in trace:
+                    org_line = b["start"] + ln
+                    src = b["code"][ln - 1] if 0 < ln <= len(b["code"]) else ""
+                    print("      depth %+d after org-line %d: %s"
+                          % (dp, org_line, src.strip()[:70]))
                 bad_total += 1
                 continue
             code_lines = sum(1 for l in b["code"] if l.strip())
-            if code_lines > MAX_BLOCK_LINES:
-                print("BIG   %s: block @org-line %d => %d code lines"
-                      % (rel, b["start"], code_lines))
+            if code_lines > MAX_BLOCK_LINES and not any(
+                    p in path for p in BIG_EXEMPT):
+                big_lines.append(
+                    "BIG   %s: block @org-line %d => %d code lines"
+                    % (rel, b["start"], code_lines))
                 big_total += 1
+    if show_big:
+        for line in big_lines:
+            print(line)
     print("%d blocks checked, %d bad parens, %d oversized (> %d lines)"
           % (block_total, bad_total, big_total, MAX_BLOCK_LINES))
+    if bad_total == 0:
+        print("CLEAN")
 
 
 if __name__ == "__main__":

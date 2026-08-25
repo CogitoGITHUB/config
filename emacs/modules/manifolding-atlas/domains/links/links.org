@@ -6,6 +6,8 @@ Guards deletion of untracked files and broken-links.
 Provides restore command via Git history.
 Uses native =manifolding-atlas-db-query-links-to= and =manifolding-atlas-db-query-links-from= API (v2.1+).
 *** Broken Links File
+
+**** Path and bootstrap
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas-links--broken-links-file "admin/broken-links"
   "Filename for the broken links repair queue.
@@ -55,8 +57,17 @@ Lives in `my/manifolding-atlas-root-dir'. Auto-created if missing.")
         (insert "#+STARTUP: overview\n\n")))
     path))
 #+end_src
-*** File Cleanup Helper
+*** Jump to First Heading on Open
+
+**** Admin file inventory and empty cleanup
 #+begin_src emacs-lisp
+(defun my/manifolding-atlas-links--admin-file-paths ()
+  "Absolute paths of all managed admin queue files."
+  (mapcar (lambda (f) (expand-file-name f (my/manifolding-atlas-root-dir)))
+          (list my/manifolding-atlas-links--broken-links-file
+                my/manifolding-atlas-links--deleted-files-file
+                my/manifolding-atlas-missing--file)))
+
 (defun my/manifolding-atlas-links--delete-if-empty (path)
   "Delete PATH if it contains no org headings."
   (when (and path (file-exists-p path))
@@ -66,34 +77,27 @@ Lives in `my/manifolding-atlas-root-dir'. Auto-created if missing.")
       (unless (re-search-forward "^\\*+ " nil t)
         (when (file-exists-p path)
           (delete-file path))))))
-#+end_src
-*** Jump to First Heading on Open
-#+begin_src emacs-lisp
+
 (defun my/manifolding-atlas-links--cleanup-empty-admin-files ()
   "Delete all admin files that have no headings."
-  (dolist (f (list my/manifolding-atlas-links--broken-links-file
-                   my/manifolding-atlas-links--deleted-files-file
-                   my/manifolding-atlas-missing--file))
-    (my/manifolding-atlas-links--delete-if-empty
-     (expand-file-name f (my/manifolding-atlas-root-dir)))))
+  (dolist (p (my/manifolding-atlas-links--admin-file-paths))
+    (my/manifolding-atlas-links--delete-if-empty p)))
 
 (defun my/manifolding-atlas-links--cleanup-on-save ()
   "After saving an admin file, delete ALL empty admin files."
   (when (and buffer-file-name
              (member (buffer-file-name)
-                     (mapcar (lambda (f) (expand-file-name f (my/manifolding-atlas-root-dir)))
-                             (list my/manifolding-atlas-links--broken-links-file
-                                   my/manifolding-atlas-links--deleted-files-file
-                                   my/manifolding-atlas-missing--file))))
+                     (my/manifolding-atlas-links--admin-file-paths)))
     (my/manifolding-atlas-links--cleanup-empty-admin-files)))
+#+end_src
 
+**** Admin buffer setup
+RET follows links; saves trigger the cleanup sweep.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--setup-admin-buffer ()
   "Configure admin files: jump to first heading, RET follows link."
   (when (member (buffer-file-name)
-                (mapcar (lambda (f) (expand-file-name f (my/manifolding-atlas-root-dir)))
-                        (list my/manifolding-atlas-links--broken-links-file
-                              my/manifolding-atlas-links--deleted-files-file
-                              my/manifolding-atlas-missing--file)))
+                (my/manifolding-atlas-links--admin-file-paths))
     (setq-local org-return-follows-link t)
     (add-hook 'after-save-hook #'my/manifolding-atlas-links--cleanup-on-save nil t)
     (when (string= (buffer-name) "MISSING PROMPTS")
@@ -120,6 +124,24 @@ Lives in `my/manifolding-atlas-root-dir'. Auto-created if missing.")
 (advice-add 'org-open-at-point :around #'my/manifolding-atlas-missing--around-open)
 #+end_src
 *** Deleted Entry Writer
+
+**** Entry drawer text
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-links--deleted-entry-props (rel deleted-id refs)
+  "Return the :PROPERTIES: drawer text for a deleted-files entry."
+  (concat "  :PROPERTIES:\n"
+          (format "  :CREATED:       %s\n"
+                  (format-time-string "<%Y-%m-%d %a>"))
+          (format "  :DELETED_FILE:  %s\n" rel)
+          (when deleted-id
+            (format "  :DELETED_ID:    %s\n" deleted-id))
+          (when refs
+            (format "  :DELETED_REFS:  %s\n"
+                    (mapconcat #'identity refs " ")))
+          "  :END:\n"))
+#+end_src
+
+**** Entry writer command
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--write-deleted-entry (file &optional refs)
   "Append a heading for deleted FILE to deleted-files.
@@ -137,16 +159,7 @@ recorded in the :DELETED_REFS: property for later restore."
     (with-current-buffer (find-file-noselect path)
       (goto-char (point-max))
       (insert (format "\n* TODO [[restore:][%s]]\n" heading))
-      (insert "  :PROPERTIES:\n")
-      (insert (format "  :CREATED:       %s\n"
-                      (format-time-string "<%Y-%m-%d %a>")))
-      (insert (format "  :DELETED_FILE:  %s\n" rel))
-      (when deleted-id
-        (insert (format "  :DELETED_ID:    %s\n" deleted-id)))
-      (when refs
-        (insert (format "  :DELETED_REFS:  %s\n"
-                        (mapconcat #'identity refs " "))))
-      (insert "  :END:\n")
+      (insert (my/manifolding-atlas-links--deleted-entry-props rel deleted-id refs))
       (save-buffer)
       (kill-buffer (current-buffer)))))
 #+end_src
@@ -163,6 +176,8 @@ recorded in the :DELETED_REFS: property for later restore."
 Captured before deletion so the file can be scanned while it still exists.")
 #+end_src
 *** Ref Cleanup on Delete
+
+**** Ref id detection
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--ref-id-in-file-p (id file)
   "Non-nil when FILE contains an [[id:ID][...]] link."
@@ -171,6 +186,15 @@ Captured before deletion so the file can be scanned while it still exists.")
       (insert-file-contents file)
       (goto-char (point-min))
       (re-search-forward re nil t))))
+
+(defun my/manifolding-atlas-links--ref-id-p (id)
+  "Non-nil when ID names a ref note under admin/refs/."
+  (when-let ((note (manifolding-atlas-db-get-by-id id)))
+    (let ((path (manifolding-atlas-note-path note)))
+      (and path
+           (file-in-directory-p path
+                                (expand-file-name "admin/refs/"
+                                                  (my/manifolding-atlas-root-dir)))))))
 
 (defun my/manifolding-atlas-links--note-ref-ids (file)
   "Return list of ref note IDs referenced by FILE.
@@ -187,20 +211,13 @@ admin/refs/. Returns the list of matching IDs."
             (when (my/manifolding-atlas-links--ref-id-p id)
               (push id ref-ids))))))
     (delete-dups ref-ids)))
+#+end_src
 
-(defun my/manifolding-atlas-links--ref-id-p (id)
-  "Non-nil when ID names a ref note under admin/refs/."
-  (when-let ((note (manifolding-atlas-db-get-by-id id)))
-    (let ((path (manifolding-atlas-note-path note)))
-      (and path
-           (file-in-directory-p path
-                                (expand-file-name "admin/refs/"
-                                                  (my/manifolding-atlas-root-dir)))))))
-
+**** Orphan detection
+Skips DELETED-FILE itself and files under admin/refs/.
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--ref-orphaned-p (ref-id deleted-file)
-  "Non-nil when REF-ID is referenced only by DELETED-FILE.
-Scans every file in the vault; returns nil when any OTHER file links
-to REF-ID. Skipped files: DELETED-FILE itself and files under admin/refs/."
+  "Non-nil when REF-ID is referenced only by DELETED-FILE."
   (let* ((root (my/manifolding-atlas-root-dir))
         (deleted-exp (expand-file-name deleted-file))
         (refs-dir (expand-file-name "admin/refs/" (my/manifolding-atlas-root-dir)))
@@ -221,11 +238,14 @@ to REF-ID. Skipped files: DELETED-FILE itself and files under admin/refs/."
     (let ((path (manifolding-atlas-note-path note)))
       (and path
            (file-relative-name path (my/manifolding-atlas-root-dir))))))
+#+end_src
 
-(defun my/manifolding-atlas-links--orphaned-refs-for (file)
-  "Return relative paths of refs that only FILE references.
+**** Orphan collection for a file
 Used to delete refs alongside a deleted note without breaking other
-notes that share the same closed-vocab ref."
+notes that share the same closed-vocab ref.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-links--orphaned-refs-for (file)
+  "Return relative paths of refs that only FILE references."
   (let ((deleted-file (expand-file-name file))
         (refs (my/manifolding-atlas-links--note-ref-ids file))
         orphans)
@@ -236,6 +256,22 @@ notes that share the same closed-vocab ref."
     (delete-dups orphans)))
 #+end_src
 *** TODO Entry Writer
+
+**** Broken-link entry text
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-links--todo-entry-props (direction deleted-title deleted-id)
+  "Return the :PROPERTIES: drawer and restore line for a broken-links entry."
+  (concat "  :PROPERTIES:\n"
+          (format "  :CREATED:       %s\n"
+                  (format-time-string "<%Y-%m-%d %a>"))
+          (format "  :DIRECTION:     %s\n" direction)
+          (format "  :DELETED_NOTE:  %s\n" deleted-title)
+          (format "  :DELETED_ID:    %s\n" deleted-id)
+          "  :END:\n"
+          "  [[elisp:(my/manifolding-atlas-links-restore)][Restore from Git]]\n"))
+#+end_src
+
+**** TODO writer command
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--write-todo (source-id
                                     source-title
@@ -253,19 +289,15 @@ DIRECTION is either incoming or outgoing — recorded in the entry."
     (with-current-buffer (find-file-noselect path)
       (goto-char (point-max))
       (insert (format "\n* TODO Fix broken link in %s\n" link))
-      (insert "  :PROPERTIES:\n")
-      (insert (format "  :CREATED:       %s\n"
-                      (format-time-string "<%Y-%m-%d %a>")))
-      (insert (format "  :DIRECTION:     %s\n" direction))
-      (insert (format "  :DELETED_NOTE:  %s\n" deleted-title))
-      (insert (format "  :DELETED_ID:    %s\n" deleted-id))
-      (insert "  :END:\n")
-      (insert "  [[elisp:(my/manifolding-atlas-links-restore)][Restore from Git]]\n")
+      (insert (my/manifolding-atlas-links--todo-entry-props
+               direction deleted-title deleted-id))
       (save-buffer)
       (kill-buffer (current-buffer)))))
 #+end_src
 
 *** Broken-Links Guard
+
+**** Open TODO counter
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--broken-links-open-count ()
   "Return count of open TODO entries in broken-links.
@@ -282,7 +314,10 @@ Returns 0 if the file does not exist."
               (when (equal (org-element-property :todo-keyword h) "TODO")
                 (setq count (1+ count)))))
           count)))))
+#+end_src
 
+**** Deletion guard for the queue file itself
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--guard-broken-links-file (file &rest _)
   "Before broken-links is deleted: check for open TODO entries.
 Warns and asks for confirmation if any remain unresolved."
@@ -299,147 +334,140 @@ Warns and asks for confirmation if any remain unresolved."
                         (if (= count 1) "" "s"))))))))
 #+end_src
 *** Core: Guard Before Deletion
+
+**** Peer title resolution
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-links--peer-title (link key)
+  "Title of LINK's peer under KEY (:source or :dest), or its raw id."
+  (let* ((peer-id (plist-get link key))
+         (note (manifolding-atlas-db-get-by-id peer-id)))
+    (if note
+        (manifolding-atlas-note-title note)
+      peer-id)))
+#+end_src
+
+**** Incoming transclusion sources
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-links--transclude-sources (deleted-id)
+  "Distinct source ids transcluding DELETED-ID."
+  (delete-dups
+   (append
+    (when (fboundp 'my/manifolding-atlas-db-query-transclude-links-to)
+      (my/manifolding-atlas-db-query-transclude-links-to deleted-id))
+    (my/manifolding-atlas-links--find-transclude-refs deleted-id))))
+#+end_src
+
+**** TODO recording for one direction
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-links--write-direction-todos
+    (deleted-id deleted-title links peer-key direction)
+  "Write a broken-links TODO per LINK; PEER-KEY picks the other end."
+  (dolist (link links)
+    (let* ((peer-id (plist-get link peer-key))
+           (peer-note (manifolding-atlas-db-get-by-id peer-id))
+           (peer-title (if peer-note
+                           (manifolding-atlas-note-title peer-note)
+                         peer-id)))
+      (if (eq peer-key :source)
+          (my/manifolding-atlas-links--write-todo
+           peer-id peer-title deleted-title deleted-id direction)
+        (my/manifolding-atlas-links--write-todo
+         deleted-id deleted-title peer-title peer-id direction)))))
+#+end_src
+
+**** Direction guard
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-links--check-direction
+    (deleted-id deleted-title links verb peer-key direction)
+  "Ask about DELETED-TITLE's LINKS (VERB phrase); record TODOs if confirmed."
+  (let ((count (length links))
+        (plural (if (= (length links) 1) "" "s")))
+    (when (> count 0)
+      (let ((names (mapcar (lambda (link)
+                             (my/manifolding-atlas-links--peer-title link peer-key))
+                           links)))
+        (if (y-or-n-p
+             (format "%s %s %d note%s: %s. Delete anyway? "
+                     deleted-title verb count plural
+                     (string-join names ", ")))
+            (my/manifolding-atlas-links--write-direction-todos
+             deleted-id deleted-title links peer-key direction)
+          (user-error "Deletion cancelled: %s %s %d note%s"
+                      deleted-title verb count plural))))))
+#+end_src
+
+**** Guard dispatcher
+Two checks, each prompting separately with y-or-n-p. y — proceeds,
+recording TODO entries for broken links. n — cancels deletion.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--guard-deletion (deleted-id deleted-title)
   "Guard deletion of DELETED-ID / DELETED-TITLE.
-Runs two checks:
-1. Incoming: notes that link TO this note.
-2. Outgoing: notes that this note links TO.
-Each check prompts separately with y-or-n-p.
-y — proceeds, records TODO entries for broken links.
-n — cancels deletion via user-error."
+1. Incoming: notes that link TO this note (incl. transclusions).
+2. Outgoing: notes that this note links TO."
   (when (and deleted-id deleted-title)
-
-    ;; ── Check 1: Incoming links (incl. transclusions) ────────────────
-    (let (incoming count-in transclude-ids)
-      (setq incoming (manifolding-atlas-db-query-links-to deleted-id))
-      (setq transclude-ids
-            (delete-dups
-             (append
-              (when (fboundp 'my/manifolding-atlas-db-query-transclude-links-to)
-                (my/manifolding-atlas-db-query-transclude-links-to deleted-id))
-              (my/manifolding-atlas-links--find-transclude-refs deleted-id))))
-      (dolist (id transclude-ids)
+    ;; Check 1: incoming links and transclusions
+    (let ((incoming (manifolding-atlas-db-query-links-to deleted-id)))
+      (dolist (id (my/manifolding-atlas-links--transclude-sources deleted-id))
         (push (list :source id) incoming))
-      (setq count-in (length incoming))
-      (when (> count-in 0)
-        (let ((names-in (mapcar
-                     (lambda (link)
-                            (let (src-id src-note)
-                              (setq src-id (plist-get link :source))
-                              (setq src-note (manifolding-atlas-db-get-by-id src-id))
-                              (if src-note
-                                  (manifolding-atlas-note-title src-note)
-                                src-id)))
-                         incoming)))
-          (if (y-or-n-p
-               (format "%s is linked from %d note%s: %s. Delete anyway? "
-                       deleted-title
-                       count-in
-                       (if (= count-in 1) "" "s")
-                       (string-join names-in ", ")))
-              (dolist (link incoming)
-                (let (src-id src-note src-title)
-                  (setq src-id    (plist-get link :source))
-                  (setq src-note  (manifolding-atlas-db-get-by-id src-id))
-                  (setq src-title (if src-note
-                                      (manifolding-atlas-note-title src-note)
-                                    src-id))
-                  (my/manifolding-atlas-links--write-todo
-                   src-id
-                   src-title
-                   deleted-title
-                   deleted-id
-                   "incoming")))
-            (user-error "Deletion cancelled: %s is linked from %d note%s"
-                        deleted-title
-                        count-in
-                        (if (= count-in 1) "" "s"))))))
-
-    ;; ── Check 2: Outgoing links ──────────────────────────────────────
-    (let (outgoing count-out)
-      (setq outgoing  (manifolding-atlas-db-query-links-from deleted-id))
-      (setq count-out (length outgoing))
-      (when (> count-out 0)
-        (let ((names-out (mapcar
-                          (lambda (link)
-                            (let (dest-id dest-note)
-                              (setq dest-id (plist-get link :dest))
-                              (setq dest-note (manifolding-atlas-db-get-by-id dest-id))
-                              (if dest-note
-                                  (manifolding-atlas-note-title dest-note)
-                                dest-id)))
-                          outgoing)))
-          (if (y-or-n-p
-               (format "%s links to %d note%s: %s. Delete anyway? "
-                       deleted-title
-                       count-out
-                       (if (= count-out 1) "" "s")
-                       (string-join names-out ", ")))
-              (dolist (link outgoing)
-                (let (dest-id dest-note dest-title)
-                  (setq dest-id    (plist-get link :dest))
-                  (setq dest-note  (manifolding-atlas-db-get-by-id dest-id))
-                  (setq dest-title (if dest-note
-                                       (manifolding-atlas-note-title dest-note)
-                                     dest-id))
-                  (my/manifolding-atlas-links--write-todo
-                   deleted-id
-                   deleted-title
-                   dest-title
-                   dest-id
-                    "outgoing")))
-             (user-error "Deletion cancelled: %s links to %d note%s"
-                         deleted-title
-                         count-out
-                         (if (= count-out 1) "" "s"))))))))
+      (my/manifolding-atlas-links--check-direction
+       deleted-id deleted-title incoming "is linked from" :source "incoming"))
+    ;; Check 2: outgoing links
+    (let ((outgoing (manifolding-atlas-db-query-links-from deleted-id)))
+      (my/manifolding-atlas-links--check-direction
+       deleted-id deleted-title outgoing "links to" :dest "outgoing"))))
 #+end_src
 
 *** Pre-Delete Capture: File
+
+**** Eligibility predicate
+Skips admin files, ref files, and non-org files.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-links--deletion-guardable-p (expanded)
+  "Non-nil when EXPANDED is a deletable vault note file."
+  (and (file-exists-p expanded)
+       (not (file-in-directory-p
+             expanded
+             (expand-file-name "admin/refs/" (my/manifolding-atlas-root-dir))))
+       (or (string-suffix-p ".org" expanded)
+           (not (string-match-p "\\." (file-name-nondirectory expanded))))
+        (not (member (file-name-nondirectory expanded)
+                     (list my/manifolding-atlas-links--broken-links-file
+                           my/manifolding-atlas-links--deleted-files-file
+                           my/manifolding-atlas-missing--file)))))
+#+end_src
+
+**** Before-file-delete advice
+Guards the queue file, reads ID/title, runs the link guard, captures
+orphaned refs while the file still exists, then records the entry.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--before-file-delete (file &rest _)
-  "Before FILE is deleted:
-1. Guard broken-links if that is the file.
-2. Read ID and title from file buffer.
-3. Run link guard. Skips non-org files silently.
-4. Compute refs only this file references (orphans).
-5. Record entry in deleted-files."
-   (let ((expanded (expand-file-name file)))
-      ;; Skip admin files, ref files, and non-org files
-      (when (and (file-exists-p expanded)
-                 (not (file-in-directory-p
-                       expanded
-                       (expand-file-name "admin/refs/" (my/manifolding-atlas-root-dir))))
-                 (or (string-suffix-p ".org" expanded)
-                     (not (string-match-p "\\." (file-name-nondirectory expanded))))
-                 (not (member (file-name-nondirectory expanded)
-                               (list my/manifolding-atlas-links--broken-links-file
-                                     my/manifolding-atlas-links--deleted-files-file
-                                     my/manifolding-atlas-missing--file))))
-       ;; Guard broken-links specifically
-       (my/manifolding-atlas-links--guard-broken-links-file expanded)
-       ;; Read ID and title then run link guard
+  "Before FILE is deleted: guard, capture state, record."
+  (let ((expanded (expand-file-name file)))
+    (when (my/manifolding-atlas-links--deletion-guardable-p expanded)
+      ;; Guard broken-links specifically
+      (my/manifolding-atlas-links--guard-broken-links-file expanded)
+      ;; Read ID and title then run link guard
       (with-temp-buffer
         (insert-file-contents expanded)
         (org-mode)
         (let (id title)
           (setq id    (org-entry-get (point-min) "ID"))
           (setq title (cadr (assoc "TITLE"
-                                    (org-collect-keywords
-                                     (list "TITLE")))))
-           (when id
-             (setq my/manifolding-atlas-links--deleted-id    id
-                   my/manifolding-atlas-links--deleted-title
-                   (or title (file-name-base expanded)))
-             (my/manifolding-atlas-links--guard-deletion
-               id
-               my/manifolding-atlas-links--deleted-title))
-          ;; Capture refs orphaned by this deletion while the file exists
-          (setq my/manifolding-atlas-links--deleted-refs
-                (my/manifolding-atlas-links--orphaned-refs-for expanded))
-          ;; Record in deleted-files even without ID
-          (my/manifolding-atlas-links--write-deleted-entry
-           expanded my/manifolding-atlas-links--deleted-refs))))))
+                                   (org-collect-keywords
+                                    (list "TITLE")))))
+          (when id
+            (setq my/manifolding-atlas-links--deleted-id    id
+                  my/manifolding-atlas-links--deleted-title
+                  (or title (file-name-base expanded)))
+            (my/manifolding-atlas-links--guard-deletion
+             id
+             my/manifolding-atlas-links--deleted-title)))
+        ;; Capture refs orphaned by this deletion while the file exists
+        (setq my/manifolding-atlas-links--deleted-refs
+              (my/manifolding-atlas-links--orphaned-refs-for expanded))
+        ;; Record in deleted-files even without ID
+        (my/manifolding-atlas-links--write-deleted-entry
+         expanded my/manifolding-atlas-links--deleted-refs)))))
 
 (defun my/manifolding-atlas-links--after-file-delete (&rest _)
   "After file deletion: delete orphaned refs and clear captured state.
@@ -475,6 +503,8 @@ then run the guard. Only fires for headings with an :ID: property."
         my/manifolding-atlas-links--deleted-title nil))
 #+end_src
 *** Hook Registration
+
+**** Advice setup
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-links-setup ()
   "Register all advice hooks for the links guard.

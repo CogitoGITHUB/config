@@ -1780,7 +1780,27 @@ Overridden for Manifolding Atlas: scans contacts/ in the vault."
   (let ((s (downcase name)))
     (setq s (replace-regexp-in-string "[^a-z0-9]+" "-" s))
     (replace-regexp-in-string "^-+\\|-+$" "" s)))
-
+#+end_src
+** Body capture opener
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-contacts--open-body-capture (note body)
+  "Open org-capture for NOTE's body with BODY template."
+  (let ((org-capture-templates
+         `(("v" "Edit contact body"
+             plain
+             (file+function
+              ,(manifolding-atlas-note-path note)
+              (lambda ()
+                (goto-char (point-max))
+                (skip-chars-backward " \t\n")))
+             ,(or body "%?")
+             :kill-buffer t :unnarrowed t))))
+    (org-capture nil "v")
+    (set-buffer-modified-p nil)
+    (modaled-set-state "insert")))
+#+end_src
+** New contact
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-contacts-new (name)
   "Create a new contact note for NAME.
 Prompts for fast mode level and general (file) prompts; tags the
@@ -1800,22 +1820,12 @@ note `contact' and stores it as admin/contacts/SLUG.org."
                 name file-name tags properties body)))
     (dolist (fn post-apply)
       (funcall fn note))
-    (let ((org-capture-templates
-           `(("v" "Edit contact body"
-               plain
-               (file+function
-                ,(manifolding-atlas-note-path note)
-                (lambda ()
-                  (goto-char (point-max))
-                  (skip-chars-backward " \t\n")))
-               ,(or body "%?")
-               :kill-buffer t :unnarrowed t))))
-      (org-capture nil "v")
-      (set-buffer-modified-p nil)
-      (modaled-set-state "insert"))
+    (my/manifolding-atlas-contacts--open-body-capture note body)
     (setq org-contacts-files (my/manifolding-atlas-contacts--files))
     note))
-
+#+end_src
+** Find and default filter
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-contacts-find ()
   "Find a contact note via manifolding-atlas."
   (interactive)

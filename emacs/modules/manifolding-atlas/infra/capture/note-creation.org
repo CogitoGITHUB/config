@@ -28,9 +28,9 @@ else gets WARNING.
                  (?u "QUICK" "defaults, and no body capture afterwards")
                  (?s "SELECTION" "select which properties to customize; everything else gets WARNING")
                  (?\r "NORMAL" "same as a"))))
-         ;; rmc normally returns (KEY . DESCRIPTION); tolerate a bare
-         ;; key or anything else by normalizing first.
-         (key (if (consp ans) (car ans) ans)))
+          ;; rmc normally returns (KEY . DESCRIPTION); tolerate a bare
+          ;; key or anything else by normalizing first.
+          (key (if (consp ans) (car ans) ans)))
     (pcase key
       (?o (setq my/manifolding-atlas--fast-level 1)
           (message "Capture mode: SKIP GENERAL") 1)
@@ -41,8 +41,11 @@ else gets WARNING.
       (?s (setq my/manifolding-atlas--fast-level 4)
           (message "Capture mode: SELECTION") 4)
       (_ (setq my/manifolding-atlas--fast-level 0)
-         (message "Capture mode: NORMAL") 0))))
+         (message "Capture mode: NORMAL") 0)))
+#+end_src
 
+** Slug spacing advice
+#+begin_src emacs-lisp
 (setq use-dialog-box nil)
 
 (defun my/manifolding-atlas-title-to-slug-spaces (orig-fun title)
