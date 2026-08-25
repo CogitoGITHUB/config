@@ -63,6 +63,7 @@ The document is the primary artifact; code is subordinate. Every unit of behavio
 - **Notes directory:** `~/test/` (`(my/manifolding-atlas-root-dir)` → `"/home/aoeu/test/"`)
 - **Notes must be in a git repo** — `before-save-hook` blocks with `user-error` if no `.git`
 - **manifolding-atlas.db:** at `~/test/admin/manifolding-atlas.db`, root-owned (`root:users 664`), excluded from git
+- **Block hygiene / paren discipline:** see `modules/AGENTS.md` → Paren Discipline. Blocks ≤ ~20 lines, one concern each, close-where-you-open, verify with `python3 ~/.config/emacs/check-parens.py` (expect `CLEAN`) after every edited file, then boot-gate with `emacs --batch --load ~/.config/emacs/init.el --eval '(message "ok")'` before declaring done.
 
 ## LaTeX / TeX Live
 

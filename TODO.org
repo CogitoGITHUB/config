@@ -15,12 +15,7 @@ https://github.com/larrasket/org-draw.git
 [7/31, 18:40] Paul: https://github.com/Hinikaa/tileroot.git
 [8/8, 10:34] Paul: https://github.com/fosrl/pangolin.git
 [8/8, 16:12] Paul: https://github.com/nilbuild/slim
-[8/8, 17:15] Paul: https://github.com/alvinunreal/oh-my-opencode-slim.git
-[8/8, 17:15] Paul: https://github.com/tickernelz/opencode-mem.git
-[8/8, 17:16] Paul: https://github.com/mksglu/context-mode.git
-[8/8, 17:16] Paul: https://github.com/makeplane/plane-mcp-server.git
 [8/8, 17:17] Paul: https://github.com/bmad-code-org/BMAD-METHOD.git
-[8/8, 17:18] Paul: https://github.com/abhigyanpatwari/GitNexus.git !!!
 [8/8, 17:18] Paul: https://github.com/ferdinandobons/CodeDebrief.git
 [8/8, 19:25] Paul: schema reinforcement
 [8/8, 20:44] Paul: manifolding atlas agenda

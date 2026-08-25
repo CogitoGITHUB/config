@@ -41,7 +41,7 @@ else gets WARNING.
       (?s (setq my/manifolding-atlas--fast-level 4)
           (message "Capture mode: SELECTION") 4)
       (_ (setq my/manifolding-atlas--fast-level 0)
-         (message "Capture mode: NORMAL") 0)))
+         (message "Capture mode: NORMAL") 0))))
 #+end_src
 
 ** Slug spacing advice
@@ -70,7 +70,7 @@ instead of `my/manifolding-atlas-root-dir'.")
                          (file-name-sans-extension raw-name)))
                   (subdir (my/manifolding-atlas-choose-subdir (or my/manifolding-atlas-default-subdir-root (my/manifolding-atlas-root-dir))))
                  (fname (concat subdir slug))
-                 (prompts (my/manifolding-atlas-collect-prompts-with-fast '() '(file))))
+                 (prompts (my/manifolding-atlas-collect-prompts-with-fast '(file) '(file))))
             (setq my/manifolding-atlas--pending-post-apply (plist-get prompts :post-apply))
             (when (fboundp 'my/manifolding-atlas-org-prompt--park-deferred)
               (my/manifolding-atlas-org-prompt--park-deferred))

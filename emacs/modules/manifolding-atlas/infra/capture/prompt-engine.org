@@ -255,28 +255,38 @@ buffer-UI prompts are queued on
                                key)))
                (dspec (my/manifolding-atlas-collect--dspec-for key))
                (quiet my/manifolding-atlas-org-prompt--defaults-only)
-               (defer (my/manifolding-atlas-collect--defer-p dspec))
-               (template-skip (and dspec
-                                   (not quiet)
-                                   (eq (plist-get dspec :kind) 'template)))
-               (silent (and dspec
-                            quiet
+               ;; Silenced = fast modes (quiet) OR SELECTION mode where
+               ;; the key was not picked.  Applies to declarative AND
+               ;; legacy elisp prompts alike.
+               (silent (and (or quiet
+                                my/manifolding-atlas-org-prompt--custom-set)
                             (not (and my/manifolding-atlas-org-prompt--custom-set
                                       (member key
                                               my/manifolding-atlas-org-prompt--custom-set)))))
-               (frag (cond
-                      ;; Interactive-only kinds (TEMPLATE) stand down in capture flows.
-                      ((or template-skip defer)
-                       (when defer
-                         (setq deferred-list
-                               (my/manifolding-atlas-collect--queue-deferred
-                                key dspec deferred-list)))
-                       nil)
-                      (silent
-                       (my/manifolding-atlas-collect--silent-fragment dspec))
-                      (t
-                       (my/manifolding-atlas-collect--run-interactive
-                        spec context declared)))))
+                (defer (and (my/manifolding-atlas-collect--defer-p dspec)
+                            (or (not silent)
+                                (member key
+                                        my/manifolding-atlas-org-prompt--custom-set))))
+                (template-skip (and dspec
+                                    (not quiet)
+                                    (eq (plist-get dspec :kind) 'template)))
+                (frag (cond
+                       ;; Interactive-only kinds (TEMPLATE) stand down in capture flows.
+                       ((or template-skip defer)
+                        (when defer
+                          (setq deferred-list
+                                (my/manifolding-atlas-collect--queue-deferred
+                                 key dspec deferred-list)))
+                        nil)
+                       ;; Non-declarative silenced prompts just skip —
+                       ;; they have no fragment machinery of their own.
+                       ((and silent (not dspec))
+                        nil)
+                       (silent
+                        (my/manifolding-atlas-collect--silent-fragment dspec))
+                       (t
+                        (my/manifolding-atlas-collect--run-interactive
+                         spec context declared)))))
           (when frag
             (setq result (my/manifolding-atlas-collect--merge-fragment
                           result frag))))))
@@ -342,28 +352,38 @@ body-template entry that locks the choice immediately.
           cands)))
 #+end_src
 *** SELECTION chooser
-Opens the same transient toggle menu as the properties update command
-\(SPC P), scoped to CONTEXTS. Returns registry KEYS to make interactive.
+Opens the toggle menu when it works; any menu failure falls back to
+completing-read-multiple so SELECTION can never silently skip.
 #+begin_src emacs-lisp
+(defun my/manifolding-atlas-collect--fallback-choose (contexts)
+  "Bulletproof SELECTION picker: completing-read-multiple over candidates."
+  (let* ((cands (my/manifolding-atlas-collect--custom-candidates contexts))
+         (picked (completing-read-multiple
+                  "Customize which properties (comma between picks): "
+                  (mapcar #'car cands)))
+         (ids (delq nil
+                    (mapcar (lambda (p) (cdr (assoc p cands))) picked))))
+    (when (memq 'body-template ids)
+      ;; Pre-answer the end-of-flow template chooser.
+      (setq my/manifolding-atlas--chosen-capture
+            (my/manifolding-atlas--choose-capture))
+      (message "Body template locked: %s"
+               my/manifolding-atlas--chosen-capture))
+    (remq 'body-template ids)))
+
 (defun my/manifolding-atlas-collect--choose-custom (contexts)
   "Ask which properties to customize for this capture.
-The menu's body-template entry pre-runs the template chooser now,
-so it is not asked again at finalize."
+Opens the toggle grid as SPC P does. On failure, falls back to
+completing-read-multiple and surfaces the error in *Warnings*."
   (if (fboundp 'my/manifolding-atlas-select-properties-menu)
-      (my/manifolding-atlas-select-properties-menu contexts)
-    (let* ((cands (my/manifolding-atlas-collect--custom-candidates contexts))
-           (picked (completing-read-multiple
-                    "Customize which properties (comma between picks): "
-                    (mapcar #'car cands)))
-           (ids (delq nil
-                      (mapcar (lambda (p) (cdr (assoc p cands))) picked))))
-      (when (memq 'body-template ids)
-        ;; Pre-answer the end-of-flow template chooser.
-        (setq my/manifolding-atlas--chosen-capture
-              (my/manifolding-atlas--choose-capture))
-        (message "Body template locked: %s"
-                 my/manifolding-atlas--chosen-capture))
-      (remq 'body-template ids))))
+      (condition-case err
+          (my/manifolding-atlas-select-properties-menu contexts)
+        (error
+         (warn "Manifolding Atlas: toggle grid failed: %s\nFalling back to completing-read."
+               (error-message-string err))
+         (my/manifolding-atlas-collect--fallback-choose contexts)))
+    (warn "Manifolding Atlas: select-properties-menu not loaded — using completing-read fallback.")
+    (my/manifolding-atlas-collect--fallback-choose contexts)))
 #+end_src
 *** SELECTION fast level
 Level 4 collapses to level 1 with the chosen keys made interactive.
@@ -397,18 +417,29 @@ When FAST-LEVEL is nil, prompts the user via `my/manifolding-atlas--fast-level'.
                     specialized-contexts general-contexts)
                  fast0))
          (my/manifolding-atlas-collect-defer t)
-         (spec (if (>= fast 2)
-                    (my/manifolding-atlas--collect-default-prompts specialized-contexts)
-                 (my/manifolding-atlas-collect-prompts specialized-contexts)))
-         (gen  (if (= fast 0)
-                   (my/manifolding-atlas-collect-prompts general-contexts)
-                 (my/manifolding-atlas--collect-default-prompts general-contexts))))
-     (let ((merged (list :tags (append (plist-get gen :tags) (plist-get spec :tags))
-                          :properties (append (plist-get gen :properties) (plist-get spec :properties))
-                          :body (concat (plist-get gen :body) (plist-get spec :body))
-                          :post-apply (append (plist-get gen :post-apply) (plist-get spec :post-apply)))))
-       (setq my/manifolding-atlas-org-prompt--custom-set nil)
-       merged)))
+         (spec (cond
+                ;; SELECTION: picked keys must actually run, so never
+                ;; stifle the specialized side when a pick list exists.
+                ((and (= fast 1) my/manifolding-atlas-org-prompt--custom-set)
+                 (my/manifolding-atlas-collect-prompts specialized-contexts))
+                ((>= fast 2)
+                 (my/manifolding-atlas--collect-default-prompts specialized-contexts))
+                (t
+                 (my/manifolding-atlas-collect-prompts specialized-contexts))))
+         (gen  (cond
+                ((= fast 0)
+                 (my/manifolding-atlas-collect-prompts general-contexts))
+                ;; SELECTION: picked general-context keys fire too.
+                (my/manifolding-atlas-org-prompt--custom-set
+                 (my/manifolding-atlas-collect-prompts general-contexts))
+                (t
+                 (my/manifolding-atlas--collect-default-prompts general-contexts)))))
+    (let ((merged (list :tags (append (plist-get gen :tags) (plist-get spec :tags))
+                        :properties (append (plist-get gen :properties) (plist-get spec :properties))
+                        :body (concat (plist-get gen :body) (plist-get spec :body))
+                        :post-apply (append (plist-get gen :post-apply) (plist-get spec :post-apply)))))
+      (setq my/manifolding-atlas-org-prompt--custom-set nil)
+      merged)))
  #+end_src
 
 ** Missing Prompts Management

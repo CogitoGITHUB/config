@@ -31,7 +31,22 @@
       "type": "local",
       "command": ["node", "/home/aoeu/.local/share/herdr-mcp/dist/index.js"],
       "enabled": true
+    },
+    "gitnexus": {
+      "type": "local",
+      "command": ["npx", "-y", "gitnexus@latest", "mcp"],
+      "enabled": true
+    },
+    "plane": {
+      "type": "local",
+      "command": ["uvx", "plane-mcp-server", "stdio"],
+      "environment": {
+        "PLANE_API_KEY": "<fill-your-api-key>",
+        "PLANE_WORKSPACE_SLUG": "<fill-your-workspace-slug>"
+      },
+      "enabled": false
     }
   },
-  "instructions": ["~/.config/opencode/instructions/emacs.md"]
+  "instructions": ["~/.config/opencode/instructions/emacs.md"],
+  "plugin": ["opencode-mem", "context-mode", "oh-my-opencode-slim"]
 }

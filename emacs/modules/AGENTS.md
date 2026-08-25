@@ -80,8 +80,40 @@ Example:
 - **Granularity = error isolation.** Each heading maps to a unit that can fail independently and be meaningfully reported by the three-tier error system.
 - **No mixed concerns in one block.** Package install is its own heading; hooks/keybindings/functions are child headings underneath.
 - **When in doubt, over-split.** A 3-line block with one sentence of prose is a correctly-sized unit.
+- **Org structure mirrors call structure.** Helpers extracted from a giant defun become child headings (`***`/`****`) *under* the command's heading, ordered before it — readers see the pieces, then the orchestrator. Shared builders used by multiple commands go in their own sibling section.
 
 Full rules: see root `AGENTS.md` → Literate Org-Mode Authoring.
+
+## Paren Discipline (hard-won — read before splitting blocks)
+
+Splitting or editing elisp inside org blocks is where configs die. These rules are mandatory:
+
+- **Close where you open.** Every form's closing paren goes on the line where its last argument ends — NEVER compensated by an extra closer at the function tail. A tail-compensated file "balances" but parses wrong: `(key ...)` silently becomes a second value-form of the previous `let` binding, and only RUNTIME catches it.
+- **`let`/`let*` binding pairs close immediately after their value.** `(ans (read-multiple-choice ...))` — the pair's closer comes right after the rmc form, before the next binding starts. Count: bindings-list open → N pairs → bindings-list close → body → let closer → defun closer.
+- **Multi-line docstrings are strings spanning lines.** Any paren-aware tooling (or your brain) must track string-state ACROSS newlines. Comments end at EOL; strings do not.
+- **When extracting a defun from a bigger block, recount THAT defun's closers in isolation** — don't trust the surrounding balance.
+- **Never hand-count a hairy form twice with different results and pick the answer you like.** Restructure the form instead (e.g. hoist a nested `let` binding into a separate `setq`) so the counting becomes trivial.
+
+## Verification Workflow (mandatory after editing any module)
+
+```bash
+# 1. After EVERY file (not at the end of a batch):
+python3 ~/.config/emacs/check-parens.py | grep -E "BAD|CLEAN"
+#    Expect CLEAN. BAD output includes per-line depth traces — read them.
+
+# 2. Full listing when needed:
+python3 ~/.config/emacs/check-parens.py --big
+#    Vendored/engine/doc files (core/, transclusion, search.org,
+#    plugin-guide.org, contacts.org) are exempt from BIG via BIG_EXEMPT
+#    in the script — keep that list current.
+
+# 3. Final gate — the loader is the only real judge:
+emacs --batch --load ~/.config/emacs/init.el --eval '(message "ok")'
+#    Then EXERCISE the changed commands in the daemon. Balance ≠ correctness:
+#    a tail-compensated block passes the checker and still explodes at runtime.
+```
+
+Known scanner truths (check-parens.py): elisp strings span lines (state persists across `\n`); comments reset at EOL; `?x`/`?\\x` char literals are skipped; BIG reports exclude `BIG_EXEMPT`; BAD reports include per-line depth traces — trust the trace over mental arithmetic.
 
 ## Rules
 - `global-auto-revert-mode 1` is in `bootstrap.org` — don't duplicate

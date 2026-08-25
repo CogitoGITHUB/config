@@ -128,7 +128,8 @@
                 modaled-vterm-state-keymap
                 modaled-magit-state-keymap
                 modaled-dired-state-keymap
-                modaled-presentation-state-keymap))
+                modaled-presentation-state-keymap
+                modaled-atlas-pick-state-keymap))
   (makunbound sym))
 (modaled-define-state "normal"
   :lighter "[NOR]"
@@ -162,6 +163,18 @@
 (modaled-define-state "ibuffer"
   :lighter "[IBF]"
   :cursor-type 'box)
+#+end_src
+*** Atlas Pick State
+Defined in its own block: an error here must never abort the core
+state rebuild above, which starts by unbinding every keymap.
+#+begin_src emacs-lisp
+(modaled-define-state "atlas-pick"
+  :sparse t
+  :lighter "[PCK]"
+  :cursor-type 'box)
+#+end_src
+*** Tree Slide Hooks
+#+begin_src emacs-lisp
 (add-hook 'org-tree-slide-play-hook
           (lambda () (modaled-set-state "presentation")))
 (add-hook 'org-tree-slide-stop-hook
@@ -341,6 +354,33 @@
     ("U"    . git-timemachine)
     ;; Narrow
     ("W"    . org-narrow-to-subtree)))
+#+end_src
+** Atlas Pick
+#+begin_src emacs-lisp
+(modaled-define-keys
+  :states '("atlas-pick")
+  :bind
+  `(;; Selection
+    ("RET"     . my/manifolding-atlas-org-prompt--buffer-accept)
+    ("<return>" . my/manifolding-atlas-org-prompt--buffer-accept)
+    ("C-c C-c" . my/manifolding-atlas-org-prompt--buffer-accept)
+    ("a"       . my/manifolding-atlas-org-prompt--avy-to-option)
+    ("m"       . my/manifolding-atlas-org-prompt--buffer-mark)
+    ("l"       . my/manifolding-atlas-org-prompt--make-live)
+    ;; Session navigation
+    ("b"       . my/manifolding-atlas-org-prompt--session-back)
+    ("B"       . my/manifolding-atlas-org-prompt--session-revisit)
+    ;; Cancellation
+    ("q"       . my/manifolding-atlas-org-prompt--buffer-abort)
+    ("C-c C-k" . my/manifolding-atlas-org-prompt--buffer-abort)
+    ("Q"       . my/manifolding-atlas-org-prompt--quit-all)
+    ("C-g"     . my/manifolding-atlas-org-prompt--quit-all)
+    ;; Org outline navigation
+    ("h"       . org-previous-visible-heading)
+    ("H"       . org-backward-heading-same-level)
+    ("t"       . org-next-visible-heading)
+    ("T"       . org-forward-heading-same-level)
+    ("n"       . org-cycle)))
 #+end_src
 
 ** Vterm

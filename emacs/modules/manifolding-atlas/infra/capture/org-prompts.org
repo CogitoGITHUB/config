@@ -1067,7 +1067,8 @@ has one, otherwise on the self-healed WARNING sentinel.
       (beginning-of-line))))
 #+end_src
 ** Session open
-Arms the picker: mode on, point at WARNING/default, highlight applied.
+Arms the picker: atlas-pick state on, point at WARNING/default,
+highlight applied.
 
 *** Buffer arming
 Resets picker state per request and restores any previously applied
@@ -1089,9 +1090,9 @@ value so revisits highlight correctly.
           (plist-get req :applied-value))
     (setq my/manifolding-atlas-org-prompt--this-kind
           (plist-get spec :kind))
-    (setq my/manifolding-atlas-org-prompt--select-on t)
     (setq my/manifolding-atlas-org-prompt--session-p t)
-    (my/manifolding-atlas-org-prompt-select-mode 1)
+    (when (fboundp 'modaled-set-state)
+      (modaled-set-state "atlas-pick"))
     (my/manifolding-atlas-org-prompt--highlight-applied
      my/manifolding-atlas-org-prompt--applied)))
 #+end_src
@@ -1104,6 +1105,12 @@ value so revisits highlight correctly.
          (buf (my/manifolding-atlas-org-prompt--picker-buffer file)))
     (my/manifolding-atlas-org-prompt--session-arm buf req spec)
     (my/manifolding-atlas-org-prompt--session-display buf)
+    ;; Re-assert the modal state AFTER display: window/buffer churn
+    ;; re-runs modaled's init hooks, which reset fresh org buffers to
+    ;; the major-mode default ("org") — leaving the picker keyless.
+    (with-current-buffer buf
+      (when (fboundp 'modaled-set-state)
+        (modaled-set-state "atlas-pick")))
     (when-let ((win (get-buffer-window buf)))
       (with-selected-window win
         (ignore-errors (recenter-top-bottom))))
@@ -1247,36 +1254,6 @@ Runs the fragment's post-apply hooks with errors reported per hook.
 
 (defvar-local my/manifolding-atlas-org-prompt--this-kind nil)
 #+end_src
-** Picker keymap
-Q/C-g abort everything, q skips to WARNING, m toggles live apply.
-#+begin_src emacs-lisp
-(defvar my/manifolding-atlas-org-prompt-select-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "RET") #'my/manifolding-atlas-org-prompt--buffer-accept)
-    (define-key map (kbd "<return>") #'my/manifolding-atlas-org-prompt--buffer-accept)
-    (define-key map (kbd "C-c C-c") #'my/manifolding-atlas-org-prompt--buffer-accept)
-    (define-key map (kbd "m") #'my/manifolding-atlas-org-prompt--buffer-mark)
-    (define-key map (kbd "C-c C-k") #'my/manifolding-atlas-org-prompt--buffer-abort)
-    (define-key map (kbd "q") #'my/manifolding-atlas-org-prompt--buffer-abort)
-    (define-key map (kbd "Q") #'my/manifolding-atlas-org-prompt--quit-all)
-    (define-key map (kbd "C-g") #'my/manifolding-atlas-org-prompt--quit-all)
-    (define-key map "b" #'my/manifolding-atlas-org-prompt--session-back)
-    (define-key map "B" #'my/manifolding-atlas-org-prompt--session-revisit)
-    (define-key map "l" #'my/manifolding-atlas-org-prompt--make-live)
-    (define-key map "a" #'my/manifolding-atlas-org-prompt--avy-to-option)
-    map))
-#+end_src
-** Picker minor mode
-The buffer stays editable; only the keys change.
-#+begin_src emacs-lisp
-(define-minor-mode my/manifolding-atlas-org-prompt-select-mode
-  "Atlas prompt option picker.
-Move anywhere in the outline; RET/C-c C-c selects the option heading
-at point (level 2+, deeper headings are variants), m marks for
-multi-select, C-c C-k/q cancels. Buffer stays editable."
-  :lighter " Atlas-Pick"
-  :keymap my/manifolding-atlas-org-prompt-select-mode-map)
-#+end_src
 ** Picker teardown
 Saves edits, kills the picker buffer.
 #+begin_src emacs-lisp
@@ -1286,31 +1263,15 @@ Killing removes its tab/window entirely, mirroring org-capture's
 :kill-buffer behavior.  Content is safe on disk."
   (when (and buffer-file-name (buffer-modified-p))
     (save-buffer))
+  ;; Hand control back to the appropriate modal state — the picker
+  ;; ran in atlas-pick state so its own keys won.
+  (when (fboundp 'my/smart-escape)
+    (my/smart-escape))
   (kill-buffer))
 #+end_src
-** Emulation-level keymap
-Picker keys must win over modaled states, so the map rides in
-emulation-mode-map-alists keyed on a buffer-local switch.
-#+begin_src emacs-lisp
-(defvar my/manifolding-atlas-org-prompt--select-on nil)
-(make-variable-buffer-local 'my/manifolding-atlas-org-prompt--select-on)
 
-(defvar my/manifolding-atlas-org-prompt--select-emulation
-  `((my/manifolding-atlas-org-prompt--select-on .
-     ,my/manifolding-atlas-org-prompt-select-mode-map)))
-
-(defun my/manifolding-atlas-org-prompt--emulation-register ()
-  (setq emulation-mode-map-alists
-        (delq 'my/manifolding-atlas-org-prompt--select-emulation
-              emulation-mode-map-alists))
-  (add-to-list 'emulation-mode-map-alists
-               'my/manifolding-atlas-org-prompt--select-emulation))
-
-(with-eval-after-load 'modaled
-  (my/manifolding-atlas-org-prompt--emulation-register))
-#+end_src
 ** Standalone picker setup
-Same tree-slide/widen/mode dance as the session picker, minus the
+Same tree-slide/widen/state dance as the session picker, minus the
 session bookkeeping — the recursive-edit flow drives it instead.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--standalone-setup (buf default kind)
@@ -1330,9 +1291,9 @@ session bookkeeping — the recursive-edit flow drives it instead.
                      (regexp-quote default))
              nil t)
         (beginning-of-line)))
-    (setq my/manifolding-atlas-org-prompt--select-on t)
     (setq my/manifolding-atlas-org-prompt--session-p nil)
-    (my/manifolding-atlas-org-prompt-select-mode 1)
+    (when (fboundp 'modaled-set-state)
+      (modaled-set-state "atlas-pick"))
     (setq my/manifolding-atlas-org-prompt--this-kind kind)))
 #+end_src
 ** Standalone picker command
@@ -1347,13 +1308,14 @@ multi-select kinds.
   (let ((buf (my/manifolding-atlas-org-prompt--picker-buffer file)))
     (my/manifolding-atlas-org-prompt--standalone-setup buf default kind)
     (pop-to-buffer buf)
+    ;; Re-assert after display — same init-hook reset risk as the
+    ;; session picker (see --session-open).
+    (with-current-buffer buf
+      (when (fboundp 'modaled-set-state)
+        (modaled-set-state "atlas-pick")))
     (ignore-errors (recenter-top-bottom))
     (message "Option picker — RET/C-c C-c select · m mark · C-c C-k/q cancel")
     (recursive-edit)
-    (when (buffer-live-p buf)
-      (with-current-buffer buf
-        (setq my/manifolding-atlas-org-prompt--select-on nil)
-        (my/manifolding-atlas-org-prompt-select-mode -1)))
     my/manifolding-atlas-org-prompt--buffer-result))
 #+end_src
 ** UI dispatch
