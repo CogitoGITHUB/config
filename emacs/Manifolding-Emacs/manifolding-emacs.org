@@ -1291,6 +1291,10 @@ Pure renderer: reads the error/warnings lists, never mutates them.
   (expand-file-name ".local/cache/manifolding-boot-times"
                     user-emacs-directory))
 
+(defvar manifolding-emacs--last-boot-seconds nil
+  "Duration of the most recent boot, set by the clean-finish handoff
+and displayed by the dashboard's Manifold status widget.")
+
 (defun manifolding-emacs-show-splash ()
   (let ((buf (get-buffer-create "*Manifolding-Emacs*")))
     (with-current-buffer buf
@@ -1502,15 +1506,20 @@ Atomic upstream renderers — kept whole.
     (error 0)))
 
 (defun manifolding-emacs-splash-clean-finish (buf boot-seconds)
-  "Show a brief CLEAN BOOT flash, then morph into the dashboard."
+  "Record the duration, then hand off to the *dashboard*.
+The old splash dashboard is gone: *dashboard* IS the post-boot view.
+Non-clean boots stay in *Manifolding-Emacs* with the full report."
   (manifolding-emacs-splash--record-duration boot-seconds)
-  (manifolding-emacs-splash-update-dashboard
-   buf boot-seconds "CLEAN BOOT")
-  (run-with-idle-timer
-   1.2 nil
-   (lambda ()
-     (manifolding-emacs-splash-update-dashboard
-      buf boot-seconds nil))))
+  (setq manifolding-emacs--last-boot-seconds boot-seconds)
+  (cond
+   ((and (fboundp 'dashboard-refresh-buffer)
+         (fboundp 'dashboard-open))
+    ;; Bury the progress screen; the vendored dashboard takes over.
+    (when (buffer-live-p buf) (bury-buffer buf))
+    (dashboard-open))
+   (t
+    (manifolding-emacs-splash-update-dashboard
+     buf boot-seconds "CLEAN BOOT"))))
 #+end_src
 
 ** Splash — module todos & vault git info
@@ -1942,9 +1951,9 @@ tracking, an idle sweep to surface deferred-load errors early, and
               (condition-case dash-err
                   (manifolding-emacs-splash-clean-finish
                    buf (- (float-time) boot-t0))
-                (error
-                 (message "manifolding-emacs: dashboard error %s"
-                          (error-message-string dash-err)))))))))))) 
+                 (error
+                  (message "manifolding-emacs: dashboard error %s"
+                           (error-message-string dash-err)))))))))
 #+end_src
 
 ** Entry — message redirection

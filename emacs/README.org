@@ -7,12 +7,14 @@ artifacts or legacy leftovers, never the source of truth.
 
 #+begin_example
 ~/.config/emacs/
-├── bootstrap.org            ← the only real build step:
-│                              tangles to init.el / early-init.el
-├── init.el · early-init.el  ← GENERATED. Never edit by hand.
 ├── Manifolding-Emacs/       ← the living configuration
+│   ├── Manifolding-Emacs-Foundation.org ← SINGLE SOURCE OF TRUTH
+│   │                           (auto-tangles on save + at startup)
 │   ├── loader.org           ← the package manager itself, as Org
 │   └── modules/             ← every feature, as Org (see its README)
+├── init.el                  ← STATIC SEED: tangles foundation, loads it
+├── early-init.el            ← GENERATED (refreshed each tangle)
+├── foundation-init.el       ← GENERATED payload (loaded at startup)
 ├── lisp/                    ← misc elisp + RETIRED loader artifacts
 │                              (lisp/manifolding-emacs/*.el — pending deletion)
 └── straight/                ← dependency checkouts (see straight.org)
@@ -20,22 +22,21 @@ artifacts or legacy leftovers, never the source of truth.
 
 * How boot works
 
-1. early-init.el sets frame/palette/modeline before any package.
-2. init.el: straight → latest Org → leaf → then a micro-evaluator
-   (~my/load-literate-loader~) evaluates
-   =Manifolding-Emacs/manifolding-emacs.org= block by block,
-   lexically, in order.  That Org *is* the package manager.
-3. =(manifolding-emacs-boot)= compiles every file under
-   =Manifolding-Emacs/modules/= (priority-sorted) with three-tier
-   error isolation, splash progress, and a CLEAN BOOT flash.
+1. early-init.el (generated) already set frame/palette/modeline.
+2. init.el — a STATIC SEED — tangles Manifolding-Emacs-Foundation.org
+   and loads the freshly generated foundation-init.el.
+3. foundation-init.el: straight → latest Org → leaf → literate loader
+   (~my/load-literate-loader~) → boots every module.
 
 If boot fails, the splash names the file/block.  Errors also land
 in =(manifolding-emacs-errors-list)= and can be filed to TODO.
 
 * Rules that keep this sane
 
-- Edit Org, never the generated .el files.  Regenerate via
-  =org-babel-tangle= on bootstrap.org after editing it.
+- Edit Org, never the generated .el files (early-init.el,
+  foundation-init.el).  Tangling is automatic: saving the Foundation
+  auto-tangles via org-auto-tangle, and startup re-tangles before
+  loading — no manual =org-babel-tangle= ever needed.
 - Loader changes require a **full restart** (the loader cannot
   reload itself while running).  Module changes only need
   =M-x manifolding-emacs-reload= (=SPC d r=).

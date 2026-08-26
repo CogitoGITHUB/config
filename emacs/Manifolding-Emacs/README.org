@@ -1,11 +1,16 @@
 #+title: Manifolding-Emacs — the running configuration
 
-This directory is where the machine lives.  Two things:
+This directory is where the machine lives.  Three things:
 
-| loader.org | The package manager itself, as Org.  init.el evaluates
-              its emacs-lisp blocks directly (lexical, in document
-              order) via ~my/load-literate-loader~.  There are no
-              .el artifacts for it — this file is the only source. |
+| Foundation | ~Manifolding-Emacs-Foundation.org~ — SINGLE SOURCE OF
+              TRUTH for early-init.el + foundation-init.el.
+              ~#+auto_tangle: t~ → saving it regenerates both;
+              startup re-tangles before loading (static seed init.el).
+              Early-init may be one save stale (visual only — harmless). |
+| loader.org | The package manager itself, as Org.  foundation-init.el
+              evaluates its emacs-lisp blocks directly (lexical, in
+              document order) via ~my/load-literate-loader~.  There are
+              no .el artifacts for it — this file is the only source. |
 | modules/   | Every feature of the config, as Org files compiled and
               evaluated per-file by the loader at boot.            |
 

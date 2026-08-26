@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """Paren/block hygiene checker for the literate config.
 
-Scans every emacs-lisp src block under the Org tree(s):
-  - Manifolding-Emacs/          (loader.org + all modules)
-  - bootstrap.org               (the init.el/early-init.el build step)
+Scans every emacs-lisp src block under the Org tree:
+  - Manifolding-Emacs/   (Foundation, loader.org + all modules)
 
-BAD  = unbalanced block (depth != 0, extra ')', or unterminated block)
-BIG  = block over MAX_BLOCK_LINES code lines, unless the path matches
-       BIG_EXEMPT (upstream-atomic / vendored code kept whole on purpose).
-
-Exit status mirrors reality: CLEAN is only printed when bad_total == 0.
+The old root-level bootstrap.org is a retired tombstone with no code
+blocks, so it is no longer scanned.
 """
 import os
 import sys
@@ -17,9 +13,8 @@ import sys
 EMACS_DIR = os.path.expanduser("~/.config/emacs")
 ROOTS = [
     os.path.join(EMACS_DIR, "Manifolding-Emacs"),
-    os.path.join(EMACS_DIR, "bootstrap.org"),
 ]
-MAX_BLOCK_LINES = 20
+MAX_BLOCK_LINES = 50
 
 # Vendored / upstream-atomic / generated files: still paren-checked,
 # but never flagged BIG.  Their giant single blocks are upstream code

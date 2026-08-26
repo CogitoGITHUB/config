@@ -309,8 +309,30 @@ if `dashboard-startup-banner' is set to `ascii'."
           (lambda (&rest _)
             (dired (expand-file-name "Manifolding-Emacs/modules"
                                      user-emacs-directory))))
-         (nil "  Reload" "Reload literate config (C-c l l)"
-          (lambda (&rest _) (literate-config-load)))
+         (nil "  Reload" "Reload literate config (SPC d r)"
+          (lambda (&rest _)
+            (when (fboundp 'manifolding-emacs-reload)
+              (manifolding-emacs-reload))))
+         (nil "  Missing" "Open MISSING PROMPTS"
+          (lambda (&rest _)
+            (when (fboundp 'my/manifolding-atlas-root-dir)
+              (find-file (expand-file-name
+                          "admin/MISSING PROMPTS"
+                          (my/manifolding-atlas-root-dir))))))
+         (nil "  Push" "Push the vault"
+          (lambda (&rest _)
+            (when (fboundp 'my/manifolding-atlas-git--push)
+              (my/manifolding-atlas-git--push
+               (expand-file-name
+                "admin/MISSING PROMPTS"
+                (my/manifolding-atlas-root-dir))))))
+         (nil "  Magit" "Magit status of the vault"
+          (lambda (&rest _)
+            (when (fboundp 'magit-status)
+              (magit-status
+               (if (fboundp 'my/manifolding-atlas-root-dir)
+                   (my/manifolding-atlas-root-dir)
+                 "~/test/")))))
          (nil "  Status" "Show load status (C-c l s)"
           (lambda (&rest _) (literate-config-status)))
          (nil "  Errors" "Show load errors (C-c l e)"
@@ -559,6 +581,8 @@ installed."
     (bookmarks        . 10)
     (registers        . 10)
     (projects         . 10)
+    (manifold-status  . 1)
+    (manifold-todos   . 1)
     (manifold-sartre  . 1))
   "Association list of items to show in the startup buffer.
 Will be of the form `(list-type . list-size)'.
@@ -2662,6 +2686,52 @@ Lives here as a variable; no external banner file needed.
 
 (add-to-list 'dashboard-item-generators
              '(manifold-sartre . dashboard-insert-manifold-sartre))
+#+end_src
+
+** Manifold Status Widget
+The loader's boot stats, as a dashboard section.  Reads only from the
+loader's own helper functions (defined in manifolding-emacs.org,
+which always evaluates before modules do).
+#+begin_src emacs-lisp
+(defun dashboard-insert-manifold-status (_list-size)
+  (let* ((errors (length (manifolding-emacs-errors-list)))
+         (warnings (length (manifolding-emacs-warnings-list)))
+         (notes (manifolding-emacs-splash--notes-count))
+         (missing (manifolding-emacs-splash--missing-prompts-count))
+         (git-line (manifolding-emacs-splash--vault-git-info))
+         (boot (or manifolding-emacs--last-boot-seconds
+                   (car (last (manifolding-emacs-splash--read-history))))))
+    (dashboard-insert-heading "Manifold:" nil nil)
+    (insert "\n")
+    (insert (format "    boot %s %s\n"
+                    (if boot (format "%.1fs" boot) "?")
+                    (manifolding-emacs-splash--sparkline)))
+    (insert (format "    errors %d · warnings %d\n" errors warnings))
+    (insert (format "    vault notes: %d · missing prompts: %d\n"
+                    notes missing))
+    (when git-line
+      (insert (format "    git: %s\n" git-line)))))
+
+(add-to-list 'dashboard-item-generators
+             '(manifold-status . dashboard-insert-manifold-status))
+#+end_src
+
+** Manifold TODOs Widget
+Module TODOs from every .org in Manifolding-Emacs/modules/.
+#+begin_src emacs-lisp
+(defun dashboard-insert-manifold-todos (_list-size)
+  (let ((todos (manifolding-emacs-splash--module-todos)))
+    (dashboard-insert-heading "Module TODOs:" nil nil)
+    (insert "\n")
+    (if (null todos)
+        (insert "    --- No items ---\n")
+      (dolist (td todos)
+        (insert (format "    %s: %s\n"
+                        (propertize (car td) 'face 'bold)
+                        (cdr td)))))))
+
+(add-to-list 'dashboard-item-generators
+             '(manifold-todos . dashboard-insert-manifold-todos))
 #+end_src
 
 ** Faces — Banner & Title

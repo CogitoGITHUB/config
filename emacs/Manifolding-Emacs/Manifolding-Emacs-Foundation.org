@@ -1,30 +1,37 @@
-#+TITLE: Bootstrap
-#+AUTHOR: aoeu
-#+STARTUP: overview indent
+#+title:      Manifolding Emacs Foundation
+#+filetags:   :emacs-core:foundation:
+#+auto_tangle: t
 
-This file is the bootstrap kernel.  It tangles to ~init.el~ and
-~early-init.el~ — the two files Emacs loads automatically at startup.
+This file is the SINGLE SOURCE OF TRUTH for early-init.el and
+foundation-init.el.
 
 *How it works:*
-- Each section below tangles to a specific file via ~:tangle~.
-- After editing this file, run ~org-babel-tangle~ to regenerate:
-  #+begin_src sh :eval no
-  emacs --batch -l org --eval "(org-babel-tangle-file \"~/.config/emacs/bootstrap.org\")"
-  #+end_src
-- The tangled ~init.el~ and ~early-init.el~ must *not* be edited
-  directly — treat them as build artifacts.
+- On every save of THIS FILE, org-auto-tangle regenerates both
+  targets automatically (it only fires for files carrying the
+  ~#+auto_tangle: t~ property above).
+- At every startup, the static seed ~init.el~ tangles this file
+  again (belt and suspenders) and then loads the freshly generated
+  ~foundation-init.el~.
+- ~early-init.el~ is loaded by Emacs BEFORE init.el, so it can be at
+  most one save stale — it only holds visual/palette setup, so that
+  staleness is harmless.
+- Never edit ~early-init.el~ or ~foundation-init.el~ directly — they
+  are build artifacts.
 
-*Why this exists outside ~modules/~:*
-Everything here must run before ~manifolding-emacs-boot~ processes the
-org modules under ~modules/~.  Putting it in an org module would be
-circular (the boot system itself isn't loaded yet).
+*Why this lives inside Manifolding-Emacs/:*
+Everything here must run before the loader processes ~modules~.
+Putting it in a module would be circular (the boot system isn't
+loaded yet) — so it sits beside the module tree it boots: the whole
+subsystem in one directory.
 
 * Early Init
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle early-init.el
 :END:
 
-Purely visual / path setup.  Runs before the package system.
+Loaded by Emacs automatically before init.el.  Refreshed by the
+save/startup tangles; purely visual, so worst case it is one save
+stale.  Runs before the package system.
 
 #+begin_src emacs-lisp
 ;;; early-init.el --- -*- lexical-binding: t -*-
@@ -154,40 +161,58 @@ Filters message / display-warning / lwarn. Errors are untouched.
 ;;; early-init.el ends here
 #+end_src
 
-* Init
+* Init Payload
 :PROPERTIES:
-:header-args:emacs-lisp: :tangle init.el
+:header-args:emacs-lisp: :tangle foundation-init.el
 :END:
 
+Tangled to ~foundation-init.el~ and loaded at the end of the static
+seed ~init.el~.  Everything the boot needs before modules run.
+
+** Header & boot order
 #+begin_src emacs-lisp
-;;; init.el --- -*- lexical-binding: t -*-
+;;; foundation-init.el --- generated from Manifolding-Emacs-Foundation.org
 ;;
 ;; ┌─────────────────────────────────────────────────────────────┐
 ;; │  BOOT ORDER                                                 │
-;; │  1. straight.el bootstrap   (here)                          │
-;; │  2. org from GNU ELPA       (here — must be early)          │
-;; │  3. leaf + leaf-keywords    (here — needed by boot system)  │
-;; │  4. manifolding-emacs       (here — loads all modules/*.org)│
-;; │  5. straight.el config      (modules/straight.org)          │
-;; │  6. all other modules       (modules/*.org)                 │
+;; │  1. straight.el bootstrap                                   │
+;; │  2. straight/build/* → load-path                            │
+;; │  3. org from GNU ELPA                                       │
+;; │  4. leaf + leaf-keywords                                    │
+;; │  5. manifolding-emacs (literate loader)                     │
+;; │  6. Manifolding-Emacs/modules/*.org                         │
 ;; └─────────────────────────────────────────────────────────────┘
+
+(defun my/init-note (fmt &rest args)
+  (let ((message-log-max nil)) (apply #'message fmt args)))
 #+end_src
 
 ** Straight.el Bootstrap
-Must be here — loading straight.el must happen before any straight-use-package call.
+Must be here — loading straight.el must happen before any
+straight-use-package call.
 
 #+begin_src emacs-lisp
-(defun my/init-note (fmt &rest args)
-  (let ((message-log-max nil)) (apply #'message fmt args)))
-
 (my/init-note "[init] straight bootstrap…")
 (defvar bootstrap-version)
 (let ((bootstrap-file
-       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+       (expand-file-name
+        "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
       (bootstrap-version 6))
   (when (file-exists-p bootstrap-file)
     (load bootstrap-file nil 'nomessage)))
 (my/init-note "[init] straight ready")
+#+end_src
+
+** Straight build dirs → load-path
+Migrated from the old hand-grown init.el: every package build
+directory joins `load-path' so requires resolve normally.
+#+begin_src emacs-lisp
+(let ((straight-build-dir
+       (expand-file-name "straight/build/" user-emacs-directory)))
+  (when (file-directory-p straight-build-dir)
+    (dolist (dir (directory-files straight-build-dir t "^[^.]" t))
+      (when (file-directory-p dir)
+        (add-to-list 'load-path dir)))))
 #+end_src
 
 ** Git SSL CA cert fix
@@ -201,10 +226,6 @@ Must be here — straight clones need GIT_SSL_CAINFO before any HTTPS fetch.
 ** Early Appearance
 Theme palette + modeline BEFORE the splash. Guarded — missing builds
 just mean the modules re-apply everything later in boot.
-
-NOTE: the tangled init.el also contains a Straight Build Load Paths
-section (scan of straight/build/*) that lives only in init.el for now;
-keep it in sync when tangling.
 #+begin_src emacs-lisp
 (condition-case nil
     (progn
@@ -228,8 +249,9 @@ keep it in sync when tangling.
             doom-modeline-minor-modes nil
             doom-modeline-buffer-encoding nil
             doom-modeline-percent-position nil)
-      ;; Define the SAME spec modeline.org uses — enabling the mode
-      ;; without it trips the mode-hook on the not-yet-defined
+      ;; Define the SAME spec modeline.org uses, so the early modeline
+      ;; is identical to the final one.  Enabling the mode WITHOUT this
+      ;; definition trips its mode-hook on the not-yet-defined
       ;; `my/setup-modeline' and leaves the vanilla modeline up.
       (doom-modeline-def-segment my-modaled-state
         "Display modaled state with nerd-icons."
@@ -270,53 +292,55 @@ Must be here — manifolding-emacs-boot generates leaf forms.
 (my/init-note "[init] core ready")
 #+end_src
 
-** Manifolding-Emacs
-The literate boot system.  Its code lives as Org blocks in
-Manifolding-Emacs/manifolding-emacs.org — evaluated directly here,
-lexically, in document order.  Failures are LOUD: the loader is
-critical, never silent.
+** Loader block evaluator
+Shallow on purpose: one small defun, easy to verify by eye.
+EOF ends the block quietly; read/eval errors propagate LOUDLY.
+#+begin_src emacs-lisp
+(defun my/eval-loader-block (value n)
+  "Eval every form in VALUE (Org src block N).
+End-of-file ends the block quietly; other errors fail the boot."
+  (with-temp-buffer
+    (insert value)
+    (goto-char (point-min))
+    (while t
+      (condition-case nil
+          (eval (read (current-buffer)) t)
+        (end-of-file nil)))))
+#+end_src
 
-The old lisp/manifolding-emacs/*.el files are retired; delete them
-after this path has proven itself for a few boots.
+** Literate loader
+Evaluates Manifolding-Emacs/manifolding-emacs.org — the package
+manager — block by block, lexically, in document order.
 
 #+begin_src emacs-lisp
-(my/init-note "[init] loading literate loader…")
-
 (defun my/load-literate-loader (&optional file)
   "Eval every emacs-lisp block in the loader Org, in order, lexically."
-  (let* ((file (or file
-                   (expand-file-name "Manifolding-Emacs/manifolding-emacs.org"
-                                     user-emacs-directory))))
-    (unless (file-exists-p file)
-      (error "[init] literate loader missing: %s" file))
-    (with-temp-buffer
-      (insert-file-contents file)
-      (let ((tree (org-element-parse-buffer))
-            (n 0))
-        (org-element-map tree '(src-block headline)
-          (lambda (el)
-            (pcase (org-element-type el)
-              ('headline
-               (my/init-note
-                (format "[loader] %s"
-                        (or (org-element-property :raw-value el) "?"))))
-              ('src-block
-               (when (string= (org-element-property :language el)
-                              "emacs-lisp")
-                 (setq n (1+ n))
-                 (let ((pos 0) form)
-                   (with-temp-buffer
-                     (insert (org-element-property :value el))
-                     (goto-char (point-min))
-                     (condition-case err
-                         (while (setq form (read-from-string
-                                            (buffer-string) pos))
-                           (setq pos (cdr form))
-                           (eval (car form) t))
-                       (error
-                        (error "[loader] block %d failed: %s"
-                               n (error-message-string err))))))))))))))
-    (my/init-note (format "[init] loader ready (%d blocks)" n))))
+  (or file (setq file
+                 (expand-file-name "manifolding-emacs.org"
+                                   (locate-user-emacs-directory
+                                    "Manifolding-Emacs/"))))
+  (unless (file-exists-p file)
+    (error "[init] literate loader missing: %s" file))
+  (my/init-note "[init] literate loader…")
+  (let* ((buf (find-file-noselect file))
+         (tree (with-current-buffer buf
+                 (org-element-parse-buffer)))
+         (n 0))
+    (org-element-map tree '(src-block headline)
+      (lambda (el)
+        (pcase (org-element-type el)
+          ('headline
+           (my/init-note
+            (format "[loader] %s"
+                    (or (org-element-property :raw-value el) "?"))))
+          ('src-block
+           (when (string=
+                  (org-element-property :language el) "emacs-lisp")
+             (setq n (1+ n))
+             (my/eval-loader-block
+              (org-element-property :value el) n))))))
+    (my/init-note (format "[init] loader ready (%d blocks)" n))
+    n))
 
 (add-to-list 'load-path (expand-file-name "lisp/" user-emacs-directory))
 (my/load-literate-loader)
@@ -346,10 +370,9 @@ after this path has proven itself for a few boots.
 #+end_src
 
 #+begin_src emacs-lisp
-;; Everything else lives in modules/*.org.
-;; See straight.org for straight.el config.
+;; Everything else lives in Manifolding-Emacs/modules/*.org.
 ;; See keyboard.org for keybindings.
 ;; See buffer-management.org for buffer lifecycle.
 
-;;; init.el ends here
+;;; foundation-init.el ends here
 #+end_src
