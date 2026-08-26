@@ -10,6 +10,8 @@
 ;; │      → produces early-init.el + foundation-init.el          │
 ;; └─────────────────────────────────────────────────────────────┘
 
+(setq debug-on-error t)
+
 (require 'org)
 
 (defvar manifold--foundation-org

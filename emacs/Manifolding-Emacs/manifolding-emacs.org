@@ -7,10 +7,13 @@
 :header-args:emacs-lisp: :tangle manifolding-emacs.el
 :END:
 
+#+begin_src emacs-lisp :tangle manifolding-emacs.el
+;;; -*- lexical-binding: t -*-
+#+end_src
+
 The loader itself, as Org.  This file IS the package manager —
-evaluated directly by init.el (see ~my/load-literate-loader~ there),
-block by block, lexically, in document order.  No tangle step, no
-straight, no .el artifacts.
+evaluated directly by init.el (see ~my/load-literate-loader~ there).
+Now tangles to .el for fast loading, with a lexical-binding cookie.
 
 Failures here are LOUD on purpose: this code is too critical to be
 loaded silently.  A broken block fails the boot visibly.
@@ -1870,13 +1873,16 @@ Unchanged files replay from the content-hash cache.  With FORCE
 ** Entry — boot
 Atomic upstream — kept whole.
 #+begin_src emacs-lisp
+(defvar fatal nil "Non-nil when boot throws an error.")
+
 (defun manifolding-emacs-boot ()
   "Compile every Org file, with a splash screen, structured error
 tracking, an idle sweep to surface deferred-load errors early, and
 (optionally) an automatic version freeze if the boot was clean."
   (interactive)
-  (let ((manifolding-emacs--booting t) (fatal nil)
+  (let ((manifolding-emacs--booting t)
         (boot-t0 (float-time)))
+    (setq fatal nil)
     (setq manifolding-emacs-splash--state nil)
     (manifolding-emacs-errors-clear-boot-state)
     (when manifolding-emacs-mode-line-indicator

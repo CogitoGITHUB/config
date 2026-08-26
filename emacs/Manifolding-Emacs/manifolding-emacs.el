@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t -*-
+
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
@@ -1716,13 +1718,16 @@ Unchanged files replay from the content-hash cache.  With FORCE
   (lambda (current total file)
     (manifolding-emacs-splash-update-progress buf current total file)))
 
+(defvar fatal nil "Non-nil when boot throws an error.")
+
 (defun manifolding-emacs-boot ()
   "Compile every Org file, with a splash screen, structured error
 tracking, an idle sweep to surface deferred-load errors early, and
 (optionally) an automatic version freeze if the boot was clean."
   (interactive)
-  (let ((manifolding-emacs--booting t) (fatal nil)
+  (let ((manifolding-emacs--booting t)
         (boot-t0 (float-time)))
+    (setq fatal nil)
     (setq manifolding-emacs-splash--state nil)
     (manifolding-emacs-errors-clear-boot-state)
     (when manifolding-emacs-mode-line-indicator
