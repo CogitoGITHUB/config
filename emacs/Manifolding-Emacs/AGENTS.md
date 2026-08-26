@@ -27,14 +27,14 @@ This directory boots the entire config.  Three files matter:
   capture flows.  The property grid IS the speed setting.
 - **Do not edit**: `lisp/manifolding-emacs/*.el` (retired), generated
   `early-init.el`/`foundation-init.el`, or `lisp/init.el` seed.
-- **org-capture body buffers stay in modaled "insert" state** (see
+- **org-capture body buffers stay in manifolding-keyboard "insert" state** (see
   infrastructure.org hook) — only Atlas-Pick picker buffers use the
-  "atlas-pick" modaled state.
+  "atlas-pick" manifolding-keyboard state.
 
 ## Known gotchas
 
 - Transient launched from plain Lisp exits silently → always launch
   from inside a recursive-edit or command-loop iteration.
 - Childless display-only transient groups get pruned.
-- modaled states: keyboard.org defines them; atlas-pick state owns
+- manifolding-keyboard states: manifolding-keyboard.org defines them; atlas-pick state owns
   Atlas-Pick buffers; ordinary org-capture bodies stay in "insert".

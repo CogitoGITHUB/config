@@ -15,26 +15,24 @@
 :CATEGORY: keyboard
 :END:
 
-* MODALED — Modal Editing Engine (VENDORED from DCsunset/modaled)
+* MANIFOLDING-KEYBOARD — Modal Editing Engine (VENDORED)
 Vendored — no ~:PACKAGE:/~:STRAIGHT:~.  Source decomposed below;
-edit any block directly.  To take an upstream update, diff
-straight/repos/modaled against these blocks.
+edit any block directly.
 
 ** Requires & group
 #+begin_src emacs-lisp
 (require 'cl-lib)
 
-(defgroup modaled nil
+(defgroup manifolding-keyboard nil
   "Build your own minor modes for modal editing."
   :group 'editing
-  :tag "Modaled"
-  :prefix "modaled-"
-  :link '(url-link :tag "GitHub" "https://github.com/DCsunset/modaled"))
+  :tag "Manifolding-Keyboard"
+  :prefix "manifolding-keyboard-"))
 #+end_src
 
 ** Local variable macro
 #+begin_src emacs-lisp
-(defmacro modaled-define-local-var (symbol &optional init-value docstring)
+(defmacro manifolding-keyboard-define-local-var (symbol &optional init-value docstring)
   "Define SYMBOL as a permanent buffer-local variable."
   (declare (indent defun) (doc-string 3))
   `(progn
@@ -45,96 +43,96 @@ straight/repos/modaled against these blocks.
 
 ** Buffer-local state variable
 #+begin_src emacs-lisp
-(modaled-define-local-var modaled-state nil "Current modaled state.")
+(manifolding-keyboard-define-local-var manifolding-keyboard-state nil "Current manifolding-keyboard state.")
 #+end_src
 
 ** Set state
 #+begin_src emacs-lisp
-(defun modaled-set-state (state)
-  "Set current modaled STATE."
-  (when (and modaled-state (not (equal modaled-state state)))
-    (funcall (modaled-get-state-mode modaled-state) -1))
+(defun manifolding-keyboard-set-state (state)
+  "Set current manifolding-keyboard STATE."
+  (when (and manifolding-keyboard-state (not (equal manifolding-keyboard-state state)))
+    (funcall (manifolding-keyboard-get-state-mode manifolding-keyboard-state) -1))
   (when state
-    (funcall (modaled-get-state-mode state) 1))
-  (setq modaled-state state))
+    (funcall (manifolding-keyboard-get-state-mode state) 1))
+  (setq manifolding-keyboard-state state))
 #+end_src
 
 ** Emulation mode map alist
 #+begin_src emacs-lisp
-(defvar modaled--emulation-mode-map-alist nil
-  "An alist of modaled mode map to add to `emulation-mode-map-alists'.")
+(defvar manifolding-keyboard--emulation-mode-map-alist nil
+  "An alist of manifolding-keyboard mode map to add to `emulation-mode-map-alists'.")
 #+end_src
 
 ** Main state management
 #+begin_src emacs-lisp
-(defvar modaled-main-state-alist '()
-  "Main modaled state for major modes.")
+(defvar manifolding-keyboard-main-state-alist '()
+  "Main manifolding-keyboard state for major modes.")
 
-(defvar modaled-main-state-fn nil
-  "A function to return main modaled state for buffer.")
-(make-obsolete-variable 'modaled-main-state-alist 'modaled-main-state-fn "0.8.3")
+(defvar manifolding-keyboard-main-state-fn nil
+  "A function to return main manifolding-keyboard state for buffer.")
+(make-obsolete-variable 'manifolding-keyboard-main-state-alist 'manifolding-keyboard-main-state-fn "0.8.3")
 
-(defun modaled-set-main-state ()
+(defun manifolding-keyboard-set-main-state ()
   "Set current state to main state."
   (interactive)
-  (modaled-set-state (if modaled-main-state-fn
-                         (funcall modaled-main-state-fn)
-                       (modaled-get-main-state))))
+  (manifolding-keyboard-set-state (if manifolding-keyboard-main-state-fn
+                         (funcall manifolding-keyboard-main-state-fn)
+                       (manifolding-keyboard-get-main-state))))
 
-(defvar modaled-init-state-fn nil
-  "A function to return init modaled state for buffer.")
+(defvar manifolding-keyboard-init-state-fn nil
+  "A function to return init manifolding-keyboard state for buffer.")
 
-(defun modaled-set-init-state ()
+(defun manifolding-keyboard-set-init-state ()
   "Set current state to init state."
   (interactive)
-  (modaled-set-state (and modaled-init-state-fn
-                          (funcall modaled-init-state-fn))))
+  (manifolding-keyboard-set-state (and manifolding-keyboard-init-state-fn
+                          (funcall manifolding-keyboard-init-state-fn))))
 
-(modaled-define-local-var modaled-default-state nil
-  "Default modaled state.")
-(make-obsolete-variable 'modaled-default-state 'modaled-init-state-fn "0.8.3")
+(manifolding-keyboard-define-local-var manifolding-keyboard-default-state nil
+  "Default manifolding-keyboard state.")
+(make-obsolete-variable 'manifolding-keyboard-default-state 'manifolding-keyboard-init-state-fn "0.8.3")
 
-(defun modaled-set-default-state ()
+(defun manifolding-keyboard-set-default-state ()
   "Set current state to default state."
   (interactive)
-  (modaled-set-state modaled-default-state))
-(make-obsolete #'modaled-set-default-state #'modaled-set-init-state "0.8.3")
+  (manifolding-keyboard-set-state manifolding-keyboard-default-state))
+(make-obsolete #'manifolding-keyboard-set-default-state #'manifolding-keyboard-set-init-state "0.8.3")
 
-(defun modaled-get-main-state ()
+(defun manifolding-keyboard-get-main-state ()
   "Get main state for current major mode."
   (alist-get major-mode
-             modaled-main-state-alist
-             modaled-default-state nil
+             manifolding-keyboard-main-state-alist
+             manifolding-keyboard-default-state nil
              (lambda (modes mode)
                (cond
                 ((listp modes) (memq mode modes))
                 ((eq modes t) t)
                 (t (eq mode modes))))))
-(make-obsolete #'modaled-get-main-state nil "0.8.3")
+(make-obsolete #'manifolding-keyboard-get-main-state nil "0.8.3")
 #+end_src
 
 ** Naming utilities
 #+begin_src emacs-lisp
-(defun modaled-get-state-mode (state)
+(defun manifolding-keyboard-get-state-mode (state)
   "Get the symbol of STATE minor mode."
-  (intern (format "modaled-%s-state-mode" state)))
+  (intern (format "manifolding-keyboard-%s-state-mode" state)))
 
-(defun modaled-get-state-keymap (state)
+(defun manifolding-keyboard-get-state-keymap (state)
   "Get the symbol of STATE keymap."
-  (intern (format "modaled-%s-state-keymap" state)))
+  (intern (format "manifolding-keyboard-%s-state-keymap" state)))
 
-(defun modaled-get-substate-mode (substate)
+(defun manifolding-keyboard-get-substate-mode (substate)
   "Get the symbol of SUBSTATE minor mode."
-  (intern (format "modaled-%s-substate-mode" substate)))
+  (intern (format "manifolding-keyboard-%s-substate-mode" substate)))
 
-(defun modaled-get-substate-keymap (substate)
+(defun manifolding-keyboard-get-substate-keymap (substate)
   "Get the symbol of SUBSTATE keymap."
-  (intern (format "modaled-%s-substate-keymap" substate)))
+  (intern (format "manifolding-keyboard-%s-substate-keymap" substate)))
 #+end_src
 
 ** Keymap definition helper
 #+begin_src emacs-lisp
-(defun modaled--define-keymap (keymaps keybindings)
+(defun manifolding-keyboard--define-keymap (keymaps keybindings)
   "Define KEYBINDINGS for all the KEYMAPS."
   (dolist (keymap keymaps)
     (pcase-dolist (`(,key . ,def) keybindings)
@@ -145,15 +143,15 @@ straight/repos/modaled against these blocks.
 
 ** Define-keys function
 #+begin_src emacs-lisp
-(defun modaled-define-keys (&rest body)
+(defun manifolding-keyboard-define-keys (&rest body)
   "Define keybindings for states, substates, or globally.
 
 :states / :substates / :global / :keymaps / :inherit / :bind"
   (declare (indent defun))
   (let* ((states (plist-get body :states))
          (substates (plist-get body :substates))
-         (keymaps (append (mapcar #'modaled-get-state-keymap states)
-                          (mapcar #'modaled-get-substate-keymap substates)
+         (keymaps (append (mapcar #'manifolding-keyboard-get-state-keymap states)
+                          (mapcar #'manifolding-keyboard-get-substate-keymap substates)
                           (plist-get body :keymaps)))
          (global (plist-get body :global))
          (inherit (plist-get body :inherit))
@@ -175,7 +173,7 @@ straight/repos/modaled against these blocks.
 ** Minor mode definition macro
 Atomic upstream — kept whole.
 #+begin_src emacs-lisp
-(defmacro modaled--define-minor-mode (mode keymap body)
+(defmacro manifolding-keyboard--define-minor-mode (mode keymap body)
   "Define a minor MODE with KEYMAP and options in BODY."
   (let ((mode-name (symbol-name mode))
         (sparse (plist-get body :sparse))
@@ -190,62 +188,62 @@ Atomic upstream — kept whole.
       (unless ,no-suppress
         (suppress-keymap ,keymap))
       (define-minor-mode ,mode
-        ,(format "Modaled minor mode %s" mode-name)
+        ,(format "Manifolding-Keyboard minor mode %s" mode-name)
         :lighter ,lighter
         :keymap ,keymap
         (when ,cursor-type (setq-local cursor-type ,cursor-type)))
       (unless ,no-emulation
-        (unless (boundp 'modaled--emulation-mode-map-alist)
-          (setq modaled--emulation-mode-map-alist nil))
-        (add-to-list 'modaled--emulation-mode-map-alist (cons ',mode ,keymap))
-        (add-to-list 'emulation-mode-map-alists modaled--emulation-mode-map-alist)))))
+        (unless (boundp 'manifolding-keyboard--emulation-mode-map-alist)
+          (setq manifolding-keyboard--emulation-mode-map-alist nil))
+        (add-to-list 'manifolding-keyboard--emulation-mode-map-alist (cons ',mode ,keymap))
+        (add-to-list 'emulation-mode-map-alists manifolding-keyboard--emulation-mode-map-alist)))))
 #+end_src
 
 ** Define-state macro
 #+begin_src emacs-lisp
-(defmacro modaled-define-state (state &rest body)
+(defmacro manifolding-keyboard-define-state (state &rest body)
   "Define a new STATE minor mode with options in BODY."
   (declare (indent defun))
-  (let ((mode (modaled-get-state-mode state))
-        (keymap (modaled-get-state-keymap state)))
-    `(modaled--define-minor-mode ,mode ,keymap ,body)))
+  (let ((mode (manifolding-keyboard-get-state-mode state))
+        (keymap (manifolding-keyboard-get-state-keymap state)))
+    `(manifolding-keyboard--define-minor-mode ,mode ,keymap ,body)))
 
-(defmacro modaled-define-substate (substate &rest body)
+(defmacro manifolding-keyboard-define-substate (substate &rest body)
   "Define a new SUBSTATE minor mode with options in BODY."
   (declare (indent defun))
-  (let ((mode (modaled-get-substate-mode substate))
-        (keymap (modaled-get-substate-keymap substate)))
-    `(modaled--define-minor-mode ,mode ,keymap ,body)))
+  (let ((mode (manifolding-keyboard-get-substate-mode substate))
+        (keymap (manifolding-keyboard-get-substate-keymap substate)))
+    `(manifolding-keyboard--define-minor-mode ,mode ,keymap ,body)))
 #+end_src
 
 ** Buffer initialization & setup
 #+begin_src emacs-lisp
-(modaled-define-local-var modaled--initialized nil
-  "Non-nil if this buffer is initialized by modaled.")
+(manifolding-keyboard-define-local-var manifolding-keyboard--initialized nil
+  "Non-nil if this buffer is initialized by manifolding-keyboard.")
 
-(defun modaled-initialize (&optional force)
-  "Initialize current buffer with init modaled state."
-  (when (or force (not modaled--initialized))
-    (setq modaled--initialized t)
+(defun manifolding-keyboard-initialize (&optional force)
+  "Initialize current buffer with init manifolding-keyboard state."
+  (when (or force (not manifolding-keyboard--initialized))
+    (setq manifolding-keyboard--initialized t)
     (unless (minibufferp)
-      (if modaled-init-state-fn (modaled-set-init-state)))))
+      (if manifolding-keyboard-init-state-fn (manifolding-keyboard-set-init-state)))))
 
-(defun modaled-initialize-all-buffers ()
+(defun manifolding-keyboard-initialize-all-buffers ()
   "Initialize all existing buffers."
   (dolist (buf (buffer-list))
-    (with-current-buffer buf (modaled-initialize))))
+    (with-current-buffer buf (manifolding-keyboard-initialize))))
 
-(defun modaled-setup ()
-  "Set up modaled for existing and future buffers."
+(defun manifolding-keyboard-setup ()
+  "Set up manifolding-keyboard for existing and future buffers."
   (add-hook 'after-change-major-mode-hook
             (lambda ()
-              (setq modaled--initialized nil)
-              (modaled-initialize)))
+              (setq manifolding-keyboard--initialized nil)
+              (manifolding-keyboard-initialize)))
   (add-hook 'buffer-list-update-hook
-            (lambda () (modaled-initialize-all-buffers)))
-  (modaled-initialize-all-buffers))
+            (lambda () (manifolding-keyboard-initialize-all-buffers)))
+  (manifolding-keyboard-initialize-all-buffers))
 
-(defun modaled-enable-substate-on-state-change (substate &rest body)
+(defun manifolding-keyboard-enable-substate-on-state-change (substate &rest body)
   "Enable SUBSTATE under conditions specified in BODY."
   (declare (indent defun))
   (let ((states (plist-get body :states))
@@ -255,16 +253,16 @@ Atomic upstream — kept whole.
         (check-minor (lambda (mode)
                        (and (boundp mode) (symbol-value mode)))))
     (add-variable-watcher
-     'modaled-state
+     'manifolding-keyboard-state
      (lambda (_ new-val _ _)
-       (funcall (modaled-get-substate-mode substate)
+       (funcall (manifolding-keyboard-get-substate-mode substate)
                 (if (and (or (not major) (memq major-mode major))
                          (or (not minor) (memq t (mapcar check-minor minor)))
                          (or (not pred) (funcall pred))
                          (or (not states) (member new-val states)))
                     1 -1))))))
 
-(provide 'modaled)
+(provide 'manifolding-keyboard)
 #+end_src
 
 * KEYBOARD — Custom Commands
@@ -286,17 +284,17 @@ Atomic upstream — kept whole.
   (interactive)
   (end-of-line)
   (insert "\n* TODO ")
-  (modaled-set-state "insert"))
+  (manifolding-keyboard-set-state "insert"))
 (defun my/org-insert-code-block ()
   "Insert a src block and enter insert state."
   (interactive)
   (org-insert-structure-template "src")
-  (modaled-set-state "insert"))
+  (manifolding-keyboard-set-state "insert"))
 (defun my/org-insert-latex-block ()
   "Insert a LaTeX export block and enter insert state."
   (interactive)
   (org-insert-structure-template "latex")
-  (modaled-set-state "insert"))
+  (manifolding-keyboard-set-state "insert"))
 #+end_src
 
 ** Git commands
@@ -335,9 +333,9 @@ Atomic upstream — kept whole.
   "Return to the appropriate modal state based on the current buffer."
   (interactive)
   (cond
-   ((derived-mode-p 'org-mode)   (modaled-set-state "org"))
-   ((derived-mode-p 'vterm-mode) (modaled-set-state "vterm"))
-   (t                            (modaled-set-state "normal"))))
+   ((derived-mode-p 'org-mode)   (manifolding-keyboard-set-state "org"))
+   ((derived-mode-p 'vterm-mode) (manifolding-keyboard-set-state "vterm"))
+   (t                            (manifolding-keyboard-set-state "normal"))))
 (defun my/treemacs-toggle ()
   "Toggle treemacs. If focused, close it. If open, focus it."
   (interactive)
@@ -362,7 +360,7 @@ Atomic upstream — kept whole.
 
 ** Requires
 #+begin_src emacs-lisp
-(require 'modaled)
+(require 'manifolding-keyboard)
 (require 'which-key)
 (require 'avy)
 (require 'ace-window)
@@ -372,51 +370,51 @@ Atomic upstream — kept whole.
 
 ** Force keymap redefinition on reload
 #+begin_src emacs-lisp
-(dolist (sym '(modaled-normal-state-keymap
-                modaled-insert-state-keymap
-                modaled-visual-state-keymap
-                modaled-org-state-keymap
-                modaled-motion-state-keymap
-                modaled-vterm-state-keymap
-                modaled-magit-state-keymap
-                modaled-dired-state-keymap
-                modaled-presentation-state-keymap
-                modaled-atlas-pick-state-keymap))
+(dolist (sym '(manifolding-keyboard-normal-state-keymap
+                manifolding-keyboard-insert-state-keymap
+                manifolding-keyboard-visual-state-keymap
+                manifolding-keyboard-org-state-keymap
+                manifolding-keyboard-motion-state-keymap
+                manifolding-keyboard-vterm-state-keymap
+                manifolding-keyboard-magit-state-keymap
+                manifolding-keyboard-dired-state-keymap
+                manifolding-keyboard-presentation-state-keymap
+                manifolding-keyboard-atlas-pick-state-keymap))
   (makunbound sym))
 #+end_src
 
 ** State definitions
 #+begin_src emacs-lisp
-(modaled-define-state "normal"
+(manifolding-keyboard-define-state "normal"
   :lighter "[NOR]"
   :cursor-type 'box)
-(modaled-define-state "insert"
+(manifolding-keyboard-define-state "insert"
   :sparse t
   :no-suppress t
   :lighter "[INS]"
   :cursor-type 'bar)
-(modaled-define-state "visual"
+(manifolding-keyboard-define-state "visual"
   :lighter "[VIS]"
   :cursor-type 'hollow)
-(modaled-define-state "org"
+(manifolding-keyboard-define-state "org"
   :lighter "[ORG]"
   :cursor-type 'box)
-(modaled-define-state "motion"
+(manifolding-keyboard-define-state "motion"
   :lighter "[MOT]"
   :cursor-type 'hbar)
-(modaled-define-state "vterm"
+(manifolding-keyboard-define-state "vterm"
   :lighter "[VTE]"
   :cursor-type 'box)
-(modaled-define-state "magit"
+(manifolding-keyboard-define-state "magit"
   :lighter "[GIT]"
   :cursor-type 'box)
-(modaled-define-state "dired"
+(manifolding-keyboard-define-state "dired"
   :lighter "[DIR]"
   :cursor-type 'box)
-(modaled-define-state "presentation"
+(manifolding-keyboard-define-state "presentation"
   :lighter "[PRE]"
   :cursor-type 'bar)
-(modaled-define-state "ibuffer"
+(manifolding-keyboard-define-state "ibuffer"
   :lighter "[IBF]"
   :cursor-type 'box)
 #+end_src
@@ -424,7 +422,7 @@ Atomic upstream — kept whole.
 *** Atlas Pick State
 Own block: an error here must never abort the core rebuild above.
 #+begin_src emacs-lisp
-(modaled-define-state "atlas-pick"
+(manifolding-keyboard-define-state "atlas-pick"
   :sparse t
   :lighter "[PCK]"
   :cursor-type 'box)
@@ -433,14 +431,14 @@ Own block: an error here must never abort the core rebuild above.
 *** Tree Slide Hooks
 #+begin_src emacs-lisp
 (add-hook 'org-tree-slide-play-hook
-          (lambda () (modaled-set-state "presentation")))
+          (lambda () (manifolding-keyboard-set-state "presentation")))
 (add-hook 'org-tree-slide-stop-hook
-          (lambda () (modaled-set-state "org")))
+          (lambda () (manifolding-keyboard-set-state "org")))
 #+end_src
 
 ** Init State
 #+begin_src emacs-lisp
-(setq modaled-init-state-fn
+(setq manifolding-keyboard-init-state-fn
       (lambda ()
         (cond
          ((minibufferp) nil)
@@ -452,7 +450,7 @@ Own block: an error here must never abort the core rebuild above.
          ((derived-mode-p 'vundo-mode)  nil)
          ((buffer-local-value 'buffer-read-only (current-buffer)) "motion")
          (t "normal"))))
-(modaled-setup)
+(manifolding-keyboard-setup)
 #+end_src
 
 ** State Commands
@@ -460,34 +458,34 @@ Own block: an error here must never abort the core rebuild above.
 (defun my/insert-state ()
   "Switch to insert state."
   (interactive)
-  (modaled-set-state "insert"))
+  (manifolding-keyboard-set-state "insert"))
 
 (defun my/normal-state ()
   "Switch to normal state."
   (interactive)
-  (modaled-set-state "normal"))
+  (manifolding-keyboard-set-state "normal"))
 
 (defun my/visual-normal-state ()
   "Deactivate mark and switch to normal state."
   (interactive)
   (deactivate-mark)
-  (modaled-set-state "normal"))
+  (manifolding-keyboard-set-state "normal"))
 #+end_src
 
 ** State Hooks
 #+begin_src emacs-lisp
-(add-hook 'org-mode-hook   (lambda () (modaled-set-state "org")))
-(add-hook 'dired-mode-hook (lambda () (modaled-set-state "dired")))
-(add-hook 'vterm-mode-hook (lambda () (modaled-set-state "vterm")))
-(add-hook 'help-mode-hook  (lambda () (modaled-set-state "motion")))
-(add-hook 'Info-mode-hook  (lambda () (modaled-set-state "motion")))
-(add-hook 'view-mode-hook  (lambda () (modaled-set-state "motion")))
-(add-hook 'magit-mode-hook (lambda () (modaled-set-state "magit")))
+(add-hook 'org-mode-hook   (lambda () (manifolding-keyboard-set-state "org")))
+(add-hook 'dired-mode-hook (lambda () (manifolding-keyboard-set-state "dired")))
+(add-hook 'vterm-mode-hook (lambda () (manifolding-keyboard-set-state "vterm")))
+(add-hook 'help-mode-hook  (lambda () (manifolding-keyboard-set-state "motion")))
+(add-hook 'Info-mode-hook  (lambda () (manifolding-keyboard-set-state "motion")))
+(add-hook 'view-mode-hook  (lambda () (manifolding-keyboard-set-state "motion")))
+(add-hook 'magit-mode-hook (lambda () (manifolding-keyboard-set-state "magit")))
 #+end_src
 
 ** Modeline
 #+begin_src emacs-lisp
-(add-hook 'modaled-state-change-hook #'doom-modeline-refresh-bars)
+(add-hook 'manifolding-keyboard-state-change-hook #'doom-modeline-refresh-bars)
 #+end_src
 
 ** Activate
@@ -501,7 +499,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Universal — All Non-Insert States
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("normal" "visual" "org" "motion" "vterm" "dired")
   :bind
   `(("<wheel-up>"   . scroll-down-command)
@@ -521,7 +519,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Normal
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("normal")
   :bind
   `(("i"   . my/insert-state)
@@ -542,7 +540,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Insert
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("insert")
   :bind
   `(("<escape>" . my/smart-escape)
@@ -551,7 +549,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Visual
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("visual")
   :bind
   `(("<escape>" . my/visual-normal-state)
@@ -571,7 +569,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Org
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("org")
   :bind
   `(("i"   . my/insert-state)
@@ -614,7 +612,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Atlas Pick
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("atlas-pick")
   :bind
   `(;; Selection
@@ -642,7 +640,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Vterm
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("vterm")
   :bind
   `(("i"        . my/insert-state)
@@ -669,7 +667,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Dired
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("dired")
   :bind
   `(("h"    . dired-up-directory)
@@ -685,7 +683,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Ibuffer
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("ibuffer")
   :bind
   `(("<escape>" . my/normal-state)
@@ -707,7 +705,7 @@ Own block: an error here must never abort the core rebuild above.
 
 ** Motion
 #+begin_src emacs-lisp
-(modaled-define-keys
+(manifolding-keyboard-define-keys
   :states '("motion")
   :bind
   `(("<escape>" . my/normal-state)
@@ -728,8 +726,8 @@ Own block: an error here must never abort the core rebuild above.
 ** Magit
 #+begin_src emacs-lisp
 (with-eval-after-load 'magit
-  (add-hook 'magit-mode-hook (lambda () (modaled-set-state nil)))
-  (modaled-define-keys
+  (add-hook 'magit-mode-hook (lambda () (manifolding-keyboard-set-state nil)))
+  (manifolding-keyboard-define-keys
     :states '("magit")
     :bind
     `(("SPC"        . my/main-hydra/body)
@@ -770,7 +768,7 @@ Own block: an error here must never abort the core rebuild above.
 ** Presentation
 #+begin_src emacs-lisp
 (with-eval-after-load 'org-tree-slide
-  (modaled-define-keys
+  (manifolding-keyboard-define-keys
     :states '("presentation")
     :bind
     `(("i"   . my/insert-state)
@@ -789,7 +787,7 @@ Own block: an error here must never abort the core rebuild above.
       ("q"   . ,(lambda ()
                   (interactive)
                   (org-tree-slide-mode -1)
-                  (modaled-set-state "org"))))))
+                  (manifolding-keyboard-set-state "org"))))))
 #+end_src
 
 * KEYBOARD — Tool Integrations
@@ -797,7 +795,7 @@ Own block: an error here must never abort the core rebuild above.
 ** Vundo
 #+begin_src emacs-lisp
 (with-eval-after-load 'vundo
-  (add-hook 'vundo-mode-hook (lambda () (modaled-set-state nil)))
+  (add-hook 'vundo-mode-hook (lambda () (manifolding-keyboard-set-state nil)))
   (define-key vundo-mode-map (kbd "h") #'vundo-backward)
   (define-key vundo-mode-map (kbd "t") #'vundo-forward)
   (define-key vundo-mode-map (kbd "n") #'vundo-next)
@@ -828,7 +826,7 @@ Own block: an error here must never abort the core rebuild above.
 #+begin_src emacs-lisp
 (with-eval-after-load 'git-timemachine
   (add-hook 'git-timemachine-mode-hook
-            (lambda () (modaled-set-state nil)))
+            (lambda () (manifolding-keyboard-set-state nil)))
   (define-key git-timemachine-mode-map (kbd "h")
     #'git-timemachine-show-previous-revision)
   (define-key git-timemachine-mode-map (kbd "t")
@@ -857,9 +855,50 @@ Lead keys in pure red on black.
    '(avy-lead-face-2 ((t (:foreground "#ff0000" :background unspecified :weight bold))))))
 #+end_src
 
+* Hydra Infrastructure
+
+** Defhydra-state macro
+Single declaration generates both a manifolding-keyboard state's keybindings and its hydra menu. Bindings with `:exit nil` become state keys; all bindings appear in the hydra. The "Back → parent" group is automatic.
+#+begin_src emacs-lisp
+(defmacro my/defhydra-state (hydra-name state-name title back-target &rest spec)
+  "Define manifolding-keyboard STATE-NAME and its hydra menu from SPEC.
+STATE-NAME may be nil for hydras without a manifolding-keyboard state.
+BACK-TARGET is (HYDRA/BODY LABEL) for the back link, or nil for root.
+SPEC is alternating group-name / binding-list pairs:
+  GROUP-NAME  ((KEY CMD LABEL &key EXIT) ...)
+Bindings with :exit nil go into the manifolding-keyboard state keymap.
+A \"Back\" group linking to BACK-TARGET is appended automatically."
+  (declare (indent defun))
+  (let ((groups '())
+        (state-binds '()))
+    (while spec
+      (let ((group-name (pop spec))
+            (bindings (pop spec)))
+        (push (list group-name bindings) groups)
+        (dolist (b bindings)
+          (unless (plist-get (cdddr b) :exit)
+            (push (list (nth 0 b) (nth 1 b)) state-binds)))))
+    (setq groups (nreverse groups)
+          state-binds (nreverse state-binds))
+    (let ((back-group
+           (when back-target
+             `("Back" (("SPC" ,(car back-target) ,(cadr back-target) :exit t))))))
+      `(progn
+         ,@(when state-name
+             `((manifolding-keyboard-define-keys
+                :states '(,state-name)
+                :bind ',state-binds)))
+         (pretty-hydra-define ,hydra-name
+           (:title ,title :quit-key "q" :separator "─")
+           ,@(mapcar (lambda (g)
+                       (list (car g) (cadr g)))
+                     groups)
+           ,@(when back-group (list back-group)))))))
+#+end_src
+
 * Hydras
 
-All navigation menus.  See SPC → submenu → key.
+All navigation menus.  See SPC → submenu → key.  Defined via `my/defhydra-state`.
 #+begin_src emacs-lisp
 (pretty-hydra-define my/main-hydra
   (:title "Main Menu" :quit-key "SPC" :separator "─")
@@ -895,488 +934,399 @@ All navigation menus.  See SPC → submenu → key.
 
 ** SPC v — Manifolding Atlas
 #+begin_src emacs-lisp
-(pretty-hydra-define my/manifolding-atlas-hydra
-  (:title "Manifolding Atlas" :quit-key "q" :separator "─")
-  ("Find"
-   (("v" manifolding-atlas-find "find note" :exit t)
-    ("V" my/manifolding-atlas-insert-link "insert link" :exit t)
-    ("r" my/manifolding-atlas-rename-link "rename link" :exit t))
-   "Capture"
-   (("h" my/manifolding-atlas-capture-heading "new heading" :exit t)
-    ("c" my/manifolding-atlas-insert-heading "at point" :exit t)
-    ("H" my/manifolding-atlas-heading-to-note "heading→note" :exit t))
-   "Meta"
-   (("f" my/manifolding-atlas--fix-violations "fix warnings" :exit t)
-    ("P" my/manifolding-atlas-update-properties "update props" :exit t)
-    ("u" manifolding-atlas-ui-sidebar-toggle "manifolding-atlas ui" :exit t)
-    ("E" my/manifolding-atlas-reinforce-sweep "schema sweep" :exit t))
-   "Rules"
-   (("k" my/manifolding-atlas-rules-mark-as-rule "mark rule" :exit t)
-    ("K" my/manifolding-atlas-rules-goto-routed-file "rule file" :exit t)
-    ("R" my/manifolding-atlas-find-rules "find rules" :exit t))
-   "Protocols"
-   (("p" my/manifolding-atlas-protocols-build "build" :exit t)
-    ("m" my/manifolding-atlas-protocols-mark-as-step "mark step" :exit t)
-    ("M" my/manifolding-atlas-protocols-goto-routed-file "protocol file" :exit t)
-    ("i" my/manifolding-atlas-find-protocols "find protocols" :exit t))
-   "Vocab"
-   (("w" my/manifolding-atlas-dictionary-menu "dictionary" :exit t))
-   "Contacts"
-   (("C" my/manifolding-atlas-contacts-menu "contacts" :exit t))
-   "Mastering"
-   (("g" my/manifolding-atlas-mastering-review "review due" :exit t)
-    ("G" my/manifolding-atlas-mastering-review-overdue "review overdue" :exit t)
-    ("M" my/manifolding-atlas-mastering-mark-review "mark reviewed" :exit t)
-    ("t" my/manifolding-atlas-mastering-toggle-participation "toggle pool" :exit t))
-   "Todo"
-   (("s" atlas-search-todo-dir "search todo" :exit t))
-   "Recipe"
-   (("n" my/manifolding-atlas-recipe-create "new recipe" :exit t)
-    ("e" my/manifolding-atlas-recipes-edit-servings "edit servings" :exit t)
-    ("f" my/manifolding-atlas-recipes-menu "recipes" :exit t))
-   "Routines"
-   (("N" my/manifolding-atlas-routines-create "new routine" :exit t)
-    ("J" my/manifolding-atlas-routines-chain-create "new chain" :exit t)
-    ("F" my/manifolding-atlas-routines-find "find routine" :exit t)
-    ("B" my/manifolding-atlas-routines-generate "generate" :exit t)
-    ("X" my/manifolding-atlas-routines-run "run" :exit t)
-    ("!" my/manifolding-atlas-routines-validate "validate" :exit t)
-    ("S" my/manifolding-atlas-routines-report "report" :exit t)
-    ("T" my/manifolding-atlas-routines-menu "menu" :exit t))
-   "Transclude"
-   (("y" my/transclusion-hydra/body "transclude" :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/manifolding-atlas-hydra nil "Manifolding Atlas" (my/main-hydra/body "main menu")
+  "Find"
+  (("v" manifolding-atlas-find "find note" :exit t)
+   ("V" my/manifolding-atlas-insert-link "insert link" :exit t)
+   ("r" my/manifolding-atlas-rename-link "rename link" :exit t))
+  "Capture"
+  (("h" my/manifolding-atlas-capture-heading "new heading" :exit t)
+   ("c" my/manifolding-atlas-insert-heading "at point" :exit t)
+   ("H" my/manifolding-atlas-heading-to-note "heading→note" :exit t))
+  "Meta"
+  (("f" my/manifolding-atlas--fix-violations "fix warnings" :exit t)
+   ("P" my/manifolding-atlas-update-properties "update props" :exit t)
+   ("u" manifolding-atlas-ui-sidebar-toggle "sidebar" :exit t)
+   ("E" my/manifolding-atlas-reinforce-sweep "schema sweep" :exit t))
+  "Rules"
+  (("k" my/manifolding-atlas-rules-mark-as-rule "mark rule" :exit t)
+   ("K" my/manifolding-atlas-rules-goto-routed-file "rule file" :exit t)
+   ("R" my/manifolding-atlas-find-rules "find rules" :exit t))
+  "Protocols"
+  (("p" my/manifolding-atlas-protocols-build "build" :exit t)
+   ("m" my/manifolding-atlas-protocols-mark-as-step "mark step" :exit t)
+   ("M" my/manifolding-atlas-protocols-goto-routed-file "protocol file" :exit t)
+   ("i" my/manifolding-atlas-find-protocols "find protocols" :exit t))
+  "Vocab"
+  (("w" my/manifolding-atlas-dictionary-menu "dictionary" :exit t))
+  "Contacts"
+  (("C" my/manifolding-atlas-contacts-menu "contacts" :exit t))
+  "Mastering"
+  (("g" my/manifolding-atlas-mastering-review "review due" :exit t)
+   ("G" my/manifolding-atlas-mastering-review-overdue "review overdue" :exit t)
+   ("M" my/manifolding-atlas-mastering-mark-review "mark reviewed" :exit t)
+   ("t" my/manifolding-atlas-mastering-toggle-participation "toggle pool" :exit t))
+  "Todo"
+  (("s" atlas-search-todo-dir "search todo" :exit t))
+  "Recipe"
+  (("n" my/manifolding-atlas-recipe-create "new recipe" :exit t)
+   ("e" my/manifolding-atlas-recipes-edit-servings "edit servings" :exit t)
+   ("f" my/manifolding-atlas-recipes-menu "recipes" :exit t))
+  "Routines"
+  (("N" my/manifolding-atlas-routines-create "new routine" :exit t)
+   ("J" my/manifolding-atlas-routines-chain-create "new chain" :exit t)
+   ("F" my/manifolding-atlas-routines-find "find routine" :exit t)
+   ("B" my/manifolding-atlas-routines-generate "generate" :exit t)
+   ("X" my/manifolding-atlas-routines-run "run" :exit t)
+   ("!" my/manifolding-atlas-routines-validate "validate" :exit t)
+   ("S" my/manifolding-atlas-routines-report "report" :exit t)
+   ("T" my/manifolding-atlas-routines-menu "menu" :exit t))
+  "Transclude"
+  (("y" my/transclusion-hydra/body "transclude" :exit t)))
+#+end_src
 
 ** SPC y — Transclusion
 #+begin_src emacs-lisp
-(pretty-hydra-define my/transclusion-hydra
-  (:title "Transclusion" :quit-key "q" :separator "─")
-  ("Add"
-   (("a" my/manifolding-atlas-transclusion-add       "add"         :exit t)
-    ("b" (my/manifolding-atlas-transclusion-add t)   "body only"   :exit t)
-    ("A" org-transclusion-add-all         "add all"     :exit t))
-   "Manage"
-   (("r" org-transclusion-remove          "remove"      :exit t)
-    ("R" org-transclusion-remove-all      "remove all"  :exit t)
-    ("d" org-transclusion-detach          "detach"      :exit t)
-    ("f" org-transclusion-refresh         "refresh"     :exit t))
-   "Edit"
-   (("o" org-transclusion-open-source     "open source" :exit t)
-    ("m" org-transclusion-move-to-source  "move source" :exit t)
-    ("s" org-transclusion-live-sync-start "live sync"   :exit nil)
-    ("x" org-transclusion-live-sync-exit  "exit sync"   :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/transclusion-hydra nil "Transclusion" (my/main-hydra/body "main menu")
+  "Add"
+  (("a" my/manifolding-atlas-transclusion-add       "add"         :exit t)
+   ("b" (my/manifolding-atlas-transclusion-add t)   "body only"   :exit t)
+   ("A" org-transclusion-add-all         "add all"     :exit t))
+  "Manage"
+  (("r" org-transclusion-remove          "remove"      :exit t)
+   ("R" org-transclusion-remove-all      "remove all"  :exit t)
+   ("d" org-transclusion-detach          "detach"      :exit t)
+   ("f" org-transclusion-refresh         "refresh"     :exit t))
+  "Edit"
+  (("o" org-transclusion-open-source     "open source" :exit t)
+   ("m" org-transclusion-move-to-source  "move source" :exit t)
+   ("s" org-transclusion-live-sync-start "live sync"   :exit nil)
+   ("x" org-transclusion-live-sync-exit  "exit sync"   :exit t)))
 #+end_src
 
 ** SPC m — Mind Map
 #+begin_src emacs-lisp
-(pretty-hydra-define my/mindmap-hydra
-  (:title "Mind Map" :quit-key "q" :separator "─")
-  ("Navigate"
-   (("p" mm/goto-parent       "parent"     :exit t)
-    ("c" mm/goto-child        "child"      :exit t)
-    ("s" mm/goto-sibling      "sibling"    :exit t)
-    ("r" mm/goto-root         "root"       :exit t))
-   "Position"
-   (("P" mm/assign-parent     "assign parent"  :exit t)
-    ("A" mm/assign-after      "place after"    :exit t)
-    ("B" mm/assign-between    "place between"  :exit t)
-    ("R" mm/make-root-interactive "make root"   :exit t)
-    ("!" mm/repack-all        "repack all"     :exit t))
-   "Status"
-   (("a" mm/--status-active     "set active"     :exit t)
-    ("d" mm/--status-deprecated "set deprecated" :exit t)
-    ("x" mm/--status-archived   "set archived"   :exit t))
-   "View"
-   (("m" mm/map-display       "map display"    :exit t)
-    ("g" mm/group-display     "group display"  :exit t)
-    ("j" mm/export-json       "export JSON"    :exit t)
-    ("i" mm/init              "init vault"     :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/mindmap-hydra nil "Mind Map" (my/main-hydra/body "main menu")
+  "Navigate"
+  (("p" mm/goto-parent       "parent"     :exit t)
+   ("c" mm/goto-child        "child"      :exit t)
+   ("s" mm/goto-sibling      "sibling"    :exit t)
+   ("r" mm/goto-root         "root"       :exit t))
+  "Position"
+  (("P" mm/assign-parent     "assign parent"  :exit t)
+   ("A" mm/assign-after      "place after"    :exit t)
+   ("B" mm/assign-between    "place between"  :exit t)
+   ("R" mm/make-root-interactive "make root"   :exit t)
+   ("!" mm/repack-all        "repack all"     :exit t))
+  "Status"
+  (("a" mm/--status-active     "set active"     :exit t)
+   ("d" mm/--status-deprecated "set deprecated" :exit t)
+   ("x" mm/--status-archived   "set archived"   :exit t))
+  "View"
+  (("m" mm/map-display       "map display"    :exit t)
+   ("g" mm/group-display     "group display"  :exit t)
+   ("j" mm/export-json       "export JSON"    :exit t)
+   ("i" mm/init              "init vault"     :exit t)))
 #+end_src
 
 ** SPC a — Avy
 #+begin_src emacs-lisp
-(pretty-hydra-define my/avy-hydra
-  (:title "Avy" :quit-key "q" :separator "─")
-  ("Submenus"
-   (("c" my/avy-char-hydra/body "char"      :exit t)
-    ("w" my/avy-word-hydra/body "word/line" :exit t)
-    ("k" my/avy-kill-hydra/body "copy/kill" :exit t)
-    ("m" my/avy-move-hydra/body "move"      :exit t)
-    ("z" my/avy-zap-hydra/body  "zap"       :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
-(pretty-hydra-define my/avy-char-hydra
-  (:title "Avy › Char" :quit-key "q" :separator "─")
-  ("Char"
-   (("a" avy-goto-char-timer "char timer" :exit t)
-    ("o" avy-goto-char       "char"       :exit t)
-    ("e" avy-goto-char-2     "char 2"     :exit t))
-   "Back"
-   (("SPC" my/avy-hydra/body "avy" :exit t))))
-(pretty-hydra-define my/avy-word-hydra
-  (:title "Avy › Word / Line" :quit-key "q" :separator "─")
-  ("Word / Line"
-   (("u" avy-goto-word-1      "word (1 char)"  :exit t)
-    ("i" avy-goto-word-0      "word (0 chars)" :exit t)
-    ("d" avy-goto-line        "line"           :exit t)
-    ("h" avy-goto-end-of-line "end of line"    :exit t))
-   "Back"
-   (("SPC" my/avy-hydra/body "avy" :exit t))))
-(pretty-hydra-define my/avy-kill-hydra
-  (:title "Avy › Copy / Kill" :quit-key "q" :separator "─")
-  ("Copy / Kill"
-   (("t" avy-copy-line             "copy line"      :exit t)
-    ("n" avy-copy-region           "copy region"    :exit t)
-    ("s" avy-kill-ring-save-region "kill ring save" :exit t)
-    ("S" avy-kill-region           "kill region"    :exit t))
-   "Back"
-   (("SPC" my/avy-hydra/body "avy" :exit t))))
-(pretty-hydra-define my/avy-move-hydra
-  (:title "Avy › Move" :quit-key "q" :separator "─")
-  ("Move"
-   (("t" avy-move-line   "move line"   :exit t)
-    ("n" avy-move-region "move region" :exit t))
-   "Back"
-   (("SPC" my/avy-hydra/body "avy" :exit t))))
-(pretty-hydra-define my/avy-zap-hydra
-  (:title "Avy › Zap" :quit-key "q" :separator "─")
-  ("Zap"
-   (("z" my/avy-zap-to-char-inclusive "zap to char" :exit t))
-   "Back"
-   (("SPC" my/avy-hydra/body "avy" :exit t))))
+(my/defhydra-state my/avy-hydra nil "Avy" (my/main-hydra/body "main menu")
+  "Submenus"
+  (("c" my/avy-char-hydra/body "char"      :exit t)
+   ("w" my/avy-word-hydra/body "word/line" :exit t)
+   ("k" my/avy-kill-hydra/body "copy/kill" :exit t)
+   ("m" my/avy-move-hydra/body "move"      :exit t)
+   ("z" my/avy-zap-hydra/body  "zap"       :exit t)))
+(my/defhydra-state my/avy-char-hydra nil "Avy › Char" (my/avy-hydra/body "avy")
+  "Char"
+  (("a" avy-goto-char-timer "char timer" :exit t)
+   ("o" avy-goto-char       "char"       :exit t)
+   ("e" avy-goto-char-2     "char 2"     :exit t)))
+(my/defhydra-state my/avy-word-hydra nil "Avy › Word / Line" (my/avy-hydra/body "avy")
+  "Word / Line"
+  (("u" avy-goto-word-1      "word (1 char)"  :exit t)
+   ("i" avy-goto-word-0      "word (0 chars)" :exit t)
+   ("d" avy-goto-line        "line"           :exit t)
+   ("h" avy-goto-end-of-line "end of line"    :exit t)))
+(my/defhydra-state my/avy-kill-hydra nil "Avy › Copy / Kill" (my/avy-hydra/body "avy")
+  "Copy / Kill"
+  (("t" avy-copy-line             "copy line"      :exit t)
+   ("n" avy-copy-region           "copy region"    :exit t)
+   ("s" avy-kill-ring-save-region "kill ring save" :exit t)
+   ("S" avy-kill-region           "kill region"    :exit t)))
+(my/defhydra-state my/avy-move-hydra nil "Avy › Move" (my/avy-hydra/body "avy")
+  "Move"
+  (("t" avy-move-line   "move line"   :exit t)
+   ("n" avy-move-region "move region" :exit t)))
+(my/defhydra-state my/avy-zap-hydra nil "Avy › Zap" (my/avy-hydra/body "avy")
+  "Zap"
+  (("z" my/avy-zap-to-char-inclusive "zap to char" :exit t)))
 #+end_src
 
 ** SPC o — Org
 #+begin_src emacs-lisp
-(pretty-hydra-define my/org-hydra
-  (:title "Org" :quit-key "q" :separator "─")
-  ("Submenus"
-   (("a" my/org-agenda-hydra/body  "agenda"   :exit t)
-    ("t" my/org-tasks-hydra/body   "tasks"    :exit t)
-    ("k" my/org-clock-hydra/body   "clock"    :exit t)
-    ("e" my/org-edit-hydra/body    "edit"     :exit t)
-    ("c" my/org-capture-hydra/body "capture"  :exit t)
-    ("v" my/org-manifolding-atlas-hydra/body  "manifolding-atlas"   :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
-(pretty-hydra-define my/org-agenda-hydra
-  (:title "Org › Agenda" :quit-key "q" :separator "─")
-  ("Agenda"
-   (("a" org-agenda          "agenda"         :exit t)
-    ("o" consult-org-heading "org heading"    :exit t)
-    ("e" consult-org-agenda  "agenda consult" :exit t))
-   "Back"
-   (("SPC" my/org-hydra/body "org" :exit t))))
-(pretty-hydra-define my/org-tasks-hydra
-  (:title "Org › Tasks" :quit-key "q" :separator "─")
-  ("Tasks"
-   (("t" org-todo                  "todo"         :exit t)
-    ("n" consult-todo              "consult todo" :exit t)
-    ("h" my/org-insert-level1-todo "new TODO h1"  :exit t)
-    ("r" org-priority              "priority"     :exit t)
-    ("s" org-schedule              "schedule"     :exit t)
-    ("x" org-deadline              "deadline"     :exit t)
-    ("f" org-refile                "refile"       :exit t))
-   "Back"
-   (("SPC" my/org-hydra/body "org" :exit t))))
-(pretty-hydra-define my/org-clock-hydra
-  (:title "Org › Clock" :quit-key "q" :separator "─")
-  ("Clock"
-   (("k" org-clock-in  "clock in"  :exit t)
-    ("K" org-clock-out "clock out" :exit t))
-   "Back"
-   (("SPC" my/org-hydra/body "org" :exit t))))
-(pretty-hydra-define my/org-edit-hydra
-  (:title "Org › Edit" :quit-key "q" :separator "─")
-  ("Edit"
-   (("u" org-insert-heading            "new heading"   :exit t)
-    ("i" comment-line                  "comment"       :exit t)
-    ("d" org-insert-structure-template "template"      :exit t)
-    ("Q" my/org-insert-code-block      "code block"    :exit t)
-    ("x" my/org-insert-latex-block     "latex block"   :exit t)
-    ("v" org-cycle-global              "cycle all"     :exit t)
-    ("l" org-insert-link               "insert link"   :exit t)
-    ("o" org-open-at-point             "open link"     :exit t)
-    ("g" org-set-tags-command          "set tags"      :exit t)
-    ("w" org-narrow-to-subtree         "narrow"        :exit t)
-    ("W" widen                         "widen"         :exit t)
-    ("L" org-latex-preview             "latex preview" :exit t)
-    ("c" org-capture                   "capture"       :exit t))
-   "Back"
-   (("SPC" my/org-hydra/body "org" :exit t))))
-(pretty-hydra-define my/org-capture-hydra
-  (:title "Org › Capture" :quit-key "q" :separator "─")
-  ("Capture"
-   (("n" (lambda () (interactive) (org-capture nil "vn")) "manifolding-atlas note"  :exit t)
-    ("h" my/manifolding-atlas-capture-heading              "heading"      :exit t)
-    ("t" (lambda () (interactive) (org-capture nil "t"))  "task"         :exit t)
-    ("c" org-capture                                       "capture menu" :exit t))
-   "Back"
-   (("SPC" my/org-hydra/body "org" :exit t))))
-(pretty-hydra-define my/org-manifolding-atlas-hydra
-  (:title "Org › Manifolding Atlas" :quit-key "q" :separator "─")
-   ("Manifolding Atlas"
-    (("f" manifolding-atlas-find              "find note"    :exit t)
-     ("i" manifolding-atlas-insert            "insert link"  :exit t)
-     ("r" my/manifolding-atlas-rename-link    "rename link"  :exit t)
-     ("u" manifolding-atlas-ui-sidebar-toggle "sidebar"      :exit t))
-    "Back"
-    (("SPC" my/org-hydra/body "org" :exit t))))
+(my/defhydra-state my/org-hydra nil "Org" (my/main-hydra/body "main menu")
+  "Submenus"
+  (("a" my/org-agenda-hydra/body  "agenda"   :exit t)
+   ("t" my/org-tasks-hydra/body   "tasks"    :exit t)
+   ("k" my/org-clock-hydra/body   "clock"    :exit t)
+   ("e" my/org-edit-hydra/body    "edit"     :exit t)
+   ("c" my/org-capture-hydra/body "capture"  :exit t)
+   ("v" my/org-manifolding-atlas-hydra/body  "manifolding-atlas"   :exit t)))
+(my/defhydra-state my/org-agenda-hydra nil "Org › Agenda" (my/org-hydra/body "org")
+  "Agenda"
+  (("a" org-agenda          "agenda"         :exit t)
+   ("o" consult-org-heading "org heading"    :exit t)
+   ("e" consult-org-agenda  "agenda consult" :exit t)))
+(my/defhydra-state my/org-tasks-hydra nil "Org › Tasks" (my/org-hydra/body "org")
+  "Tasks"
+  (("t" org-todo                  "todo"         :exit t)
+   ("n" consult-todo              "consult todo" :exit t)
+   ("h" my/org-insert-level1-todo "new TODO h1"  :exit t)
+   ("r" org-priority              "priority"     :exit t)
+   ("s" org-schedule              "schedule"     :exit t)
+   ("x" org-deadline              "deadline"     :exit t)
+   ("f" org-refile                "refile"       :exit t)))
+(my/defhydra-state my/org-clock-hydra nil "Org › Clock" (my/org-hydra/body "org")
+  "Clock"
+  (("k" org-clock-in  "clock in"  :exit t)
+   ("K" org-clock-out "clock out" :exit t)))
+(my/defhydra-state my/org-edit-hydra nil "Org › Edit" (my/org-hydra/body "org")
+  "Edit"
+  (("u" org-insert-heading            "new heading"   :exit t)
+   ("i" comment-line                  "comment"       :exit t)
+   ("d" org-insert-structure-template "template"      :exit t)
+   ("Q" my/org-insert-code-block      "code block"    :exit t)
+   ("x" my/org-insert-latex-block     "latex block"   :exit t)
+   ("v" org-cycle-global              "cycle all"     :exit t)
+   ("l" org-insert-link               "insert link"   :exit t)
+   ("o" org-open-at-point             "open link"     :exit t)
+   ("g" org-set-tags-command          "set tags"      :exit t)
+   ("w" org-narrow-to-subtree         "narrow"        :exit t)
+   ("W" widen                         "widen"         :exit t)
+   ("L" org-latex-preview             "latex preview" :exit t)
+   ("c" org-capture                   "capture"       :exit t)))
+(my/defhydra-state my/org-capture-hydra nil "Org › Capture" (my/org-hydra/body "org")
+  "Capture"
+  (("n" (lambda () (interactive) (org-capture nil "vn")) "manifolding-atlas note"  :exit t)
+   ("h" my/manifolding-atlas-capture-heading              "heading"      :exit t)
+   ("t" (lambda () (interactive) (org-capture nil "t"))  "task"         :exit t)
+   ("c" org-capture                                       "capture menu" :exit t)))
+(my/defhydra-state my/org-manifolding-atlas-hydra nil "Org › Manifolding Atlas" (my/org-hydra/body "org")
+  "Manifolding Atlas"
+  (("f" manifolding-atlas-find              "find note"    :exit t)
+   ("i" manifolding-atlas-insert            "insert link"  :exit t)
+   ("r" my/manifolding-atlas-rename-link    "rename link"  :exit t)
+   ("u" manifolding-atlas-ui-sidebar-toggle "sidebar"      :exit t)))
 #+end_src
 
 ** SPC g — Git
 #+begin_src emacs-lisp
-(pretty-hydra-define my/git-hydra
-  (:title "Git" :quit-key "q" :separator "─")
-  ("Magit"
-   (("s" magit-status            "status"      :exit t)
-    ("l" magit-log-current       "log"         :exit t)
-    ("d" magit-diff-working-tree "diff"        :exit t)
-    ("c" magit-commit            "commit"      :exit t)
-    ("p" magit-push              "push"        :exit t)
-    ("f" magit-fetch             "fetch"       :exit t)
-    ("F" magit-pull              "pull"        :exit t)
-    ("b" magit-branch            "branch"      :exit t)
-    ("r" magit-rebase            "rebase"      :exit t)
-    ("z" magit-stash             "stash"       :exit t)
-    ("m" magit-merge             "merge"       :exit t)
-    ("B" magit-blame             "blame"       :exit t))
-   "File"
-   (("t" git-timemachine             "timemachine" :exit t)
-    ("M" git-messenger:popup-message "messenger"   :exit t)
-    ("L" git-link                    "copy link"   :exit t)
-    ("g" git-gutter:toggle           "gutter"      :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/git-hydra nil "Git" (my/main-hydra/body "main menu")
+  "Magit"
+  (("s" magit-status            "status"      :exit t)
+   ("l" magit-log-current       "log"         :exit t)
+   ("d" magit-diff-working-tree "diff"        :exit t)
+   ("c" magit-commit            "commit"      :exit t)
+   ("p" magit-push              "push"        :exit t)
+   ("f" magit-fetch             "fetch"       :exit t)
+   ("F" magit-pull              "pull"        :exit t)
+   ("b" magit-branch            "branch"      :exit t)
+   ("r" magit-rebase            "rebase"      :exit t)
+   ("z" magit-stash             "stash"       :exit t)
+   ("m" magit-merge             "merge"       :exit t)
+   ("B" magit-blame             "blame"       :exit t))
+  "File"
+  (("t" git-timemachine             "timemachine" :exit t)
+   ("M" git-messenger:popup-message "messenger"   :exit t)
+   ("L" git-link                    "copy link"   :exit t)
+   ("g" git-gutter:toggle           "gutter"      :exit t)))
 #+end_src
 
 ** SPC b — Browse
 #+begin_src emacs-lisp
-(pretty-hydra-define my/browse-hydra
-  (:title "Browse" :quit-key "q" :separator "─")
-  ("eww"
-   (("o" eww                    "open url"      :exit t)
-    ("b" eww-list-bookmarks     "bookmarks"     :exit t)
-    ("h" eww-list-histories     "history"       :exit t)
-    ("r" eww-reload             "reload"        :exit t)
-    ("n" eww-forward-url        "forward"       :exit t)
-    ("p" eww-back-url           "back"          :exit t)
-    ("d" eww-download           "download"      :exit t)
-    ("c" eww-copy-page-url      "copy url"      :exit t)
-    ("s" eww-switch-to-buffer   "switch buffer" :exit t)
-    ("S" eww-list-buffers       "list buffers"  :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/browse-hydra nil "Browse" (my/main-hydra/body "main menu")
+  "eww"
+  (("o" eww                    "open url"      :exit t)
+   ("b" eww-list-bookmarks     "bookmarks"     :exit t)
+   ("h" eww-list-histories     "history"       :exit t)
+   ("r" eww-reload             "reload"        :exit t)
+   ("n" eww-forward-url        "forward"       :exit t)
+   ("p" eww-back-url           "back"          :exit t)
+   ("d" eww-download           "download"      :exit t)
+   ("c" eww-copy-page-url      "copy url"      :exit t)
+   ("s" eww-switch-to-buffer   "switch buffer" :exit t)
+   ("S" eww-list-buffers       "list buffers"  :exit t)))
 #+end_src
 
 ** SPC d — Dev
 #+begin_src emacs-lisp
-(pretty-hydra-define my/literate-hydra
-  (:title "Dev" :quit-key "q" :separator "─")
-  ("Submenus"
-   (("c" my/literate-config-hydra/body "config" :exit t)
-    ("d" my/literate-debug-hydra/body  "debug"  :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
-(pretty-hydra-define my/literate-debug-hydra
-  (:title "Dev › Debug" :quit-key "q" :separator "─")
-  ("Debug"
-   (("h" helpful-callable     "helpful fn"    :exit t)
-    ("H" helpful-variable     "helpful var"   :exit t)
-    ("K" helpful-key          "helpful key"   :exit t)
-    ("r" elisp-refs-function  "refs fn"       :exit t)
-    ("R" elisp-refs-variable  "refs var"      :exit t)
-    ("m" macrostep-expand     "macrostep"     :exit t)
-    ("p" esup                 "profile start" :exit t)
-    ("b" bug-hunter-init-file "bug hunt init" :exit t)
-    ("B" bug-hunter-file      "bug hunt file" :exit t))
-   "Back"
-   (("SPC" my/literate-hydra/body "dev" :exit t))))
-(pretty-hydra-define my/literate-config-hydra
-  (:title "Dev › Config" :quit-key "q" :separator "─")
-  ("Config"
-   (("l" literate-config-load            "load"           :exit t)
-    ("s" literate-config-status          "status"         :exit t)
-    ("e" literate-config-errors          "errors"         :exit t)
-    ("d" (lambda () (interactive) (my/dired-here)) "modules dir"   :exit t)
-    ("k" (lambda () (interactive) (my/find-file (expand-file-name "Manifolding-Emacs/modules/keyboard.org" user-emacs-directory))) "keyboard.org" :exit t))
-   "Manifold"
-   (("r" manifolding-emacs-reload        "reload all"     :exit t)
-    ("c" manifolding-emacs-reload-current-buffer "reload buf" :exit t)
-    ("m" (lambda () (interactive) (switch-to-buffer "*Manifolding-Emacs*")) "splash" :exit t)
-    ("R" (lambda () (interactive) (start-process "restart-emacs" nil "herd" "restart" "emacs-daemon")) "restart server" :exit t))
-   "Buffers"
-   (("o" my/kill-orphaned-buffers        "kill orphaned"  :exit t)
-    ("a" my/kill-all-buffers             "kill all"       :exit t))
-   "Back"
-    (("SPC" my/literate-hydra/body "dev" :exit t))))
+(my/defhydra-state my/literate-hydra nil "Dev" (my/main-hydra/body "main menu")
+  "Submenus"
+  (("c" my/literate-config-hydra/body "config" :exit t)
+   ("d" my/literate-debug-hydra/body  "debug"  :exit t)))
+(my/defhydra-state my/literate-debug-hydra nil "Dev › Debug" (my/literate-hydra/body "dev")
+  "Debug"
+  (("h" helpful-callable     "helpful fn"    :exit t)
+   ("H" helpful-variable     "helpful var"   :exit t)
+   ("K" helpful-key          "helpful key"   :exit t)
+   ("r" elisp-refs-function  "refs fn"       :exit t)
+   ("R" elisp-refs-variable  "refs var"      :exit t)
+   ("m" macrostep-expand     "macrostep"     :exit t)
+   ("p" esup                 "profile start" :exit t)
+   ("b" bug-hunter-init-file "bug hunt init" :exit t)
+   ("B" bug-hunter-file      "bug hunt file" :exit t)))
+(my/defhydra-state my/literate-config-hydra nil "Dev › Config" (my/literate-hydra/body "dev")
+  "Config"
+  (("l" literate-config-load            "load"           :exit t)
+   ("s" literate-config-status          "status"         :exit t)
+   ("e" literate-config-errors          "errors"         :exit t)
+   ("d" (lambda () (interactive) (my/dired-here)) "modules dir"   :exit t)
+   ("k" (lambda () (interactive) (my/find-file (expand-file-name "Manifolding-Emacs/modules/manifolding-keyboard.org" user-emacs-directory))) "keyboard" :exit t))
+  "Manifold"
+  (("r" manifolding-emacs-reload        "reload all"     :exit t)
+   ("c" manifolding-emacs-reload-current-buffer "reload buf" :exit t)
+   ("m" (lambda () (interactive) (switch-to-buffer "*Manifolding-Emacs*")) "splash" :exit t)
+   ("R" (lambda () (interactive) (start-process "restart-emacs" nil "herd" "restart" "emacs-daemon")) "restart server" :exit t))
+  "Buffers"
+  (("o" my/kill-orphaned-buffers        "kill orphaned"  :exit t)
+   ("a" my/kill-all-buffers             "kill all"       :exit t)))
 #+end_src
 
 ** SPC w — Windows
 #+begin_src emacs-lisp
-(pretty-hydra-define my/windows-hydra
-  (:title "Windows" :quit-key "q" :separator "─")
-  ("Navigate"
-   (("h" windmove-left   "left"   :exit nil)
-    ("t" windmove-right  "right"  :exit nil)
-    ("n" windmove-down   "down"   :exit nil)
-    ("s" windmove-up     "up"     :exit nil)
-    ("b" consult-buffer   "buffer" :exit t))
-   "Split / Delete"
-   (("|" my/split-window-right   "split right"   :exit nil)
-    ("-" my/split-window-below   "split below"   :exit nil)
-    ("d" my/delete-current-window "delete"        :exit nil)
-    ("D" delete-other-windows     "delete others" :exit nil))
-   "Resize"
-   (("[" my/shrink-window-horizontally "shrink ←"  :exit nil)
-    ("]" my/enlarge-window-horizontally "grow →"    :exit nil)
-    ("{" my/shrink-window              "shrink ↑"  :exit nil)
-    ("}" my/enlarge-window             "grow ↓"    :exit nil))
-   "Move"
-   (("H" buf-move-left    "move ←"  :exit nil)
-    ("T" buf-move-right   "move →"  :exit nil)
-    ("N" buf-move-down    "move ↓"  :exit nil)
-    ("S" buf-move-up      "move ↑"  :exit nil))
-   "Swap"
-   (("p" (lambda () (interactive) (my/swap-windows-left 1)) "swap ←" :exit nil)
-    ("P" (lambda () (interactive) (my/swap-windows-left 2)) "swap 2←" :exit nil)
-    ("f" (lambda () (interactive) (my/swap-windows-right 1)) "swap →" :exit nil)
-    ("F" (lambda () (interactive) (my/swap-windows-right 2)) "swap 2→" :exit nil))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/windows-hydra nil "Windows" (my/main-hydra/body "main menu")
+  "Navigate"
+  (("h" windmove-left   "left"   :exit nil)
+   ("t" windmove-right  "right"  :exit nil)
+   ("n" windmove-down   "down"   :exit nil)
+   ("s" windmove-up     "up"     :exit nil)
+   ("b" consult-buffer   "buffer" :exit t))
+  "Split / Delete"
+  (("|" my/split-window-right   "split right"   :exit nil)
+   ("-" my/split-window-below   "split below"   :exit nil)
+   ("d" my/delete-current-window "delete"        :exit nil)
+   ("D" delete-other-windows     "delete others" :exit nil))
+  "Resize"
+  (("[" my/shrink-window-horizontally "shrink ←"  :exit nil)
+   ("]" my/enlarge-window-horizontally "grow →"    :exit nil)
+   ("{" my/shrink-window              "shrink ↑"  :exit nil)
+   ("}" my/enlarge-window             "grow ↓"    :exit nil))
+  "Move"
+  (("H" buf-move-left    "move ←"  :exit nil)
+   ("T" buf-move-right   "move →"  :exit nil)
+   ("N" buf-move-down    "move ↓"  :exit nil)
+   ("S" buf-move-up      "move ↑"  :exit nil))
+  "Swap"
+  (("p" (lambda () (interactive) (my/swap-windows-left 1)) "swap ←" :exit nil)
+   ("P" (lambda () (interactive) (my/swap-windows-left 2)) "swap 2←" :exit nil)
+   ("f" (lambda () (interactive) (my/swap-windows-right 1)) "swap →" :exit nil)
+   ("F" (lambda () (interactive) (my/swap-windows-right 2)) "swap 2→" :exit nil)))
 #+end_src
 
 ** SPC i — Tabs
 #+begin_src emacs-lisp
-(pretty-hydra-define my/tabs-hydra
-  (:title "Tabs" :quit-key "q" :separator "─")
-  ("Navigate"
-   (("t" my/tab-bar-switch-to-recent-tab "recent"  :exit nil)
-    ("n" tab-bar-switch-to-next          "next"    :exit nil)
-    ("p" tab-bar-switch-to-tab           "prev"    :exit nil))
-   "Create / Close"
-   (("c" tab-bar-new-tab       "new tab"    :exit nil)
-    ("d" my/tab-bar-close-tab-by-name "close tab"   :exit nil)
-    ("C" tab-bar-close-other-tabs "close others" :exit nil))
-   "Manage"
-   (("r" tab-bar-rename-tab    "rename"     :exit nil)
-    ("b" my/tab-bar-echo-tab-names "list tabs" :exit nil)
-    ("m" tab-bar-move-tab      "move tab"   :exit nil))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/tabs-hydra nil "Tabs" (my/main-hydra/body "main menu")
+  "Navigate"
+  (("t" my/tab-bar-switch-to-recent-tab "recent"  :exit nil)
+   ("n" tab-bar-switch-to-next          "next"    :exit nil)
+   ("p" tab-bar-switch-to-tab           "prev"    :exit nil))
+  "Create / Close"
+  (("c" tab-bar-new-tab       "new tab"    :exit nil)
+   ("d" my/tab-bar-close-tab-by-name "close tab"   :exit nil)
+   ("C" tab-bar-close-other-tabs "close others" :exit nil))
+  "Manage"
+  (("r" tab-bar-rename-tab    "rename"     :exit nil)
+   ("b" my/tab-bar-echo-tab-names "list tabs" :exit nil)
+   ("m" tab-bar-move-tab      "move tab"   :exit nil)))
 #+end_src
 
 ** SPC h — Buffers
 #+begin_src emacs-lisp
-(pretty-hydra-define my/buffers-hydra
-  (:title "Buffers" :quit-key "q" :separator "─")
-  ("Buffer Management"
-   (("b" consult-buffer          "buffer list"  :exit t)
-    ("i" ibuffer                "ibuffer"      :exit t)
-    ("x" kill-current-buffer    "kill current" :exit t))
-   "Window Layout"
-   (("n" my/ibuffer-avy-visit   "avy visit"    :exit t)
-    ("f" my/ibuffer-avy-visit-other "avy other" :exit t)
-    ("m" my/ibuffer-open-dwim   "open dwim"    :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/buffers-hydra nil "Buffers" (my/main-hydra/body "main menu")
+  "Buffer Management"
+  (("b" consult-buffer          "buffer list"  :exit t)
+   ("i" ibuffer                "ibuffer"      :exit t)
+   ("x" kill-current-buffer    "kill current" :exit t))
+  "Window Layout"
+  (("n" my/ibuffer-avy-visit   "avy visit"    :exit t)
+   ("f" my/ibuffer-avy-visit-other "avy other" :exit t)
+   ("m" my/ibuffer-open-dwim   "open dwim"    :exit t)))
 #+end_src
 
 ** SPC t — Bookmarks
 #+begin_src emacs-lisp
-(pretty-hydra-define my/bookmarks-hydra
-  (:title "Bookmarks" :quit-key "q" :separator "─")
-  ("Bookmarks"
-   (("b" consult-bookmarks      "list"      :exit t)
-    ("s" bookmark-set           "set"       :exit t)
-    ("d" bookmark-delete        "delete"    :exit t)
-    ("r" bookmark-rename        "rename"    :exit t)
-    ("l" bookmark-load          "load file" :exit t)
-    ("w" bookmark-write         "save file" :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/bookmarks-hydra nil "Bookmarks" (my/main-hydra/body "main menu")
+  "Bookmarks"
+  (("b" consult-bookmarks      "list"      :exit t)
+   ("s" bookmark-set           "set"       :exit t)
+   ("d" bookmark-delete        "delete"    :exit t)
+   ("r" bookmark-rename        "rename"    :exit t)
+   ("l" bookmark-load          "load file" :exit t)
+   ("w" bookmark-write         "save file" :exit t)))
 #+end_src
 
 ** SPC n — Files
 #+begin_src emacs-lisp
-(pretty-hydra-define my/files-hydra
-  (:title "Files" :quit-key "q" :separator "─")
-  ("Find / Open"
-   (("f" find-file              "find file"        :exit t)
-    ("r" consult-recent-file    "recent files"     :exit t)
-    ("p" find-file-other-project "other project"   :exit t)
-    ("o" (lambda () (interactive) (find-file (my/last-org))) "last org file" :exit t)
-    ("e" (lambda () (interactive) (find-file (my/last-elisp))) "last elisp file" :exit t))
-   "Manage"
-   (("R" revert-buffer          "revert"     :exit t)
-    ("s" my/save-all            "save all"   :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/files-hydra nil "Files" (my/main-hydra/body "main menu")
+  "Find / Open"
+  (("f" find-file              "find file"        :exit t)
+   ("r" consult-recent-file    "recent files"     :exit t)
+   ("p" find-file-other-project "other project"   :exit t)
+   ("o" (lambda () (interactive) (find-file (my/last-org))) "last org file" :exit t)
+   ("e" (lambda () (interactive) (find-file (my/last-elisp))) "last elisp file" :exit t))
+  "Manage"
+  (("R" revert-buffer          "revert"     :exit t)
+   ("s" my/save-all            "save all"   :exit t)))
 #+end_src
 
 ** SPC r — Registers
 #+begin_src emacs-lisp
-(pretty-hydra-define my/registers-hydra
-  (:title "Registers" :quit-key "q" :separator "─")
-  ("Registers"
-   (("l" point-to-register     "store position" :exit t)
-    ("j" jump-to-register      "jump"           :exit t)
-    ("n" number-to-register    "store number"   :exit t)
-    ("f" frame-configuration-to-register "store frame" :exit t)
-    ("w" window-configuration-to-register "store window" :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/registers-hydra nil "Registers" (my/main-hydra/body "main menu")
+  "Registers"
+  (("l" point-to-register     "store position" :exit t)
+   ("j" jump-to-register      "jump"           :exit t)
+   ("n" number-to-register    "store number"   :exit t)
+   ("f" frame-configuration-to-register "store frame" :exit t)
+   ("w" window-configuration-to-register "store window" :exit t)))
 #+end_src
 
 ** SPC s — Select
 #+begin_src emacs-lisp
-(pretty-hydra-define my/select-hydra
-  (:title "Select" :quit-key "q" :separator "─")
-  ("Selection"
-   (("s" mark-sexp             "sexp"     :exit nil)
-    ("d" mark-defun            "defun"    :exit nil)
-    ("p" mark-paragraph        "para"     :exit nil)
-    ("h" mark-whole-buffer     "buffer"   :exit nil)
-    ("l" er/mark-method-body  "method"   :exit nil))
-   "Edit Selected"
-   (("c" my/copy-sexp-at-point  "copy"     :exit nil)
-    ("x" my/delete-sexp-at-point "kill"    :exit nil)
-    ("y" my/yank-sexp-at-point "yank"     :exit nil)
-    ("e" eval-region           "eval"     :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/select-hydra nil "Select" (my/main-hydra/body "main menu")
+  "Selection"
+  (("s" mark-sexp             "sexp"     :exit nil)
+   ("d" mark-defun            "defun"    :exit nil)
+   ("p" mark-paragraph        "para"     :exit nil)
+   ("h" mark-whole-buffer     "buffer"   :exit nil)
+   ("l" er/mark-method-body  "method"   :exit nil))
+  "Edit Selected"
+  (("c" my/copy-sexp-at-point  "copy"     :exit nil)
+   ("x" my/delete-sexp-at-point "kill"    :exit nil)
+   ("y" my/yank-sexp-at-point "yank"     :exit nil)
+   ("e" eval-region           "eval"     :exit t)))
 #+end_src
 
 ** SPC e — Activities
 #+begin_src emacs-lisp
-(pretty-hydra-define my/activities-hydra
-  (:title "Activities" :quit-key "q" :separator "─")
-  ("Activities"
-   (("a" activities-new            "new"      :exit t)
-    ("r" activities-resume         "resume"   :exit t)
-    ("s" activities-switch         "switch"   :exit t)
-    ("l" activities-list           "list"     :exit t)
-    ("d" activities-discard        "discard"  :exit t)
-    ("R" activities-rename         "rename"   :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/activities-hydra nil "Activities" (my/main-hydra/body "main menu")
+  "Activities"
+  (("a" activities-new            "new"      :exit t)
+   ("r" activities-resume         "resume"   :exit t)
+   ("s" activities-switch         "switch"   :exit t)
+   ("l" activities-list           "list"     :exit t)
+   ("d" activities-discard        "discard"  :exit t)
+   ("R" activities-rename         "rename"   :exit t)))
 #+end_src
 
 ** SPC x — Templates
 #+begin_src emacs-lisp
-(pretty-hydra-define my/templates-hydra
-  (:title "Templates" :quit-key "q" :separator "─")
-  ("Templates"
-   (("i" tempel-insert           "insert" :exit t)
-    ("I" tempel-complete         "complete" :exit t)
-    ("n" tempel-next             "next"   :exit nil)
-    ("p" tempel-previous         "prev"   :exit nil)
-    ("a" tempel-abort             "abort"  :exit t))
-   "Back"
-   (("SPC" my/main-hydra/body "main menu" :exit t))))
+(my/defhydra-state my/templates-hydra nil "Templates" (my/main-hydra/body "main menu")
+  "Templates"
+  (("i" tempel-insert           "insert" :exit t)
+   ("I" tempel-complete         "complete" :exit t)
+   ("n" tempel-next             "next"   :exit nil)
+   ("p" tempel-previous         "prev"   :exit nil)
+   ("a" tempel-abort             "abort"  :exit t)))
 #+end_src
