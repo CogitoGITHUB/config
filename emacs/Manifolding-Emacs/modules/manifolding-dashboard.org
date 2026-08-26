@@ -132,12 +132,12 @@ See `create-image' and Info node `(elisp)Image Descriptors'."
 
 ** Customization — icon toggles
 #+begin_src emacs-lisp
-(defcustom dashboard-set-heading-icons nil
+(defcustom dashboard-set-heading-icons t
   "When non nil, heading sections will have icons."
   :type 'boolean
   :group 'dashboard)
 
-(defcustom dashboard-set-file-icons nil
+(defcustom dashboard-set-file-icons t
   "When non nil, file lists will have icons."
   :type 'boolean
   :group 'dashboard)
@@ -156,15 +156,12 @@ See `create-image' and Info node `(elisp)Image Descriptors'."
 (make-obsolete-variable 'dashboard-set-footer
                         'dashboard-startupify-list "1.9.0")
 
-(defcustom dashboard-footer-messages
-  '("The one true editor, Emacs!"
-    "Who the hell uses VIM anyway? Go Evil!"
-    "Free as free speech, free as free Beer"
-    "Happy coding!"
-    "Vi Vi Vi, the editor of the beast"
-    "Welcome to the church of Emacs"
-    "While any text editor can save your files, only Emacs can save your soul"
-    "I showed you my source code, pls respond")
+(defcustom dashboard-footer-messages '("🌹 the manifold endures 🌹"
+                                        "🌹 every module a petal 🌹"
+                                        "🌹 sovereign and self-contained 🌹"
+                                        "🌹 per aspera ad astra 🌹"
+                                        "🌹 existence precedes essence 🌹"
+                                        "🌹 man is condemned to be free 🌹")
   "A list of messages, one of which dashboard chooses to display."
   :type '(repeat string)
   :group 'dashboard)
@@ -296,7 +293,7 @@ nerd-icons or (all-the-icons-faicon \"newspaper-o\") using all-the-icons."
 
 ** Customization — title, navigator, init info
 #+begin_src emacs-lisp
-(defcustom dashboard-banner-logo-title "Welcome to Emacs!"
+(defcustom dashboard-banner-logo-title "🌹 𝕸𝖆𝖓𝖎𝖋𝖔𝖑𝖉 🌹"
   "Specify the startup banner."
   :type 'string
   :group 'dashboard)
@@ -307,13 +304,20 @@ if `dashboard-startup-banner' is set to `ascii'."
   :type 'string
   :group 'dashboard)
 
-(defcustom dashboard-navigator-buttons nil
-  "Specify the navigator buttons.
-The format is: `icon title help action face prefix suffix`.
-
-Example:
-`((\"☆\" \"Star\" \"Show stars\" (lambda (&rest _)
-                                    (show-stars)) warning \"[\" \"]\"))"
+(defcustom dashboard-navigator-buttons
+      `(((nil "  Modules" "Open modules in Dired"
+          (lambda (&rest _)
+            (dired (expand-file-name "Manifolding-Emacs/modules"
+                                     user-emacs-directory))))
+         (nil "  Reload" "Reload literate config (C-c l l)"
+          (lambda (&rest _) (literate-config-load)))
+         (nil "  Status" "Show load status (C-c l s)"
+          (lambda (&rest _) (literate-config-status)))
+         (nil "  Errors" "Show load errors (C-c l e)"
+          (lambda (&rest _) (literate-config-errors)))
+         (nil "  Scratch" "Go to scratch buffer"
+          (lambda (&rest _) (switch-to-buffer "*scratch*")))))
+  "Navigator buttons shown under the banner."
   :type '(repeat (repeat (list string
                                string
                                string
@@ -530,7 +534,7 @@ Possible values for list-type are: `recents', `bookmarks', `projects',
   :type  '(alist :key-type symbol :value-type function)
   :group 'dashboard)
 
-(defcustom dashboard-projects-backend 'project-el
+(defcustom dashboard-projects-backend 'projectile
   "The package that supplies the list of recent projects.
 With the value `projectile', the projects widget uses the package
 projectile (available in MELPA).  With the value `project-el',
@@ -549,9 +553,13 @@ installed."
   :group 'dashboard)
 
 (defcustom dashboard-items
-  '((recents   . 5)
-    (bookmarks . 5)
-    (agenda    . 5))
+  '((manifold-clock   . 1)
+    (manifold-commands . 1)
+    (recents          . 10)
+    (bookmarks        . 10)
+    (registers        . 10)
+    (projects         . 10)
+    (manifold-sartre  . 1))
   "Association list of items to show in the startup buffer.
 Will be of the form `(list-type . list-size)'.
 If nil it is disabled.  Possible values for list-type are:
@@ -574,7 +582,12 @@ shortcut is disabled.  See `dashboard-items' for possible values of list-type.'"
   :type '(alist :key-type symbol :value-type string)
   :group 'dashboard)
 
-(defcustom dashboard-item-names nil
+(defcustom dashboard-item-names '(("Recent Files:"               . "🌹 Recently Opened:")
+                                   ("Bookmarks:"                  . "🌹 Marks:")
+                                   ("Registers:"                  . "🌹 Registers:")
+                                   ("Projects:"                   . "🌹 Projects:")
+                                   ("Agenda for the coming week:" . "🌹 Agenda:")
+                                   ("Sartre:"                     . "🌹 Sartre:"))
   "Association list of item heading names.
 When an item is nil or not present, the default name is used.
 Will be of the form `(default-name . new-name)'."
@@ -1975,7 +1988,7 @@ to compare."
 
 ** Main — customization
 #+begin_src emacs-lisp
-(defcustom dashboard-center-content nil
+(defcustom dashboard-center-content t
   "Whether to center content within the window."
   :type 'boolean
   :group 'dashboard)
@@ -1990,7 +2003,8 @@ to compare."
     dashboard-insert-newline
     dashboard-insert-banner-title
     dashboard-insert-newline
-    dashboard-insert-init-info
+    dashboard-insert-navigator
+    dashboard-insert-newline
     dashboard-insert-items
     dashboard-insert-newline
     dashboard-insert-footer)
@@ -2488,57 +2502,26 @@ See `dashboard-item-generators' for all items available."
 (provide 'dashboard)
 #+end_src
 
-* Configuration
+** Banner — vendored rose MANIFOLD art
+Lives here as a variable; no external banner file needed.
 #+begin_src emacs-lisp
-(setq dashboard-center-content t)
-(setq dashboard-startup-banner (expand-file-name "manifold-banner.txt" user-emacs-directory))
-(setq dashboard-banner-logo-title "🌹 𝕸𝖆𝖓𝖎𝖋𝖔𝖑𝖉 🌹")
-(setq dashboard-set-init-info nil)
-(setq dashboard-projects-backend 'projectile)
-(setq dashboard-items '((manifold-clock   . 1)
-                        (manifold-commands . 1)
-                        (recents          . 10)
-                        (bookmarks        . 10)
-                        (registers        . 10)
-                        (projects         . 10)
-                        (manifold-sartre  . 1)))
-(setq dashboard-set-heading-icons t)
-(setq dashboard-set-file-icons t)
-(setq dashboard-icon-type 'nerd-icons)
-(setq dashboard-item-names '(("Recent Files:"               . "🌹 Recently Opened:")
-                              ("Bookmarks:"                  . "🌹 Marks:")
-                              ("Registers:"                  . "🌹 Registers:")
-                              ("Projects:"                   . "🌹 Projects:")
-                              ("Agenda for the coming week:" . "🌹 Agenda:")
-                              ("Sartre:"                     . "🌹 Sartre:")))
-(setq dashboard-footer-messages '("🌹 the manifold endures 🌹"
-                                  "🌹 every module a petal 🌹"
-                                  "🌹 sovereign and self-contained 🌹"
-                                  "🌹 per aspera ad astra 🌹"
-                                  "🌹 existence precedes essence 🌹"
-                                  "🌹 man is condemned to be free 🌹"))
-(setq dashboard-navigator-buttons
-      `(((nil "  Modules" "Open modules in Dired"
-          (lambda (&rest _)
-            (dired "/home/aoeu/.emacs.d/modules")))
-         (nil "  Reload" "Reload literate config (C-c l l)"
-          (lambda (&rest _) (literate-config-load)))
-         (nil "  Status" "Show load status (C-c l s)"
-          (lambda (&rest _) (literate-config-status)))
-         (nil "  Errors" "Show load errors (C-c l e)"
-          (lambda (&rest _) (literate-config-errors)))
-         (nil "  Scratch" "Go to scratch buffer"
-          (lambda (&rest _) (switch-to-buffer "*scratch*"))))))
-(setq dashboard-startupify-list '(dashboard-insert-banner
-                                  dashboard-insert-newline
-                                  dashboard-insert-banner-title
-                                  dashboard-insert-newline
-                                  dashboard-insert-navigator
-                                  dashboard-insert-newline
-                                  dashboard-insert-items
-                                  dashboard-insert-newline
-                                  dashboard-insert-footer))
-(setq dashboard-items-default-length 20)
+(defvar manifold/banner-text
+  "🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹
+🌹                                                                      🌹
+🌹  ███╗   ███╗ █████╗ ███╗   ██╗██╗███████╗ ██████╗ ██╗     ██████╗    🌹
+🌹  ████╗ ████║██╔══██╗████╗  ██║██║██╔════╝██╔═══██╗██║     ██╔══██╗   🌹
+🌹  ██╔████╔██║███████║██╔██╗ ██║██║█████╗  ██║   ██║██║     ██║  ██║   🌹
+🌹  ██║╚██╔╝██║██╔══██║██║╚██╗██║██║██╔══╝  ██║   ██║██║     ██║  ██║   🌹
+🌹  ██║ ╚═╝ ██║██║  ██║██║ ╚████║██║██║     ╚██████╔╝███████╗██████╔╝   🌹
+🌹  ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝╚═╝      ╚═════╝ ╚══════╝╚═════╝    🌹
+🌹                                                                      🌹
+🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹🌹"
+  "The rose MANIFOLD banner.")
+#+end_src
+
+#+begin_src emacs-lisp
+(setq dashboard-banner-ascii manifold/banner-text)
+(setq dashboard-startup-banner 'ascii)
 #+end_src
 
 ** Mode hook & keys

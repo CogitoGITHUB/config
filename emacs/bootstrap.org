@@ -271,12 +271,55 @@ Must be here — manifolding-emacs-boot generates leaf forms.
 #+end_src
 
 ** Manifolding-Emacs
-The literate boot system.  Processes all modules/*.org.
+The literate boot system.  Its code lives as Org blocks in
+Manifolding-Emacs/manifolding-emacs.org — evaluated directly here,
+lexically, in document order.  Failures are LOUD: the loader is
+critical, never silent.
+
+The old lisp/manifolding-emacs/*.el files are retired; delete them
+after this path has proven itself for a few boots.
 
 #+begin_src emacs-lisp
-(mapc (lambda (d) (add-to-list 'load-path (expand-file-name d user-emacs-directory)))
-      '("lisp/" "lisp/manifolding-emacs/"))
-(require 'manifolding-emacs)
+(my/init-note "[init] loading literate loader…")
+
+(defun my/load-literate-loader (&optional file)
+  "Eval every emacs-lisp block in the loader Org, in order, lexically."
+  (let* ((file (or file
+                   (expand-file-name "Manifolding-Emacs/manifolding-emacs.org"
+                                     user-emacs-directory))))
+    (unless (file-exists-p file)
+      (error "[init] literate loader missing: %s" file))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (let ((tree (org-element-parse-buffer))
+            (n 0))
+        (org-element-map tree '(src-block headline)
+          (lambda (el)
+            (pcase (org-element-type el)
+              ('headline
+               (my/init-note
+                (format "[loader] %s"
+                        (or (org-element-property :raw-value el) "?"))))
+              ('src-block
+               (when (string= (org-element-property :language el)
+                              "emacs-lisp")
+                 (setq n (1+ n))
+                 (let ((pos 0) form)
+                   (with-temp-buffer
+                     (insert (org-element-property :value el))
+                     (goto-char (point-min))
+                     (condition-case err
+                         (while (setq form (read-from-string
+                                            (buffer-string) pos))
+                           (setq pos (cdr form))
+                           (eval (car form) t))
+                       (error
+                        (error "[loader] block %d failed: %s"
+                               n (error-message-string err))))))))))))))
+    (my/init-note (format "[init] loader ready (%d blocks)" n))))
+
+(add-to-list 'load-path (expand-file-name "lisp/" user-emacs-directory))
+(my/load-literate-loader)
 
 (my/init-note "[init] loader ready — booting modules…")
 
@@ -289,8 +332,10 @@ The literate boot system.  Processes all modules/*.org.
                     manifolding-emacs--boot-warnings)))
 
 (setq manifolding-emacs-package-method 'leaf
-      manifolding-emacs-org-directory (expand-file-name "modules" user-emacs-directory)
-      manifolding-emacs-output-directory (expand-file-name "manifolding-emacs" user-emacs-directory))
+      manifolding-emacs-org-directory
+      (expand-file-name "Manifolding-Emacs/modules" user-emacs-directory)
+      manifolding-emacs-output-directory
+      (expand-file-name "manifolding-emacs" user-emacs-directory))
 (setq inhibit-startup-screen t)
 (manifolding-emacs-boot)
 

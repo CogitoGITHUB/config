@@ -1,0 +1,73 @@
+#+title: Emacs Configuration — the map
+
+Everything in this directory is Org.  Elisp files are build
+artifacts or legacy leftovers, never the source of truth.
+
+* The map
+
+#+begin_example
+~/.config/emacs/
+├── bootstrap.org            ← the only real build step:
+│                              tangles to init.el / early-init.el
+├── init.el · early-init.el  ← GENERATED. Never edit by hand.
+├── Manifolding-Emacs/       ← the living configuration
+│   ├── loader.org           ← the package manager itself, as Org
+│   └── modules/             ← every feature, as Org (see its README)
+├── lisp/                    ← misc elisp + RETIRED loader artifacts
+│                              (lisp/manifolding-emacs/*.el — pending deletion)
+└── straight/                ← dependency checkouts (see straight.org)
+#+end_example
+
+* How boot works
+
+1. early-init.el sets frame/palette/modeline before any package.
+2. init.el: straight → latest Org → leaf → then a micro-evaluator
+   (~my/load-literate-loader~) evaluates
+   =Manifolding-Emacs/manifolding-emacs.org= block by block,
+   lexically, in order.  That Org *is* the package manager.
+3. =(manifolding-emacs-boot)= compiles every file under
+   =Manifolding-Emacs/modules/= (priority-sorted) with three-tier
+   error isolation, splash progress, and a CLEAN BOOT flash.
+
+If boot fails, the splash names the file/block.  Errors also land
+in =(manifolding-emacs-errors-list)= and can be filed to TODO.
+
+* Rules that keep this sane
+
+- Edit Org, never the generated .el files.  Regenerate via
+  =org-babel-tangle= on bootstrap.org after editing it.
+- Loader changes require a **full restart** (the loader cannot
+  reload itself while running).  Module changes only need
+  =M-x manifolding-emacs-reload= (=SPC d r=).
+- New elisp modules: add ~(require 'cl-lib)~-style prologues as
+  needed, mark vendored modules with ~#+property: header-args:emacs-lisp :lexical t~
+  when upstream expects lexical scope.
+- Run =python3 ~/.config/emacs/check-parens.py= after editing any
+  module.  BAD output includes exact depth traces.
+- Git commit after every working state.  There is no other safety
+  net.
+
+* Vendored packages (no straight)
+
+| Package   | Location                          | Origin                     |
+|-----------+-----------------------------------+----------------------------|
+| dashboard | Manifolding-Emacs/modules/manifolding-dashboard.org | emacs-dashboard/dashboard |
+| atlas     | Manifolding-Emacs/modules/manifolding-atlas/        | d12frosted/vulpea          |
+
+Their defaults are baked directly into defcustoms — there is no
+separate config layer.  To take an upstream update, diff
+straight/repos/<pkg> against the vendored blocks.
+
+* Per-directory details
+
+- [[file:Manifolding-Emacs/README.org][Manifolding-Emacs/README.org]] — loader + modules
+- [[file:Manifolding-Emacs/modules/README.org][modules/README.org]] — module authoring & conventions
+- Layer-specific rules live in =AGENTS.md= files (root,
+  Manifolding-Emacs/modules/, manifolding-atlas/…).
+
+* Operations
+
+: emacs --batch --load ~/.config/emacs/init.el --eval '(message "ok")'
+
+headless-boots the whole thing — use it before restarting the
+daemon after risky edits.

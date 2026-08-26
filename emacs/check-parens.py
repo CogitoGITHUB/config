@@ -1,19 +1,37 @@
 #!/usr/bin/env python3
+"""Paren/block hygiene checker for the literate config.
+
+Scans every emacs-lisp src block under the Org tree(s):
+  - Manifolding-Emacs/          (loader.org + all modules)
+  - bootstrap.org               (the init.el/early-init.el build step)
+
+BAD  = unbalanced block (depth != 0, extra ')', or unterminated block)
+BIG  = block over MAX_BLOCK_LINES code lines, unless the path matches
+       BIG_EXEMPT (upstream-atomic / vendored code kept whole on purpose).
+
+Exit status mirrors reality: CLEAN is only printed when bad_total == 0.
+"""
 import os
 import sys
 
-ROOT = os.path.expanduser(
-    "~/.config/emacs/modules/manifolding-atlas")
+EMACS_DIR = os.path.expanduser("~/.config/emacs")
+ROOTS = [
+    os.path.join(EMACS_DIR, "Manifolding-Emacs"),
+    os.path.join(EMACS_DIR, "bootstrap.org"),
+]
 MAX_BLOCK_LINES = 20
 
-# Vendored / doc files: still paren-checked, but never flagged BIG.
-# Their giant single blocks are upstream code or copy-paste examples.
+# Vendored / upstream-atomic / generated files: still paren-checked,
+# but never flagged BIG.  Their giant single blocks are upstream code
+# kept whole on purpose.
 BIG_EXEMPT = (
-    "/core/",
+    "/core/",                                # atlas vendored engine
     "/transclusion/transclusion.org",
     "/search/search.org",
     "/plugin-guide.org",
     "/contacts/contacts.org",
+    "/manifolding-dashboard.org",            # vendored emacs-dashboard
+    "/manifolding-emacs.org",                # the loader itself (atomic defuns)
 )
 
 
@@ -84,6 +102,19 @@ def scan_block(lines):
     return depth, first_neg_line, first_neg_col, trace
 
 
+def collect_files():
+    """Yield (display-rel-path, absolute-path) for every .org file."""
+    for root in ROOTS:
+        if os.path.isfile(root):
+            yield os.path.basename(root), root
+        elif os.path.isdir(root):
+            for dirpath, _dirnames, filenames in os.walk(root):
+                for fn in sorted(filenames):
+                    if fn.endswith(".org"):
+                        p = os.path.join(dirpath, fn)
+                        yield os.path.relpath(p, EMACS_DIR), p
+
+
 def main():
     argv = sys.argv[1:]
     show_big = "--big" in argv or "--all" in argv
@@ -91,15 +122,9 @@ def main():
     bad_total = 0
     big_total = 0
     block_total = 0
-    files = []
-    for dirpath, _dirnames, filenames in os.walk(ROOT):
-        for fn in sorted(filenames):
-            if fn.endswith(".org"):
-                files.append(os.path.join(dirpath, fn))
-    files.sort()
     big_lines = []
-    for path in files:
-        rel = os.path.relpath(path, ROOT)
+    files = sorted(collect_files())
+    for rel, path in files:
         with open(path, encoding="utf-8") as fh:
             content = fh.read()
         raw_lines = content.split("\n")
