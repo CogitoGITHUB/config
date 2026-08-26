@@ -16,7 +16,7 @@
   (locate-user-emacs-file
    "Manifolding-Emacs/Manifolding-Emacs-Foundation.org"))
 (defvar manifold--foundation-init
-  (locate-user-emacs-file "foundation-init.el"))
+  (locate-user-emacs-file "Manifolding-Emacs/foundation-init.el"))
 
 (defun manifold/tangle-foundation ()
   "Tangle the foundation.  Uses only built-in Org — no deps."

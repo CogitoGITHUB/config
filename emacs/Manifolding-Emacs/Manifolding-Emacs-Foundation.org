@@ -292,55 +292,29 @@ Must be here — manifolding-emacs-boot generates leaf forms.
 (my/init-note "[init] core ready")
 #+end_src
 
-** Loader block evaluator
-Shallow on purpose: one small defun, easy to verify by eye.
-EOF ends the block quietly; read/eval errors propagate LOUDLY.
-#+begin_src emacs-lisp
-(defun my/eval-loader-block (value n)
-  "Eval every form in VALUE (Org src block N).
-End-of-file ends the block quietly; other errors fail the boot."
-  (with-temp-buffer
-    (insert value)
-    (goto-char (point-min))
-    (while t
-      (condition-case nil
-          (eval (read (current-buffer)) t)
-        (end-of-file nil)))))
-#+end_src
-
 ** Literate loader
-Evaluates Manifolding-Emacs/manifolding-emacs.org — the package
-manager — block by block, lexically, in document order.
+Loads Manifolding-Emacs/manifolding-emacs.org — the package manager.
+Tangles the org to .el (like init.el does for Foundation.org), then
+loads the .el directly.  If the .el is already fresh, skips tangle.
 
 #+begin_src emacs-lisp
 (defun my/load-literate-loader (&optional file)
-  "Eval every emacs-lisp block in the loader Org, in order, lexically."
+  "Tangle the loader org to .el, then load it."
   (or file (setq file
                  (expand-file-name "manifolding-emacs.org"
-                                   (locate-user-emacs-directory
-                                    "Manifolding-Emacs/"))))
+                                   (expand-file-name "Manifolding-Emacs/"
+                                                     user-emacs-directory))))
   (unless (file-exists-p file)
     (error "[init] literate loader missing: %s" file))
-  (my/init-note "[init] literate loader…")
-  (let* ((buf (find-file-noselect file))
-         (tree (with-current-buffer buf
-                 (org-element-parse-buffer)))
-         (n 0))
-    (org-element-map tree '(src-block headline)
-      (lambda (el)
-        (pcase (org-element-type el)
-          ('headline
-           (my/init-note
-            (format "[loader] %s"
-                    (or (org-element-property :raw-value el) "?"))))
-          ('src-block
-           (when (string=
-                  (org-element-property :language el) "emacs-lisp")
-             (setq n (1+ n))
-             (my/eval-loader-block
-              (org-element-property :value el) n))))))
-    (my/init-note (format "[init] loader ready (%d blocks)" n))
-    n))
+  (let ((el (concat (file-name-sans-extension file) ".el")))
+    (when (or (not (file-exists-p el))
+              (time-less-p (nth 5 (file-attributes file))
+                           (nth 5 (file-attributes el))))
+      (my/init-note "[init] tangling loader…")
+      (org-babel-tangle-file file))
+    (my/init-note "[init] loading literate loader…")
+    (load el nil t)
+    (my/init-note "[init] literate loader ready")))
 
 (add-to-list 'load-path (expand-file-name "lisp/" user-emacs-directory))
 (my/load-literate-loader)

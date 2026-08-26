@@ -1,26 +1,3 @@
-#+title:      Manifolding Emacs — the literate package manager
-#+filetags:   :emacs-core:boot:
-#+auto_tangle: t
-
-* Manifolding Emacs
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle manifolding-emacs.el
-:END:
-
-The loader itself, as Org.  This file IS the package manager —
-evaluated directly by init.el (see ~my/load-literate-loader~ there),
-block by block, lexically, in document order.  No tangle step, no
-straight, no .el artifacts.
-
-Failures here are LOUD on purpose: this code is too critical to be
-loaded silently.  A broken block fails the boot visibly.
-
-The old lisp/manifolding-emacs/*.el files were converted verbatim
-into the sections below and then retired.  Sections follow the old
-require chain so dependencies always precede their users.
-
-** Prologue — requirements
-#+begin_src emacs-lisp
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
@@ -32,10 +9,7 @@ require chain so dependencies always precede their users.
 (require 'ffap)
 
 (defvar straight-current-profile)
-#+end_src
 
-** Vars — group & package macro configuration
-#+begin_src emacs-lisp
 (defgroup manifolding-emacs nil
   "A literate, org-based Emacs package manager built on leaf and straight."
   :group 'emacs
@@ -89,10 +63,7 @@ silently defeats `:leaf-defer' for every single package, which is the
 single biggest lever leaf gives you for boot-time cost."
   :type '(choice (const t) (const nil) (const auto))
   :group 'manifolding-emacs)
-#+end_src
 
-** Vars — directories
-#+begin_src emacs-lisp
 (defcustom manifolding-emacs-org-directory
   (expand-file-name "org" user-emacs-directory)
   "Directory where the Org files are stored."
@@ -125,10 +96,7 @@ single biggest lever leaf gives you for boot-time cost."
 a single readable Elisp form (not human prose) so it can be read back
 with `read' next session."
   :type 'string :group 'manifolding-emacs)
-#+end_src
 
-** Vars — behavior toggles
-#+begin_src emacs-lisp
 (defcustom manifolding-emacs-force-compile nil
   "Force recompilation even if output looks up to date."
   :type 'boolean :group 'manifolding-emacs)
@@ -159,10 +127,7 @@ errors get discovered, never how fast Emacs starts."
 (defcustom manifolding-emacs-mode-line-indicator t
   "If non-nil, show a package-health segment in the mode line."
   :type 'boolean :group 'manifolding-emacs)
-#+end_src
 
-** Vars — dynamic / working state
-#+begin_src emacs-lisp
 (defvar manifolding-emacs-packages nil
   "Working plist of package-name -> keyword-plist for whatever is
 currently being compiled.  Always dynamically `let'-bound around a
@@ -179,10 +144,7 @@ resolve to.")
 
 (defvar manifolding-emacs--boot-phase :loading
   "Current boot phase, `:compiling' or `:loading', for splash labeling.")
-#+end_src
 
-** Vars — generic utilities
-#+begin_src emacs-lisp
 (defun manifolding-emacs-indent (string n)
   "Indent every line of STRING by N spaces."
   (let ((indentation (make-string n ?\s)))
@@ -207,12 +169,7 @@ resolve to.")
   (if manifolding-emacs-compiling-remote
       (expand-file-name manifolding-emacs-remote-output-directory)
     (expand-file-name manifolding-emacs-output-directory)))
-#+end_src
 
-** Errors — data shape
-Three isolation tiers all report through this file:
-part / package / file.  See upstream commentary for the model.
-#+begin_src emacs-lisp
 (cl-defstruct (manifolding-emacs-error-entry
                (:constructor manifolding-emacs--make-error-entry))
   level file line package keyword message time)
@@ -233,10 +190,7 @@ status for files it didn't touch.")
 (defvar manifolding-emacs--inside-tier2-eval nil
   "Bound to t only during the synchronous per-package eval in the
 compiler.  Prevents double-recording of synchronous part failures.")
-#+end_src
 
-** Errors — recording
-#+begin_src emacs-lisp
 (cl-defun manifolding-emacs-record-error
     (&key level file line package keyword message)
   "Record a failure and, unless still booting, surface it immediately."
@@ -268,10 +222,7 @@ compiler.  Prevents double-recording of synchronous part failures.")
            (list :status status :file file :message message
                  :time (float-time))
            manifolding-emacs--package-status))
-#+end_src
 
-** Errors — accessors & clearing
-#+begin_src emacs-lisp
 (defun manifolding-emacs-errors-list () manifolding-emacs--boot-errors)
 (defun manifolding-emacs-warnings-list () manifolding-emacs--boot-warnings)
 
@@ -297,10 +248,7 @@ confusing than useful."
   (interactive)
   (clrhash manifolding-emacs--package-status)
   (message "manifolding-emacs: cleared all package status history"))
-#+end_src
 
-** Errors — warning capture
-#+begin_src emacs-lisp
 (defun manifolding-emacs--warning-advice (type message &rest _)
   (manifolding-emacs-record-warning type message))
 
@@ -313,10 +261,7 @@ confusing than useful."
               ,@body)
      (advice-remove 'display-warning
                     #'manifolding-emacs--warning-advice)))
-#+end_src
 
-** Errors — safe reading
-#+begin_src emacs-lisp
 (defun manifolding-emacs--first-bad-line (string)
   "Locate the first syntactically broken s-expression in STRING.
 Uses only built-in motion (`forward-sexp', `forward-comment').
@@ -361,10 +306,7 @@ instead of a bare \"End of file during parsing\"."
                     (format "%s — bad form at +%d: %s"
                             base (nth 0 scan) (nth 1 scan))
                   base)))))))
-#+end_src
 
-** Errors — part-level wrapping
-#+begin_src emacs-lisp
 (defun manifolding-emacs-wrap-in-condition (file part
                                              &optional package keyword)
   "Wrap PART's body in `condition-case', baked into the returned code so
@@ -399,10 +341,7 @@ return its trimmed body string."
     (manifolding-emacs-safe-read
      (format "(progn\n%s\n)" expression-string) file line)
     expression-string))
-#+end_src
 
-** Errors — TODO filing
-#+begin_src emacs-lisp
 (defun manifolding-emacs--error-heading (entry)
   (format "** TODO Fix: %s%s"
           (if (manifolding-emacs-error-entry-file entry)
@@ -434,10 +373,7 @@ return its trimmed body string."
     (insert (format "%s\n"
                     (manifolding-emacs-error-entry-message entry)))
     (save-buffer)))
-#+end_src
 
-** Errors — under-point lookup & splash actions
-#+begin_src emacs-lisp
 (defun manifolding-emacs-error-under-point ()
   "Return the error entry linked at point in a splash/doctor buffer."
   (save-excursion
@@ -470,10 +406,7 @@ return its trimmed body string."
     (message "All %d errors added to %s"
              (length manifolding-emacs--boot-errors)
              manifolding-emacs-todo-file)))
-#+end_src
 
-** Errors — persistence
-#+begin_src emacs-lisp
 (defun manifolding-emacs--entry-to-plist (entry)
   (list :level (manifolding-emacs-error-entry-level entry)
         :file (manifolding-emacs-error-entry-file entry)
@@ -504,11 +437,7 @@ return its trimmed body string."
       (condition-case nil
           (progn (forward-line 2) (read (current-buffer)))
         (error nil)))))
-#+end_src
 
-** Org parse — property readers
-Pure readers over Org buffers/files — nothing here mutates state.
-#+begin_src emacs-lisp
 (defun manifolding-emacs-find-property (property)
   "Find PROPERTY on the current Org element or nearest ancestor."
   (save-excursion
@@ -565,10 +494,7 @@ Pure readers over Org buffers/files — nothing here mutates state.
     (list package (or (manifolding-emacs-find-keyword)
                       (manifolding-emacs-find-tag keywords)
                       "config"))))
-#+end_src
 
-** Org parse — file-level properties
-#+begin_src emacs-lisp
 (defun manifolding-emacs-file-properties (file)
   "Return the #+KEY: value file-level properties of FILE."
   (with-temp-buffer
@@ -635,10 +561,7 @@ Pure readers over Org buffers/files — nothing here mutates state.
     (progn (message "manifolding-emacs: directory does not exist: %s"
                     directory)
            nil)))
-#+end_src
 
-** Package builder — keyword resolution
-#+begin_src emacs-lisp
 (defun manifolding-emacs-package-keywords ()
   "Return the ordered keyword list for the active package macro.
 Preserves the macro's own canonical order — this matters, because leaf
@@ -674,10 +597,7 @@ know about are appended at the end, never interleaved."
                            (plist-get x :body) file (plist-get x :line))))
         (setq result (append result parsed))))
     (when result (prin1-to-string result))))
-#+end_src
 
-** Package builder — straight recipe validation
-#+begin_src emacs-lisp
 (defun manifolding-emacs-validate-straight-recipe (recipe-string
                                                    package-name file line)
   "Return t for allowed :type (built-in, local, file, git, or anything
@@ -707,11 +627,7 @@ with explicit :host/:repo); record an error and return nil otherwise."
       :message (format "error reading straight recipe: %s"
                        (error-message-string err)))
      nil)))
-#+end_src
 
-** Package builder — string building
-Atomic upstream — kept whole.
-#+begin_src emacs-lisp
 (defun manifolding-emacs-build-package-string (package-name package file)
   (let* ((package-macro (pcase manifolding-emacs-package-method
                           ('leaf "leaf") ('use-package! "use-package!")
@@ -775,10 +691,7 @@ Atomic upstream — kept whole.
   (mapconcat (lambda (name)
                (or (manifolding-emacs-build-package file name) ""))
              (manifolding-emacs-plist-keys manifolding-emacs-packages) ""))
-#+end_src
 
-** Remote — paths & fetch
-#+begin_src emacs-lisp
 (defun manifolding-emacs-remote-plist-to-org-file (remote-file-plist)
   (file-name-concat
    (file-name-as-directory
@@ -837,13 +750,7 @@ Atomic upstream — kept whole.
                    "^[^#]*\\.org$" (manifolding-emacs-get-org-directory)))
       (when-let* ((remote-file-plist (manifolding-emacs-file-remote file)))
         (manifolding-emacs-pull-remote-file remote-file-plist)))))
-#+end_src
 
-** Compiler — block extraction
-The engine.  Packages are read and eval'd ONE AT A TIME (never
-concatenated into one blob) — that's what makes per-package isolation
-possible at all.
-#+begin_src emacs-lisp
 (defcustom manifolding-emacs-lexical-binding t
   "When non-nil, every module block/package is evaluated with lexical
 binding.  Lexical compilation makes closures capture their environment
@@ -930,10 +837,7 @@ strings, in file order."
                        file (list :body body :line line))
                       results))))))
       (nreverse results))))
-#+end_src
 
-** Compiler — per-package eval isolation
-#+begin_src emacs-lisp
 (defun manifolding-emacs--eval-package-string (package-name package-string file)
   "Read and eval PACKAGE-STRING in isolation: a failure marks
 PACKAGE-NAME as errored instead of propagating to its siblings.
@@ -965,10 +869,7 @@ failing code so you never have to guess."
                  (manifolding-emacs-build-package file package-name)))
       (manifolding-emacs--eval-package-string package-name
                                               package-string file))))
-#+end_src
 
-** Compiler — cache salt, dir, key
-#+begin_src emacs-lisp
 (defconst manifolding-emacs-cache-salt "3"
   "Bump to invalidate every cached module after loader changes.")
 
@@ -1009,10 +910,7 @@ failing code so you never have to guess."
     (with-temp-file path
       (insert ";; manifolding-emacs module cache\n"
               (prin1-to-string data)))))
-#+end_src
 
-** Compiler — parts extraction & evaluation
-#+begin_src emacs-lisp
 (defun manifolding-emacs--extract-parts (file)
   "Return (PARTS . PROFILE) mirroring compile-file's eval units.
 PARTS is an ordered list of (:kind part|package [:name N] :body S):
@@ -1089,10 +987,7 @@ something broke during extraction."
             :message (format "%s: %s" label (error-message-string err)))
            (when signal-error
              (signal (car err) (cdr err)))))))))
-#+end_src
 
-** Compiler — cache validation & compile entries
-#+begin_src emacs-lisp
 (defun manifolding-emacs--cache-validate (data)
   "Return t when DATA is a well-formed cache entry."
   (and (listp data)
@@ -1158,10 +1053,7 @@ package in FILE untouched.  Used by the doctor."
                                package-name)
                               :status)))
       (user-error "No such package `%s' in %s" package-name file))))
-#+end_src
 
-** Compiler — directory loop & summary
-#+begin_src emacs-lisp
 (defun manifolding-emacs-compile-directory (&optional progress-fn force)
   "Compile every Org file under the active Org directory.
 Unchanged files replay from the content-hash cache; FORCE bypasses it.
@@ -1222,10 +1114,7 @@ disk instead of eval'ing directly."
                            (length (manifolding-emacs-get-org-directory))))
                ".el"))
     (error "File is not under the active Org directory")))
-#+end_src
 
-** Lockfile — freeze/thaw
-#+begin_src emacs-lisp
 (declare-function straight-freeze-versions "straight")
 (declare-function straight-thaw-versions "straight")
 
@@ -1277,11 +1166,7 @@ that should happen silently just because nothing broke today."
                             "(default)")
                         file))))
     (display-buffer buf)))
-#+end_src
 
-** Splash — constants & state
-Pure renderer: reads the error/warnings lists, never mutates them.
-#+begin_src emacs-lisp
 (defconst manifolding-emacs-splash--bar-width 54)
 (defconst manifolding-emacs-splash--redraw-interval 0.1
   "Seconds between live splash redraws (throttle).")
@@ -1332,10 +1217,7 @@ and displayed by the dashboard's Manifold status widget.")
                            (buffer-string)))))))
         (if (listp raw) raw nil))
     (error nil)))
-#+end_src
 
-** Splash — sparkline, centering, bar
-#+begin_src emacs-lisp
 (defun manifolding-emacs-splash--sparkline ()
   "Render recent boot durations as a one-line block sparkline."
   (let* ((times (manifolding-emacs-splash--read-history))
@@ -1374,11 +1256,7 @@ and displayed by the dashboard's Manifold status widget.")
             (propertize (make-string done ?█) 'face 'bold)
             (make-string todo ?·)
             "]")))
-#+end_src
 
-** Splash — problem grouping & progress rendering
-Atomic upstream renderers — kept whole.
-#+begin_src emacs-lisp
 (defun manifolding-emacs-splash--group-by-file (entries)
   "Group error/warning ENTRIES by file."
   (let ((groups (make-hash-table :test #'equal))
@@ -1484,10 +1362,7 @@ Atomic upstream renderers — kept whole.
           (manifolding-emacs-splash--render-progress buf current total file)
           (with-current-buffer buf
             (redisplay)))))))
-#+end_src
 
-** Splash — counts
-#+begin_src emacs-lisp
 (defun manifolding-emacs-splash--missing-prompts-count ()
   (condition-case nil
       (let ((path (expand-file-name
@@ -1524,11 +1399,7 @@ Non-clean boots stay in *Manifolding-Emacs* with the full report."
    (t
     (manifolding-emacs-splash-update-dashboard
      buf boot-seconds "CLEAN BOOT"))))
-#+end_src
 
-** Splash — module todos & vault git info
-Note: --modules-dir const points at the new home.
-#+begin_src emacs-lisp
 (defvar manifolding-emacs-splash--todos-expanded nil
   "When non-nil, the dashboard lists every module TODO instead of a few.")
 
@@ -1573,11 +1444,7 @@ Note: --modules-dir const points at the new home.
                     (when (and ahead (not (string= ahead "0")))
                       (format " · ↑%s" ahead))))))
     (error nil)))
-#+end_src
 
-** Splash — dashboard render
-Atomic upstream renderer — kept whole.
-#+begin_src emacs-lisp
 (defun manifolding-emacs-splash-update-dashboard (buf boot-seconds banner)
   (when (buffer-live-p buf)
     (let* ((errors (length (manifolding-emacs-errors-list)))
@@ -1669,12 +1536,7 @@ Atomic upstream renderer — kept whole.
                               default-directory)))))
            map))
         (redisplay)))))
-#+end_src
 
-** Doctor — known packages & rows
-Answers "is everything actually OK?" without triggering every package
-by hand.
-#+begin_src emacs-lisp
 (defun manifolding-emacs-doctor--known-packages ()
   "Alist of (package-name . file) for every package declared anywhere
 under the active Org directory."
@@ -1711,10 +1573,7 @@ under the active Org directory."
                             (manifolding-emacs-error-entry-message e)))
               rows)))
     (nreverse rows)))
-#+end_src
 
-** Doctor — mode & commands
-#+begin_src emacs-lisp
 (defvar manifolding-emacs-doctor-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map tabulated-list-mode-map)
@@ -1758,10 +1617,7 @@ under the active Org directory."
       (manifolding-emacs-doctor-mode)
       (manifolding-emacs-doctor-refresh))
     (switch-to-buffer buf)))
-#+end_src
 
-** Doctor — mode-line indicator
-#+begin_src emacs-lisp
 (defun manifolding-emacs-doctor--mode-line-string ()
   (let ((broken (cl-count-if (lambda (p)
                                (eq (plist-get (cdr p) :status) 'error))
@@ -1781,10 +1637,7 @@ under the active Org directory."
           (if manifolding-emacs-doctor-indicator-mode
               (append (remove segment global-mode-string) (list segment))
             (remove segment global-mode-string)))))
-#+end_src
 
-** Doctor — idle sweep
-#+begin_src emacs-lisp
 (defvar manifolding-emacs-doctor--idle-timer nil)
 
 (defun manifolding-emacs-doctor--force-require-one (package-name)
@@ -1814,10 +1667,7 @@ under the active Org directory."
                                  (setq manifolding-emacs-doctor--idle-timer
                                        nil)
                                  (manifolding-emacs-doctor-sweep-now))))))
-#+end_src
 
-** Entry — reload, current-buffer, preview
-#+begin_src emacs-lisp
 (defun manifolding-emacs-reload (&optional force)
   "Recompile every Org file.
 Unchanged files replay from the content-hash cache.  With FORCE
@@ -1865,11 +1715,7 @@ Unchanged files replay from the content-hash cache.  With FORCE
 (defun manifolding-emacs--splash-progress (buf)
   (lambda (current total file)
     (manifolding-emacs-splash-update-progress buf current total file)))
-#+end_src
 
-** Entry — boot
-Atomic upstream — kept whole.
-#+begin_src emacs-lisp
 (defun manifolding-emacs-boot ()
   "Compile every Org file, with a splash screen, structured error
 tracking, an idle sweep to surface deferred-load errors early, and
@@ -1958,11 +1804,7 @@ tracking, an idle sweep to surface deferred-load errors early, and
                  (error
                   (message "manifolding-emacs: dashboard error %s"
                              (error-message-string dash-err)))))))))))
-#+end_src
 
-** Entry — message redirection
-Loader chatter goes to its own buffer, never *Messages*.
-#+begin_src emacs-lisp
 (defvar manifolding-emacs--log-buffer-name "*Manifolding-Emacs*"
   "Buffer receiving loader chatter instead of *Messages*.")
 
@@ -1982,4 +1824,3 @@ Loader chatter goes to its own buffer, never *Messages*.
 (advice-add 'message :around #'manifolding-emacs--redirect-message)
 
 (provide 'manifolding-emacs)
-#+end_src
