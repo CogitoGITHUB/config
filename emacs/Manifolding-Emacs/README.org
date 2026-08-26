@@ -1,6 +1,8 @@
 #+title: Manifolding-Emacs — the running configuration
 
-This directory is where the machine lives.  Three things:
+This directory is where the machine lives.
+Org is not merely documentation for the machine; in important layers, the Org structures are inputs to the machine that generates its behavior.
+The same principle that governs Manifolding Atlas applies here: representations are temporary, and the machinery for producing the next representation is what endures.
 
 | Foundation | ~Manifolding-Emacs-Foundation.org~ — SINGLE SOURCE OF
               TRUTH for early-init.el + foundation-init.el.

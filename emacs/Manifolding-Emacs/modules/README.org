@@ -1,10 +1,15 @@
-#+title: modules — every feature, as Org
+#+title: modules — composable transformations over the common substrate
 
 Discovered recursively under this directory by the loader, sorted by
 ~#+priority:~ (default 10), compiled to leaf forms + loose elisp, and
 evaluated with three-tier error isolation (part → package → file).
 One broken block costs only its own unit; the boot reports exactly
 where.
+
+Modules are composable transformations operating over the same
+underlying substrate.  Each module owns its own representation of a
+capability; no current representation is sacred, and the transformation
+machinery survives the decomposition of any individual module.
 
 * Layout
 
@@ -13,7 +18,7 @@ multi-file subsystem:
 
 | path                              | what                                            |
 |-----------------------------------+-------------------------------------------------|
-| manifolding-keyboard.org           | modal editing engine — VENDORED from modaled, hydras, avy faces |
+| manifolding-keyboard.org           | modal editing engine — VENDORED from modaled   |
 | org-*.org                         | the Org ecosystem                               |
 | completion/corfu/cape/consult …   | completion stack                                |
 | manifolding-atlas/                | notes system — VENDORED from vulpea             |
@@ -40,8 +45,10 @@ cache behavior, message silence).  The short version:
 
 Interactive behavior knobs live in the module that defines them —
 baked into defcustom defaults when we own the source (dashboard),
-pre-init setqs when configuring a require (atlas).  Never maintain
-the same setting in two places.
+pre-init setqs when configuring a require (atlas).
+Never maintain the same setting in two places.
+The configuration itself is subject to transformation; modules may
+be rewritten, split, or merged as the system evolves.
 
 * Vendoring an upstream package (recipe)
 

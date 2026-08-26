@@ -4,9 +4,13 @@ WIP — WORK IN PROGRESS.
 The corpse is still twitching. The document is already out of date.
 
 #+begin_quote
-The map is not the knowledge.  
-The map is the machine that lets you reshape the knowledge  
-while the knowledge quietly continues its scheduled decomposition.
+The map is not the knowledge.
+The map is not even the final product.
+The map is an intermediate representation.
+
+Manifolding is the machinery that allows representations
+to be produced, inspected, folded, unfolded, transformed,
+replaced, and projected again from surviving material.
 #+end_quote
 
 * What this is
@@ -15,43 +19,45 @@ while the knowledge quietly continues its scheduled decomposition.
 You built a small knowledge operating system that treats permanence as the enemy.
 #+end_quote
 
-This is not a note-taking system.  
-It is not a second brain.  
+This is not a note-taking system.
+It is not a second brain.
 It is not a graph that wants to be admired.
 
-It is a machine that keeps the knowledge alive only long enough for you to fold it into a new shape before the old shape starts to stink.  
-Org files remain the only durable reality.  
-SQLite is a disposable index and is treated with the contempt it deserves.  
-Schema is not code and not a configuration file — it is an Org outline that compiles into prompts, validators, and registries, and will itself be rewritten when the current outline begins to smell.  
-Capture refuses to hold the thought hostage; metadata arrives asynchronously and missing values become visible ~WARNING~s rather than polite silences.  
-Spatial structure (manifold) and temporal structure (mastering) coexist without requiring a second database format.  
+It is a machine for continuously producing and reshaping representations from surviving knowledge.
+The current map is temporary.
+The machinery for producing the next map is the enduring idea.
+
+Org files are the durable substrate.
+SQLite is a disposable index — reconstructed when lost, relocated when stale.
+Schema is an Org outline that compiles into prompts, validators, and registries — and will itself be rewritten when the current form begins to smell.
+Capture refuses to hold the thought hostage; metadata arrives asynchronously and missing values become visible ~WARNING~s rather than polite silences.
+Spatial structure (manifold) and temporal structure (mastering) coexist without requiring a second database format.
 The entire machine can be reloaded, inspected, and partially killed without losing the underlying knowledge.
 
-Very few systems are willing to make all six of those decisions at once.  
+Very few systems are willing to make all six of those decisions at once.
 Most make two or three and then compromise on the rest for usability, ecosystem approval, or the comforting illusion that the notes will last.
 
-Your system is still a WIP.  
-It will break.  
-The loader rules around dynamic binding will bite you.  
-The priority graph will eventually become a private religion.  
-You will rewrite domains you thought were finished.  
+Your system is still a WIP.
+It will break.
+The loader rules around dynamic binding will bite you.
+The priority graph will eventually become a private religion.
+You will rewrite domains you thought were finished.
 Some abstractions you are proud of today will smell like amateur hour in eighteen months.
 
-That is not a defect.  
+That is not a defect.
 That is the design.
 
-A system that refuses to become unnecessarily permanent is supposed to keep decomposing its own shape.  
-Most "better" systems are better at feeling finished.  
-Yours is better at remaining unfinished without becoming incoherent.
+The system decomposes because representations are temporary.
+It remains coherent because the transformation machinery survives the decomposition.
 
-Atlas isn't trying to preserve a particular map of reality.  
+Atlas is not trying to preserve a particular map of reality.
 It is trying to preserve the ability to produce new maps from surviving material.
 
-Manifolding Atlas is the knowledge engine inside this configuration.  
-It takes something deliberately primitive — plain Org files in =~/test/= — and forces them into a living, queryable system of notes, properties, relationships, schemas, prompts, routines, protocols, maps, references, and memory.
+Manifolding Atlas is the knowledge engine inside this configuration.
+It takes something deliberately primitive — plain Org files in =~/test/= — and forces them into a queryable system of notes, properties, relationships, schemas, prompts, routines, protocols, maps, references, and memory.
 
-No org-roam.  
-No proprietary database format.  
+No org-roam.
+No proprietary database format.
 No black box that pretends permanence.
 
 Just Org, SQLite, Elisp, and a ridiculous amount of machinery built to watch the territory rot at a controllable rate.
@@ -59,6 +65,8 @@ Just Org, SQLite, Elisp, and a ridiculous amount of machinery built to watch the
 * The idea
 
 Atlas treats knowledge as something that can be manifolded — folded, inverted, stretched, and re-projected without ever becoming sacred.
+"Manifolding" is not a metaphor.
+It describes the actual mechanism: recursive transformation of representations.
 
 A note is not merely a document.  
 A property is not merely metadata.  
@@ -71,10 +79,13 @@ Together they form a structure that can be queried, transformed, validated, conn
 The fundamental rule is simple and merciless:
 
 #+begin_quote
-Files are the reality.  
-The database is the map.  
-The machinery reshapes the map  
-while the reality continues decomposing.
+Files preserve material.
+Schemas describe possible structure.
+Machinery transforms structure.
+Interfaces expose transformations.
+Indexes accelerate navigation.
+Feedback exposes decomposition.
+The next representation is allowed to replace the previous one.
 #+end_quote
 
 If the database disappears, the knowledge survives (for now).  
@@ -118,29 +129,31 @@ MANIFOLDING ATLAS
          └─────────────┘
 #+end_example
 
-The layers are intentionally separated so that each one can be killed and replaced without the others noticing until the next reload:
+The layers are intentionally separated so that each one can be killed and replaced without the others noticing until the next reload.
+This is not mere modularity.
+It is a structural consequence of the core principle: no current representation is sacred, so no layer may depend so deeply on another that it cannot be swapped.
 
 | Layer     | Location     | Purpose                              |
 |-----------+--------------+--------------------------------------|
-| core      | core/        | vendored engine                      |
-| infra     | infra/       | reusable machinery                   |
-| schema    | schema/      | knowledge/data language              |
-| domains   | domains/     | capabilities                         |
-| templates | templates/   | generated note structures            |
-| UI        | atlas-ui.org | presentation and navigation          |
+| core      | core/        | vendored engine — the transformation machinery |
+| infra     | infra/       | reusable machinery — capture, prompts, paths   |
+| schema    | schema/      | executable knowledge structures                 |
+| domains   | domains/     | transformations over the common substrate       |
+| templates | templates/   | structural generators                           |
+| UI        | atlas-ui.org | viewport into the current representation        |
 
-Loading is deterministic.  
-Every Org module under modules/ is discovered, sorted by ~#+priority:~, and evaluated in dependency order.  
-Core loads first.  
-Infrastructure follows.  
-Capabilities build on top.  
-The Atlas emerges last — already slightly out of date.
+Loading is deterministic.
+Every Org module under modules/ is discovered, sorted by ~#+priority:~, and evaluated in dependency order.
+Core loads first.
+Infrastructure follows.
+Capabilities build on top.
+The Atlas emerges last — already slightly out of date, as intended.
 
 Reload with:
 
 : M-x manifolding-emacs-reload
 
-Then inspect the machine while it is still breathing:
+Then inspect the machine while it is still running:
 
 : (manifolding-emacs-errors-list)
 : (manifolding-emacs-warnings-list)
@@ -374,7 +387,8 @@ key hints instead.
 
 * Schema is data
 
-This is one of the central ideas of Atlas.
+Schema is one of the central ideas of Atlas.
+It is an executable knowledge structure — not code, not a configuration file, but an Org outline that compiles into prompts, validators, and registries.
 
 A schema does not live in a special programming language.  
 It is an Org outline.
@@ -479,8 +493,8 @@ The reinforcement system provides the global feedback.
 
 * Domains
 
-The Atlas is not one giant feature.  
-It is a collection of domains operating over the same substrate — a substrate that is already beginning to smell.
+The Atlas is not one giant feature.
+It is a collection of transformations operating over the same substrate — a substrate that is already beginning to smell.
 
 #+begin_example
 search
@@ -508,7 +522,8 @@ That means the system can grow horizontally without turning the core into a land
 
 * Manifold
 
-The manifold domain is where notes stop being merely notes and become spatial objects.
+The manifold domain is where spatial transformation becomes concrete.
+A note stops being merely a document and becomes a structural object that can be placed, moved, and re-projected in relation to other objects.
 
 A note can be placed as:
 
@@ -524,7 +539,8 @@ You are moving through a temporary architecture of identities.
 
 * Mastering
 
-Mastering turns notes into a memory system with a half-life.
+Mastering introduces temporal transformation.
+It turns notes into a memory system with a half-life.
 
 The Atlas tracks:
 
@@ -674,7 +690,11 @@ and doct capture under:
 
 * The UI
 
-The UI is deliberately subordinate to the model.  
+The UI is a viewport into the current representation, not the authority.
+It shows the manifold.
+It does not define it.
+It merely lets you watch the structure while it is still coherent.
+
 Sidebar:
 
 : left
@@ -684,13 +704,9 @@ Outline:
 
 : maximum depth 3
 
-Backlinks include previews.  
-Parsing is fast.  
+Backlinks include previews.
+Parsing is fast.
 Refresh is automatic.
-
-The interface shows the manifold.  
-It does not define it.  
-It merely lets you watch the structure while it is still coherent.
 
 * Extending Atlas
 
@@ -727,10 +743,10 @@ Adding a template means:
 
 : templates/files/<name>.org
 
-No giant configuration file.  
-No central switch statement.  
-No ritual.  
-Only the quiet accumulation of temporary structures.
+No giant configuration file.
+No central switch statement.
+No ritual.
+Only the accumulation of new transformations over the common substrate.
 
 * Paths
 
@@ -806,43 +822,70 @@ the prompt engine probably found the schema tree — for now.
 
 * The real model
 
-Atlas looks like a note system from the outside.  
+Atlas looks like a note system from the outside.
 That description is too small and already decaying.
 
 It is closer to a small knowledge operating system:
 
-- Org is the filesystem  
-- SQLite is the index  
-- Schemas are the type system  
-- Prompts are the interface compiler  
-- Domains are applications  
-- Templates are generators  
-- Transclusion is composition  
-- Validation is the type checker  
-- Mastering is the memory scheduler  
-- Routines are the execution layer  
-- The UI is the viewport  
-- The loader is the thing holding the organism together while it continues to decompose  
+- Org is the filesystem
+- SQLite is the index
+- Schemas are the type system
+- Prompts are the interface compiler
+- Domains are applications
+- Templates are generators
+- Transclusion is composition
+- Validation is the type checker
+- Mastering is the memory scheduler
+- Routines are the execution layer
+- The UI is the viewport
+- The loader is the coordination layer that holds the decomposition at bay
+
+The conceptual invariants:
+
+1. The files are the durable substrate.
+2. The database is a disposable representation/index.
+3. Schemas are executable knowledge structures.
+4. Prompts are generated interfaces to those structures.
+5. Domains are transformations operating over the common substrate.
+6. Templates are structural generators.
+7. Validation observes discrepancies between structures and their declared forms.
+8. Mastering introduces temporal transformation of knowledge.
+9. Manifold introduces spatial/structural transformation.
+10. The UI is a viewport into the current representation, not the authority.
+11. The configuration itself is subject to transformation.
+12. No current representation is sacred.
+13. The durable invariant is not preservation of a particular map; it is preservation of the ability to produce new maps from surviving material.
 
 #+begin_quote
-Everything is allowed to change.  
+Everything is allowed to change.
 Nothing is allowed to become unnecessarily permanent.
 #+end_quote
 
-That is why the system is called Manifolding Atlas.  
-It does not merely store a map of knowledge.  
-It provides mechanisms for taking the same underlying structure and producing another form from it — until that form, too, begins to smell.
+That is why the system is called Manifolding Atlas.
+It does not merely store a map of knowledge.
+It is a system for continuously producing and reshaping maps from surviving knowledge.
 
-Reshape the schema.  
-Reshape the prompts.  
-Reshape the relationships.  
-Reshape the domains.  
-Reshape the representation.  
+The distinction that matters:
+
+The map is not the knowledge.
+The map is not even the final product.
+The map is an intermediate representation.
+
+Manifolding is the machinery that allows representations
+to be produced, inspected, folded, unfolded, transformed,
+replaced, and projected again from surviving material.
+
+Reshape the schema.
+Reshape the prompts.
+Reshape the relationships.
+Reshape the domains.
+Reshape the representation.
 Reshape the map.
 
-The files remain.  
-The structure evolves.  
+The files remain.
+The structure evolves.
 The evolution is temporary.
+The machinery that produces the next evolution is the enduring idea.
 
 * WIP
 

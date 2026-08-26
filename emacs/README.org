@@ -1,7 +1,11 @@
 #+title: Emacs Configuration — the map
 
-Everything in this directory is Org.  Elisp files are build
-artifacts or legacy leftovers, never the source of truth.
+Everything in this directory is Org.
+Elisp files are build artifacts or legacy leftovers, never the source of truth.
+
+This configuration is not merely a collection of modules.
+It is the substrate for a manifolding methodology: Org structures are inputs to the machine that generates behavior, not documentation about the machine.
+The same principle that governs Manifolding Atlas — that representations are temporary and the machinery for producing the next representation is what endures — applies here at the configuration layer.
 
 * The map
 
@@ -52,6 +56,7 @@ in =(manifolding-emacs-errors-list)= and can be filed to TODO.
 
 | Package   | Location                          | Origin                     |
 |-----------+-----------------------------------+----------------------------|
+| keyboard  | Manifolding-Emacs/modules/manifolding-keyboard.org | DCsunset/modaled |
 | dashboard | Manifolding-Emacs/modules/manifolding-dashboard.org | emacs-dashboard/dashboard |
 | atlas     | Manifolding-Emacs/modules/manifolding-atlas/        | d12frosted/vulpea          |
 
