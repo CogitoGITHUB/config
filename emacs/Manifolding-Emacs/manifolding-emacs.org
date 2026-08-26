@@ -1906,7 +1906,7 @@ tracking, an idle sweep to surface deferred-load errors early, and
              '(("my/manifolding-atlas-org-prompt--ask" . "org-prompts.org")
                ("my/manifolding-atlas-collect-prompts" . "prompt-engine.org")
                ("my/manifolding-atlas-routines-run" . "routines.org")
-               ("modaled-define-keys" . "keyboard.org (via modaled)")))
+                               ("manifolding-keyboard-define-keys" . "manifolding-keyboard.org")))
       (unless (fboundp (intern (car check))))
         (message "⚠ CRITICAL: %s is VOID — check %s for paren/nesting issues"
                  (car check) (cdr check))))
@@ -1953,7 +1953,7 @@ tracking, an idle sweep to surface deferred-load errors early, and
                    buf (- (float-time) boot-t0))
                  (error
                   (message "manifolding-emacs: dashboard error %s"
-                           (error-message-string dash-err)))))))))
+                             (error-message-string dash-err)))))))))))
 #+end_src
 
 ** Entry — message redirection

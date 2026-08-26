@@ -13,7 +13,7 @@ multi-file subsystem:
 
 | path                              | what                                            |
 |-----------------------------------+-------------------------------------------------|
-| keyboard.org                      | modaled states, hydras, avy faces               |
+| manifolding-keyboard.org           | modal editing engine — VENDORED from modaled, hydras, avy faces |
 | org-*.org                         | the Org ecosystem                               |
 | completion/corfu/cape/consult …   | completion stack                                |
 | manifolding-atlas/                | notes system — VENDORED from vulpea             |

@@ -27,7 +27,7 @@ edit any block directly.
   "Build your own minor modes for modal editing."
   :group 'editing
   :tag "Manifolding-Keyboard"
-  :prefix "manifolding-keyboard-"))
+  :prefix "manifolding-keyboard-")
 #+end_src
 
 ** Local variable macro
