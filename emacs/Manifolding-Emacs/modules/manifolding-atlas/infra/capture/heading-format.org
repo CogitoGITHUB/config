@@ -46,9 +46,13 @@ TODO, when set, prefixes the heading line and is consumed."
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--headingify-note-content (orig-fn id title &optional head meta tags properties)
   "Wrap `manifolding-atlas--format-note-content' to produce heading-based notes.
-Injects TODO state from `my/manifolding-atlas--creation-todo' into the heading line."
+Injects TODO state from `my/manifolding-atlas--creation-todo' into the
+heading line. Skip sentinels (WARNING/empty) are treated as no-todo."
   (let ((todo my/manifolding-atlas--creation-todo))
     (setq my/manifolding-atlas--creation-todo nil)
+    (when (or (null todo) (string-empty-p todo)
+              (string-equal todo "WARNING"))
+      (setq todo nil))
     (my/manifolding-atlas--headingify-content
      (funcall orig-fn id title head meta tags properties) todo)))
 

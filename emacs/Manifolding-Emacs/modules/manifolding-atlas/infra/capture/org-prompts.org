@@ -681,7 +681,9 @@ of an option jumps there and applies it live (same as m). Pausing
 surfaces the control prompt — RET next · q skip · l live.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--avy-mark-loop (buf)
-  "Avy-first marking loop over picker BUF."
+  "Avy-first marking loop over picker BUF.
+REAL avy overlays every visible line: jumping to an option heading
+applies it live. Pausing surfaces RET next · q skip · l live."
   (require 'avy)
   (let ((again t) action)
     (while (and again (buffer-live-p buf))
@@ -693,6 +695,7 @@ surfaces the control prompt — RET next · q skip · l live.
                        (when (and (org-at-heading-p)
                                   (>= (org-outline-level) 2))
                          (my/manifolding-atlas-org-prompt--buffer-mark)))
+              (user-error nil)
               (error nil)))))
       (pcase (read-key "letters mark · RET next · q skip · l live")
         (?\r (if (or my/manifolding-atlas-org-prompt--applied
@@ -1201,19 +1204,31 @@ REMOVE-PROPS lists property keys to delete instead."
      ((eq todo 'none)
       (ignore-errors (org-todo 'none)))
      ((and todo (not (member todo '("WARNING" ""))))
-      (ignore-errors (org-todo todo))))
-    ;; Park the view at the end of the property drawer.
+      ;; org-todo only accepts keywords declared in the buffer's TODO
+      ;; sequence; schema states (NEXT, DOING, WAIT...) may not be —
+      ;; fall back to setting the keyword textually on the heading.
+      (condition-case nil
+          (org-todo todo)
+        (error
+         (org-back-to-heading t)
+         (beginning-of-line)
+         (when (looking-at "^\\*+\\s-*")
+           (goto-char (match-end 0))
+           (when (looking-at "[A-Za-z]+ ")
+             (delete-region (point) (match-end 0)))
+           (insert todo " "))))))
+    ;; Park the view ON the heading so TODO/keyword changes are
+    ;; visible while the session picks are applied.
     (save-excursion
-      (if (re-search-forward "^:END:[ \t]*$" nil t)
-          (line-beginning-position)
-        (point)))))
+      (org-back-to-heading t)
+      (point))))
 #+end_src
 *** Note application
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--apply-to-note
     (note props tags todo &optional remove-props)
   "Write PROPS, TAGS and TODO at NOTE's heading in its buffer, save,
-then park the note window on the end of the property drawer."
+then park the note window centered on the heading."
   (let* ((file (manifolding-atlas-note-path note))
          (buf (find-file-noselect file))
          view-target)
@@ -1227,7 +1242,7 @@ then park the note window on the end of the property drawer."
     (when-let ((win (get-buffer-window buf t)))
       (with-selected-window win
         (goto-char (or view-target (point-min)))
-        (recenter -1)))))
+        (recenter nil)))))
 #+end_src
 ** Session remove
 Inverse of a pick: delete property / clear tags / drop TODO.

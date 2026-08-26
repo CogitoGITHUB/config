@@ -27,8 +27,14 @@ Architecture: core (engine) → infra (machinery) → domains (capabilities)
   selected; red per-row codes toggle rows (first pick SOLO-selects,
   dropping the rest); SPC flips all/none; RET → review buffer (start/
   back/cancel); empty confirm asks nothing. Picks travel via
-  `my/manifolding-atlas-org-prompt--custom-set`. SPC v P keeps the
-  classic transient (letter toggles) for property UPDATES on notes.
+  `my/manifolding-atlas-org-prompt--custom-set`. SPC v P runs the
+  SAME grid unselected (no solo); confirm applies every picked prompt
+  to the note via `--run-update-key` and reopens for more.
+  SINGLE SOURCE OF TRUTH: grid rows are read fresh from
+  `my/manifolding-atlas-prompt-registry` (built from schema/*.org
+  outlines) at every open — adding/renaming/deleting a property in
+  schema/ updates BOTH modes automatically. Never maintain menu
+  content in two places.
 - Every prompt file self-heals a first `** WARNING` option (skip
   sentinel, plain text — no emoji anywhere). RET on it = skip; q/C-g
   too. Point lands on WARNING unless :TASK-DEFAULT: exists.

@@ -147,8 +147,13 @@ carrier consumed by heading-format.
   (when-let ((v (plist-get frag :file-name)))
     (setq result (plist-put result :file-name v)))
   (when (plist-member frag :todo)
-    (setq result (plist-put result :todo (plist-get frag :todo))
-          my/manifolding-atlas--creation-todo (plist-get frag :todo)))
+    (setq result (plist-put result :todo (plist-get frag :todo)))
+    ;; Only real keywords feed the heading carrier — the WARNING
+    ;; skip sentinel must never prefix the created heading.
+    (let ((tv (plist-get frag :todo)))
+      (when (and tv (not (string-empty-p tv))
+                 (not (string-equal tv "WARNING")))
+        (setq my/manifolding-atlas--creation-todo tv))))
   result)
 #+end_src
 
@@ -291,10 +296,18 @@ buffer-UI prompts are queued on
             (setq result (my/manifolding-atlas-collect--merge-fragment
                           result frag))))))
     (when deferred-list
-      (setq my/manifolding-atlas-org-prompt--deferred
-            (append my/manifolding-atlas-org-prompt--deferred
-                    (nreverse deferred-list)
-                    nil)))
+      ;; Both sweeps can queue the same key (file captures pass the
+      ;; same contexts as specialized AND general) — ask each only once.
+      (let (seen unique)
+        (dolist (req (nreverse deferred-list))
+          (let ((k (plist-get (plist-get req :spec) :key)))
+            (unless (member k seen)
+              (push k seen)
+              (push req unique))))
+        (setq my/manifolding-atlas-org-prompt--deferred
+              (append my/manifolding-atlas-org-prompt--deferred
+                      (nreverse unique)
+                      nil))))
     result))
 #+end_src
 

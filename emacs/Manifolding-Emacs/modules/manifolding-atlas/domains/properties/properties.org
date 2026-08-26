@@ -97,48 +97,16 @@ Strips Org link brackets so values stay readable; WARNING stays visible.
 #+end_src
 *** Dynamic Suffixes
 
-**** Key map and toggle command (SPC v P)
+**** Capture grid — entries
+Dedicated buffer engine for capture AND updates: we own all input,
+so SPC and picking keys can never conflict. Rows are plain display;
+REAL avy overlays handle jumping (normal avy behavior — any number
+of rows, automatic narrowing, no code bookkeeping).
 #+begin_src emacs-lisp
-(defvar my/manifolding-atlas--update-key-map nil
-  "Alist mapping transient key chars to prompt :key symbols.")
-
-(defun my/manifolding-atlas--toggle-prompt ()
-  "Toggle the prompt identified by the key that invoked this command."
-  (interactive)
-  (condition-case err
-      (let* ((key (event-basic-type last-command-event))
-             (cell (assq key my/manifolding-atlas--update-key-map))
-             (prompt-key (cdr cell)))
-        (when prompt-key
-          (if (memq prompt-key my/manifolding-atlas--selected-keys)
-              (setq my/manifolding-atlas--selected-keys (delq prompt-key my/manifolding-atlas--selected-keys))
-            (push prompt-key my/manifolding-atlas--selected-keys))
-          (transient-setup 'my/manifolding-atlas--properties-menu)))
-    (error (message "Toggle error: %s" err))))
-#+end_src
-
-**** Capture grid — codes and entries
-Dedicated buffer engine for capture: we own all input, so SPC and
-the picking keys can never conflict. Codes are laid out breadth-
-first over `avy-keys' and painted with `avy-lead-face'.
-#+begin_src emacs-lisp
-(require 'cl-lib)
-
-(defun my/manifolding-atlas--capture-grid-codes (n)
-  "Return N key sequences, breadth-first over `avy-keys'."
-  (let* ((keys (mapcar #'string avy-keys))
-         (codes (copy-sequence keys))
-         (frontier (copy-sequence keys)))
-    (while (< (length codes) n)
-      (setq frontier
-            (cl-mapcan (lambda (p) (mapcar (lambda (k) (concat p k)) keys))
-                       frontier)
-            codes (append codes frontier)))
-    codes))
-
 (defun my/manifolding-atlas--capture-grid-entries ()
-  "Build grid entries: plists (:key :label :code :selected :pos).
-Everything starts SELECTED; picking with letters narrows."
+  "Build grid entries: plists (:key :label :selected :pos).
+Starting selection depends on mode: captures open ALL-selected
+(first avy pick then SOLO-selects), updates open UNSELECTED."
   (let* ((prompts (seq-filter
                    (lambda (s)
                      (let ((k (plist-get s :key)))
@@ -148,25 +116,21 @@ Everything starts SELECTED; picking with letters narrows."
                             (seq-intersection
                              my/manifolding-atlas--current-contexts
                              (plist-get s :contexts) #'eq))))
-                    my/manifolding-atlas-prompt-registry))
-         (codes (my/manifolding-atlas--capture-grid-codes
-                 (length prompts))))
-    (cl-mapcar
-     (lambda (s code)
+                    my/manifolding-atlas-prompt-registry)))
+    (mapcar
+     (lambda (s)
        (list :key (plist-get s :key)
              :label (my/manifolding-atlas--update-short-label s)
-             :code code
-             :selected t
+             :selected (and my/manifolding-atlas--capture-selection-mode t)
              :pos nil))
-     prompts codes)))
+     prompts)))
 #+end_src
 
 **** Capture grid — rendering
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--capture-grid-line (e)
-  "Render entry E as one grid line."
-  (format "%s   [%s] %s"
-          (propertize (plist-get e :code) 'face 'avy-lead-face)
+  "Render entry E as one grid line (gutter for avy overlays)."
+  (format "   [%s] %s"
           (if (plist-get e :selected) "✓" " ")
           (plist-get e :label)))
 
@@ -174,7 +138,7 @@ Everything starts SELECTED; picking with letters narrows."
   "Paint the whole grid BUF from ENTRIES."
   (with-current-buffer buf
     (erase-buffer)
-    (insert "Properties — letters pick · SPC all/none · RET done · q cancel\n\n")
+    (insert "Properties — letters jump+toggle · SPC all/none · RET done · q cancel\n\n")
     (dolist (e entries)
       (plist-put e :pos (point-marker))
       (insert (my/manifolding-atlas--capture-grid-line e) "\n"))
@@ -215,37 +179,6 @@ WARNING answers count as "unchanged" and apply nothing.
       (my/manifolding-atlas--apply-fragment frag spec))))
 #+end_src
 
-**** Confirm and cancel suffixes
-One confirm for both menus: in capture SELECTION mode it records
-the toggled keys; otherwise it runs each selected prompt and
-applies changes.
-#+begin_src emacs-lisp
-(transient-define-suffix my/manifolding-atlas--menu-confirm ()
-  "Confirm the toggle grid: apply every selected property."
-  :transient 'transient--do-exit
-  (interactive)
-  (let ((keys my/manifolding-atlas--selected-keys))
-    (setq my/manifolding-atlas--selected-keys nil)
-    (dolist (key keys)
-      (my/manifolding-atlas--run-update-key key))
-    (when (fboundp 'my/manifolding-atlas--add-live-transcludes)
-      (my/manifolding-atlas--add-live-transcludes my/manifolding-atlas--current-note))
-    (save-buffer)
-    (message "Updated properties on %s"
-             (manifolding-atlas-note-title my/manifolding-atlas--current-note))
-    (when (called-interactively-p 'any)
-      (my/manifolding-atlas--properties-menu))))
-
-(defun my/manifolding-atlas--selection-mode-p ()
-  "Non-nil while the shared menu serves capture SELECTION."
-  my/manifolding-atlas--capture-selection-mode)
-
-(transient-define-suffix my/manifolding-atlas--menu-cancel ()
-  "Cancel the toggle grid."
-  (interactive)
-  (setq my/manifolding-atlas--selected-keys nil)
-  (message "Update cancelled."))
-#+end_src
 *** Buffer Note Helper
 
 **** Point-based lookup
@@ -405,9 +338,10 @@ to the property drawer when no description-list value exists."
 (put 'my/manifolding-atlas--fix-violations 'transient--suffix nil)
 #+end_src
 *** Shared Toggle Menu
-SPC v P uses the transient grid below. Capture SELECTION uses the
-dedicated custom buffer engine (see Capture grid sections) and only
-shares this file's helpers.
+ONE engine serves both flows: SPC v P (update mode — starts empty,
+confirm applies picked prompts) and captures (starts all-selected,
+first avy pick solos). The mode flag switches starting state and
+what confirm does; rows always follow the schema registry.
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas--capture-selection-mode nil
   "Non-nil while capture flows run their dedicated property grid.")
@@ -422,130 +356,95 @@ shares this file's helpers.
       (plist-put e :selected (not any))
       (my/manifolding-atlas--capture-grid-redraw e))))
 
+(defun my/manifolding-atlas--capture-grid-row-at (entries)
+  "Return the entry whose label appears on the current line."
+  (let ((line (buffer-substring-no-properties
+               (line-beginning-position) (line-end-position))))
+    (seq-find (lambda (e)
+                (string-match-p
+                 (regexp-quote (plist-get e :label)) line))
+              entries)))
+
 (defun my/manifolding-atlas--capture-grid-loop ()
-  "Run the capture property grid. Returns 'confirm or 'cancel.
-Opens all-selected. Letters pick (first pick SOLO-selects, dropping
-every other ✓), SPC flips all/none, RET confirms, q cancels."
+  "Run the property grid. Returns 'confirm or 'cancel.
+REAL avy overlays every row: jump to a row to toggle it (the first
+jump SOLO-selects in capture mode). SPC flips all/none without
+leaving avy; pausing surfaces RET/q."
   (let* ((entries (my/manifolding-atlas--capture-grid-entries))
          (buf (get-buffer-create "*Atlas Grid*"))
-         (solo t)
-         pending)
+         (solo my/manifolding-atlas--capture-selection-mode))
     (my/manifolding-atlas--capture-grid-render buf entries)
     (pop-to-buffer buf)
     (catch 'exit
       (while t
-        (let* ((ev (read-event))
-               (ch (and (characterp ev) ev)))
-          (cond
-           ((eq ch ?\s)
-            (my/manifolding-atlas--capture-grid-toggle-all entries buf)
-            (setq solo nil))
-           ((eq ch ?\r)
-            ;; Sync row state back into the variable the collector
-            ;; and the review screen read.
-            (setq my/manifolding-atlas--selected-keys
-                  (mapcar (lambda (e) (plist-get e :key))
-                          (seq-filter (lambda (e) (plist-get e :selected))
-                                      entries)))
-            (throw 'exit
-                   (if my/manifolding-atlas--selected-keys
-                       'confirm 'cancel)))
-           ((eq ch ?q)
+        (let ((win (get-buffer-window buf t))
+              spc jumped)
+          (unless win
             (throw 'exit 'cancel))
-           (ch
-            (setq pending (concat pending (string ch)))
-            (let ((exact (seq-find (lambda (e) (string=
-                                             (plist-get e :code) pending))
-                                   entries))
-                  (partial (seq-some (lambda (e) (string-prefix-p
-                                                  pending (plist-get e :code)))
-                                     entries)))
-              (cond (exact
-                     (if solo
-                         (progn
-                           (dolist (x entries)
-                             (plist-put x :selected nil))
-                           (plist-put exact :selected t)
-                           (my/manifolding-atlas--capture-grid-refresh
-                            entries buf)
-                           (message "Only [%s] %s selected"
-                                    (plist-get exact :code)
-                                    (plist-get exact :label)))
-                       (plist-put exact :selected
-                                  (not (plist-get exact :selected)))
-                       (my/manifolding-atlas--capture-grid-redraw exact))
-                     (setq solo nil pending ""))
-                    ((not partial)
-                     (setq pending "")
-                     (ding)))))))))))
+          (with-selected-window win
+            (let* ((avy-all-windows nil)
+                   (avy-dispatch-alist
+                    (cons (cons ?\s
+                                (lambda (_)
+                                  (setq spc t)
+                                  (user-error "SPC")))
+                            avy-dispatch-alist)))
+              (condition-case nil
+                  (progn (avy-goto-line)
+                         (let ((e (my/manifolding-atlas--capture-grid-row-at
+                                   entries)))
+                           (when e
+                             (if solo
+                                 (progn
+                                   (dolist (x entries)
+                                     (unless (eq x e)
+                                       (plist-put x :selected nil)))
+                                   (plist-put e :selected t)
+                                   (setq solo nil))
+                                 (plist-put e :selected
+                                            (not (plist-get e :selected))))
+                               (setq jumped t)
+                               (my/manifolding-atlas--capture-grid-refresh
+                                entries buf))))
+                (user-error nil)
+                (error nil))))
+          (when spc
+            (setq spc nil)
+            (my/manifolding-atlas--capture-grid-toggle-all entries buf))
+          (unless (or spc jumped)
+            (pcase (read-key "letters jump · SPC all/none · RET confirm · q cancel")
+              (?\r (setq my/manifolding-atlas--selected-keys
+                         (mapcar (lambda (e) (plist-get e :key))
+                                 (seq-filter
+                                  (lambda (e) (plist-get e :selected))
+                                  entries)))
+                   (throw 'exit
+                          (if my/manifolding-atlas--selected-keys
+                              'confirm 'cancel)))
+              (?q  (setq my/manifolding-atlas--selected-keys nil)
+                   (throw 'exit 'cancel))
+              (_ nil))))))))
 
-(defun my/manifolding-atlas--selection-body-template ()
-  "Pre-run the body template chooser during capture SELECTION.
-Locks the choice now so it is not asked again at finalize."
-  (interactive)
-  (when (fboundp 'my/manifolding-atlas--choose-capture)
-    (setq my/manifolding-atlas--chosen-capture
-          (my/manifolding-atlas--choose-capture))
-    (message "Body template locked: %s"
-             (or my/manifolding-atlas--chosen-capture "none"))))
-#+end_src
+(defun my/manifolding-atlas--update-grid-session ()
+  "SPC v P: run the grid UNSELECTED until cancel.
+Confirm applies every picked prompt to the note, then reopens the
+grid so more properties can be updated in the same sitting."
+  (catch 'done
+    (while t
+      (unless (eq 'confirm (my/manifolding-atlas--capture-grid-loop))
+        (throw 'done nil))
+      (let ((keys my/manifolding-atlas--selected-keys))
+        (setq my/manifolding-atlas--selected-keys nil)
+        (dolist (key keys)
+          (my/manifolding-atlas--run-update-key key))
+        (when (fboundp 'my/manifolding-atlas--add-live-transcludes)
+          (my/manifolding-atlas--add-live-transcludes
+           my/manifolding-atlas--current-note))
+        (save-buffer)
+        (message "Updated properties on %s"
+                 (manifolding-atlas-note-title
+                  my/manifolding-atlas--current-note))))))
 
-**** Suffix grid builder (SPC v P)
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas--update-build-children (prompts)
-  "Build transient suffix specs for PROMPTS, filling the key map.
-Lowercase then uppercase letters: 52 toggle slots."
-  (let ((keys "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-        (idx 0)
-        children)
-    (setq my/manifolding-atlas--update-key-map nil)
-    (dolist (spec (reverse prompts))
-      (when (< idx (length keys))
-        (let ((k (aref keys idx))
-              (prompt-key (plist-get spec :key)))
-          (push (cons k prompt-key) my/manifolding-atlas--update-key-map)
-          (push (list (char-to-string k)
-                      (my/manifolding-atlas--update-format-prompt prompt-key)
-                      'my/manifolding-atlas--toggle-prompt)
-                children)
-          (setq idx (1+ idx)))))
-    (nreverse children)))
-#+end_src
-
-**** Update menu spec
-#+begin_src emacs-lisp
-(defun my/manifolding-atlas--menu-group-specs ()
-  "Return the group spec vectors for the SPC v P update menu.
-Capture flows use the dedicated custom grid instead of transient."
-  (let* ((prompts (seq-filter
-                   (lambda (s)
-                     (let ((k (plist-get s :key)))
-                       (and (not (memq k '(position)))
-                            (plist-get s :read-current-fn)
-                            (plist-get s :prompt-fn)
-                            (seq-intersection
-                             my/manifolding-atlas--current-contexts
-                             (plist-get s :contexts) #'eq))))
-                    my/manifolding-atlas-prompt-registry))
-         (children (my/manifolding-atlas--update-build-children prompts))
-         (actions '(("RET" "Confirm" my/manifolding-atlas--menu-confirm)
-                    ("C-c C-k" "Cancel" my/manifolding-atlas--menu-cancel))))
-    (unless children
-      (user-error "No toggleable properties for context %s"
-                  my/manifolding-atlas--current-contexts))
-    (list
-     (vconcat (vector "Properties") children)
-     (vconcat (vector "Actions") actions))))
-
-(eval
- `(transient-define-prefix my/manifolding-atlas--properties-menu ()
-    "Toggle-grid menu: properties update AND capture SELECTION."
-    ,(vector :class 'transient-columns
-             :setup-children
-             (lambda (_)
-               (transient-parse-suffixes
-                'my/manifolding-atlas--properties-menu
-                 (my/manifolding-atlas--menu-group-specs))))))
 #+end_src
 
 **** Selection review
@@ -799,11 +698,12 @@ skip the prompt and open the menu directly."
           my/manifolding-atlas--capture-selection-mode nil)
     (find-file file)
     (goto-char (or (and pos (> pos 0) pos) (point-min)))
-    (unless (org-at-heading-p)
-      (ignore-errors (org-back-to-heading t))
       (unless (org-at-heading-p)
-        (ignore-errors (org-next-visible-heading 1))))
-    (my/manifolding-atlas--properties-menu)))
+        (ignore-errors (org-back-to-heading t))
+        (unless (org-at-heading-p)
+          (ignore-errors (org-next-visible-heading 1))))
+    (setq my/manifolding-atlas--capture-selection-mode nil)
+    (my/manifolding-atlas--update-grid-session)))
 #+end_src
 
 
