@@ -389,7 +389,8 @@ completing-read-multiple and surfaces the error in *Warnings*."
 Level 4 collapses to level 1 with the chosen keys made interactive.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-collect--selection-fast-level (specialized-contexts general-contexts)
-  "Ask which keys fire; store them and return effective level 1."
+  "Ask which keys fire; store them and return effective level.
+An empty pick list means nothing gets asked: effective level 2."
   (setq my/manifolding-atlas-org-prompt--custom-set
         (my/manifolding-atlas-collect--choose-custom
          (append (if (listp specialized-contexts)
@@ -398,7 +399,21 @@ Level 4 collapses to level 1 with the chosen keys made interactive.
                  (if (listp general-contexts)
                      general-contexts
                    (list general-contexts)))))
-  1)
+  (if my/manifolding-atlas-org-prompt--custom-set 1 2))
+#+end_src
+*** Property merge dedup
+Specialized and general sweeps can cover the same contexts (file
+captures pass '(file) twice), so every prompt may contribute a
+fragment on both sides. Later duplicates are dropped, first wins.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--dedupe-properties (props)
+  "Drop later PROPS pairs whose KEY already appeared."
+  (let (seen out)
+    (dolist (pair props (nreverse out))
+      (let ((key (car pair)))
+        (unless (member key seen)
+          (push key seen)
+          (push pair out))))))
 #+end_src
 *** Fast dispatch
 #+begin_src emacs-lisp
@@ -434,10 +449,13 @@ When FAST-LEVEL is nil, prompts the user via `my/manifolding-atlas--fast-level'.
                  (my/manifolding-atlas-collect-prompts general-contexts))
                 (t
                  (my/manifolding-atlas--collect-default-prompts general-contexts)))))
-    (let ((merged (list :tags (append (plist-get gen :tags) (plist-get spec :tags))
-                        :properties (append (plist-get gen :properties) (plist-get spec :properties))
-                        :body (concat (plist-get gen :body) (plist-get spec :body))
-                        :post-apply (append (plist-get gen :post-apply) (plist-get spec :post-apply)))))
+    (let ((merged (list :tags (delete-dups (append (plist-get gen :tags)
+                                                   (plist-get spec :tags)))
+                    :properties (my/manifolding-atlas--dedupe-properties
+                                 (append (plist-get gen :properties)
+                                         (plist-get spec :properties)))
+                    :body (concat (plist-get gen :body) (plist-get spec :body))
+                    :post-apply (append (plist-get gen :post-apply) (plist-get spec :post-apply)))))
       (setq my/manifolding-atlas-org-prompt--custom-set nil)
       merged)))
  #+end_src

@@ -20,10 +20,15 @@ Architecture: core (engine) → infra (machinery) → domains (capabilities)
   `RET` advance only when something was applied, `q` skip→WARNING,
   `b` step back / `B` revisit any answered prompt (applied value
   restored+highlighted), `Q`/`C-g` abort session and DELETE the draft.
-  Fast modes o/e/u never open UI; fast mode `s` (SELECTION) multi-selects
-  which registry keys fire interactively while the rest answer WARNING
-  silently (`my/manifolding-atlas-org-prompt--custom-set`, includes a
-  Body-Template entry that pre-runs the template chooser).
+  Session pickers open with an avy-mark loop armed (letters jump+apply
+  live; pause → RET/q/l hints).
+  Speed menu DELETED: every capture opens the dedicated "*Atlas Grid*"
+  buffer (`domains/properties/properties.org`) — all properties start
+  selected; red per-row codes toggle rows (first pick SOLO-selects,
+  dropping the rest); SPC flips all/none; RET → review buffer (start/
+  back/cancel); empty confirm asks nothing. Picks travel via
+  `my/manifolding-atlas-org-prompt--custom-set`. SPC v P keeps the
+  classic transient (letter toggles) for property UPDATES on notes.
 - Every prompt file self-heals a first `** WARNING` option (skip
   sentinel, plain text — no emoji anywhere). RET on it = skip; q/C-g
   too. Point lands on WARNING unless :TASK-DEFAULT: exists.

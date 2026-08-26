@@ -8,40 +8,20 @@
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas--fast-level 0
   "Fast mode level for current creation.
-0=normal, 1=skip general, 2=skip all, 3=quick (no body),
-4=selection (pick which properties to customize).")
+Captures always run at level 4: the property toggle grid asks
+directly. Picked keys fire interactively; confirming empty asks
+nothing. Other levels remain meaningful to downstream gates.")
 #+end_src
 
-** Fast mode level menu
-Direct letter selection; press ? inside the prompt for a help
-window describing every option. Always returns a number 0-3.
-SELECTION (s) asks which properties to customize; everything
-else gets WARNING.
+** Capture speed
+No separate speed menu any more — captures go straight into the
+shared property toggle grid. This stub keeps the historical
+call sites and numeric contract working.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--fast-level ()
-  "Prompt for capture speed."
-  (let* ((ans (read-multiple-choice
-               "Capture speed"
-               '((?a "NORMAL" "every prompt fires — the full interrogation")
-                 (?o "SKIP GENERAL" "specialized prompts still ask; general ones take defaults")
-                 (?e "SKIP ALL" "accept every default — zero questions")
-                 (?u "QUICK" "defaults, and no body capture afterwards")
-                 (?s "SELECTION" "select which properties to customize; everything else gets WARNING")
-                 (?\r "NORMAL" "same as a"))))
-          ;; rmc normally returns (KEY . DESCRIPTION); tolerate a bare
-          ;; key or anything else by normalizing first.
-          (key (if (consp ans) (car ans) ans)))
-    (pcase key
-      (?o (setq my/manifolding-atlas--fast-level 1)
-          (message "Capture mode: SKIP GENERAL") 1)
-      (?e (setq my/manifolding-atlas--fast-level 2)
-          (message "Capture mode: SKIP ALL") 2)
-      (?u (setq my/manifolding-atlas--fast-level 3)
-          (message "Capture mode: QUICK") 3)
-      (?s (setq my/manifolding-atlas--fast-level 4)
-          (message "Capture mode: SELECTION") 4)
-      (_ (setq my/manifolding-atlas--fast-level 0)
-         (message "Capture mode: NORMAL") 0))))
+  "Capture speed is always custom: the property grid asks directly."
+  (setq my/manifolding-atlas--fast-level 4)
+  4)
 #+end_src
 
 ** Slug spacing advice

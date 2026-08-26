@@ -675,6 +675,39 @@ Afterwards use m / l / RET on that line as usual."
           (user-error "Not an option heading"))))))
 
 #+end_src
+** Avy marking loop
+The session picker opens with avy already listening: typing letters
+of an option jumps there and applies it live (same as m). Pausing
+surfaces the control prompt — RET next · q skip · l live.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-org-prompt--avy-mark-loop (buf)
+  "Avy-first marking loop over picker BUF."
+  (require 'avy)
+  (let ((again t) action)
+    (while (and again (buffer-live-p buf))
+      (when-let ((win (get-buffer-window buf)))
+        (with-selected-window win
+          (let ((avy-all-windows nil))
+            (condition-case nil
+                (progn (avy-goto-line)
+                       (when (and (org-at-heading-p)
+                                  (>= (org-outline-level) 2))
+                         (my/manifolding-atlas-org-prompt--buffer-mark)))
+              (error nil)))))
+      (pcase (read-key "letters mark · RET next · q skip · l live")
+        (?\r (if (or my/manifolding-atlas-org-prompt--applied
+                     my/manifolding-atlas-org-prompt--buffer-marks)
+                 (setq again nil action 'accept)
+               (message "Mark an option first — or q to skip")))
+        (?q (setq again nil action 'skip))
+        (?l (setq again nil action 'live))
+        (_ nil)))
+    (when (buffer-live-p buf)
+      (pcase action
+        ('accept (my/manifolding-atlas-org-prompt--buffer-accept))
+        ('skip   (my/manifolding-atlas-org-prompt--buffer-abort))
+        ('live   (my/manifolding-atlas-org-prompt--make-live))))))
+#+end_src
 ** Buffer mark
 Session: live apply/un-apply; standalone: classic multi-mark.
 #+begin_src emacs-lisp
@@ -927,12 +960,12 @@ Labels make the completion list readable; the request rides behind it.
         (my/manifolding-atlas-org-prompt--session-reopen req)))))
 
 #+end_src
-** QUICK-mode session starts
+** SKIP-ALL session starts
 Both entry points discard the queue when fast level is 3.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--session-maybe-start (note &optional finalize)
   "Answer any deferred prompts against NOTE, then call FINALIZE.
-QUICK capture mode (fast level 3) skips every queued prompt."
+SKIP ALL · NO BODY mode (fast level 3) skips every queued prompt."
   (let ((queue my/manifolding-atlas-org-prompt--deferred))
     (setq my/manifolding-atlas-org-prompt--deferred nil)
     (if (and queue (/= my/manifolding-atlas--fast-level 3))
@@ -944,7 +977,7 @@ Same gate for default-function flows (note created after collection).
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--session-start-parked (note &optional finalize)
   "Answer parked prompts against NOTE, then call FINALIZE.
-QUICK capture mode (fast level 3) skips every parked prompt."
+SKIP ALL · NO BODY mode (fast level 3) skips every parked prompt."
   (let ((queue my/manifolding-atlas-org-prompt--pending-create))
     (setq my/manifolding-atlas-org-prompt--pending-create nil)
     (if (and queue (/= my/manifolding-atlas--fast-level 3))
@@ -1115,7 +1148,11 @@ value so revisits highlight correctly.
       (with-selected-window win
         (ignore-errors (recenter-top-bottom))))
     (message "%s — m apply · l live · a avy · RET next · q skip · b/B back"
-             (plist-get spec :label))))
+             (plist-get spec :label))
+    ;; Avy-first: letters jump to options and mark them live; the
+    ;; control prompt only surfaces once typing pauses.
+    (when my/manifolding-atlas-org-prompt--session-p
+      (my/manifolding-atlas-org-prompt--avy-mark-loop buf))))
 
 #+end_src
 ** Session value

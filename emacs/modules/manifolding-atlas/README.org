@@ -241,30 +241,23 @@ There are several entry points:
 | ~manifolding-atlas-find~                | find/create      |
 | ~my/manifolding-atlas-insert-link~      | identity link    |
 
-The capture engine has five speeds.
+The capture engine has one speed now: the grid.
 
 #+begin_example
-RET / a    NORMAL
-ask everything
+*Atlas Grid* opens immediately — every property starts selected.
 
-o          SKIP GENERAL
-specialized prompts survive
+<code>     toggle that row (red, per row)
+           first pick is solo: it drops every other ✓
+SPC        all ↔ none
+RET        confirm → review screen
+           RET start · SPC back to grid · q cancel
 
-e          SKIP ALL
-accept everything, zero questions
-
-s          SELECTION
-pick which properties to customize;
-everything else gets WARNING
-
-u          QUICK
-defaults + no body capture
+confirm with nothing selected = ask nothing at all
 #+end_example
 
-The distinction matters.  
-Capture should not become a bureaucratic ceremony between a thought and its existence.  
-Sometimes you want the full interrogation.  
-Sometimes you want the machine to get out of the way so the thought can die in peace.
+Pick exactly what should be asked.  
+Everything else quietly becomes a ~WARNING~.  
+The old speed menu is gone; the grid IS the speed setting.
 
 * The asynchronous prompt machine
 
@@ -374,6 +367,10 @@ Aborting deletes the draft so nothing half-made survives.
 Multi-choice prompts accumulate marks; clearing them all removes the
 property.  Reopened prompts restore their applied value, highlighted
 in bold, so changes are always visible before they become real.
+
+Session pickers open with an avy loop already armed: typing letters
+of an option jumps there and applies it live; pausing surfaces the
+key hints instead.
 
 * Schema is data
 

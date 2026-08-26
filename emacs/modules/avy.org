@@ -16,12 +16,12 @@
     ;; Dvorak home row only
     (setq avy-keys '(?a ?o ?e ?u ?i ?d ?h ?t ?n ?s))
 
-    ;; Always visible purple highlights
+    ;; Always visible red highlights
     (setq avy-background nil)
     (custom-set-faces
-     '(avy-lead-face   ((t (:foreground "#ffffff" :background unspecified :weight bold))))
-     '(avy-lead-face-0 ((t (:foreground "#ffffff" :background unspecified :weight bold))))
-     '(avy-lead-face-1 ((t (:foreground "#ffffff" :background unspecified :weight bold))))
-     '(avy-lead-face-2 ((t (:foreground "#ffffff" :background unspecified :weight bold))))))
+     '(avy-lead-face   ((t (:foreground "#ff0000" :background unspecified :weight bold))))
+     '(avy-lead-face-0 ((t (:foreground "#ff0000" :background unspecified :weight bold))))
+     '(avy-lead-face-1 ((t (:foreground "#ff0000" :background unspecified :weight bold))))
+     '(avy-lead-face-2 ((t (:foreground "#ff0000" :background unspecified :weight bold))))))
   
 #+end_src

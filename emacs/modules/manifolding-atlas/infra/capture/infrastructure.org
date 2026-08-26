@@ -144,7 +144,7 @@ When a template is chosen, stores `:TEMPLATE:' and `:TEMPLATE_HASH:'
 properties on NOTE for schema validation.
 When TEMPLATE is \"\" (empty), skip template selection and use empty body."
   (when (= my/manifolding-atlas--fast-level 3)
-    (message "QUICK capture — %s created"
+    (message "SKIP ALL · NO BODY — %s created"
              (file-name-nondirectory (manifolding-atlas-note-path note)))
     ;; Bail BEFORE the let*: computing tmpl would otherwise fire the
     ;; interactive body-template chooser even though we discard it.
@@ -236,8 +236,8 @@ Records where a newly created note was born from.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--open-capture-new-note (note)
   "Finalizer for parked prompt sessions: open capture for NOTE.
-QUICK mode (fast level 3) stops here — the file exists, nothing
-else happens."
+SKIP ALL · NO BODY mode (fast level 3) stops here — the file
+exists, nothing else happens."
   (unless (= my/manifolding-atlas--fast-level 3)
     (my/manifolding-atlas--open-capture-for-note note)))
 #+end_src

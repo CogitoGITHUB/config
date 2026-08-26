@@ -7,7 +7,8 @@ capture/: entry-points (create flows — create note first, then async
 prompt session applies picks to the note; finalizers are named fns,
 no closures: loader compiles dynamically), infrastructure
 (choose-capture), heading-format (* Title advice), link-utilities,
-note-creation (fast mode), prompt-engine (registry, collectors with
+note-creation (fast-level stub — captures always run level 4),
+prompt-engine (registry, collectors with dedup merge,
 defer/defaults-only flags, MISSING PROMPTS rebuild), org-prompts
 (declarative outline→prompt engine + ASYNC session picker + WARNING
 auto-insert + template helpers under `--choose` names), root-dir
