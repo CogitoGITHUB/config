@@ -27,6 +27,7 @@
      "deprecated positional arguments to ‘define-minor-mode’"
      "Manifolding Atlas: opening database"
      "Manifolding Atlas: database ready"
+     "Org version mismatch"
      "For information about GNU Emacs")
    "\\|"))
 

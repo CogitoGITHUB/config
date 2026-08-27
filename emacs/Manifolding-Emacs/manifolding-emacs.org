@@ -1387,7 +1387,10 @@ Atomic upstream renderers — kept whole.
   (let ((groups (make-hash-table :test #'equal))
         order)
     (dolist (e entries)
-      (let* ((f (or (manifolding-emacs-error-entry-file e) "unknown"))
+      (let* ((f (or (if (manifolding-emacs-error-entry-p e)
+                         (manifolding-emacs-error-entry-file e)
+                       nil)
+                     "unknown"))
              (base (file-name-nondirectory f)))
         (unless (gethash base groups)
           (push base order))
@@ -1409,7 +1412,9 @@ Atomic upstream renderers — kept whole.
               out)
         (dolist (e items)
           (push (format "  %s\n"
-                        (manifolding-emacs-error-entry-message e))
+                        (if (manifolding-emacs-error-entry-p e)
+                            (manifolding-emacs-error-entry-message e)
+                          (plist-get e :message)))
                 out)))
       (apply #'concat (nreverse out)))))
 

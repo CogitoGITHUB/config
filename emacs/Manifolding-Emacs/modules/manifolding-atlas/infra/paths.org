@@ -21,7 +21,7 @@ fires.  4000 is ~2.5x default — generous yet C-safe.
 (defun my/manifolding-atlas-module-dir ()
   "Return the manifolding-atlas module root."
   (expand-file-name "manifolding-atlas/"
-                    (expand-file-name "modules" user-emacs-directory)))
+                    (expand-file-name "modules" (locate-user-emacs-file "Manifolding-Emacs"))))
 
 (defun my/manifolding-atlas-schema-dir ()
   "Return the schema/ directory (prompt definitions)."

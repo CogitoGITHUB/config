@@ -890,10 +890,10 @@ A \"Back\" group linking to BACK-TARGET is appended automatically."
                 :bind ',state-binds)))
          (pretty-hydra-define ,hydra-name
            (:title ,title :quit-key "q" :separator "─")
-           ,@(mapcar (lambda (g)
-                       (list (car g) (cadr g)))
-                     groups)
-           ,@(when back-group (list back-group)))))))
+           (,@(apply #'append (mapcar (lambda (g)
+                                        (list (car g) (cadr g)))
+                                      groups))
+            ,@back-group))))))
 #+end_src
 
 * Hydras

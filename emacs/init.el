@@ -12,6 +12,10 @@
 
 (setq debug-on-error t)
 
+(let ((org-build (locate-user-emacs-file "straight/build/org")))
+  (when (file-directory-p org-build)
+    (add-to-list 'load-path org-build)))
+
 (require 'org)
 
 (defvar manifold--foundation-org
