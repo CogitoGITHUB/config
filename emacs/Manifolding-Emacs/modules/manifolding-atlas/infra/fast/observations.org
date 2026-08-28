@@ -16,5 +16,5 @@ Fast observation capture. Creates an observation heading in Observations.org.
               :kill-buffer t :unnarrowed t))))
       (org-capture nil "o")
       (set-buffer-modified-p nil)
-      (modaled-set-state "insert"))))
+      (when (fboundp 'modaled-set-state) (modaled-set-state "insert")))))
 #+end_src

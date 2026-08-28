@@ -368,12 +368,13 @@ body-template entry that locks the choice immediately.
 Opens the toggle menu when it works; any menu failure falls back to
 completing-read-multiple so SELECTION can never silently skip.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-collect--fallback-choose (contexts)
-  "Bulletproof SELECTION picker: completing-read-multiple over candidates."
-  (let* ((cands (my/manifolding-atlas-collect--custom-candidates contexts))
-         (picked (completing-read-multiple
-                  "Customize which properties (comma between picks): "
-                  (mapcar #'car cands)))
+ (defun my/manifolding-atlas-collect--fallback-choose (contexts)
+   "Bulletproof SELECTION picker: completing-read-multiple over candidates."
+   (let* ((cands (my/manifolding-atlas-collect--custom-candidates contexts))
+          (picked (let ((enable-recursive-minibuffers t))
+                    (completing-read-multiple
+                     "Customize which properties (comma between picks): "
+                     (mapcar #'car cands))))
          (ids (delq nil
                     (mapcar (lambda (p) (cdr (assoc p cands))) picked))))
     (when (memq 'body-template ids)

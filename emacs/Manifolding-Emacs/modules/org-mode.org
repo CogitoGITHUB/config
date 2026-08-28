@@ -7,13 +7,15 @@
 :END:
 
 ** Todo Vocabulary
-Must match the options in manifolding-atlas/schema/general/todo.org —
-otherwise org-todo rejects the picked state silently.
+Single source is `org-todo-states.org`; this mirrors it. Font-lock is
+refreshed on every Org buffer via hook so load order never matters.
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
   (setq org-todo-keywords
-        '((sequence "TODO" "NEXT" "DOING" "TESTING" "WAIT"
-                    "|" "DONE" "CANCELLED"))))
+        '((sequence "TODO" "NEXT" "DOING" "TESTING" "WAIT" "WARNING"
+                    "|"
+                    "DONE" "CANCELLED" "CANCELED"))))
+(add-hook 'org-mode-hook #'org-set-regexps-and-options)
 #+end_src
 
 ** Links

@@ -158,6 +158,47 @@ Starting selection depends on mode: captures open ALL-selected
       (my/manifolding-atlas--capture-grid-redraw e))
     (goto-char (point-min))))
 #+end_src
+*** Grid placement
+Responsive placement keeps pickers stable across frame sizes and reuses the same window so toggling with SPC does not flick placement.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--grid-display (buf)
+  "Show BUF via shared responsive helper."
+  (if (fboundp 'my/manifolding-atlas--display-buffer-responsive)
+      (my/manifolding-atlas--display-buffer-responsive buf)
+    (condition-case err
+        (if (> (frame-width) 140)
+            (let ((win (condition-case err2 (split-window-right (floor (* 0.65 (frame-width)))) (error (warn "atlas-grid split-right: %s" (error-message-string err2)) nil))))
+              (if win (progn (set-window-buffer win buf) (select-window win)) (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.35)))))
+          (let ((win (condition-case err2 (split-window-below (- (max 10 (floor (* 0.60 (frame-height)))))) (error (warn "atlas-grid split-below: %s" (error-message-string err2)) nil))))
+            (if win (progn (set-window-buffer win buf) (select-window win)) (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.35))))))
+      (error (warn "atlas-grid-display outer: %s" (error-message-string err)) (ignore-errors (pop-to-buffer buf))))))
+#+end_src
+*** Transient window cleanup
+Killing a transient buffer without managing its window makes that window revert to its previous buffer (often Dired), duplicating it.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--kill-buffer-reuse-window (buf &optional note-buf)
+  "Kill BUF. For windows showing it: place NOTE-BUF into exactly one
+of them if it's the last window on its frame, delete the rest."
+  (when (buffer-live-p buf)
+    (let ((placed nil))
+      (dolist (win (get-buffer-window-list buf nil t))
+        (when (window-live-p win)
+          (if (and (not placed)
+                   (= 1 (length (window-list (window-frame win) 'no-minibuf)))
+                   note-buf (buffer-live-p note-buf))
+              (progn (set-window-buffer win note-buf) (setq placed t))
+            (ignore-errors (delete-window win)))))
+      (kill-buffer buf))))
+#+end_src
+*** Org-element guard
+Downstream symptom of window bug — ensure Org APIs never run in Dired.
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  (advice-add 'org-element-at-point :around
+              (lambda (orig &rest args)
+                (when (derived-mode-p 'org-mode)
+                  (apply orig args)))))
+#+end_src
 *** Confirm / Cancel
 
 **** Per-key prompt run
@@ -185,13 +226,14 @@ WARNING answers count as "unchanged" and apply nothing.
 Walks up to the enclosing heading if the cursor is in the
 body/drawer, so it targets exactly the note you are on.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas--note-at-point ()
-  "Return the manifolding-atlas note for the heading under (or enclosing) point."
-  (let (id)
-    (unless (org-at-heading-p)
-      (ignore-errors (org-back-to-heading t)))
-    (setq id (org-entry-get nil "ID"))
-    (and id (manifolding-atlas-db-get-by-id id))))
+ (defun my/manifolding-atlas--note-at-point ()
+   "Return the manifolding-atlas note for the heading under (or enclosing) point."
+   (when (derived-mode-p 'org-mode)
+     (let (id)
+       (unless (org-at-heading-p)
+         (ignore-errors (org-back-to-heading t)))
+       (setq id (org-entry-get nil "ID"))
+       (and id (manifolding-atlas-db-get-by-id id)))))
 #+end_src
 
 **** Buffer fallback
@@ -374,25 +416,21 @@ leaving avy; pausing surfaces RET/q."
          (buf (get-buffer-create "*Atlas Grid*"))
          (solo my/manifolding-atlas--capture-selection-mode))
     (my/manifolding-atlas--capture-grid-render buf entries)
-    (pop-to-buffer buf)
+    (my/manifolding-atlas--grid-display buf)
     (catch 'exit
       (while t
         (let ((win (get-buffer-window buf t))
-              spc jumped)
+              spc jumped ret quit)
           (unless win
             (throw 'exit 'cancel))
-          (with-selected-window win
-            (let* ((avy-all-windows nil)
-                   (avy-dispatch-alist
-                    (cons (cons ?\s
-                                (lambda (_)
-                                  (setq spc t)
-                                  (user-error "SPC")))
-                            avy-dispatch-alist)))
-              (condition-case nil
-                  (progn (avy-goto-line)
-                         (let ((e (my/manifolding-atlas--capture-grid-row-at
-                                   entries)))
+           (with-selected-window win
+             (let* ((avy-all-windows nil)
+                    (avy-dispatch-alist
+                     (append (list (cons ?\s (lambda (_) (message "atlas-grid SPC dispatch") (setq spc t) t)) (cons ?\r (lambda (_) (message "atlas-grid RET dispatch") (setq ret t) t)) (cons ?\n (lambda (_) (message "atlas-grid RET dispatch \\n") (setq ret t) t)) (cons ?q (lambda (_) (message "atlas-grid Q dispatch") (setq quit t) t))) avy-dispatch-alist)))
+               (condition-case err
+                   (progn (avy-goto-line)
+                          (let ((e (my/manifolding-atlas--capture-grid-row-at
+                                    entries)))
                            (when e
                              (if solo
                                  (progn
@@ -403,17 +441,24 @@ leaving avy; pausing surfaces RET/q."
                                    (setq solo nil))
                                  (plist-put e :selected
                                             (not (plist-get e :selected))))
-                               (setq jumped t)
-                               (my/manifolding-atlas--capture-grid-refresh
-                                entries buf))))
-                (user-error nil)
-                (error nil))))
-          (when spc
-            (setq spc nil)
-            (my/manifolding-atlas--capture-grid-toggle-all entries buf))
-          (unless (or spc jumped)
+                                (setq jumped t)
+                                (my/manifolding-atlas--capture-grid-refresh
+                                 entries buf))))
+                 (error (warn "atlas-grid avy: %s" (error-message-string err)) nil))))
+           (when spc
+             (setq spc nil)
+             (setq solo nil)
+             (my/manifolding-atlas--capture-grid-toggle-all entries buf))
+          (when ret
+            (setq my/manifolding-atlas--selected-keys
+                  (mapcar (lambda (e) (plist-get e :key)) (seq-filter (lambda (e) (plist-get e :selected)) entries)))
+            (throw (quote exit) (if my/manifolding-atlas--selected-keys (quote confirm) (quote cancel))))
+          (when quit
+            (setq my/manifolding-atlas--selected-keys nil)
+            (throw (quote exit) (quote cancel)))
+          (unless (or spc ret quit)
             (pcase (read-key "letters jump · SPC all/none · RET confirm · q cancel")
-              (?\r (setq my/manifolding-atlas--selected-keys
+              ((or ?\r ?\n) (setq my/manifolding-atlas--selected-keys
                          (mapcar (lambda (e) (plist-get e :key))
                                  (seq-filter
                                   (lambda (e) (plist-get e :selected))
@@ -478,12 +523,16 @@ Synchronous and deliberately not a transient: it runs inside the
 confirm suffix, so nesting another transient here would fight the
 grid's own teardown. read-key keeps it bulletproof.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas--selection-review ()
-  "Review the picks. Returns 'start, 'back or 'cancel.
-'start stores the picks in `my/manifolding-atlas--selection-result'."
-  (let ((buf (my/manifolding-atlas--selection-review-buffer))
-        action)
-    (pop-to-buffer buf)
+ (defun my/manifolding-atlas--selection-review ()
+   "Review the picks. Returns 'start, 'back or 'cancel.
+ 'start stores the picks in `my/manifolding-atlas--selection-result'."
+   (let ((buf (my/manifolding-atlas--selection-review-buffer))
+         action)
+     (condition-case nil
+         (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.30)))
+       (error (pop-to-buffer buf)))
+     (when-let ((win (get-buffer-window buf)))
+       (select-window win))
     (while (not action)
       (pcase (read-key "RET start · SPC back to menu · q cancel")
         ((or ?\r ?\n)
@@ -491,9 +540,23 @@ grid's own teardown. read-key keeps it bulletproof.
                (reverse my/manifolding-atlas--selected-keys)
                action 'start))
         (?\s (setq action 'back))
-        (?q  (setq action 'cancel))))
-    (kill-buffer buf)
+         (?q  (setq action 'cancel))))
+    (unless (eq action 'start)
+      (my/manifolding-atlas--kill-buffer-reuse-window buf))
     action))
+#+end_src
+
+**** Return to confirmation
+SPC in the note buffer after start returns to the persisted selection
+buffer, so the confirmation stays reachable until the flow ends.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--show-selection-review ()
+  "Display the persisted selection-confirmation buffer."
+  (interactive)
+  (let ((buf (get-buffer "*Atlas Selection*")))
+    (if (buffer-live-p buf)
+        (pop-to-buffer buf)
+      (user-error "No confirmation buffer — select properties first"))))
 #+end_src
 
 **** Selection entry
@@ -522,14 +585,17 @@ the grid with checkmarks intact until the user starts or cancels.
                 (setq my/manifolding-atlas--selected-keys nil)
                 (message "Cancelled — every property gets WARNING.")
                 (throw 'done nil))
-              ;; Confirmed: tear the grid down before the review.
               (when-let ((gbuf (get-buffer "*Atlas Grid*")))
-                (when-let ((win (get-buffer-window gbuf t)))
-                  (when (eq (window-buffer win) gbuf)
-                    (ignore-errors (delete-window win))))
-                (kill-buffer gbuf))
-              (pcase (my/manifolding-atlas--selection-review)
-                ('start  (throw 'done t))
+                 (my/manifolding-atlas--kill-buffer-reuse-window gbuf (when my/manifolding-atlas--current-note (when-let ((f (manifolding-atlas-note-path my/manifolding-atlas--current-note))) (get-file-buffer f)))))
+               (pcase (my/manifolding-atlas--selection-review)
+                ('start
+                 (when-let ((note my/manifolding-atlas--current-note)
+                            (f (manifolding-atlas-note-path note))
+                            (nbuf (get-file-buffer f)))
+                   (with-current-buffer nbuf
+                     (local-set-key (kbd "SPC")
+                                    #'my/manifolding-atlas--show-selection-review)))
+                 (throw 'done t))
                 ('back   nil)
                 ('cancel (setq my/manifolding-atlas--selected-keys nil
                                my/manifolding-atlas--selection-result nil)
@@ -540,13 +606,9 @@ the grid with checkmarks intact until the user starts or cancels.
          (warn "Manifolding Atlas: toggle grid failed: %s"
                (error-message-string err))
          (my/manifolding-atlas-collect--fallback-choose contexts)))
-    ;; Tear down the grid buffer/window on every exit path.
-    (when-let ((gbuf (get-buffer "*Atlas Grid*")))
-      (when-let ((win (get-buffer-window gbuf t)))
-        (when (eq (window-buffer win) gbuf)
-          (ignore-errors (delete-window win))))
-      (kill-buffer gbuf))
-    (setq my/manifolding-atlas--capture-selection-mode nil))
+      (when-let ((gbuf (get-buffer "*Atlas Grid*")))
+        (my/manifolding-atlas--kill-buffer-reuse-window gbuf (when my/manifolding-atlas--current-note (when-let ((f (manifolding-atlas-note-path my/manifolding-atlas--current-note))) (get-file-buffer f)))))
+      (setq my/manifolding-atlas--capture-selection-mode nil))
   my/manifolding-atlas--selection-result)
 #+end_src
 *** Fragment Applier

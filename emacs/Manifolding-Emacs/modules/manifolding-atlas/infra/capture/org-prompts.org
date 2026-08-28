@@ -657,11 +657,27 @@ the rest of the prompts."
     (my/manifolding-atlas-org-prompt--capture-ref-content ref-path)))
 
 #+end_src
+** Edit property file
+C-e: the picker buffer IS the property file (file-backed). C-e drops
+the modal pick state so you can edit it in place; C-x C-s commits.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-org-prompt--edit-property-file ()
+  "Make the picker buffer directly editable in place.
+The picker buffer visits the property file, so editing here and
+saving with C-x C-s writes the file itself."
+  (interactive)
+  (setq buffer-read-only nil)
+  (when (fboundp 'modaled-set-state)
+    (modaled-set-state nil))
+  (message "Editing property file in place — C-x C-s to save"))
 ** Avy to option
+Manual one-shot jump: pick an option with avy and the cursor lands on
+it (no auto-mark). The auto-armed marking loop (below) is the default
+in sessions; this is the standalone / fallback jump.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--avy-to-option ()
   "Select an option line with avy; the cursor lands on it.
-Afterwards use m / l / RET on that line as usual."
+Marking is manual afterwards — use buffer-mark on that line."
   (interactive)
   (require 'avy)
   (avy-with my/manifolding-atlas-org-prompt-avy
@@ -676,17 +692,24 @@ Afterwards use m / l / RET on that line as usual."
 
 #+end_src
 ** Avy marking loop
-The session picker opens with avy already listening: typing letters
-of an option jumps there and applies it live (same as m). Pausing
-surfaces the control prompt — RET next · q skip · l live.
+The session picker opens with avy ARMED BY DEFAULT. Letters are ONLY
+jump targets — press an option's letter and it jumps there and marks
+it live immediately. Avy stays alive: after each jump you can press
+another option's letter to jump and mark that too (multi-select or
+change selection). Only level-2 option headings can be marked.
+Control keys (never letters): RET advances ONLY when something is
+marked (else inert); SPC steps back; C-q quits; C-l makes the marked
+option live; C-e edits the property file in place; C-g aborts all.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--avy-mark-loop (buf)
   "Avy-first marking loop over picker BUF.
-REAL avy overlays every visible line: jumping to an option heading
-applies it live. Pausing surfaces RET next · q skip · l live."
+Avy stays armed the whole time the picker is open: typing letters
+jumps to an option and applies it live; you can keep jumping and re-
+mark to change the selection. RET advances only when something is
+marked; C-q quits, C-l makes live, C-e edits the property file."
   (require 'avy)
-  (let ((again t) action)
-    (while (and again (buffer-live-p buf))
+  (let ((exit-loop nil))
+    (while (and (not exit-loop) (buffer-live-p buf))
       (when-let ((win (get-buffer-window buf)))
         (with-selected-window win
           (let ((avy-all-windows nil))
@@ -697,19 +720,29 @@ applies it live. Pausing surfaces RET next · q skip · l live."
                          (my/manifolding-atlas-org-prompt--buffer-mark)))
               (user-error nil)
               (error nil)))))
-      (pcase (read-key "letters mark · RET next · q skip · l live")
-        (?\r (if (or my/manifolding-atlas-org-prompt--applied
-                     my/manifolding-atlas-org-prompt--buffer-marks)
-                 (setq again nil action 'accept)
-               (message "Mark an option first — or q to skip")))
-        (?q (setq again nil action 'skip))
-        (?l (setq again nil action 'live))
-        (_ nil)))
+      (let ((key (read-key "jump to mark · RET advance · SPC back · C-q quit · C-l live · C-e edit")))
+        (cond
+         ((eq key 32)
+          (if (or my/manifolding-atlas-org-prompt--applied
+                  my/manifolding-atlas-org-prompt--buffer-marks)
+              (setq exit-loop 'back)
+            (message "Nothing applied — mark an option first")))
+         ((eq key ?\r)
+          (if (or my/manifolding-atlas-org-prompt--applied
+                  my/manifolding-atlas-org-prompt--buffer-marks)
+              (setq exit-loop 'accept)
+            (message "Mark an option first — or C-q to quit")))
+         ((eq key ?\C-q) (setq exit-loop 'skip))
+         ((eq key ?\C-l) (setq exit-loop 'live))
+         ((eq key ?\C-e) (setq exit-loop 'edit))
+         (t nil))))
     (when (buffer-live-p buf)
-      (pcase action
+      (pcase exit-loop
         ('accept (my/manifolding-atlas-org-prompt--buffer-accept))
         ('skip   (my/manifolding-atlas-org-prompt--buffer-abort))
-        ('live   (my/manifolding-atlas-org-prompt--make-live))))))
+        ('live   (my/manifolding-atlas-org-prompt--make-live))
+        ('edit   (my/manifolding-atlas-org-prompt--edit-property-file))
+        ('back   (my/manifolding-atlas-org-prompt--session-back))))))
 #+end_src
 ** Buffer mark
 Session: live apply/un-apply; standalone: classic multi-mark.
@@ -844,11 +877,22 @@ Kills every leftover picker buffer.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--sweep-pickers ()
   "Kill every leftover picker buffer from this or an interrupted session."
-  (dolist (buf (buffer-list))
-    (when (and (buffer-live-p buf)
-               (buffer-local-value
-                'my/manifolding-atlas-org-prompt--session-p buf))
-      (condition-case nil (kill-buffer buf) (error nil)))))
+  (let ((note-buf (when-let ((note (plist-get my/manifolding-atlas-org-prompt--session :note))
+                             (path (and note (manifolding-atlas-note-path note))))
+                    (get-file-buffer path))))
+    (dolist (buf (buffer-list))
+      (when (and (buffer-live-p buf)
+                 (buffer-local-value
+                  'my/manifolding-atlas-org-prompt--session-p buf))
+        (let ((placed nil))
+          (dolist (win (get-buffer-window-list buf nil t))
+            (when (window-live-p win)
+              (if (and (not placed)
+                       (= 1 (length (window-list (window-frame win) 'no-minibuf)))
+                       note-buf (buffer-live-p note-buf))
+                  (progn (set-window-buffer win note-buf) (setq placed t))
+                (ignore-errors (delete-window win))))))
+        (condition-case nil (kill-buffer buf) (error nil))))))
 
 #+end_src
 ** Session begin
@@ -1005,22 +1049,19 @@ Pops the queue and opens the next picker.
 ** Session finish
 Drains queue, restores frame, runs finalizer.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-org-prompt--session-finish ()
-  "Drained the queue: clean up, restore the frame, run the finalizer."
-  (let* ((note (plist-get my/manifolding-atlas-org-prompt--session :note))
-         (finalize (plist-get my/manifolding-atlas-org-prompt--session
-                              :finalize)))
-    (let ((my/manifolding-atlas--quiet t))
-      (my/manifolding-atlas-org-prompt--sweep-pickers)
-      (setq my/manifolding-atlas-org-prompt--session nil)
-      (when (and note
-                 (manifolding-atlas-note-path note)
-                 (file-exists-p (manifolding-atlas-note-path note)))
-        (delete-other-windows)
-        (set-window-buffer
-         (selected-window)
-         (find-file-noselect (manifolding-atlas-note-path note)))))
-    (when finalize (funcall finalize))))
+ (defun my/manifolding-atlas-org-prompt--session-finish ()
+   "Drained the queue: clean up, restore the frame, run the finalizer."
+   (let* ((note (plist-get my/manifolding-atlas-org-prompt--session :note))
+          (finalize (plist-get my/manifolding-atlas-org-prompt--session
+                               :finalize)))
+     (let ((my/manifolding-atlas--quiet t))
+       (my/manifolding-atlas-org-prompt--sweep-pickers)
+       (setq my/manifolding-atlas-org-prompt--session nil)
+       (when (and note
+                  (manifolding-atlas-note-path note)
+                  (file-exists-p (manifolding-atlas-note-path note)))
+         (pop-to-buffer (find-file-noselect (manifolding-atlas-note-path note)))))
+     (when finalize (funcall finalize))))
 
 #+end_src
 ** WARNING self-heal
@@ -1047,29 +1088,39 @@ prompt file self-heals permanently on first visit."
       (forward-line -1))))
 
 #+end_src
+*** Shared display helper
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--display-buffer-responsive (buf)
+  "Show BUF in a side window on wide frames, bottom window on narrow
+ones. Never silently swallows a split failure — always warns."
+  (condition-case err
+      (if (> (frame-width) 140)
+          (let ((win (condition-case err2
+                         (split-window-right (floor (* 0.65 (frame-width))))
+                       (error (warn "atlas-display side: %s" (error-message-string err2)) nil))))
+            (if win
+                (progn (set-window-buffer win buf) (select-window win))
+              (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.35)))))
+        (let ((win (condition-case err2
+                       (split-window-below (- (max 10 (floor (* 0.60 (frame-height))))))
+                     (error (warn "atlas-display bottom: %s" (error-message-string err2)) nil))))
+          (if win
+              (progn (set-window-buffer win buf) (select-window win))
+            (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.35))))))
+    (error (warn "atlas-display outer: %s" (error-message-string err)) (ignore-errors (pop-to-buffer buf)))))
+#+end_src
 ** Session display
 Bottom strip under the note window.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--session-display (buf)
-  "Show picker BUF in a bottom strip beneath the session's note.
-The note fills the rest of the frame so applied properties are
-visible while prompts are answered."
   (let* ((note (plist-get my/manifolding-atlas-org-prompt--session :note))
-         (note-buf (and note
-                        (manifolding-atlas-note-path note)
-                        (condition-case nil
-                            (find-file-noselect
-                             (manifolding-atlas-note-path note))
-                          (error nil)))))
-    (if (not (buffer-live-p note-buf))
-        (pop-to-buffer buf)
-      (delete-other-windows)
-      (set-window-buffer (selected-window) note-buf)
-      (let ((win (split-window-below
-                  (- (max 10 (floor (* 0.60 (frame-height))))))))
-        (set-window-buffer win buf)
-        (select-window win)))))
-
+         (note-buf (and note (manifolding-atlas-note-path note)
+                        (condition-case err
+                            (find-file-noselect (manifolding-atlas-note-path note))
+                          (error (warn "atlas-prompt note-buf: %s" (error-message-string err)) nil)))))
+    (when (buffer-live-p note-buf)
+      (set-window-buffer (selected-window) note-buf))
+    (my/manifolding-atlas--display-buffer-responsive buf)))
 #+end_src
 ** Picker buffer resolution
 Both session and standalone pickers need the same visit-or-create
@@ -1150,12 +1201,11 @@ value so revisits highlight correctly.
     (when-let ((win (get-buffer-window buf)))
       (with-selected-window win
         (ignore-errors (recenter-top-bottom))))
-    (message "%s — m apply · l live · a avy · RET next · q skip · b/B back"
+    (message "%s — letters jump+mark · RET advance · C-q quit · C-l live · C-e edit"
              (plist-get spec :label))
-    ;; Avy-first: letters jump to options and mark them live; the
-    ;; control prompt only surfaces once typing pauses.
-    (when my/manifolding-atlas-org-prompt--session-p
-      (my/manifolding-atlas-org-prompt--avy-mark-loop buf))))
+    ;; Arm the avy-first marking loop: letters jump and mark by
+    ;; default, only RET advances, C-q/C-l/C-e are the controls.
+    (my/manifolding-atlas-org-prompt--avy-mark-loop buf)))
 
 #+end_src
 ** Session value
@@ -1209,14 +1259,18 @@ REMOVE-PROPS lists property keys to delete instead."
       ;; fall back to setting the keyword textually on the heading.
       (condition-case nil
           (org-todo todo)
-        (error
-         (org-back-to-heading t)
-         (beginning-of-line)
-         (when (looking-at "^\\*+\\s-*")
-           (goto-char (match-end 0))
-           (when (looking-at "[A-Za-z]+ ")
-             (delete-region (point) (match-end 0)))
-           (insert todo " "))))))
+         (error
+          (org-back-to-heading t)
+          (beginning-of-line)
+          (when (looking-at "^\\*+\\s-*")
+            (goto-char (match-end 0))
+            (when (looking-at "[A-Za-z]+ ")
+              (delete-region (point) (match-end 0)))
+            (insert todo " "))
+          ;; The keyword was inserted textually (not via org-todo), so
+          ;; org's font-lock/heading regexps don't know it yet — refresh
+          ;; them or redisplay trips "No match 2 ... org-headline-done".
+          (org-set-regexps-and-options)))))
     ;; Park the view ON the heading so TODO/keyword changes are
     ;; visible while the session picks are applied.
     (save-excursion
@@ -1239,10 +1293,12 @@ then park the note window centered on the heading."
              (manifolding-atlas-note-level note)
              props tags todo remove-props))
       (save-buffer))
+    ;; Park the note window on the heading WITHOUT selecting it: selecting
+    ;; the note window here steals focus out of the picker's read-key
+    ;; loop, re-entrantly destabilizing it (double toggles, buffer churn).
     (when-let ((win (get-buffer-window buf t)))
-      (with-selected-window win
-        (goto-char (or view-target (point-min)))
-        (recenter nil)))))
+      (set-window-point win (or view-target (point-min)))
+      (with-selected-window win (recenter nil)))))
 #+end_src
 ** Session remove
 Inverse of a pick: delete property / clear tags / drop TODO.
@@ -1309,17 +1365,25 @@ Runs the fragment's post-apply hooks with errors reported per hook.
 ** Picker teardown
 Saves edits, kills the picker buffer.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-org-prompt--buffer-finish ()
-  "Persist option edits, then kill the picker buffer.
-Killing removes its tab/window entirely, mirroring org-capture's
-:kill-buffer behavior.  Content is safe on disk."
-  (when (and buffer-file-name (buffer-modified-p))
-    (save-buffer))
-  ;; Hand control back to the appropriate modal state — the picker
-  ;; ran in atlas-pick state so its own keys won.
-  (when (fboundp 'my/smart-escape)
-    (my/smart-escape))
-  (kill-buffer))
+ (defun my/manifolding-atlas-org-prompt--buffer-finish ()
+   "Persist option edits, then kill the picker buffer and manage its window."
+   (when (and buffer-file-name (buffer-modified-p))
+     (save-buffer))
+   (when (fboundp 'my/smart-escape)
+     (my/smart-escape))
+    (let ((buf (current-buffer))
+          (note-buf (when-let ((note (plist-get my/manifolding-atlas-org-prompt--session :note))
+                               (path (and note (manifolding-atlas-note-path note))))
+                      (get-file-buffer path))))
+      (let ((placed nil))
+        (dolist (win (get-buffer-window-list buf nil t))
+          (when (window-live-p win)
+            (if (and (not placed)
+                     (= 1 (length (window-list (window-frame win) 'no-minibuf)))
+                     note-buf (buffer-live-p note-buf))
+                (progn (set-window-buffer win note-buf) (setq placed t))
+              (ignore-errors (delete-window win))))))
+      (kill-buffer buf)))
 #+end_src
 
 ** Standalone picker setup
@@ -1353,22 +1417,32 @@ Conventions mirror org-capture buffers: C-c C-c accepts the option
 heading at point (RET also works), C-c C-k cancels. m marks for
 multi-select kinds.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-org-prompt--ask-buffer (file kind default)
-  "Open FILE capture-style and let the user pick an option."
-  (setq my/manifolding-atlas-org-prompt--buffer-result nil)
-  (setq my/manifolding-atlas-org-prompt--buffer-marks nil)
-  (let ((buf (my/manifolding-atlas-org-prompt--picker-buffer file)))
-    (my/manifolding-atlas-org-prompt--standalone-setup buf default kind)
-    (pop-to-buffer buf)
-    ;; Re-assert after display — same init-hook reset risk as the
-    ;; session picker (see --session-open).
-    (with-current-buffer buf
-      (when (fboundp 'modaled-set-state)
-        (modaled-set-state "atlas-pick")))
-    (ignore-errors (recenter-top-bottom))
-    (message "Option picker — RET/C-c C-c select · m mark · C-c C-k/q cancel")
-    (recursive-edit)
-    my/manifolding-atlas-org-prompt--buffer-result))
+ (defun my/manifolding-atlas-org-prompt--ask-buffer (file kind default)
+   "Open FILE capture-style and let the user pick an option."
+   (setq my/manifolding-atlas-org-prompt--buffer-result nil)
+   (setq my/manifolding-atlas-org-prompt--buffer-marks nil)
+   (let ((buf (my/manifolding-atlas-org-prompt--picker-buffer file)))
+     (my/manifolding-atlas-org-prompt--standalone-setup buf default kind)
+     (condition-case err
+         (if (> (frame-width) 140)
+             (condition-case err
+                 (if (fboundp 'display-buffer-in-side-window)
+                     (display-buffer-in-side-window buf '((side . right) (slot . 0) (window-width . 0.35)))
+                   (let ((win (split-window-right (floor (* 0.65 (frame-width))))))
+                     (if win (progn (set-window-buffer win buf) (select-window win)) (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.35))))))
+               (error (warn "atlas-ask-buffer right: %s" (error-message-string err)) (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.35)))))
+           (condition-case err
+               (let ((win (split-window-below (- (max 10 (floor (* 0.60 (frame-height))))))))
+                 (if win (progn (set-window-buffer win buf) (select-window win)) (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.35)))))
+             (error (warn "atlas-ask-buffer below: %s" (error-message-string err)) (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.35))))))
+       (error (warn "atlas-ask-buffer outer: %s" (error-message-string err)) (pop-to-buffer buf)))
+     (with-current-buffer buf
+       (when (fboundp 'modaled-set-state)
+         (modaled-set-state "atlas-pick")))
+     (ignore-errors (recenter-top-bottom))
+     (message "Option picker — RET/C-c C-c select · m mark · C-c C-k/q cancel")
+     (recursive-edit)
+     my/manifolding-atlas-org-prompt--buffer-result))
 #+end_src
 ** UI dispatch
 Chooses buffer picker vs minibuffer per kind. `scoped' and

@@ -47,10 +47,16 @@ file as it will appear after capture.  Replaces %? with TITLE."
           (org-indent-mode 1))
         (current-buffer)))))
 
-(defun my/manifolding-atlas--capture-cleanup (names)
-  "Kill all capture preview buffers for NAMES."
-  (dolist (name names)
-    (let ((buf (get-buffer (format " *capture-preview-%s*" name))))
-      (when (buffer-live-p buf)
-        (kill-buffer buf)))))
+ (defun my/manifolding-atlas--capture-cleanup (names)
+   "Kill all capture preview buffers for NAMES and manage their windows."
+   (dolist (name names)
+     (let ((buf (get-buffer (format " *capture-preview-%s*" name))))
+       (when (buffer-live-p buf)
+         (dolist (win (get-buffer-window-list buf nil t))
+           (if (one-window-p t)
+               (when-let ((prev (window-prev-buffers win)))
+                 (when (car prev)
+                   (set-window-buffer win (car (car prev)))))
+             (ignore-errors (delete-window win))))
+         (kill-buffer buf)))))
 #+end_src

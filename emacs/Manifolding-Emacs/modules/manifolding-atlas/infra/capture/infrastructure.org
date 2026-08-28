@@ -188,7 +188,7 @@ Runs via `org-capture-after-finalize-hook'."
   (setq my/manifolding-atlas--skip-open-prompt nil))
 
 (add-hook 'org-capture-after-finalize-hook #'my/manifolding-atlas--cleanup-after-capture)
-(add-hook 'org-capture-mode-hook (lambda () (modaled-set-state "insert")))
+(add-hook 'org-capture-mode-hook (lambda () (when (fboundp 'modaled-set-state) (modaled-set-state "insert"))))
 #+end_src
 ** Current Note ID
 Heading-level ID first, then file-level fallback.

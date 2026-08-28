@@ -12,9 +12,14 @@ TODO/DONE workflow and the expanded states used by the Properties Update
 Plugin and manifolding-atlas prompts.
 
 ** Config
+Canonical TODO vocabulary; `org-mode.org` mirrors this value. Hook
+refreshes DONE-headline font-lock on every Org buffer regardless of
+load order.
 #+begin_src emacs-lisp
-(setq org-todo-keywords
-      '((sequence "TODO" "NEXT" "DOING" "TESTING" "WAIT" "WARNING"
-                  "|"
-                  "DONE" "CANCELLED" "CANCELED")))
+(with-eval-after-load 'org
+  (setq org-todo-keywords
+        '((sequence "TODO" "NEXT" "DOING" "TESTING" "WAIT" "WARNING"
+                    "|"
+                    "DONE" "CANCELLED" "CANCELED"))))
+(add-hook 'org-mode-hook #'org-set-regexps-and-options)
 #+end_src

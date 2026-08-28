@@ -1878,16 +1878,19 @@ Unchanged files replay from the content-hash cache.  With FORCE
 ** Entry — boot
 Atomic upstream — kept whole.
 #+begin_src emacs-lisp
-(defvar fatal nil "Non-nil when boot throws an error.")
+ (defvar fatal nil "Non-nil when boot throws an error.")
 
-(defun manifolding-emacs-boot ()
-  "Compile every Org file, with a splash screen, structured error
-tracking, an idle sweep to surface deferred-load errors early, and
-(optionally) an automatic version freeze if the boot was clean."
-  (interactive)
-  (let ((manifolding-emacs--booting t)
-        (boot-t0 (float-time)))
-    (setq fatal nil)
+ (defvar manifolding-emacs--boot-t0 nil "Boot start time for dashboard.")
+
+ (defun manifolding-emacs-boot ()
+   "Compile every Org file, with a splash screen, structured error
+ tracking, an idle sweep to surface deferred-load errors early, and
+ (optionally) an automatic version freeze if the boot was clean."
+   (interactive)
+   (let ((manifolding-emacs--booting t)
+         (boot-t0 (float-time)))
+     (setq manifolding-emacs--boot-t0 boot-t0)
+     (setq fatal nil)
     (setq manifolding-emacs-splash--state nil)
     (manifolding-emacs-errors-clear-boot-state)
     (when manifolding-emacs-mode-line-indicator
@@ -1962,13 +1965,13 @@ tracking, an idle sweep to surface deferred-load errors early, and
               (local-set-key "g"
                              (lambda ()
                                (interactive) (manifolding-emacs-reload))))
-             (t
-              (condition-case dash-err
-                  (manifolding-emacs-splash-clean-finish
-                   buf (- (float-time) boot-t0))
-                 (error
-                  (message "manifolding-emacs: dashboard error %s"
-                             (error-message-string dash-err)))))))))))
+               (t
+                (condition-case dash-err
+                    (manifolding-emacs-splash-clean-finish
+                     buf (- (float-time) (or manifolding-emacs--boot-t0 (float-time))))
+                   (error
+                    (message "manifolding-emacs: dashboard error %s"
+                               (error-message-string dash-err)))))))))))
 #+end_src
 
 ** Entry — message redirection

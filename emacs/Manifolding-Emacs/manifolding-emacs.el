@@ -1725,6 +1725,8 @@ Unchanged files replay from the content-hash cache.  With FORCE
 
 (defvar fatal nil "Non-nil when boot throws an error.")
 
+(defvar manifolding-emacs--boot-t0 nil "Boot start time for dashboard.")
+
 (defun manifolding-emacs-boot ()
   "Compile every Org file, with a splash screen, structured error
 tracking, an idle sweep to surface deferred-load errors early, and
@@ -1732,88 +1734,89 @@ tracking, an idle sweep to surface deferred-load errors early, and
   (interactive)
   (let ((manifolding-emacs--booting t)
         (boot-t0 (float-time)))
+    (setq manifolding-emacs--boot-t0 boot-t0)
     (setq fatal nil)
-    (setq manifolding-emacs-splash--state nil)
-    (manifolding-emacs-errors-clear-boot-state)
-    (when manifolding-emacs-mode-line-indicator
-      (manifolding-emacs-doctor-indicator-mode 1))
-    (condition-case err
-        (manifolding-emacs-with-warning-capture
-         (let ((buf (manifolding-emacs-show-splash))
-               (manifolding-emacs--boot-phase :compiling))
-           (with-current-buffer buf
-             (let ((inhibit-read-only t)
-                   (org-mode-hook nil))
-               (erase-buffer)
-               (insert (manifolding-emacs-splash--center
-                        "MANIFOLDING-EMACS\n\nreading modules/ …")))
-             (redisplay))
-           (let ((message-log-max nil))
-             (message "Manifolding-Emacs: reading modules/"))
-           (manifolding-emacs-compile-directory
-            (manifolding-emacs--splash-progress buf))))
-      (error (setq fatal err)))
-    (manifolding-emacs-errors-save-log)
-    (unless fatal
-      (manifolding-emacs-maybe-freeze-on-clean-boot)
-      (manifolding-emacs-doctor-schedule-idle-sweep))
-    (message "manifolding-emacs: %s%d error(s), %d warning(s)"
-             (if fatal "BOOT THREW - " "")
-             (length (manifolding-emacs-errors-list))
-             (length (manifolding-emacs-warnings-list)))
-    ;; Void-defun sweep: verify critical functions actually exist.
-    (dolist (check
-             '(("my/manifolding-atlas-org-prompt--ask" . "org-prompts.org")
-               ("my/manifolding-atlas-collect-prompts" . "prompt-engine.org")
-               ("my/manifolding-atlas-routines-run" . "routines.org")
-                               ("manifolding-keyboard-define-keys" . "manifolding-keyboard.org")))
-      (unless (fboundp (intern (car check)))
-        (message "⚠ CRITICAL: %s is VOID — check %s for paren/nesting issues"
-                 (car check) (cdr check)))))
-    ;; Paren-issue detector.
-    (dolist (e (manifolding-emacs-errors-list))
-      (when (and (manifolding-emacs-error-entry-p e)
-                 (manifolding-emacs-error-entry-message e)
-                 (string-match-p
-                  "UNBALANCED PARENS\\|End of file during parsing"
-                  (manifolding-emacs-error-entry-message e)))
-        (message
-         "⚠ UNBALANCED PARENS — the error above shows the exact function and position. Fix the extra/missing closer and reload.")))
-    (let ((buf (get-buffer "*Manifolding-Emacs*")))
-      (when (buffer-live-p buf)
-        (with-current-buffer buf
-          (let ((inhibit-read-only t))
-            (goto-char (point-min))
-            (cond
-             (fatal
-              (insert (propertize
-                       (format "Boot threw: %s\n\n"
-                               (error-message-string fatal))
-                       'face 'error))
-              (insert "This escaped all three isolation tiers - check *Messages*.\n")
-              (local-set-key "q" #'quit-window))
-             ((manifolding-emacs-errors-list)
-              (insert (propertize "Boot completed with errors.\n\n"
-                                  'face 'error))
-              (insert "Press RET or `C-c C-o' on a link to jump to it.\n")
-              (insert "Press `t' to file the error at point to TODO, `T' for all.\n\n")
-              (local-set-key "q" #'quit-window)
-              (local-set-key "t" #'manifolding-emacs-splash-add-error-at-point)
-              (local-set-key "T" #'manifolding-emacs-splash-add-all-errors))
-             ((manifolding-emacs-warnings-list)
-              (insert (propertize "Boot completed with warnings.\n\n"
-                                  'face 'warning))
-              (local-set-key "q" #'quit-window)
-              (local-set-key "g"
-                             (lambda ()
-                               (interactive) (manifolding-emacs-reload))))
-             (t
-              (condition-case dash-err
-                  (manifolding-emacs-splash-clean-finish
-                   buf (- (float-time) boot-t0))
-                 (error
-                  (message "manifolding-emacs: dashboard error %s"
-                             (error-message-string dash-err)))))))))))
+   (setq manifolding-emacs-splash--state nil)
+   (manifolding-emacs-errors-clear-boot-state)
+   (when manifolding-emacs-mode-line-indicator
+     (manifolding-emacs-doctor-indicator-mode 1))
+   (condition-case err
+       (manifolding-emacs-with-warning-capture
+        (let ((buf (manifolding-emacs-show-splash))
+              (manifolding-emacs--boot-phase :compiling))
+          (with-current-buffer buf
+            (let ((inhibit-read-only t)
+                  (org-mode-hook nil))
+              (erase-buffer)
+              (insert (manifolding-emacs-splash--center
+                       "MANIFOLDING-EMACS\n\nreading modules/ …")))
+            (redisplay))
+          (let ((message-log-max nil))
+            (message "Manifolding-Emacs: reading modules/"))
+          (manifolding-emacs-compile-directory
+           (manifolding-emacs--splash-progress buf))))
+     (error (setq fatal err)))
+   (manifolding-emacs-errors-save-log)
+   (unless fatal
+     (manifolding-emacs-maybe-freeze-on-clean-boot)
+     (manifolding-emacs-doctor-schedule-idle-sweep))
+   (message "manifolding-emacs: %s%d error(s), %d warning(s)"
+            (if fatal "BOOT THREW - " "")
+            (length (manifolding-emacs-errors-list))
+            (length (manifolding-emacs-warnings-list)))
+   ;; Void-defun sweep: verify critical functions actually exist.
+   (dolist (check
+            '(("my/manifolding-atlas-org-prompt--ask" . "org-prompts.org")
+              ("my/manifolding-atlas-collect-prompts" . "prompt-engine.org")
+              ("my/manifolding-atlas-routines-run" . "routines.org")
+                              ("manifolding-keyboard-define-keys" . "manifolding-keyboard.org")))
+     (unless (fboundp (intern (car check)))
+       (message "⚠ CRITICAL: %s is VOID — check %s for paren/nesting issues"
+                (car check) (cdr check)))))
+   ;; Paren-issue detector.
+   (dolist (e (manifolding-emacs-errors-list))
+     (when (and (manifolding-emacs-error-entry-p e)
+                (manifolding-emacs-error-entry-message e)
+                (string-match-p
+                 "UNBALANCED PARENS\\|End of file during parsing"
+                 (manifolding-emacs-error-entry-message e)))
+       (message
+        "⚠ UNBALANCED PARENS — the error above shows the exact function and position. Fix the extra/missing closer and reload.")))
+   (let ((buf (get-buffer "*Manifolding-Emacs*")))
+     (when (buffer-live-p buf)
+       (with-current-buffer buf
+         (let ((inhibit-read-only t))
+           (goto-char (point-min))
+           (cond
+            (fatal
+             (insert (propertize
+                      (format "Boot threw: %s\n\n"
+                              (error-message-string fatal))
+                      'face 'error))
+             (insert "This escaped all three isolation tiers - check *Messages*.\n")
+             (local-set-key "q" #'quit-window))
+            ((manifolding-emacs-errors-list)
+             (insert (propertize "Boot completed with errors.\n\n"
+                                 'face 'error))
+             (insert "Press RET or `C-c C-o' on a link to jump to it.\n")
+             (insert "Press `t' to file the error at point to TODO, `T' for all.\n\n")
+             (local-set-key "q" #'quit-window)
+             (local-set-key "t" #'manifolding-emacs-splash-add-error-at-point)
+             (local-set-key "T" #'manifolding-emacs-splash-add-all-errors))
+            ((manifolding-emacs-warnings-list)
+             (insert (propertize "Boot completed with warnings.\n\n"
+                                 'face 'warning))
+             (local-set-key "q" #'quit-window)
+             (local-set-key "g"
+                            (lambda ()
+                              (interactive) (manifolding-emacs-reload))))
+              (t
+               (condition-case dash-err
+                   (manifolding-emacs-splash-clean-finish
+                    buf (- (float-time) (or manifolding-emacs--boot-t0 (float-time))))
+                  (error
+                   (message "manifolding-emacs: dashboard error %s"
+                              (error-message-string dash-err)))))))))))
 
 (defvar manifolding-emacs--log-buffer-name "*Manifolding-Emacs*"
   "Buffer receiving loader chatter instead of *Messages*.")

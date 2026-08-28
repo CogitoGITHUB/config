@@ -611,6 +611,11 @@ Own block: an error here must never abort the core rebuild above.
 #+end_src
 
 ** Atlas Pick
+Flow: session pickers open with an auto-armed avy loop (org-prompts.org)
+that owns letters for jumps+marking and takes SPC/RET/C-q/C-l/C-e. This
+keymap mirrors the control keys so they work there and in standalone
+pickers too; the letter binds below apply only when the loop is not
+armed.
 #+begin_src emacs-lisp
 (manifolding-keyboard-define-keys
   :states '("atlas-pick")
@@ -621,12 +626,15 @@ Own block: an error here must never abort the core rebuild above.
     ("C-c C-c" . my/manifolding-atlas-org-prompt--buffer-accept)
     ("a"       . my/manifolding-atlas-org-prompt--avy-to-option)
     ("m"       . my/manifolding-atlas-org-prompt--buffer-mark)
-    ("l"       . my/manifolding-atlas-org-prompt--make-live)
+    ("C-l"     . my/manifolding-atlas-org-prompt--make-live)
+    ("C-e"     . my/manifolding-atlas-org-prompt--edit-property-file)
     ;; Session navigation
+    ("SPC"     . my/manifolding-atlas-org-prompt--session-back)
     ("b"       . my/manifolding-atlas-org-prompt--session-back)
     ("B"       . my/manifolding-atlas-org-prompt--session-revisit)
     ;; Cancellation
     ("q"       . my/manifolding-atlas-org-prompt--buffer-abort)
+    ("C-q"     . my/manifolding-atlas-org-prompt--buffer-abort)
     ("C-c C-k" . my/manifolding-atlas-org-prompt--buffer-abort)
     ("Q"       . my/manifolding-atlas-org-prompt--quit-all)
     ("C-g"     . my/manifolding-atlas-org-prompt--quit-all)

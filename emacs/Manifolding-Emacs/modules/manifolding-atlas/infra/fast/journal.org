@@ -68,5 +68,5 @@ child heading and opens capture.
                                "*** %?" :kill-buffer t :unnarrowed t)))))
       (org-capture nil "j")
       (set-buffer-modified-p nil)
-      (modaled-set-state "insert"))))
+      (when (fboundp 'modaled-set-state) (modaled-set-state "insert")))))
 #+end_src
