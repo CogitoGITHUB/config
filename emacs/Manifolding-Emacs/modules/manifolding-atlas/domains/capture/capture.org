@@ -3,21 +3,20 @@
 #+property: header-args:emacs-lisp :tangle ../../infra/elisp/capture.el
 
 A literate plugin for manifolding-atlas v2 providing two workflows:
-1. Select text via avy → create a new manifolding-atlas note
+1. Select text via key selection → create a new manifolding-atlas note
 2. Extract current org heading → promote it into its own manifolding-atlas note file
 
 *** Dependencies
 #+begin_src emacs-lisp
-;;; capture.el --- Avy region & heading capture for manifolding-atlas v2 -*- lexical-binding: t; -*-
+;;; capture.el --- Key-selection region & heading capture for manifolding-atlas v2 -*- lexical-binding: t; -*-
 
 (require 'manifolding-atlas)
 (require 'manifolding-atlas-db)
-(require 'avy)
 (require 'org)
 #+end_src
-*** Capture Region via Avy
+*** Capture Region via Key Selection
 :PROPERTIES:
-:DESCRIPTION: Select any visible text with an avy jump and send it to a new manifolding-atlas note.
+:DESCRIPTION: Select any visible text with a key-selection jump and send it to a new manifolding-atlas note.
 :END:
 
 *** Extract Org Heading into its own Manifolding Atlas Note

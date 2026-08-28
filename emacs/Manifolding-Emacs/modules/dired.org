@@ -19,12 +19,12 @@
     (if file
         (find-file file)
       (message "No file on this line"))))
-(defun my/dired-avy-open-file ()
-  "Select a dired line with avy and open the file directly."
+(defun my/dired-ks-open-file ()
+  "Select a dired line with key selection and open the file directly."
   (interactive)
-  (avy-with my/dired-avy-open-file
-    (let ((r (avy--line (eq current-prefix-arg 4))))
-      (when (and (not (memq r '(t nil))) (eq avy-action #'identity))
+  (ks-with my/dired-ks-open-file
+    (let ((r (ks--line (eq current-prefix-arg 4))))
+      (when (and (not (memq r '(t nil))) (eq ks-action #'identity))
         (goto-char r)
         (my/dired-find-file)))))
 #+end_src

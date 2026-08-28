@@ -342,18 +342,1582 @@ Atomic upstream — kept whole.
   (if (treemacs-is-treemacs-window? (selected-window))
       (treemacs-quit)
     (treemacs-select-window)))
-(defun my/avy-zap-to-char-inclusive ()
-  "Zap from point up to and including an avy-selected character."
+(defun my/ks-zap-to-char-inclusive ()
+  "Zap from point up to and including a key-selection-selected character."
   (interactive)
   (let ((start (point)))
-    (avy-goto-char-timer)
+    (ks-goto-char-timer)
     (forward-char 1)
     (kill-region start (point))))
-(defun my/ibuffer-avy-visit ()
-  "Avy-jump to an ibuffer entry line and visit its buffer."
+(defun my/ks-ibuffer-visit ()
+  "Jump to an ibuffer entry line and visit its buffer."
   (interactive)
-  (avy-goto-char-timer)
+  (ks-goto-char-timer)
   (ibuffer-visit-buffer))
+(defun my/window-quit ()
+  "Quit current window, or switch to previous buffer when only one window.
+If more than one window is visible in the selected frame, close the
+current window; otherwise switch to the previously visited buffer."
+  (interactive)
+  (if (> (length (window-list (selected-frame))) 1)
+      (quit-window)
+    (previous-buffer)))
+#+end_src
+
+** TUI ESC / Meta disambiguation (Meow-extracted, ~my/esc-mode~)
+Extracted from ~meow-esc.el~ (meow 1.5.0, GPLv3). In the terminal, ESC can
+double as META because they share a keycode. This mode rewires the terminal's
+~input-decode-map~ binding for ESC through a ~:filter~ that waits
+~my/esc-delay~: if another key follows within the delay it is treated as a Meta
+combo, otherwise a standalone ESC. This gives BOTH standalone-ESC and Meta /
+ESC-prefix usage in the TUI simultaneously. Layout-independent, Dvorak-safe.
+~my/smart-escape~ (above) handles *state* selection on ESC; this handles the
+terminal input layer. Not enabled by default — call ~(my/esc-mode 1)~ to turn on.
+#+begin_src emacs-lisp
+(defcustom my/esc-delay 0.1
+  "Maximum time in seconds between ESC and the following key to be treated
+as a Meta / ESC-prefix combo rather than a standalone ESC, when
+~my/esc-mode~ is active in the terminal."
+  :type 'number
+  :group 'manifolding-keyboard)
+
+(defvar my/esc-sequence [?\e]
+  "The key sequence used to reach the terminal's original ESC binding.")
+
+(define-minor-mode my/esc-mode
+  "Ensure ESC works as a standalone key AND as Meta/prefix in the terminal.
+When enabled, the terminal ~input-decode-map~'s ESC binding is wrapped in a
+filter (see ~my/esc~) that waits ~my/esc-delay~: a key pressed within the delay
+is read as a Meta/ESC-prefix combo; otherwise it is a standalone ESC."
+  :init-value nil
+  :global t
+  (if my/esc-mode
+      (progn
+        (add-hook 'after-make-frame-functions #'my/esc-init-if-tui)
+        (mapc #'my/esc-init-if-tui (frame-list)))
+    (progn
+      (remove-hook 'after-make-frame-functions #'my/esc-init-if-tui)
+      (mapc #'my/esc-deinit-if-tui (frame-list)))))
+
+(defun my/esc-init-if-tui (frame)
+  "Wrap FRAME's terminal ESC binding with the ~my/esc~ filter, if in TUI."
+  (with-selected-frame frame
+    (unless window-system
+      (let ((term (frame-terminal frame)))
+        (when (not (terminal-parameter term 'my-esc-map))
+          (let ((my-esc-map (lookup-key input-decode-map [?\e])))
+            (set-terminal-parameter term 'my-esc-map my-esc-map)
+            (define-key input-decode-map my/esc-sequence
+              `(menu-item "" ,my-esc-map :filter ,#'my/esc))))))))
+
+(defun my/esc-deinit-if-tui (frame)
+  "Restore FRAME's terminal ESC binding, removing the ~my/esc~ filter."
+  (with-selected-frame frame
+    (unless window-system
+      (let ((term (frame-terminal frame)))
+        (when (terminal-live-p term)
+          (let ((my-esc-map (terminal-parameter term 'my-esc-map)))
+            (when my-esc-map
+              (define-key input-decode-map my/esc-sequence my-esc-map)
+              (set-terminal-parameter term 'my-esc-map nil))))))))
+
+(defun my/esc (map)
+  "Menu-item filter for ESC in the terminal.
+
+If the ESC is promptly followed by another key (within ~my/esc-delay~),
+return MAP (allowing the Meta / ESC-prefix keymap to handle it); otherwise
+return [escape] (a standalone ESC). MAP is the original ESC keymap."
+  (if (and (let ((keys (this-single-command-keys)))
+             (and (> (length keys) 0)
+                  (= (aref keys (1- (length keys))) ?\e)))
+           (sit-for my/esc-delay))
+      (prog1 [escape]
+        (when defining-kbd-macro
+          (end-kbd-macro)
+          (setq last-kbd-macro (vconcat last-kbd-macro [escape]))
+          (start-kbd-macro t t)))
+    map))
+#+end_src
+
+** Atomic undo wrapper (Meow-extracted, ~my/wrap-collapse-undo~)
+Extracted from ~meow--wrap-collapse-undo~ (meow-util.el:569–589, meow 1.5.0,
+GPLv3). Runs a body of multiple edits but collapses them into a SINGLE undo
+step via change groups, so downstream undo/undo-amalgamate behave atomically.
+If the body signals an error the change group is cancelled instead. Layout-
+independent, Dvorak-safe. Useful for multi-step edit commands (replace-all,
+bulk ks/visual edits) that should feel like one atomic operation.
+#+begin_src emacs-lisp
+(defmacro my/wrap-collapse-undo (&rest body)
+  "Like `progn' but perform BODY with its edits collapsed into one undo step.
+
+If BODY completes, its changes are accepted and amalgamated with the preceding
+undo entry so they undo as a single action. If BODY signals an error, the
+change group is cancelled (no partial changes, no undo entry)."
+  (declare (indent 0) (debug t))
+  (let ((handle (make-symbol "--change-group-handle--"))
+        (success (make-symbol "--change-group-success--")))
+    `(let ((,handle (prepare-change-group))
+           ;; Don't truncate any undo data in the middle of this.
+           (undo-outer-limit nil)
+           (undo-limit most-positive-fixnum)
+           (undo-strong-limit most-positive-fixnum)
+           (,success nil))
+       (unwind-protect
+           (progn
+             (activate-change-group ,handle)
+             (prog1 ,(macroexp-progn body)
+               (setq ,success t)))
+         (if ,success
+             (progn
+               (accept-change-group ,handle)
+               (undo-amalgamate-change-group ,handle))
+           (cancel-change-group ,handle))))))
+#+end_src
+
+Concrete bound consumer: the normal zap does ~ks-goto-char-timer~ + ~kill-region~
+(two undo steps). Wrapping it in ~my/wrap-collapse-undo~ collapses the whole zap
+into a single undo step. Bound to ~z~ in the Key Selection › Zap menu.
+#+begin_src emacs-lisp
+(defun my/ks-zap-to-char-atomic ()
+  "Zap to a key-selection-selected char as ONE atomic undo step.
+
+Like ~my/ks-zap-to-char-inclusive~ but the timer jump + kill happen inside
+~my/wrap-collapse-undo~, so undoing (vundo) reverts the whole zap at once."
+  (interactive)
+  (my/wrap-collapse-undo
+    (let ((start (point)))
+      (ks-goto-char-timer)
+      (forward-char 1)
+      (kill-region start (point)))))
+#+end_src
+
+** Bidirectional mark-ring cycle (Meow-extracted, ~my/pop-to-mark~ / ~my/unpop-to-mark~)
+Extracted from ~meow-pop-to-mark~ / ~meow-unpop-to-mark~ /
+~meow-pop-or-unpop-to-mark~ (meow-command.el:1566–1600, meow 1.5.0, GPLv3).
+Jumps through the Emacs ~mark-ring~ in BOTH directions, recording the current
+position each time so you can walk backward (pop) and forward (unpop) through
+where you've been. Standalone — depends only on ~mark-ring~, ~point-marker~,
+~copy-marker~, ~mark-marker~, ~pop-to-mark-command~. Layout-independent,
+Dvorak-safe. Bound to ~j~ (older) / ~k~ (newer) in normal + motion states; if
+you have never set a mark the commands no-op safely.
+#+begin_src emacs-lisp
+(defcustom my/pop-or-unpop-to-mark-repeat-unpop nil
+  "If non-nil, repeating ~my/pop-or-unpop-to-mark~ keeps unpopping forward
+instead of toggling direction."
+  :type 'boolean
+  :group 'manifolding-keyboard)
+
+(defun my/unpop-to-mark ()
+  "Unpop off the mark ring (move forward to a newer position). Does nothing
+if the mark ring is empty."
+  (interactive)
+  (deactivate-mark)
+  (when mark-ring
+    (setq mark-ring (cons (copy-marker (mark-marker)) mark-ring))
+    (set-marker (mark-marker) (car (last mark-ring)) (current-buffer))
+    (setq mark-ring (nbutlast mark-ring))
+    (goto-char (marker-position (car (last mark-ring))))))
+
+(defun my/pop-to-mark ()
+  "Jump to an older mark-ring position, saving the current point first."
+  (interactive)
+  (deactivate-mark)
+  (unless (member last-command
+                  '(my/pop-to-mark my/unpop-to-mark my/pop-or-unpop-to-mark))
+    (setq mark-ring (append mark-ring (list (point-marker)))))
+  (pop-to-mark-command))
+
+(defun my/pop-or-unpop-to-mark (arg)
+  "Call ~my/pop-to-mark~ or ~my/unpop-to-mark~ depending on ARG.
+
+With a negative prefix ARG, call ~my/unpop-to-mark~. Otherwise call
+~my/pop-to-mark~. See ~my/pop-or-unpop-to-mark-repeat-unpop~."
+  (interactive "p")
+  (if (or (and my/pop-or-unpop-to-mark-repeat-unpop
+               (eq last-command 'my/unpop-to-mark))
+          (< arg 0))
+      (progn
+        (setq this-command 'my/unpop-to-mark)
+        (my/unpop-to-mark))
+    (my/pop-to-mark)))
+#+end_src
+
+** Symbol/word occurrence collector (Meow-extracted, ~my/jump-to-symbol~)
+Extracted from ~meow--prompt-symbol-and-words~ (meow-util.el:284–305, meow
+1.5.0, GPLv3). Scans a region, collects every symbol/word as a completion
+candidate (each presented as its word-boundary regexp ~\\_<...\\_>~ when
+~my/symbol-collect-sanitize~ is non-nil), and lets the user pick one via
+~completing-read~. The helper returns the chosen symbol or its regexp; bound
+consumer ~my/jump-to-symbol~ jumps to the chosen symbol's next occurrence.
+Deps: builtins only (~save-mark-and-excursion~, ~re-search-forward~,
+~match-string-no-properties~, ~regexp-quote~, ~delete-dups~, ~completing-read~,
+~string-empty-p~). Layout-independent, Dvorak-safe. Bound to ~f~ (find word /
+symbol) in normal + motion states.
+#+begin_src emacs-lisp
+(defcustom my/symbol-collect-min-length 1
+  "Minimal length for a symbol/word to be collected as a completion candidate."
+  :type 'integer
+  :group 'manifolding-keyboard)
+
+(defcustom my/symbol-collect-sanitize t
+  "If non-nil, present each candidate as its ~\\_<...\\_>~ word-boundary regexp."
+  :type 'boolean
+  :group 'manifolding-keyboard)
+
+(defun my/prompt-symbol-and-words (prompt beg end &optional disallow-empty)
+  "Completion with PROMPT for symbols and words from BEG to END.
+
+Returns the chosen symbol, or — when ~my/symbol-collect-sanitize~ is non-nil —
+its word-boundary regexp ~\\_<SYMBOL\\_>~. If DISALLOW-EMPTY, requests again
+until a non-empty selection is made."
+  (let ((completions))
+    (save-mark-and-excursion
+      (goto-char beg)
+      (while (re-search-forward "\\_<\\(\\sw\\|\\s_\\)+\\_>" end t)
+        (let ((result (match-string-no-properties 0)))
+          (when (>= (length result) my/symbol-collect-min-length)
+            (if my/symbol-collect-sanitize
+                (push (cons result (format "\\_<%s\\_>" (regexp-quote result)))
+                      completions)
+              (push (format "\\_<%s\\_>" (regexp-quote result))
+                    completions))))))
+    (setq completions (delete-dups completions))
+    (let ((selected (completing-read prompt completions nil nil)))
+      (while (and (string-empty-p selected) disallow-empty)
+        (setq selected (completing-read
+                        (concat "[Input must be non-empty] " prompt)
+                        completions nil nil)))
+      (if my/symbol-collect-sanitize
+          (or (cdr (assoc selected completions))
+              (regexp-quote selected))
+        selected))))
+
+(defun my/jump-to-symbol ()
+  "Pick any symbol/word in the buffer, then jump to its next occurrence.
+
+Collects symbols/words from the whole buffer via ~completing-read~ and moves
+point to the next match (wrapping to the top on reaching the buffer end)."
+  (interactive)
+  (let ((target (my/prompt-symbol-and-words "Jump to symbol: "
+                                             (point-min) (point-max))))
+    (when target
+      (unless (re-search-forward target nil t)
+        (goto-char (point-min))
+        (unless (re-search-forward target nil t)
+          (message "No occurrence of %s" target))))))
+#+end_src
+
+** Balanced-delimiter bounds finder (Meow-extracted, ~my/select-inside-delimiters~)
+Extracted from ~meow--thing-pair-function~ / ~meow--thing-parse-pair-search~
+(meow-thing.el:134–189, meow 1.5.0, GPLv3). Finds the ~(beg . end)~ of a
+balanced delimiter pair by depth-counting push/pop tokens in both directions.
+The ported helpers are general (any push/pop regexp tokens); the bound consumer
+~my/select-inside-delimiters~ finds the innermost enclosing ~() [] {} <>~ pair
+around point and activates its inner CONTENT as the region (visual state).
+Deps: builtins + cl-lib (~save-mark-and-excursion~, ~re-search-forward~,
+~re-search-backward~, ~match-beginning~, ~match-end~, ~regexp-quote~,
+~cl-incf~, ~cl-decf~). Layout-independent, Dvorak-safe. Bound to ~b~ (block /
+bracket) in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/thing-parse-pair-search (push-token pop-token back near)
+  "Search for the nearest PUSH-TOKEN or POP-TOKEN (regexps) around point.
+
+When BACK is non-nil search backward, else forward. Returns (push|pop . POS)
+with POS at the delimiter boundary; moves point to the token start for the
+next iteration. Returns nil if neither token is found."
+  (let* ((search-fn (if back #'re-search-backward #'re-search-forward))
+         (match-fn (if back #'match-end #'match-beginning))
+         (cmp-fn (if back #'> #'<))
+         (push-next-pos nil)
+         (pop-next-pos nil)
+         (push-pos (save-mark-and-excursion
+                     (when (funcall search-fn push-token nil t)
+                       (setq push-next-pos (point))
+                       (if near (funcall match-fn 0) (point)))))
+         (pop-pos (save-mark-and-excursion
+                    (when (funcall search-fn pop-token nil t)
+                      (setq pop-next-pos (point))
+                      (if near (funcall match-fn 0) (point))))))
+    (cond
+     ((and (not pop-pos) (not push-pos)) nil)
+     ((not pop-pos) (goto-char push-next-pos) (cons 'push push-pos))
+     ((not push-pos) (goto-char pop-next-pos) (cons 'pop pop-pos))
+     ((funcall cmp-fn push-pos pop-pos)
+      (goto-char push-next-pos) (cons 'push push-pos))
+     (t
+      (goto-char pop-next-pos) (cons 'pop pop-pos)))))
+
+(defun my/thing-pair-function (push-token pop-token near)
+  "Return (beg . end) of the balanced pair of regexps PUSH-TOKEN/POP-TOKEN
+surrounding point, or nil. With NEAR, boundaries hug the delimiters; else beg
+is the opening token's position and end is just past the closing token."
+  (let* ((found nil)
+         (depth 0)
+         (beg (save-mark-and-excursion
+                (prog1
+                    (let ((case-fold-search nil))
+                      (while (and (<= depth 0)
+                                  (setq found (my/thing-parse-pair-search
+                                               push-token pop-token t near)))
+                        (let ((push-or-pop (car found)))
+                          (if (eq 'push push-or-pop)
+                              (cl-incf depth)
+                            (cl-decf depth))))
+                      (when (> depth 0) (cdr found)))
+                  (setq depth 0 found nil))))
+         (end (save-mark-and-excursion
+                (let ((case-fold-search nil))
+                  (while (and (>= depth 0)
+                              (setq found (my/thing-parse-pair-search
+                                           push-token pop-token nil near)))
+                    (let ((push-or-pop (car found)))
+                      (if (eq 'push push-or-pop)
+                          (cl-incf depth)
+                        (cl-decf depth))))
+                  (when (< depth 0) (cdr found))))))
+    (when (and beg end)
+      (cons beg end))))
+
+(defun my/select-inside-delimiters ()
+  "Activate the INNER content of the innermost enclosing ~() [] {} <>~ around point.
+
+Finds the nearest balanced delimiter pair surrounding point, sets point and
+mark to the text strictly between the delimiters, and enters visual state."
+  (interactive)
+  (let ((pairs '(("\\(" . "\\)") ("\\[" . "\\]") ("{" . "}") ("<" . ">")))
+        (best nil))
+    (dolist (p pairs)
+      (let* ((found (my/thing-pair-function (car p) (cdr p) nil))
+             (beg (and found (car found)))
+             (end (and found (cdr found))))
+        (when (and beg end (<= beg (point) end)
+                   (or (null best) (> beg (car best))))
+          (setq best (cons beg end)))))
+    (if best
+        (progn
+          (goto-char (car best))
+          (push-mark (1+ (point)) t t)
+          (goto-char (1- (cdr best)))
+          (activate-mark)
+          (manifolding-keyboard-set-state "visual"))
+      (message "No enclosing delimiter pair"))))
+#+end_src
+
+** Syntax-context predicates (Meow-extracted, ~my/select-syntax-context~)
+Extracted from ~meow--in-string-p~ / ~meow--in-comment-p~ (meow-util.el:251–261,
+meow 1.5.0, GPLv3). Predicates report whether POS (default point) is inside a
+string literal or a comment, via ~syntax-ppss~. Depend on Emacs's ~syntax-ppss~
+(parses with the current mode's syntax table, so string/comment detection is
+language-aware). Bound consumer ~my/select-syntax-context~ selects the whole
+enclosing string or comment and enters visual state. Deps: builtins only
+(~save-mark-and-excursion~, ~goto-char~, ~forward-sexp~, ~syntax-ppss~).
+Layout-independent, Dvorak-safe. Bound to ~c~ (context / comment / string) in
+normal + motion states.
+#+begin_src emacs-lisp
+(defun my/in-string-p (&optional pos)
+  "Return whether POS (default point) is inside a string literal."
+  (save-mark-and-excursion
+    (when pos (goto-char pos))
+    (nth 3 (syntax-ppss))))
+
+(defun my/in-comment-p (&optional pos)
+  "Return whether POS (default point) is inside a comment."
+  (save-mark-and-excursion
+    (when pos (goto-char pos))
+    (nth 4 (syntax-ppss))))
+
+(defun my/select-syntax-context ()
+  "Select the enclosing STRING or COMMENT containing point (visual state).
+
+If point is inside a string literal, selects the whole literal; if inside a
+comment, selects the whole comment (block comments to their terminator, line
+comments to end of line). Otherwise no-op with a message."
+  (interactive)
+  (let ((ppss (syntax-ppss)))
+    (cond
+     ((my/in-string-p)
+      (let ((start (nth 8 ppss)))
+        (goto-char start)
+        (forward-sexp 1)
+        (push-mark (1+ start) t t)
+        (activate-mark)
+        (manifolding-keyboard-set-state "visual")))
+     ((my/in-comment-p)
+      (let* ((start (nth 8 ppss))
+             (end (save-mark-and-excursion
+                    (goto-char start)
+                    (condition-case nil
+                        (progn
+                          (skip-syntax-backward " ")
+                          (if comment-end-skip
+                              (progn
+                                (re-search-forward comment-end-skip nil t)
+                                (if (and comment-end (not (equal comment-end "")))
+                                    (progn (goto-char match-beginning) (point))
+                                  (point)))
+                            (line-end-position)))
+                      (error (line-end-position))))))
+        (goto-char start)
+        (push-mark start t t)
+        (goto-char end)
+        (activate-mark)
+        (manifolding-keyboard-set-state "visual")))
+     (t
+      (message "Point is not inside a string or comment")))))
+#+end_src
+
+** Expose invisible overlays (Meow-extracted, ~my/reveal-at-point~)
+Extracted from ~meow--ensure-visible~ (meow-util.el:425–431, meow 1.5.0,
+GPLv3). Opens the invisible overlays at point (org folding, outline, isearch-
+hidden text) by invoking each overlay's ~isearch-open-invisible~ handler, so
+folded/hidden content under the cursor becomes visible. Deps: builtins only
+(~overlays-at~, ~invisible-p~, ~overlay-get~, ~funcall~). Layout-independent,
+Dvorak-safe. Bound command ~my/reveal-at-point~ to ~r~ (reveal) in normal +
+motion states.
+#+begin_src emacs-lisp
+(defun my/ensure-visible ()
+  "Expose invisible overlays at point so folded/hidden content becomes visible.
+
+Iterates the overlays touching the char before point and, for each that is
+invisible AND carries an ~isearch-open-invisible~ handler, invokes that handler
+(the org/outline/isearch mechanism that actually unfolds)."
+  (let ((overlays (overlays-at (1- (point))))
+        ov expose)
+    (while (setq ov (pop overlays))
+      (if (and (invisible-p (overlay-get ov 'invisible))
+               (setq expose (overlay-get ov 'isearch-open-invisible)))
+          (funcall expose ov)))))
+
+(defun my/reveal-at-point ()
+  "Reveal folded or hidden content at point."
+  (interactive)
+  (my/ensure-visible))
+#+end_src
+
+** Indent / blank-line primitives (Meow-extracted, ~my/indent-to-match~)
+Extracted from ~meow--get-indent~ (meow-util.el:316–320) and ~meow--empty-line-p~
+(meow-util.el:322–326, meow 1.5.0, GPLv3). ~my/get-indent~ returns the current
+line's indentation column; ~my/empty-line-p~ reports whether the line is blank.
+Bound consumer ~my/indent-to-match~ reindents the current line to match the
+nearest preceding non-blank line. Deps: builtins only (~back-to-indentation~,
+~line-beginning-position~, ~string-match-p~, ~buffer-substring-no-properties~,
+~line-end-position~, ~skip-chars-forward~, ~delete-region~, ~indent-to~).
+Layout-independent, Dvorak-safe. Bound to ~g~ (get indent / match line) in
+normal + motion states.
+#+begin_src emacs-lisp
+(defun my/get-indent ()
+  "Get the indentation column of the current line."
+  (save-mark-and-excursion
+    (back-to-indentation)
+    (- (point) (line-beginning-position))))
+
+(defun my/empty-line-p ()
+  "Return whether the current line is blank (only whitespace)."
+  (string-match-p "^ *$" (buffer-substring-no-properties
+                          (line-beginning-position)
+                          (line-end-position))))
+
+(defun my/indent-to-match ()
+  "Indent the current line to match the nearest preceding non-blank line.
+
+Scans upward for the previous non-empty line and sets this line's leading
+whitespace to that line's indentation column."
+  (interactive)
+  (let ((target nil))
+    (save-excursion
+      (goto-char (line-beginning-position))
+      (while (and (not target) (not (bobp)))
+        (forward-line -1)
+        (unless (my/empty-line-p)
+          (setq target (my/get-indent)))))
+    (if (not target)
+        (message "No preceding non-blank line to match")
+      (let ((line-start (line-beginning-position)))
+        (goto-char line-start)
+        (delete-region line-start (progn (skip-chars-forward " \t") (point)))
+        (indent-to target)
+        (back-to-indentation)))))
+#+end_src
+
+** Modal relative line numbers (Meow-extracted, ~my/toggle-line-numbers~)
+Extracted from ~meow--toggle-relative-line-number~ (meow-util.el:368–372,
+meow 1.5.0, GPLv3). Line numbers show ~'relative~ in the editing states and
+absolute (~t~) in insert, so cursor-relative distance is always readable.
+Adapted from Meow's ~meow-insert-mode~ test to M-K's ~manifolding-keyboard-state~
+(string holding the current state, e.g. \"insert\"). The mechanism runs on
+~manifolding-keyboard-state-change-hook~; bound command ~my/toggle-line-numbers~
+turns the whole feature on/off. Deps: builtins (~display-line-numbers~,
+~display-line-numbers-mode~). Layout-independent, Dvorak-safe. Bound to ~l~ (line
+numbers) in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/update-relative-line-numbers ()
+  "Show relative line numbers, switching to absolute in insert state."
+  (when display-line-numbers
+    (setq display-line-numbers
+          (if (equal manifolding-keyboard-state "insert") t 'relative))))
+
+(add-hook 'manifolding-keyboard-state-change-hook
+          #'my/update-relative-line-numbers)
+
+(defun my/toggle-line-numbers ()
+  "Toggle line numbers on/off (relative in normal/motion, absolute in insert)."
+  (interactive)
+  (if display-line-numbers
+      (display-line-numbers-mode -1)
+    (display-line-numbers-mode 1)
+    (my/update-relative-line-numbers)))
+#+end_src
+
+** Smart line motion (Boon-extracted, ~my/line-beginning~ / ~my/line-end~)
+Extracted from ~boon-beginning-of-line~ (boon-moves.el:183–193) and
+~boon-end-of-line~ (boon-moves.el:196–216) plus their helpers
+~boon-visible-beginning-of-line~ (boon-moves.el:174–180) and
+~boon-looking-at-line-comment-start-p~ (boon-utils.el:55–60), all from Boon
+(GPLv3). Smart home/end cycling: BOL goes to the first non-whitespace char,
+else the true beginning of line (skipping folded outline text); EOL cycles
+last-code-char → last-non-blank-char → true end-of-line, honoring comment
+starts. Reuses the previously imported ~my/in-string-p~ (Meow #06) instead of
+Boon's ~boon-in-string-p~. Deps: builtins only. Layout-independent,
+Dvorak-safe. Bound to ~y~ (line-beginning) and ~z~ (line-end) in normal +
+motion states.
+#+begin_src emacs-lisp
+(defun my/line-comment-start-p ()
+  "Non-nil if point is at a line comment start (and not inside a string)."
+  (and (bound-and-true-p comment-start)
+       (looking-at comment-start)
+       (not (my/in-string-p))))
+
+(defun my/line-beginning ()
+  "Move point to first non-whitespace on the line; else to true line start.
+Skips folded (invisible) outline text at the beginning of line."
+  (interactive)
+  (let ((oldpos (point)))
+    (back-to-indentation)
+    (when (or (and (fboundp 'outline-invisible-p)
+                   (outline-invisible-p))
+              (= oldpos (point)))
+      (beginning-of-line)
+      (while (bound-and-true-p outline-invisible-p)
+        (backward-char 1)
+        (beginning-of-line 1)))))
+
+(defun my/line-end ()
+  "Move point to the end of the line, cycling through smart positions.
+Cycles: last non-comment char, then last non-blank char, then true end of line."
+  (interactive)
+  (let* ((orig (point))
+         (orig-eol (eolp))
+         (progress (lambda () (and (not (bolp)) (or orig-eol (> (point) orig))))))
+    (beginning-of-line)
+    (while (not (or (my/line-comment-start-p) (eolp)))
+      (forward-char))
+    (skip-chars-backward "\n\t " (line-beginning-position))
+    (unless (funcall progress)
+      (end-of-line)
+      (skip-chars-backward "\n\t " (line-beginning-position))
+      (unless (funcall progress)
+        (end-of-line)))))
+#+end_src
+
+** Syntax-unit move dispatch (Boon-extracted, ~my/smarter-forward~ / ~my/smarter-backward~)
+Extracted from ~boon-smarter-forward~ (boon-moves.el:125–171) and
+~boon-smarter-backward~ (boon-moves.el:80–122) plus helpers
+~boon-jump-over-blanks-forward/backward~ (boon-utils.el:71–79) and
+~boon-looking-at-comment~ (boon-utils.el:47–49), all from Boon (GPLv3). Moves
+over ONE whole syntactic unit at a time (comment / string / brackets / math /
+punctuation / word / subword / symbol), syntax-table driven — the base motion
+layer of Boon. Reuses ~my/line-comment-start-p~ (B01) and ~my/in-string-p~
+(Meow #06) instead of Boon's own. Deps: builtins only. Layout-independent,
+Dvorak-safe. Bound to ~x~ (unit-backward) and ~v~ (unit-forward) in normal +
+motion states.
+#+begin_src emacs-lisp
+(defun my/jump-over-blanks-forward ()
+  "Jump over blank characters (newline, tab, space), forward."
+  (interactive)
+  (skip-chars-forward "\n\t "))
+
+(defun my/jump-over-blanks-backward ()
+  "Jump over blank characters (newline, tab, space), backward."
+  (interactive)
+  (skip-chars-backward "\n\t "))
+
+(defun my/looking-at-comment (how-many)
+  "Non-nil if point is at the start of HOW-MANY comments (negative = backward)."
+  (save-excursion (forward-comment how-many)))
+
+(defun my/smarter-backward (count)
+  "Move point backward over COUNT whole syntactic units."
+  (interactive "p")
+  (dotimes (_number count)
+    (my/jump-over-blanks-backward)
+    (let ((back-limit (- (point) 5)))
+      (cond
+       ((my/looking-at-comment -1)
+        (forward-comment -1))
+       ((looking-back "\\s\"" back-limit)
+        (backward-char)
+        (when-let ((char (nth 8 (syntax-ppss))))
+          (goto-char char)))
+       ((looking-back "\\s)" back-limit)
+        (backward-list))
+       ((looking-back "\\s$" back-limit)
+        (condition-case nil
+            (let ((end-pos (scan-sexps (point) -1)))
+              (if (>= end-pos (line-beginning-position))
+                  (goto-char end-pos)
+                (backward-char)))
+          (scan-error
+           (message "matching thing not found")
+           (backward-char))))
+       ((looking-back "\\s." back-limit)
+        (skip-syntax-backward "."))
+       ((looking-back "\\s(" back-limit)
+        (backward-char))
+       ((looking-back "\\s!" back-limit)
+        (skip-syntax-backward "!"))
+       ((and (fboundp 'subword-backward)
+             (bound-and-true-p subword-mode)
+             (looking-at "\\sw")
+             (looking-back "\\sw" (1- (point))))
+        (subword-backward))
+       ((looking-back "\\sw\\|\\s_" back-limit)
+        (if (looking-at "\\sw\\|\\s_")
+            (progn
+              (skip-syntax-backward "_")
+              (skip-syntax-backward "w"))
+          (skip-syntax-backward "w_")))
+       (t
+        (backward-char))))))
+
+(defun my/smarter-forward (count)
+  "Move point forward over COUNT whole syntactic units."
+  (interactive "p")
+  (dotimes (_number count)
+    (my/jump-over-blanks-forward)
+    (cond
+     ((my/line-comment-start-p)
+      (end-of-line)
+      (my/jump-over-blanks-forward))
+     ((my/looking-at-comment 1)
+      (forward-comment 1))
+     ((looking-at "\\s\"")
+      (forward-char)
+      (when-let ((char (nth 8 (syntax-ppss))))
+        (goto-char char)
+        (forward-sexp)))
+     ((looking-at "\\s(")
+      (forward-list))
+     ((looking-at "\\s)")
+      (forward-char))
+     ((looking-at "\\s$")
+      (condition-case nil
+          (let ((end-pos (scan-sexps (point) 1)))
+            (if (<= end-pos (line-end-position))
+                (goto-char end-pos)
+              (forward-char)))
+        (scan-error
+         (message "matching thing not found")
+         (forward-char))))
+     ((looking-at "\\s.")
+      (skip-syntax-forward "."))
+     ((looking-at "\\s!")
+      (skip-syntax-forward "!"))
+     ((and (fboundp 'subword-forward)
+           (bound-and-true-p subword-mode)
+           (looking-at "\\sw")
+           (looking-back "\\sw" (1- (point))))
+      (subword-forward))
+     ((looking-at "\\sw\\|\\s_")
+      (if (looking-back "\\sw\\|\\s_" (1- (point)))
+          (progn
+            (skip-syntax-forward "_")
+            (skip-syntax-forward "w"))
+        (skip-syntax-forward "w_")))
+     (t
+      (forward-char)))))
+#+end_src
+
+** Indent-relative vertical motion (Boon-extracted, ~my/smarter-upward~ / ~my/smarter-downward~)
+Extracted from ~boon-smarter-upward~ / ~boon-smarter-downward~ (boon-moves.el:59–77)
+and ~boon-col-relative-to-indent~ (boon-utils.el:42–45), all from Boon (GPLv3).
+Vertical navigation that skips to the nearest line of the SAME or LESS
+indentation (instead of the physical next line), so it hops between structural
+blocks rather than scrolling line-by-line. Deps: builtins only (uses
+~previous-logical-line~ / ~next-logical-line~, ~back-to-indentation~).
+Layout-independent, Dvorak-safe. Bound to ~[~ (upward) and ~]~ (downward) in
+normal + motion states — plain punctuation keys, no Shift.
+#+begin_src emacs-lisp
+(defun my/col-relative-to-indent ()
+  "Return the position of point relative to the line's indentation.
+Can be negative when point is before the indentation column."
+  (- (point) (save-excursion (back-to-indentation) (point))))
+
+(defun my/smarter-upward (count)
+  "Move upward, to a line with the same level of indentation or less, COUNT times."
+  (interactive "p")
+  (back-to-indentation)
+  (dotimes (_number count)
+    (previous-logical-line)
+    (while (< (my/col-relative-to-indent) 0) (previous-logical-line)))
+  (back-to-indentation))
+
+(defun my/smarter-downward (count)
+  "Move downward, to a line with the same level of indentation or less, COUNT times."
+  (interactive "p")
+  (back-to-indentation)
+  (dotimes (_number count)
+    (next-logical-line)
+    (while (< (my/col-relative-to-indent) 0) (next-logical-line)))
+  (back-to-indentation)))
+#+end_src
+
+** Region algebra (Boon-extracted, ~my/reg-*~)
+Extracted from boon-regs.el (boon-regs.el:8–82, Boon, GPLv3) — Boon's generic
+region data structure (~(mark point cursor)~) and its transformers: normalize
+beg/end, crop to content, expose borders, extend by surrounding spaces, and
+convert to/from MARKERS for kill/delete safety. Fully standalone, zero state
+coupling; pairs with M-K's ks targeting. Deps: builtins only. Layout-independent,
+Dvorak-safe. All helpers renamed ~boon-*~ → ~my/reg-*~. Bound via consumer
+~my/yank-line-content~ (copies the current line's code content, dropping
+surrounding blank, marker-safe so the copy survives edits) → plain key ~.~ in
+normal + motion states. The obsolete ~boon-reg-cur-after~ is not ported.
+#+begin_src emacs-lisp
+(defun my/reg-mk (mrk pnt &optional cursor)
+  "Make a region with MRK, PNT and CURSOR, as the list (mark point cursor)."
+  (list mrk pnt cursor))
+
+(defun my/reg-nil (reg)
+  "Return t if either the point or the mark of region REG is nil."
+  (not (or (my/reg-point reg) (my/reg-mark reg))))
+
+(defun my/reg-bounds (bnds)
+  "Convert BNDS as (mark . point) into a list of one region, or nil."
+  (when bnds
+    (list (my/reg-mk (car bnds) (cdr bnds) nil))))
+
+(defun my/reg-mark  (reg) (nth 0 reg))
+(defun my/reg-point (reg) (nth 1 reg))
+(defun my/reg-cursor (reg) (nth 2 reg))
+
+(defun my/reg-to-markers (reg)
+  "Return a COPY of region REG whose borders are markers (edit-safe)."
+  (my/reg-mk (copy-marker (my/reg-mark reg))
+             (copy-marker (my/reg-point reg))
+             (my/reg-cursor reg)))
+
+(defun my/reg-from-markers (reg)
+  "Convert the marker borders of REG back to plain positions."
+  (my/reg-mk (marker-position (my/reg-mark reg))
+             (marker-position (my/reg-point reg))
+             (my/reg-cursor reg)))
+
+(defun my/reg-borders (reg how-much)
+  "Given a normalized region REG, return its borders as a region list.
+The size of each border is HOW-MUCH."
+  (list (my/reg-mk (my/reg-end reg)   (- (my/reg-end reg) how-much)   (my/reg-cursor reg))
+        (my/reg-mk (my/reg-begin reg) (+ (my/reg-begin reg) how-much) (my/reg-cursor reg))))
+
+(defun my/reg-include-spaces (reg)
+  "Return REG extended to include surrounding spaces around point.
+Spaces are searched after point if the region is directed forward, else before."
+  (save-excursion
+    (let* ((mk (my/reg-mark reg))
+           (pt (my/reg-point reg))
+           (fwd (> pt mk))
+           (skip-pt (if fwd 'skip-syntax-forward 'skip-syntax-backward))
+           (skip-mk (if fwd 'skip-syntax-backward 'skip-syntax-forward))
+           (pt-ext (progn (goto-char pt) (funcall skip-pt "-") (point))))
+      (my/reg-mk (if (equal pt-ext pt)
+                     (progn (goto-char mk) (funcall skip-mk "-") (point))
+                   mk)
+                 pt-ext
+                 (my/reg-cursor reg)))))
+
+(defun my/reg-begin (reg)
+  "The beginning of region REG."
+  (min (my/reg-point reg) (my/reg-mark reg)))
+
+(defun my/reg-end (reg)
+  "The end of region REG."
+  (max (my/reg-point reg) (my/reg-mark reg)))
+
+(defun my/reg-content (reg)
+  "Given region REG, return its content (crop the region by 1 on each side)."
+  (my/reg-mk (+ (my/reg-begin reg) 1) (- (my/reg-end reg) 1) (my/reg-cursor reg)))
+
+(defun my/reg-before (r1 r2)
+  "Return non-nil when region R1 occurs before region R2."
+  (< (my/reg-begin r1) (my/reg-end r2)))
+
+(defun my/reg-after (r1 r2)
+  "Return non-nil when region R2 occurs before region R1."
+  (> (my/reg-begin r1) (my/reg-end r2)))
+
+(defun my/yank-line-content ()
+  "Copy the code content of the current line to the kill-ring.
+Drops leading indentation and trailing blank; uses marker-safe regions so the
+copy is unaffected by edits. Does not delete anything."
+  (interactive)
+  (save-excursion
+    (let* ((beg (progn (back-to-indentation) (point)))
+           (end (progn (end-of-line) (skip-chars-backward " \t") (point)))
+           (reg (my/reg-to-markers (my/reg-mk beg end nil))))
+      (when (> end beg)
+        (kill-ring-save (my/reg-mark reg) (my/reg-point reg))))))
+#+end_src
+
+** Counted operator selector (Boon-extracted, ~my/spec-selector~ / ~my/count-and-execute~)
+Extracted from ~boon-spec-selector~ (boon-arguments.el:351–393) and its embedded
+numeric-count parser (boon-arguments.el:368–372), from Boon (GPLv3). This is the
+"operator + motion/selector" composition core: read an optional DECIMAL COUNT
+from typed digits, then a SINGLE command key, and produce a value to run with
+that count as prefix argument. The count accumulation
+(~(+ (- last-char ?0) (* 10 count))~) is fully layout-agnostic. ADAPTED: Boon
+reads two bespoke keymaps (~boon-moves-map~ / ~boon-select-map~); M-K has one
+global modal engine with per-state active maps, so this reads the command from
+~current-active-maps~ (which already includes M-K's state keymaps via
+~emulation-mode-map-alists~). Boon's multiple-cursors and ~boon-selected-by-move~
+kill-ring aggregation are NOT ported (M-K has no MC). Deps: builtins only
+(~read-event~, ~current-active-maps~, ~lookup-key~, ~call-interactively~).
+Layout-independent, Dvorak-safe. Bound via consumer ~my/count-and-execute~ →
+plain key ~,~ in normal + motion states: type a count, then a command key, and
+the command runs with that count as ~current-prefix-arg~ (enables counted
+operators like ~d~ N times without built-in prefix keys).
+#+begin_src emacs-lisp
+(defun my/spec-selector (msg)
+  "Read a decimal count and a single command key, returning (count . command).
+MSG is used as the prompt. If no digits are typed, count is nil. Digits are
+accumulated into a decimal number exactly like Boon, then a single key is read
+and resolved against the currently active keymaps (which include M-K's state
+keymaps). Returns nil if the key is not a command."
+  (let ((count 0)
+        (maps (current-active-maps t)))
+    (while (let ((ch (read-event (format "%s %s" msg count))))
+             (and (integerp ch) (>= ch ?0) (<= ch ?9)
+                  (setq count (+ (- ch ?0) (* 10 count)))))
+      nil)
+    (if (zerop count) (setq count nil))
+    (let ((cmd (lookup-key maps (vector last-input-event))))
+      (when (commandp cmd)
+        (cons count cmd)))))
+
+(defun my/count-and-execute ()
+  "Read a count and a command key, then run that command with the count.
+Type digits for a count (optional), then a single command key from the active
+keymaps; the command is invoked with the count as ~current-prefix-arg~ so it
+repeats / behaves as a counted operator."
+  (interactive)
+  (let ((sel (my/spec-selector "count")))
+    (when sel
+      (let ((current-prefix-arg (car sel)))
+        (call-interactively (cdr sel))))))
+#+end_src
+
+** Searchable-highlight engine (Boon-extracted, ~my/hl-*~)
+Extracted from boon-hl.el (boon-hl.el:1–159, Boon/GPLv3, a fork of hi-lock made
+after Emacs 28 broke searching highlighted patterns). The key mechanism: each
+highlight stores a font-lock keyword closure (~:kw~) supporting BOTH forward and
+BACKWARD search, so highlights are *searchable* — enabling "jump between
+highlights", not just visual marking. Faces are rotated from a defaults list.
+ADAPTED: Boon imports ~dash~; M-K rewrites those helpers with builtin ~cl-lib~
+(~mapcar~, ~cl-position~, ~cl-loop~, ~delete~), keeping the engine dash-free.
+Deps: builtins ~hi-lock~ + ~cl-lib~. Layout-independent, Dvorak-safe. Names
+changed ~boon-hl-*~ → ~my/hl-*~. Bound via consumer ~my/hl-next-at-point~
+(highlight the symbol at point, then jump to its next occurrence) → plain key ~/~.
+#+begin_src emacs-lisp
+(require 'cl-lib)
+
+(defvar-local my/hl-patterns nil
+  "Patterns provided to my/hl.  Should not be changed.")
+(put 'my/hl-patterns 'permanent-local t)
+
+(defcustom my/hl-face-defaults
+  '(hi-yellow hi-pink hi-green hi-blue hi-salmon hi-aquamarine
+    hi-black-b hi-blue-b hi-red-b hi-green-b hi-black-hb)
+  "Default faces for my/hl."
+  :group 'manifolding-keyboard
+  :type '(repeat face))
+
+(defvar-local my/hl-unused-faces nil
+  "Faces available for highlighting new text.")
+
+(defun my/hl-read-face-name ()
+  "Return the next available highlight face (or read one with a prefix arg)."
+  (unless my/hl-unused-faces
+    (setq my/hl-unused-faces my/hl-face-defaults))
+  (let* ((defaults (append my/hl-unused-faces my/hl-face-defaults))
+         (face (if current-prefix-arg
+                   (intern (completing-read
+                            (format-prompt "Highlight using face" (car defaults))
+                            obarray 'facep t nil 'face-name-history
+                            (mapcar #'symbol-name defaults)))
+                 (car defaults))))
+    (setq my/hl-unused-faces (remove face my/hl-unused-faces))
+    (add-to-list 'my/hl-face-defaults face t)
+    face))
+
+(defun my/hl-add (regexp face &optional lighter case-fold spaces-regexp)
+  "Highlight matches of REGEXP with FACE; LIGHTER is a human label.
+CASE-FOLD ignores case; SPACES-REGEXP substitutes spaces in font-lock search.
+Each highlight stores a keyword closure supporting both forward and backward
+search, so it can be jumped between."
+  (let ((id (list regexp case-fold spaces-regexp)))
+    (let ((ix (cl-position id my/hl-patterns
+                           :key (lambda (p) (plist-get (cdr p) :id))
+                           :test #'equal)))
+      (if ix
+          (progn
+            (setq my/hl-patterns
+                  (cons (nth ix my/hl-patterns)
+                        (append (cl-subseq my/hl-patterns 0 ix)
+                                (cl-subseq my/hl-patterns (1+ ix)))))
+            (nth 0 my/hl-patterns))
+        (setq face (or face (my/hl-read-face-name)))
+        (let ((kw (list (lambda (limit &optional backward)
+                          (let ((case-fold-search case-fold)
+                                (search-spaces-regexp spaces-regexp))
+                            (if backward
+                                (re-search-backward regexp limit t)
+                              (re-search-forward regexp limit t))))
+                        (list 0 (list 'quote face) 'prepend))))
+          (let ((entry (list (or lighter regexp) :kw kw :face face :id id)))
+            (push entry my/hl-patterns)
+            (font-lock-add-keywords nil (list kw) t)
+            (font-lock-flush)
+            entry))))))
+
+(defun my/hl-remove (pattern)
+  "Remove the highlight PATTERN."
+  (font-lock-remove-keywords nil (list (plist-get (cdr pattern) :kw)))
+  (push (plist-get (cdr pattern) :face) my/hl-unused-faces)
+  (setq my/hl-patterns (delete pattern my/hl-patterns))
+  (font-lock-flush))
+
+(defun my/hl-search (pattern &optional direction limit)
+  "Search for highlighted PATTERN up to LIMIT.
+Search backward if DIRECTION is non-nil."
+  (funcall (car (plist-get (cdr pattern) :kw)) limit direction))
+
+(defun my/hl-search-backward (pattern &optional limit)
+  "Search for highlighted PATTERN up to LIMIT, backward."
+  (my/hl-search pattern t limit))
+
+(defun my/hl-regexp (regexp &optional face)
+  "Highlight each match of REGEXP with FACE (chosen from defaults if nil)."
+  (interactive
+   (list (hi-lock-regexp-okay (read-regexp "Regexp to highlight"
+                                           'regexp-history-last))))
+  (my/hl-add regexp face nil
+             (if (and case-fold-search search-upper-case)
+                 (isearch-no-upper-case-p regexp t)
+               case-fold-search)
+             search-whitespace-regexp))
+
+(defun my/hl-symbol (string &optional face)
+  "Highlight whole words matching STRING with FACE."
+  (interactive "sSymbol to highlight:")
+  (my/hl-add (hi-lock-regexp-okay (format "\\_<%s\\_>" (regexp-quote string)))
+             face string font-lock-keywords-case-fold-search))
+
+(defun my/hl-next-at-point ()
+  "Highlight the symbol at point (if not already) and jump to its next match.
+This makes the highlighted symbol searchable and navigable."
+  (interactive)
+  (my/hl-symbol (thing-at-point 'symbol t))
+  (let ((pattern (car my/hl-patterns)))
+    (when pattern
+      (unless (my/hl-search pattern nil nil)
+        (goto-char (point-min))
+        (my/hl-search pattern nil nil)))))
+#+end_src
+
+** Smart-yank splice with spacing normalization (Boon-extracted, ~my/fix-a-space~)
+Extracted from ~boon-need-space~ (boon-main.el:108–113), ~boon-fix-a-space~
+(boon-main.el:116–133), ~boon-splice-fix-spaces~ (boon-main.el:136–146) and
+~boon-splice~ (boon-main.el:96–105), all from Boon (GPLv3). The mechanism makes
+space handling smart: a single space is inserted when needed to separate
+words/expressions and removed when redundant (at line edges, before closing
+pairs, between punctuation). ~my/splice-fix-spaces~ normalizes both sides of a
+yanked boundary. ~my/splice~ replaces the region with N yanks. Deps: builtins
+only (~delete-char~, ~insert~, ~yank~, ~eolp~/~bolp~, syntax classes). Reuses
+~my/reg-*~ region helpers (B04). ~boon-delete-region~ inlined as plain region
+kill; ~boon-hint~ dropped. Layout-independent, Dvorak-safe. Bound via interactive
+~my/fix-a-space~ (fix spacing at point) → plain key ~-~ in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/need-space ()
+  "Return t if a space is needed here to separate words or expressions."
+  (let ((back-limit (1- (point))))
+    (and (not (or (eolp) (looking-at "\\s-") (looking-at "\\s)")))
+         (not (or (bolp) (looking-back "\\s-" back-limit)
+                  (looking-back "\\s(" back-limit)))
+         (or (and (looking-back "\\sw\\|\\s_\\|\\s.\\|\\s)" back-limit)
+                  (looking-at "\\sw\\|\\s_\\|\\s("))))))
+
+(defun my/fix-a-space ()
+  "Fix the text to have the correct amount of spacing at point.
+Return non-nil if any change was made."
+  (interactive)
+  (let ((back-limit (1- (point))))
+    (cond ((bolp) nil)
+          ((looking-at " ")
+           (when (or (bolp) (looking-back "\\s-\\|\\s(" back-limit))
+             (delete-char 1)
+             t))
+          ((looking-back " " back-limit)
+           (when (or (eolp) (looking-at "\\s-\\|\\s)\\|\\s."))
+             (delete-char -1)
+             t))
+          ((my/need-space)
+           (insert " ")
+           t)
+          (t nil))))
+
+(defun my/splice-fix-spaces ()
+  "Normalize spacing on both sides of a yanked boundary.
+Return non-nil if any change was made."
+  (interactive)
+  (let ((fix-here (my/fix-a-space))
+        (fix-there (save-excursion
+                     (goto-char (mark))
+                     (my/fix-a-space))))
+    (or fix-here fix-there)))
+
+(defun my/splice (number-of-copies)
+  "Yank NUMBER-OF-COPIES times, replacing the region if active.
+Re-running after a yank fixes the spacing instead."
+  (interactive "p")
+  (unless (and (eq number-of-copies 1)
+               (eq last-command 'yank)
+               (my/splice-fix-spaces))
+    (when (use-region-p)
+      (kill-region (my/reg-begin (my/reg-mk (mark) (point) nil))
+                   (my/reg-end (my/reg-mk (mark) (point) nil))))
+    (dotimes (_ number-of-copies) (yank))
+    (message "If spaces are wrong, run my/splice again.")))
+#+end_src
+
+** Quick-search highlighted text + unified navigate (Boon-extracted, ~my/qsearch~ / ~my/navigate~)
+Extracted from ~boon-cur-pattern~ (boon-search.el:12–13), ~boon-qsearch~
+(boon-search.el:15–31), ~boon-qsearch-next/previous~ (boon-search.el:34–43),
+~boon-qsearch-next/previous-at-point~ (boon-search.el:46–59), ~boon-navigate~
+(boon-search.el:62–69), ~boon-navigate-forward/backward~ (boon-search.el:72–81),
+all from Boon (GPLv3), plus ~boon-stuff-at-point~ (boon-utils.el:62–69). The
+mechanism makes the currently highlighted symbol (from the B06 hl engine)
+instantly searchable: ~my/qsearch~ moves to the next/previous match of the
+current hl pattern with wrap-around and "no more occurrences" feedback.
+~my/qsearch-next-at-point~ highlights the symbol/region at point then jumps to
+its next match. ~my/navigate~ is a unified "next item of interest": hl-pattern
+match if one is highlighted, else ~next-error~. Deps: B06 hl engine
+~my/hl-patterns~ / ~my/hl-symbol~ / ~my/hl-search~, plus ~isearch~ and builtins.
+Multiple-cursors branch of Boon's ~boon-navigate~ DROPPED (M-K has no MC);
+~boon-stuff-at-point~ → ~my/stuff-at-point~ reuses ~use-region-p~ +
+~thing-at-point~. Layout-independent, Dvorak-safe. Bound ~my/navigate-forward~
+→ ~;~ and ~my/qsearch-next-at-point~ → ~'~ in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/hl-current-pattern ()
+  "Return the current highlight search pattern (most recent hl), or nil."
+  (car my/hl-patterns))
+
+(defun my/stuff-at-point ()
+  "Return meaningful text at point (region if active, else symbol).
+Signal an error if nothing relevant is there."
+  (interactive)
+  (if (use-region-p)
+      (buffer-substring-no-properties (region-beginning) (region-end))
+    (or (thing-at-point 'symbol)
+        (error "Nothing relevant at point; move to a symbol or select a region"))))
+
+(defun my/qsearch (forward &optional pattern)
+  "Search for the current highlight PATTERN in direction FORWARD.
+Move point to the start of the match, wrapping around with feedback."
+  (if-let* ((pattern (or pattern (my/hl-current-pattern))))
+      (setq isearch-success
+            (save-excursion
+              (goto-char (if forward (1+ (point)) (1- (point))))
+              (or (my/hl-search pattern (not forward))
+                  (if isearch-success
+                      (prog1 nil
+                        (message "No more occurrences %s"
+                                 (if forward "below" "above")))
+                    (message "Wrapping around")
+                    (goto-char (if forward (point-min) (point-max)))
+                    (my/hl-search pattern (not forward))))))
+    (error "Nothing to search: highlight something before using my/qsearch."))
+  (when isearch-success (goto-char (match-beginning 0))))
+
+(defun my/qsearch-next (&optional pattern)
+  "Search the next occurrence of the current search regexp."
+  (interactive)
+  (my/qsearch t pattern))
+
+(defun my/qsearch-previous (&optional pattern)
+  "Search the previous occurrence of the current search regexp."
+  (interactive)
+  (my/qsearch nil pattern))
+
+(defun my/qsearch-next-at-point ()
+  "Highlight the text at point then jump to its next match."
+  (interactive)
+  (my/hl-symbol (my/stuff-at-point))
+  (my/qsearch t)
+  (deactivate-mark))
+
+(defun my/qsearch-previous-at-point ()
+  "Highlight the text at point then jump to its previous match."
+  (interactive)
+  (my/hl-symbol (my/stuff-at-point))
+  (my/qsearch nil)
+  (deactivate-mark))
+
+(defun my/navigate (forward)
+  "Go to the next item of interest, FORWARD or backwards."
+  (cond
+   ((my/hl-current-pattern)
+    (my/qsearch forward))
+   (t (next-error (if forward 1 -1)))))
+
+(defun my/navigate-forward ()
+  "Go to the next item of interest."
+  (interactive)
+  (my/navigate t))
+
+(defun my/navigate-backward ()
+  "Go to the previous item of interest."
+  (interactive)
+  (my/navigate nil))
+#+end_src
+
+** Line-scoped character search (Boon-extracted, ~my/find-char-*~ / ~my/search-char-*~)
+Extracted from ~boon-find-char-forward/backward~ (boon-moves.el:17–28) and
+~boon-search-char-forward/backward~ (boon-search.el:84–94), all from Boon
+(GPLv3). The mechanism reads a single character and jumps to its next/previous
+occurrence within the current line. ~my/find-char-forward/backward~ jump to the
+char and step off it (cursor sits on the char), the classic modal "find char"
+move; ~my/search-char-forward/backward~ extend this to a counted line-scoped
+search (like Vim ~f~/~F~/~t~). Deps: builtins (~read-char~, ~search-forward~ /
+~search-backward~, ~line-end-position~/~line-beginning-position~). Replaces the
+Boon ~boon-find-char-*~ ~interactive "c"~ prompt with ~read-char~ for a cleaner
+modal read. Layout-independent, Dvorak-safe. Bound ~my/find-char-forward~ → ~1~
+and ~my/find-char-backward~ → ~2~ in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/find-char-forward (char)
+  "Move forward to the next occurrence of character CHAR, stepping onto it."
+  (interactive "cType the character to find")
+  (search-forward (make-string 1 char))
+  (backward-char 1))
+
+(defun my/find-char-backward (char)
+  "Move backward to the previous occurrence of character CHAR, stepping onto it."
+  (interactive "cType the character to find")
+  (search-backward (make-string 1 char))
+  (forward-char 1))
+
+(defun my/search-char-forward (count)
+  "Search COUNT times for a character read from the keyboard, forward on this line."
+  (interactive "p")
+  (let ((char (read-char)))
+    (search-forward (string char) (line-end-position) nil count)))
+
+(defun my/search-char-backward (count)
+  "Search COUNT times for a character read from the keyboard, backward on this line."
+  (interactive "p")
+  (my/search-char-forward (if count (- count) (- 1))))
+#+end_src
+
+** Quote-next-key escape hatch (Boon-extracted, ~my/quote-character~)
+Extracted from ~boon-quote-character~ (boon-main.el:376–388), from Boon (GPLv3).
+The mechanism reads a single character, then executes the command that character
+would run *without* the modal layer — the "escape hatch" to reach any underlying
+global Emacs command from within M-K. Boon achieves this by looking up the char
+with its own modal map-alist (boon-mode-map-alist) disabled; the M-K port instead
+filters every ~manifolding-keyboard-*-state-keymap~ out of
+~current-active-maps~ before the lookup, so it reproduces exactly the command
+the key would fire if M-K were off. ~command-remapping~ is honored, and
+~last-command-event~ / ~this-command~ are set before ~call-interactively~ so
+repeat semantics behave. Deps: builtins (~read-char~, ~current-active-maps~,
+~make-composed-keymap~, ~lookup-key~, ~command-remapping~, ~call-interactively~)
++ ~cl-lib~ (~cl-remove-if~, ~cl-loop~, ~memq~). Layout-independent, Dvorak-safe.
+Bound ~my/quote-character~ → plain key ~`~ (the quote key) in normal + motion.
+#+begin_src emacs-lisp
+(defun my/quote-character (char)
+  "Execute the command bound to character CHAR as if the M-K modal layer were off."
+  (interactive (list (read-char)))
+  (let* ((mk-maps
+          (cl-loop for sym being the symbols
+                   when (and (symbolp sym)
+                             (string-prefix-p "manifolding-keyboard-"
+                                              (symbol-name sym))
+                             (string-suffix-p "-state-keymap" (symbol-name sym))
+                             (boundp sym))
+                   collect (symbol-value sym)))
+         (keymap (make-composed-keymap
+                  (cl-remove-if (lambda (m) (memq m mk-maps))
+                                (current-active-maps))))
+         (cmd (lookup-key keymap (vector char)))
+         (cmd (or (command-remapping cmd nil keymap) cmd)))
+    (setq last-command-event char)
+    (setq this-command cmd)
+    (message "Executing the command bound to %c" char)
+    (call-interactively cmd nil [char])))
+#+end_src
+
+** Modal repeat (ryo-extracted, ~my/repeat-last~)
+Extracted from ~ryo-modal-repeat~ (ryo-modal.el:49–57) and its auto-remember
+~ryo-modal-maybe-store-last-command~ (ryo-modal.el:76–85) plus the ~:norepeat~
+opt-out list (ryo-modal.el:59), from ryo-modal (MIT, Erik Sjöstrand). The
+mechanism is modal dot-repeat: the last command run from an M-K state keymap
+(plus its prefix arg) is remembered, and ~my/repeat-last~ re-executes it on
+demand, skipping commands in ~my/non-repeating-commands~. ryo-modal remembers via
+a ~post-command-hook~ that looks up ~this-command-keys~ in its own keymap; the M-K
+port instead records ~this-command~ when it resolved FROM one of the M-K state
+keymaps in ~current-active-maps~ (so only modal-initiated commands repeat, not
+insert-mode/global input). Deps: builtins (~current-active-maps~,
+~lookup-key~, ~this-command-keys~, ~last-prefix-arg~, ~command-execute~,
+~setf~/~commandp~) + ~cl-lib~ (~cl-remove-if~, ~memq~). Layout-independent,
+Dvorak-safe. Bound ~my/repeat-last~ → plain key ~=~ (modal dot) in normal + motion.
+#+begin_src emacs-lisp
+(defvar my/last-command nil
+  "Last command run from an M-K state keymap, for ~my/repeat-last~.")
+(defvar my/last-command-prefix-arg nil
+  "Prefix arg of the last M-K-state command.")
+(defvar my/non-repeating-commands '(my/repeat-last)
+  "Commands that ~my/repeat-last~ must not repeat.")
+
+(defun my/maybe-store-last-command ()
+  "Remember THIS-COMMAND + its prefix arg if it came from an M-K state keymap."
+  (when (commandp this-command)
+    (let ((in-state-map
+           (cl-remove-if-not
+            (lambda (map)
+              (and (symbolp map)
+                   (string-prefix-p "manifolding-keyboard-" (symbol-name map))
+                   (string-suffix-p "-state-keymap" (symbol-name map))))
+            (current-active-maps))))
+      (when (and in-state-map
+                 (not (member this-command my/non-repeating-commands)))
+        (setq my/last-command-prefix-arg last-prefix-arg)
+        (setq my/last-command this-command)))))
+
+(defun my/repeat-last ()
+  "Repeat the last command run from an M-K state keymap, with its prefix arg."
+  (interactive)
+  (when my/last-command
+    (setf current-prefix-arg my/last-command-prefix-arg)
+    (command-execute my/last-command nil nil t)))
+
+(add-hook 'post-command-hook #'my/maybe-store-last-command)
+#+end_src
+
+** Command chaining (ryo-extracted, ~my/chain~)
+Extracted from ryo-modal's ~:then~ / ~:first~ binding-keyword semantics
+(ryo-modal.el:133–136) as baked into its generated ~ryo:<hash>:<name>~ wrappers
+(ryo-modal.el:223–242), from ryo-modal (MIT, Erik Sjöstrand). The mechanism lets
+a single modal key compose a main command with pre- (~:first~) and follow-on
+(~:then~) commands, each executed in order and, if interactive, via
+~call-interactively~ (else applied as a raw function with no args).
+~this-command~ is bound to the MAIN command for the whole chain, so repeat
+(R01 ~my/repeat-last~) and prefix-arg semantics still see the composed target.
+Deps: builtins (~commandp~, ~call-interactively~, ~apply~, ~let~). It is a
+composable building block for any M-K binding. Layout-independent, Dvorak-safe.
+Bound consumer ~my/reindent-block~ (indent 3-line block by chaining
+~:then~ = move-down + re-indent) → plain key ~0~ in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/chain (command &optional first then)
+  "Run FIRST commands, then COMMAND, then THEN commands.
+Each element of FIRST/THEN is called interactively if a command, else applied
+with no arguments. `this-command' stays COMMAND throughout the chain."
+  (let ((real-this-command command))
+    (dolist (f first)
+      (if (commandp f) (call-interactively f) (apply f nil)))
+    (call-interactively command)
+    (dolist (f then)
+      (if (commandp f) (call-interactively f) (apply f nil)))))
+
+(defun my/reindent-block ()
+  "Re-indent the current line and the two lines below (chained via ~my/chain~)."
+  (interactive)
+  (my/chain 'my/indent-to-match
+            nil
+            '(my/smarter-downward my/indent-to-match
+              my/smarter-downward my/indent-to-match)))
+#+end_src
+
+** Bindings display buffer (ryo-extracted, ~my/modal-bindings~)
+Extracted from ~ryo-modal-bindings~ (ryo-modal.el:363–411), from ryo-modal (MIT,
+Erik Sjöstrand). The mechanism renders a sorted, column-aligned buffer of all
+modal bindings, with mode-scoped sections. ryo formats its ~ryo-modal-bindings-list~
+(populated by its binding DSL); M-K declares bindings directly in its state
+keymaps, so the port instead enumerates each M-K state keymap's direct command
+entries via ~map-keymap~ → (~key-description~ . command) pairs, sorts them, and
+prints them under per-state headers. Produces a static discoverability reference
+(supplements which-key's live hints). Deps: builtins (~map-keymap~,
+~key-description~, ~commandp~, ~with-output-to-temp-buffer~, ~format~) + ~cl-lib~
+(~cl-loop~, ~sort~). Layout-independent, Dvorak-safe. Bound ~my/modal-bindings~ →
+plain key ~3~ in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/keymap-entries (keymap)
+  "Return sorted (key-description . command) pairs from KEYMAP object."
+  (let (pairs)
+    (map-keymap (lambda (key binding)
+                  (when (commandp binding)
+                    (push (cons (key-description (vector key)) binding) pairs)))
+                keymap)
+    (sort pairs (lambda (a b) (string< (car a) (car b))))))
+
+(defun my/modal-bindings ()
+  "Display a sorted buffer of M-K normal + motion state bindings."
+  (interactive)
+  (with-output-to-temp-buffer "*my-modal-bindings*"
+    (princ "M-K Modal Bindings\n\n")
+    (dolist (state '(manifolding-keyboard-normal-state-keymap
+                     manifolding-keyboard-motion-state-keymap))
+      (let ((entries (my/keymap-entries (symbol-value state))))
+        (princ (format "%s\n%s\n" (symbol-name state) (make-string 40 ?-)))
+        (cl-loop for (key . cmd) in entries
+                 do (princ (format "%-12s %s\n" key (prin1-to-string cmd))))
+        (princ "\n")))))
+#+end_src
+
+** Interactive rebind (ryo-extracted, ~my/set-key~ / ~my/unset-key~)
+Extracted from ~ryo-modal-set-key~ / ~ryo-modal-unset-key~ (ryo-modal.el:341–360),
+from ryo-modal (MIT, Erik Sjöstrand). The mechanism interactively binds or unbinds
+a single key in the modal keymap. Deps: builtins (~define-key~, ~signal~,
+~wrong-type-argument~, ~interactive~). ryo targets ~ryo-modal-mode-map~ and is for
+its own DSL; M-K targets the normal-state keymap (the primary modal map) via
+~my/set-key~ / ~my/unset-key~ so a user can temporarily override without editing
+config. Type-safety check on the key (vector/string) is kept. Layout-independent,
+Dvorak-safe. Bound ~my/set-key~ → plain key ~4~ in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/set-key (key command)
+  "Give KEY a binding as COMMAND in the M-K normal-state keymap.
+For interactive temporary overrides. See `global-set-key'."
+  (interactive "KSet M-K key: \nCSet M-K key %s to command: ")
+  (or (vectorp key) (stringp key)
+      (signal 'wrong-type-argument (list 'arrayp key)))
+  (define-key manifolding-keyboard-normal-state-keymap key command))
+
+(defun my/unset-key (key)
+  "Remove the M-K normal-state keymap binding of KEY.
+KEY is a string or vector. For interactive temporary unbinds."
+  (interactive "kUnset M-K key: ")
+  (define-key manifolding-keyboard-normal-state-keymap key nil))
+#+end_src
+
+** Command-then-modal (ryo-extracted, ~my/command-then-modal~)
+Extracted from ~ryo-modal-command-then-ryo~ (ryo-modal.el:319–338), from ryo-modal
+(MIT, Erik Sjöstrand). The mechanism runs a command, then returns to the modal
+state — an escape-and-return pattern so a transient/global command never leaves
+you stranded outside M-K. ryo defines a keybinding that runs the command then
+activates ~ryo-modal-mode~; its definition side is dropped here (M-K declares
+bindings in its own blocks) and the run-then-enter-modal core is exposed directly:
+prompt for a command, run it, then switch to the normal modal state. Deps:
+builtins (~read-command~, ~call-interactively~,
+~manifolding-keyboard-set-state~). Layout-independent, Dvorak-safe. Bound
+~my/command-then-modal~ → plain key ~5~ in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/command-then-modal ()
+  "Prompt for a command, run it, then switch to the normal (modal) state."
+  (interactive)
+  (let ((command (read-command "Command, then modal: ")))
+    (call-interactively command)
+    (manifolding-keyboard-set-state "normal")))
+#+end_src
+
+** Chord input engine (key-chord-extracted, ~my/chord-input-method~)
+Extracted from ~key-chord-input-method~ (key-chord.el:353–437) plus its helpers
+~key-chord-check-typing-flow~ (329–351), ~key-chord-execute-chord~ (309–318),
+~key-chord-no-chord~ (320–327), ~key-chord-valid-chord-char-p~ (304–307),
+~key-chord-in-read-char-context-p~ (41–47) and ~key-chord-lookup-key~ (263–273),
+from key-chord (GPLv2, David Andersson). The mechanism dispatches a pair of
+simultaneously (or double-tapped) plain keys to a command: installed as
+~input-method-function~, it intercepts the first key and, if that key could
+begin a chord (has a ~(my/chord K1)~ binding in a current map), reads a second
+key within a delay and emits the ~(my/chord K1 K2)~ event; otherwise it replays
+the first key unchanged via ~unread-command-events~. A typing-flow timer
+(~my/chord-check-typing-flow~) temporarily disables detection while the user is
+typing fast, avoiding false chords. Chords live under the pseudo-prefix symbol
+~my/chord~ (key-chord used ~key-chord~). SKIPPED from source: the key-tracking
+optimization (~key-chord-keys-in-use~, desync risk) and kbd-macro heuristics;
+during macro execution chords are bypassed outright. Deps: builtins
+(~input-method-function~, ~read-event~, ~current-time~, ~float-time~,
+~time-subtract~, ~lookup-key~, ~unread-command-events~, ~executing-kbd-macro~).
+Coexists with M-K's modal maps (input method runs before command dispatch).
+Layout-independent, Dvorak-safe. Installed globally via ~setq-default~; demo
+chord ~jj~ → ~my/repeat-last~ (R01) bound in global-map as a live consumer.
+#+begin_src emacs-lisp
+(defvar my/chord-last-unmatched nil)
+(defvar my/chord-in-typing-flow nil)
+(defvar my/chord-last-key-time nil)
+(defvar my/chord-typing-reset-time nil)
+(defvar my/chord-two-keys-delay 0.1)
+(defvar my/chord-one-key-delay 0.2)
+(defvar my/chord-one-key-min-delay 0.0)
+(defvar my/chord-typing-speed-threshold 0.1)
+(defvar my/chord-typing-reset-delay 0.5)
+(defvar my/chord-typing-detection t)
+
+(defun my/chord-in-read-char-context-p ()
+  "Non-nil in a read-char/read-key context (input should bypass chords)."
+  (and overriding-local-map
+       (memq overriding-local-map (list read-key-empty-map read-key-full-map))))
+
+(defun my/chord-valid-chord-char-p (char)
+  "Non-nil if CHAR (<= 255) can participate in a chord."
+  (and (integerp char) (< char 255)))
+
+(defun my/chord-lookup-key1 (keymap key)
+  "Like `lookup-key' but returns nil when the result is a number."
+  (let ((res (lookup-key keymap key)))
+    (and (not (numberp res)) res)))
+
+(defun my/chord-lookup-key (key)
+  "Look up KEY in all current minor, local and global maps."
+  (let ((maps (current-minor-mode-maps)) res)
+    (while (and maps (not res))
+      (setq res (my/chord-lookup-key1 (car maps) key))
+      (setq maps (cdr maps)))
+    (or res
+        (and (current-local-map)
+             (my/chord-lookup-key1 (current-local-map) key))
+        (my/chord-lookup-key1 (current-global-map) key))))
+
+(defun my/chord-execute-chord (first-char next-char)
+  "Return the `(my/chord FIRST NEXT)' event for a matched chord."
+  (setq my/chord-last-unmatched nil)
+  (list 'my/chord first-char next-char))
+
+(defun my/chord-no-chord (first-char &optional next-char)
+  "Return FIRST-CHAR alone, pushing NEXT-CHAR back for later processing."
+  (when next-char
+    (setq unread-command-events (cons next-char unread-command-events)))
+  (setq my/chord-last-unmatched first-char)
+  (list first-char))
+
+(defun my/chord-pause-typing-flow ()
+  "Temporarily pause typing flow to allow chord detection."
+  (when my/chord-typing-detection
+    (setq my/chord-in-typing-flow nil)))
+
+(defun my/chord-check-typing-flow (current-time)
+  "Toggle typing-flow state from the spacing between keystrokes."
+  (when my/chord-typing-detection
+    (when (and my/chord-typing-reset-time
+               (> (float-time current-time) my/chord-typing-reset-time))
+      (setq my/chord-in-typing-flow nil)
+      (setq my/chord-last-unmatched nil))
+    (setq my/chord-typing-reset-time
+          (+ (float-time current-time) my/chord-typing-reset-delay))
+    (unless my/chord-in-typing-flow
+      (when my/chord-last-key-time
+        (let ((elapsed (float-time
+                        (time-subtract current-time my/chord-last-key-time))))
+          (when (< elapsed my/chord-typing-speed-threshold)
+            (setq my/chord-in-typing-flow t)))))
+    (setq my/chord-last-key-time current-time)))
+
+(defun my/chord-input-method (first-char)
+  "Input-method hook dispatching `(my/chord K1 K2)' chords.
+FIRST-CHAR is the first key input. Bypassed in read-char contexts and during
+keyboard macros; otherwise reads a second key within the chord delay and emits
+a chord event when one matches, else replays FIRST-CHAR."
+  (if (my/chord-in-read-char-context-p)
+      (progn (setq my/chord-last-unmatched nil) (list first-char))
+    (unless executing-kbd-macro
+      (my/chord-check-typing-flow (current-time)))
+    (cond
+     ((not (my/chord-valid-chord-char-p first-char))
+      (setq my/chord-last-unmatched nil)
+      (list first-char))
+     ((and my/chord-typing-detection my/chord-in-typing-flow
+           (not executing-kbd-macro))
+      (list first-char))
+     ((executing-kbd-macro)
+      (my/chord-no-chord first-char))
+     ((not (eq first-char my/chord-last-unmatched))
+      (my/chord-pause-typing-flow)
+      (let ((res (my/chord-lookup-key (vector 'my/chord first-char))))
+        (if (not res)
+            (my/chord-no-chord first-char)
+          (let ((start-time (current-time))
+                (delay (if (my/chord-lookup-key
+                            (vector 'my/chord first-char first-char))
+                           my/chord-one-key-delay
+                         my/chord-two-keys-delay)))
+            (let ((next-char (read-event nil nil delay)))
+              (cond
+               ((null next-char) (my/chord-no-chord first-char))
+               ((not (my/chord-valid-chord-char-p next-char))
+                (my/chord-no-chord first-char next-char))
+               ((eq first-char next-char)
+                (let ((elapsed (float-time
+                                (time-subtract (current-time) start-time))))
+                  (if (< elapsed my/chord-one-key-min-delay)
+                      (my/chord-no-chord first-char next-char)
+                    (if (my/chord-lookup-key
+                         (vector 'my/chord first-char next-char))
+                        (my/chord-execute-chord first-char next-char)
+                      (my/chord-no-chord first-char next-char)))))
+               (t
+                (if (my/chord-lookup-key
+                     (vector 'my/chord first-char next-char))
+                    (my/chord-execute-chord first-char next-char)
+                  (my/chord-no-chord first-char next-char)))))))))
+     (t (my/chord-no-chord first-char)))))
+
+(setq-default input-method-function #'my/chord-input-method)
+(define-key (current-global-map) (vector 'my/chord ?j ?j) 'my/repeat-last)
+#+end_src
+
+** Chord definition (key-chord-extracted, ~my/chord-define~)
+Extracted from ~key-chord-define~ (key-chord.el:228–254) plus ~key-chord-define-
+global~ / ~-local~ (144–173) and ~key-chord-unset-global~ / ~-local~ (175–183),
+from key-chord (GPLv2, David Andersson). The mechanism declares a chord: given a
+two-element key sequence it validates both are byte characters (codes < 256) and
+binds the command under the ~my/chord~ pseudo-prefix, symmetric in BOTH orders
+(K1K2 and K2K1), with a same-key (double-tap) chord defined once — matching the
+C01 lookup model. The key-tracking register/unregister calls are SKIPPED (that
+optimization was rejected in C01). The interactive global setter is the bound
+consumer: define a chord on the fly. Deps: builtins (~define-key~,
+~current-global-map~, ~current-local-map~, ~aref~, ~length~, ~error~).
+Layout-independent, Dvorak-safe. Bound ~my/chord-define-global~ → plain key ~6~
+in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/chord-define (keymap keys command)
+  "Define in KEYMAP a chord of the two keys in KEYS calling COMMAND.
+KEYS is a string/vector of two byte characters (codes < 256). If COMMAND is nil
+the chord is removed. A pair is bound in both orders (K1K2 and K2K1); a same-key
+double-tap chord is defined once."
+  (when (/= 2 (length keys))
+    (error "Chord keys must have two elements"))
+  (let ((key1 (aref keys 0))
+        (key2 (aref keys 1)))
+    (unless (and (integerp key1) (< key1 256)
+                 (integerp key2) (< key2 256))
+      (error "Chord keys must both be bytes (characters with codes < 256)"))
+    (if (eq key1 key2)
+        (define-key keymap (vector 'my/chord key1 key2) command)
+      (define-key keymap (vector 'my/chord key1 key2) command)
+      (define-key keymap (vector 'my/chord key2 key1) command))))
+
+(defun my/chord-define-global (keys command)
+  "Globally define a chord of the two keys in KEYS calling COMMAND."
+  (interactive "sSet key chord globally (2 keys): \nCSet chord \"%s\" to command: ")
+  (my/chord-define (current-global-map) keys command))
+
+(defun my/chord-define-local (keys command)
+  "Locally define a chord of the two keys in KEYS calling COMMAND."
+  (interactive "sSet key chord locally (2 keys): \nCSet chord \"%s\" to command: ")
+  (my/chord-define (current-local-map) keys command))
+
+(defun my/chord-unset-global (keys)
+  "Remove the global chord of the two keys in KEYS."
+  (interactive "sUnset key chord globally (2 keys): ")
+  (my/chord-define (current-global-map) keys nil))
+
+(defun my/chord-unset-local (keys)
+  "Remove the local chord of the two keys in KEYS."
+  (interactive "sUnset key chord locally (2 keys): ")
+  (my/chord-define (current-local-map) keys nil))
 #+end_src
 
 * KEYBOARD — Setup
@@ -362,7 +1926,6 @@ Atomic upstream — kept whole.
 #+begin_src emacs-lisp
 (require 'manifolding-keyboard)
 (require 'which-key)
-(require 'avy)
 (require 'ace-window)
 (require 'pretty-hydra)
 (require 'vundo)
@@ -502,8 +2065,8 @@ Own block: an error here must never abort the core rebuild above.
 (manifolding-keyboard-define-keys
   :states '("normal" "visual" "org" "motion" "vterm" "dired")
   :bind
-  `(("<wheel-up>"   . scroll-down-command)
-    ("<wheel-down>" . scroll-up-command)
+  `(("<wheel-up>"   . mwheel-scroll)
+    ("<wheel-down>" . mwheel-scroll)
     ("C-<wheel-up>"   . text-scale-increase)
     ("C-<wheel-down>" . text-scale-decrease)
     ("P" . ace-window)
@@ -522,10 +2085,10 @@ Own block: an error here must never abort the core rebuild above.
 (manifolding-keyboard-define-keys
   :states '("normal")
   :bind
-  `(("i"   . my/insert-state)
+  `(    ("i"   . my/insert-state)
     ("SPC"  . my/main-hydra/body)
-    ("a"    . avy-goto-char-timer)
-    ("A"    . avy-goto-line)
+    ("a"    . ks-goto-char-timer)
+    ("A"    . ks-goto-line)
     ("o"    . consult-buffer)
     ("e"    . consult-line)
     ("h"    . consult-imenu)
@@ -535,7 +2098,36 @@ Own block: an error here must never abort the core rebuild above.
     ("u"    . vundo)
     ("U"    . git-timemachine)
     ("W"    . save-buffer)
-    ("G"    . magit-status)))
+    ("G"    . magit-status)
+    ("j"    . my/pop-to-mark)
+    ("k"    . my/unpop-to-mark)
+    ("f"    . my/jump-to-symbol)
+    ("b"    . my/select-inside-delimiters)
+    ("c"    . my/select-syntax-context)
+    ("r"    . my/reveal-at-point)
+    ("g"    . my/indent-to-match)
+    ("l"    . my/toggle-line-numbers)
+    ("y"    . my/line-beginning)
+    ("z"    . my/line-end)
+    ("x"    . my/smarter-backward)
+    ("v"    . my/smarter-forward)
+    ("["    . my/smarter-upward)
+    ("]"    . my/smarter-downward)
+    ("."    . my/yank-line-content)
+    (","    . my/count-and-execute)
+    ("/"    . my/hl-next-at-point)
+    ("-"    . my/fix-a-space)
+    (";"    . my/navigate-forward)
+    ("'"    . my/qsearch-next-at-point)
+    ("1"    . my/find-char-forward)
+    ("2"    . my/find-char-backward)
+    ("`"    . my/quote-character)
+    ("="    . my/repeat-last)
+    ("0"    . my/reindent-block)
+    ("3"    . my/modal-bindings)
+    ("4"    . my/set-key)
+    ("5"    . my/command-then-modal)
+    ("6"    . my/chord-define-global)))
 #+end_src
 
 ** Insert
@@ -572,10 +2164,10 @@ Own block: an error here must never abort the core rebuild above.
 (manifolding-keyboard-define-keys
   :states '("org")
   :bind
-  `(("i"   . my/insert-state)
+  `(    ("i"   . my/insert-state)
     ("SPC"  . my/main-hydra/body)
-    ("a"    . avy-goto-char-timer)
-    ("A"    . avy-goto-line)
+    ("a"    . ks-goto-char-timer)
+    ("A"    . ks-goto-line)
     ("h"    . org-previous-visible-heading)
     ("H"    . org-backward-heading-same-level)
     ("t"    . org-next-visible-heading)
@@ -611,8 +2203,9 @@ Own block: an error here must never abort the core rebuild above.
 #+end_src
 
 ** Atlas Pick
-Flow: session pickers open with an auto-armed avy loop (org-prompts.org)
-that owns letters for jumps+marking and takes SPC/RET/C-q/C-l/C-e. This
+Flow: session pickers open with an auto-armed key-selection loop
+(org-prompts.org) that owns letters for jumps+marking and takes
+SPC/RET/C-q/C-l/C-e. This
 keymap mirrors the control keys so they work there and in standalone
 pickers too; the letter binds below apply only when the loop is not
 armed.
@@ -624,7 +2217,7 @@ armed.
     ("RET"     . my/manifolding-atlas-org-prompt--buffer-accept)
     ("<return>" . my/manifolding-atlas-org-prompt--buffer-accept)
     ("C-c C-c" . my/manifolding-atlas-org-prompt--buffer-accept)
-    ("a"       . my/manifolding-atlas-org-prompt--avy-to-option)
+    ("a"       . my/manifolding-atlas-org-prompt--ks-to-option)
     ("m"       . my/manifolding-atlas-org-prompt--buffer-mark)
     ("C-l"     . my/manifolding-atlas-org-prompt--make-live)
     ("C-e"     . my/manifolding-atlas-org-prompt--edit-property-file)
@@ -684,7 +2277,7 @@ armed.
     ("s"    . previous-line)
     ("<return>" . dired-find-file)
     ("RET"  . dired-find-file)
-    ("a"    . my/dired-avy-open-file)
+    ("a"    . my/dired-ks-open-file)
     ("."    . dired-omit-mode)
     ("SPC"  . my/main-hydra/body)))
 #+end_src
@@ -699,7 +2292,7 @@ armed.
     ("SPC"      . my/main-hydra/body)
     ("n" . ibuffer-forward-line)
     ("s" . ibuffer-backward-line)
-    ("a" . my/ibuffer-avy-visit)
+    ("a" . my/ks-ibuffer-visit)
     ("t" . ibuffer-visit-buffer)
     ("o" . ibuffer-visit-buffer-other-window)
     ("g" . ibuffer-update)
@@ -719,8 +2312,8 @@ armed.
   `(("<escape>" . my/normal-state)
     ("ESC" . my/normal-state)
     ("SPC"  . my/main-hydra/body)
-    ("a"    . avy-goto-char-timer)
-    ("A"    . avy-goto-line)
+    ("a"    . ks-goto-char-timer)
+    ("A"    . ks-goto-line)
     ("o"    . consult-outline)
     ("d"    . my/dired-here)
     ("e"    . scroll-up-command)
@@ -728,7 +2321,36 @@ armed.
     ("h"    . backward-button)
     ("t"    . forward-button)
     ("n"    . next-line)
-    ("p"    . previous-line)))
+    ("p"    . previous-line)
+    ("j"    . my/pop-to-mark)
+    ("k"    . my/unpop-to-mark)
+    ("f"    . my/jump-to-symbol)
+    ("b"    . my/select-inside-delimiters)
+    ("c"    . my/select-syntax-context)
+    ("r"    . my/reveal-at-point)
+    ("g"    . my/indent-to-match)
+    ("l"    . my/toggle-line-numbers)
+    ("y"    . my/line-beginning)
+    ("z"    . my/line-end)
+    ("x"    . my/smarter-backward)
+    ("v"    . my/smarter-forward)
+    ("["    . my/smarter-upward)
+    ("]"    . my/smarter-downward)
+    ("."    . my/yank-line-content)
+    (","    . my/count-and-execute)
+    ("/"    . my/hl-next-at-point)
+    ("-"    . my/fix-a-space)
+    (";"    . my/navigate-forward)
+    ("'"    . my/qsearch-next-at-point)
+    ("1"    . my/find-char-forward)
+    ("2"    . my/find-char-backward)
+    ("`"    . my/quote-character)
+    ("="    . my/repeat-last)
+    ("0"    . my/reindent-block)
+    ("3"    . my/modal-bindings)
+    ("4"    . my/set-key)
+    ("5"    . my/command-then-modal)
+    ("6"    . my/chord-define-global)))
 #+end_src
 
 ** Magit
@@ -780,8 +2402,8 @@ armed.
     :states '("presentation")
     :bind
     `(("i"   . my/insert-state)
-      ("a"    . my/normal-a-dispatch)
-      ("A"    . avy-goto-line)
+      ("a"    . my/ks-hydra/body)
+      ("A"    . ks-goto-line)
       ("e"   . org-tree-slide-move-previous-tree)
       ("u"   . org-tree-slide-move-next-tree)
       ("v"   . org-tree-slide-content)
@@ -850,19 +2472,6 @@ armed.
   (define-key git-timemachine-mode-map (kbd "b") #'git-timemachine-blame))
 #+end_src
 
-** Avy Faces — Red
-Lead keys in pure red on black.
-#+begin_src emacs-lisp
-(with-eval-after-load 'avy
-  (setq avy-keys '(?a ?o ?e ?u ?i ?d ?h ?t ?n ?s))
-  (setq avy-background nil)
-  (custom-set-faces
-   '(avy-lead-face   ((t (:foreground "#ff0000" :background unspecified :weight bold))))
-   '(avy-lead-face-0 ((t (:foreground "#ff0000" :background unspecified :weight bold))))
-   '(avy-lead-face-1 ((t (:foreground "#ff0000" :background unspecified :weight bold))))
-   '(avy-lead-face-2 ((t (:foreground "#ff0000" :background unspecified :weight bold))))))
-#+end_src
-
 * Hydra Infrastructure
 
 ** Defhydra-state macro
@@ -911,7 +2520,7 @@ All navigation menus.  See SPC → submenu → key.  Defined via `my/defhydra-st
 (pretty-hydra-define my/main-hydra
   (:title "Main Menu" :quit-key "SPC" :separator "─")
   ("Submenus"
-   (("a" my/avy-hydra/body        "avy"        :exit t)
+    (("a" my/ks-hydra/body       "key sel"    :exit t)
     ("t" my/bookmarks-hydra/body  "bookmarks"  :exit t)
     ("e" my/activities-hydra/body "activities" :exit t)
     ("s" my/select-hydra/body     "select"     :exit t)
@@ -1037,39 +2646,39 @@ All navigation menus.  See SPC → submenu → key.  Defined via `my/defhydra-st
    ("i" mm/init              "init vault"     :exit t)))
 #+end_src
 
-** SPC a — Avy
+** SPC a — Key Selection
 #+begin_src emacs-lisp
-(my/defhydra-state my/avy-hydra nil "Avy" (my/main-hydra/body "main menu")
+(my/defhydra-state my/ks-hydra nil "Key Selection" (my/main-hydra/body "main menu")
   "Submenus"
-  (("c" my/avy-char-hydra/body "char"      :exit t)
-   ("w" my/avy-word-hydra/body "word/line" :exit t)
-   ("k" my/avy-kill-hydra/body "copy/kill" :exit t)
-   ("m" my/avy-move-hydra/body "move"      :exit t)
-   ("z" my/avy-zap-hydra/body  "zap"       :exit t)))
-(my/defhydra-state my/avy-char-hydra nil "Avy › Char" (my/avy-hydra/body "avy")
+  (("c" my/ks-char-hydra/body "char"      :exit t)
+   ("w" my/ks-word-hydra/body "word/line" :exit t)
+   ("k" my/ks-kill-hydra/body "copy/kill" :exit t)
+   ("m" my/ks-move-hydra/body "move"      :exit t)
+   ("z" my/ks-zap-hydra/body  "zap"       :exit t)))
+(my/defhydra-state my/ks-char-hydra nil "Key Selection › Char" (my/ks-hydra/body "key sel")
   "Char"
-  (("a" avy-goto-char-timer "char timer" :exit t)
-   ("o" avy-goto-char       "char"       :exit t)
-   ("e" avy-goto-char-2     "char 2"     :exit t)))
-(my/defhydra-state my/avy-word-hydra nil "Avy › Word / Line" (my/avy-hydra/body "avy")
+  (("a" ks-goto-char-timer "char timer" :exit t)
+   ("o" ks-goto-char       "char"       :exit t)
+   ("e" ks-goto-char-2     "char 2"     :exit t)))
+(my/defhydra-state my/ks-word-hydra nil "Key Selection › Word / Line" (my/ks-hydra/body "key sel")
   "Word / Line"
-  (("u" avy-goto-word-1      "word (1 char)"  :exit t)
-   ("i" avy-goto-word-0      "word (0 chars)" :exit t)
-   ("d" avy-goto-line        "line"           :exit t)
-   ("h" avy-goto-end-of-line "end of line"    :exit t)))
-(my/defhydra-state my/avy-kill-hydra nil "Avy › Copy / Kill" (my/avy-hydra/body "avy")
+  (("u" ks-goto-word-1      "word (1 char)"  :exit t)
+   ("i" ks-goto-word-0      "word (0 chars)" :exit t)
+   ("d" ks-goto-line        "line"           :exit t)
+   ("h" ks-goto-end-of-line "end of line"    :exit t)))
+(my/defhydra-state my/ks-kill-hydra nil "Key Selection › Copy / Kill" (my/ks-hydra/body "key sel")
   "Copy / Kill"
-  (("t" avy-copy-line             "copy line"      :exit t)
-   ("n" avy-copy-region           "copy region"    :exit t)
-   ("s" avy-kill-ring-save-region "kill ring save" :exit t)
-   ("S" avy-kill-region           "kill region"    :exit t)))
-(my/defhydra-state my/avy-move-hydra nil "Avy › Move" (my/avy-hydra/body "avy")
+  (("t" ks-copy-line             "copy line"      :exit t)
+   ("n" ks-copy-region           "copy region"    :exit t)
+   ("s" ks-kill-ring-save-region "kill ring save" :exit t)
+   ("S" ks-kill-region           "kill region"    :exit t)))
+(my/defhydra-state my/ks-move-hydra nil "Key Selection › Move" (my/ks-hydra/body "key sel")
   "Move"
-  (("t" avy-move-line   "move line"   :exit t)
-   ("n" avy-move-region "move region" :exit t)))
-(my/defhydra-state my/avy-zap-hydra nil "Avy › Zap" (my/avy-hydra/body "avy")
+  (("t" ks-move-line   "move line"   :exit t)
+   ("n" ks-move-region "move region" :exit t)))
+(my/defhydra-state my/ks-zap-hydra nil "Key Selection › Zap" (my/ks-hydra/body "key sel")
   "Zap"
-  (("z" my/avy-zap-to-char-inclusive "zap to char" :exit t)))
+  (("z" my/ks-zap-to-char-atomic "zap to char (atomic)" :exit t)))
 #+end_src
 
 ** SPC o — Org
@@ -1258,9 +2867,8 @@ All navigation menus.  See SPC → submenu → key.  Defined via `my/defhydra-st
    ("i" ibuffer                "ibuffer"      :exit t)
    ("x" kill-current-buffer    "kill current" :exit t))
   "Window Layout"
-  (("n" my/ibuffer-avy-visit   "avy visit"    :exit t)
-   ("f" my/ibuffer-avy-visit-other "avy other" :exit t)
-   ("m" my/ibuffer-open-dwim   "open dwim"    :exit t)))
+   (   ("n" my/ks-ibuffer-visit   "key sel visit"    :exit t)
+    ("m" my/ibuffer-open-dwim   "open dwim"    :exit t)))
 #+end_src
 
 ** SPC t — Bookmarks
@@ -1338,3 +2946,2250 @@ All navigation menus.  See SPC → submenu → key.  Defined via `my/defhydra-st
    ("p" tempel-previous         "prev"   :exit nil)
    ("a" tempel-abort             "abort"  :exit t)))
 #+end_src
+
+* KEY SELECTION (VENDORED)
+Vendored from abo-abo/avy 0.5.0 (GPLv3), renamed `avy-*` -> `ks-*`.
+No straight dependency. Small org-src blocks, grouped by concern.
+
+** Requires & group
+#+begin_src emacs-lisp
+(require 'cl-lib)
+(require 'ring)
+
+(defgroup key-selection nil
+  "Jump to things tree-style."
+  :group 'convenience
+  :prefix "ks-")
+#+end_src
+
+** Customization
+#+begin_src emacs-lisp
+(defcustom ks-keys '(?a ?o ?e ?u ?i ?d ?h ?t ?n ?s)
+  "Default keys for jumping.
+Any key is either a character representing a self-inserting
+key (letters, digits, punctuation, etc.) or a symbol denoting a
+non-printing key like an arrow key (left, right, up, down).  For
+non-printing keys, a corresponding entry in
+`ks-key-to-char-alist' must exist in order to visualize the key
+in the ks overlays.
+
+If `ks-style' is set to words, make sure there are at least three
+keys different than the following: a, e, i, o, u, y"
+  :type '(repeat :tag "Keys" (choice
+                              (character :tag "char")
+                              (symbol :tag "non-printing key"))))
+
+(defconst ks--key-type
+  '(choice :tag "Command"
+    (const ks-goto-char)
+    (const ks-goto-char-2)
+    (const ks-isearch)
+    (const ks-goto-line)
+    (const ks-goto-subword-0)
+    (const ks-goto-subword-1)
+    (const ks-goto-word-0)
+    (const ks-goto-word-1)
+    (const ks-copy-line)
+    (const ks-copy-region)
+    (const ks-move-line)
+    (const ks-move-region)
+    (const ks-kill-whole-line)
+    (const ks-kill-region)
+    (const ks-kill-ring-save-whole-line)
+    (const ks-kill-ring-save-region)
+    (function :tag "Other command")))
+
+(defcustom ks-keys-alist nil
+  "Alist of `ks-jump' commands to `ks-keys' overriding the default `ks-keys'."
+  :type `(alist
+          :key-type ,ks--key-type
+          :value-type (repeat :tag "Keys" character)))
+
+(defcustom ks-orders-alist '((ks-goto-char . ks-order-closest))
+  "Alist of candidate ordering functions.
+Usually, candidates appear in their point position order."
+  :type `(alist
+          :key-type ,ks--key-type
+          :value-type function))
+#+end_src
+
+** Customization: words, style, dispatch
+#+begin_src emacs-lisp
+(defcustom ks-words
+  '("am" "by" "if" "is" "it" "my" "ox" "up"
+    "ace" "act" "add" "age" "ago" "aim" "air" "ale" "all" "and" "ant" "any"
+    "ape" "apt" "arc" "are" "arm" "art" "ash" "ate" "awe" "axe" "bad" "bag"
+    "ban" "bar" "bat" "bay" "bed" "bee" "beg" "bet" "bid" "big" "bit" "bob"
+    "bot" "bow" "box" "boy" "but" "cab" "can" "cap" "car" "cat" "cog" "cop"
+    "cow" "cry" "cup" "cut" "day" "dew" "did" "die" "dig" "dim" "dip" "dog"
+    "dot" "dry" "dub" "dug" "dye" "ear" "eat" "eel" "egg" "ego" "elf" "eve"
+    "eye" "fan" "far" "fat" "fax" "fee" "few" "fin" "fit" "fix" "flu" "fly"
+    "foe" "fog" "for" "fox" "fry" "fun" "fur" "gag" "gap" "gas" "gel" "gem"
+    "get" "gig" "gin" "gnu" "god" "got" "gum" "gun" "gut" "guy" "gym" "had"
+    "hag" "ham" "has" "hat" "her" "hid" "him" "hip" "his" "hit" "hop" "hot"
+    "how" "hub" "hue" "hug" "hut" "ice" "icy" "imp" "ink" "inn" "ion" "ire"
+    "ivy" "jab" "jam" "jar" "jaw" "jet" "job" "jog" "joy" "key" "kid" "kit"
+    "lag" "lap" "lay" "let" "lid" "lie" "lip" "lit" "lob" "log" "lot" "low"
+    "mad" "man" "map" "mat" "may" "men" "met" "mix" "mob" "mop" "mud" "mug"
+    "nag" "nap" "new" "nil" "nod" "nor" "not" "now" "nun" "oak" "odd" "off"
+    "oil" "old" "one" "orb" "ore" "ork" "our" "out" "owl" "own" "pad" "pan"
+    "par" "pat" "paw" "pay" "pea" "pen" "pet" "pig" "pin" "pit" "pod" "pot"
+    "pry" "pub" "pun" "put" "rag" "ram" "ran" "rat" "raw" "ray" "red" "rib"
+    "rim" "rip" "rob" "rod" "rot" "row" "rub" "rug" "rum" "run" "sad" "sat"
+    "saw" "say" "sea" "see" "sew" "she" "shy" "sin" "sip" "sit" "six" "ski"
+    "sky" "sly" "sob" "son" "soy" "spy" "sum" "sun" "tab" "tad" "tag" "tan"
+    "tap" "tar" "tax" "tea" "the" "tie" "tin" "tip" "toe" "ton" "too" "top"
+    "toy" "try" "tub" "two" "urn" "use" "van" "war" "was" "wax" "way" "web"
+    "wed" "wet" "who" "why" "wig" "win" "wit" "woe" "won" "wry" "you" "zap"
+    "zip" "zoo")
+  "Words to use in case `ks-style' is set to `words'.
+Every word should contain at least one vowel i.e. one of the following
+characters: a, e, i, o, u, y
+They do not have to be sorted but no word should be a prefix of another one."
+  :type '(repeat string))
+
+(defcustom ks-style 'at-full
+  "The default method of displaying the overlays.
+Use `ks-styles-alist' to customize this per-command."
+  :type '(choice
+          (const :tag "Pre" pre)
+          (const :tag "At" at)
+          (const :tag "At Full" at-full)
+          (const :tag "Post" post)
+          (const :tag "De Bruijn" de-bruijn)
+          (const :tag "Words" words)))
+
+(defcustom ks-styles-alist nil
+  "Alist of `ks-jump' commands to the style for each command.
+If the commands isn't on the list, `ks-style' is used."
+  :type '(alist
+          :key-type (choice :tag "Command"
+                            (const ks-goto-char)
+                            (const ks-goto-char-2)
+                            (const ks-isearch)
+                            (const ks-goto-line)
+                            (const ks-goto-subword-0)
+                            (const ks-goto-subword-1)
+                            (const ks-goto-word-0)
+                            (const ks-goto-word-1)
+                            (const ks-copy-line)
+                            (const ks-copy-region)
+                            (const ks-move-line)
+                            (const ks-move-region)
+                            (const ks-kill-whole-line)
+                            (const ks-kill-region)
+                            (const ks-kill-ring-save-whole-line)
+                            (const ks-kill-ring-save-region)
+                            (function :tag "Other command"))
+          :value-type (choice
+                       (const :tag "Pre" pre)
+                       (const :tag "At" at)
+                       (const :tag "At Full" at-full)
+                       (const :tag "Post" post)
+                       (const :tag "De Bruijn" de-bruijn)
+                       (const :tag "Words" words))))
+
+(defcustom ks-dispatch-alist
+  '((?x . ks-action-kill-move)
+    (?X . ks-action-kill-stay)
+    (?t . ks-action-teleport)
+    (?m . ks-action-mark)
+    (?n . ks-action-copy)
+    (?y . ks-action-yank)
+    (?Y . ks-action-yank-line)
+    (?i . ks-action-ispell)
+    (?z . ks-action-zap-to-char))
+  "List of actions for `ks-handler-default'.
+
+Each item is (KEY . ACTION).  When KEY not on `ks-keys' is
+pressed during the dispatch, ACTION is set to replace the default
+`ks-action-goto' once a candidate is finally selected."
+  :type
+  '(alist
+    :key-type (choice (character :tag "Char"))
+    :value-type (choice
+                 (const :tag "Mark" ks-action-mark)
+                 (const :tag "Copy" ks-action-copy)
+                 (const :tag "Kill and move point" ks-action-kill-move)
+                 (const :tag "Kill" ks-action-kill-stay))))
+
+(defcustom ks-background nil
+  "When non-nil, a gray background will be added during the selection."
+  :type 'boolean)
+
+(defcustom ks-all-windows t
+  "Determine the list of windows to consider in search of candidates."
+  :type
+  '(choice
+    (const :tag "All Frames" all-frames)
+    (const :tag "This Frame" t)
+    (const :tag "This Window" nil)))
+
+(defcustom ks-case-fold-search t
+  "Non-nil if searches should ignore case."
+  :type 'boolean)
+
+(defcustom ks-word-punc-regexp "[!-/:-@[-`{-~]"
+  "Regexp of punctuation chars that count as word starts for `ks-goto-word-1.
+When nil, punctuation chars will not be matched.
+
+\"[!-/:-@[-`{-~]\" will match all printable punctuation chars."
+  :type 'regexp)
+
+(defcustom ks-goto-word-0-regexp "\\b\\sw"
+  "Regexp that determines positions for `ks-goto-word-0'."
+  :type '(choice
+          (const :tag "Default" "\\b\\sw")
+          (const :tag "Symbol" "\\_<\\(\\sw\\|\\s_\\)")
+          (const :tag "Not whitespace" "[^ \r\n\t]+")
+          (regexp :tag "Regex")))
+
+(defcustom ks-ignored-modes '(image-mode doc-view-mode pdf-view-mode)
+  "List of modes to ignore when searching for candidates.
+Typically, these modes don't use the text representation."
+  :type 'list)
+
+(defcustom ks-single-candidate-jump t
+  "In case there is only one candidate jumps directly to it."
+  :type 'boolean)
+
+(defcustom ks-del-last-char-by '(?\b ?\d)
+  "List of event types, i.e. key presses, that delete the last
+character read.  The default represents `C-h' and `DEL'.  See
+`event-convert-list'."
+  :type 'list)
+
+(defcustom ks-escape-chars '(?\e ?\C-g)
+  "List of characters that quit key-selection during `read-char'."
+  :type 'list)
+
+(defvar ks-ring (make-ring 20)
+  "Hold the window and point history.")
+
+(defvar ks-translate-char-function #'identity
+  "Function to translate user input key into another key.
+For example, to make SPC do the same as ?a, use
+\(lambda (c) (if (= c 32) ?a c)).")
+
+(defvar ks-key-to-char-alist '((left . ?◀)
+                                (right . ?▶)
+                                (up . ?▲)
+                                (down . ?▼)
+                                (prior . ?△)
+                                (next . ?▽))
+  "An alist from non-character keys to printable chars used in ks overlays.
+This alist must contain all keys used in `ks-keys' which are not
+self-inserting keys and thus aren't read as characters.")
+#+end_src
+
+** Faces
+#+begin_src emacs-lisp
+(defface ks-lead-face-0
+  '((t (:foreground "#ff0000" :background unspecified :weight bold)))
+  "Face used for first non-terminating leading chars.")
+
+(defface ks-lead-face-1
+  '((t (:foreground "#ff0000" :background unspecified :weight bold)))
+  "Face used for matched leading chars.")
+
+(defface ks-lead-face-2
+  '((t (:foreground "#ff0000" :background unspecified :weight bold)))
+  "Face used for leading chars.")
+
+(defface ks-lead-face
+  '((t (:foreground "#ff0000" :background unspecified :weight bold)))
+  "Face used for the leading chars.")
+
+(defface ks-background-face
+  '((t (:foreground "gray40")))
+  "Face for whole window background during selection.")
+
+(defface ks-goto-char-timer-face
+  '((t (:inherit highlight)))
+  "Face for matches during reading chars using `ks-goto-char-timer'.")
+
+(defconst ks-lead-faces '(ks-lead-face
+                           ks-lead-face-0
+                           ks-lead-face-2
+                           ks-lead-face
+                           ks-lead-face-0
+                           ks-lead-face-2)
+  "Face sequence for `ks--overlay-at-full'.")
+#+end_src
+
+** Tree internals
+#+begin_src emacs-lisp
+(defmacro ks-multipop (lst n)
+  "Remove LST's first N elements and return them."
+  `(if (<= (length ,lst) ,n)
+       (prog1 ,lst
+         (setq ,lst nil))
+     (prog1 ,lst
+       (setcdr
+        (nthcdr (1- ,n) (prog1 ,lst (setq ,lst (nthcdr ,n ,lst))))
+        nil))))
+
+(defun ks--de-bruijn (keys n)
+  "De Bruijn sequence for alphabet KEYS and subsequences of length N."
+  (let* ((k (length keys))
+         (a (make-list (* n k) 0))
+         sequence)
+    (cl-labels ((db (T p)
+                  (if (> T n)
+                      (if (eq (% n p) 0)
+                          (setq sequence
+                                (append sequence
+                                        (cl-subseq a 1 (1+ p)))))
+                    (setf (nth T a) (nth (- T p) a))
+                    (db (1+ T) p)
+                    (cl-loop for j from (1+ (nth (- T p) a)) to (1- k) do
+                         (setf (nth T a) j)
+                         (db (1+ T) T)))))
+      (db 1 1)
+      (mapcar (lambda (n)
+                (nth n keys))
+              sequence))))
+
+(defun ks--path-alist-1 (lst seq-len keys)
+  "Build a De Bruin sequence from LST.
+SEQ-LEN is how many elements of KEYS it takes to identify a match."
+  (let ((db-seq (ks--de-bruijn keys seq-len))
+        prev-pos prev-seq prev-win path-alist)
+    ;; The De Bruijn seq is cyclic, so append the seq-len - 1 first chars to
+    ;; the end.
+    (setq db-seq (nconc db-seq (cl-subseq db-seq 0 (1- seq-len))))
+    (cl-labels ((subseq-and-pop ()
+                  (when (nth (1- seq-len) db-seq)
+                    (prog1 (cl-subseq db-seq 0 seq-len)
+                      (pop db-seq)))))
+      (while lst
+        (let* ((cur (car lst))
+               (pos (cond
+                      ;; ace-window has matches of the form (pos . wnd)
+                      ((integerp (car cur)) (car cur))
+                      ;; ks-jump have form ((start . end) . wnd)
+                      ((consp (car cur)) (caar cur))
+                      (t (error "Unexpected match representation: %s" cur))))
+               (win (cdr cur))
+               (path (if prev-pos
+                         (let ((diff (if (eq win prev-win)
+                                         (- pos prev-pos)
+                                       0)))
+                           (when (and (> diff 0) (< diff seq-len))
+                             (while (and (nth (1- seq-len) db-seq)
+                                         (not
+                                          (eq 0
+                                              (cl-search
+                                               (cl-subseq prev-seq diff)
+                                               (cl-subseq db-seq 0 seq-len)))))
+                               (pop db-seq)))
+                           (subseq-and-pop))
+                       (subseq-and-pop))))
+          (if (not path)
+              (setq lst nil
+                    path-alist nil)
+            (push (cons path (car lst)) path-alist)
+            (setq prev-pos pos
+                  prev-seq path
+                  prev-win win
+                  lst (cdr lst))))))
+    (nreverse path-alist)))
+
+(defun ks-order-closest (x)
+  (abs (- (if (numberp (car x))
+              (car x)
+            (caar x))
+          (point))))
+
+(defvar ks-command nil
+  "Store the current command symbol.
+E.g. `ks-goto-line' or `ks-goto-char'.")
+
+(defun ks-tree (lst keys)
+  "Coerce LST into a balanced tree.
+The degree of the tree is the length of KEYS.
+KEYS are placed appropriately on internal nodes."
+  (let* ((len (length keys))
+         (order-fn (cdr (assq ks-command ks-orders-alist)))
+         (lst (if order-fn
+                  (cl-sort lst #'< :key order-fn)
+                lst)))
+    (cl-labels
+        ((rd (ls)
+           (let ((ln (length ls)))
+             (if (< ln len)
+                 (cl-pairlis keys
+                             (mapcar (lambda (x) (cons 'leaf x)) ls))
+               (let ((ks (copy-sequence keys))
+                     res)
+                 (dolist (s (ks-subdiv ln len))
+                   (push (cons (pop ks)
+                               (if (eq s 1)
+                                   (cons 'leaf (pop ls))
+                                 (rd (ks-multipop ls s))))
+                         res))
+                 (nreverse res))))))
+      (rd lst))))
+
+(defun ks-subdiv (n b)
+  "Distribute N in B terms in a balanced way."
+  (let* ((p (1- (floor (+ (log n b) 1e-6))))
+         (x1 (expt b p))
+         (x2 (* b x1))
+         (delta (- n x2))
+         (n2 (/ delta (- x2 x1)))
+         (n1 (- b n2 1)))
+    (append
+     (make-list n1 x1)
+     (list
+      (- n (* n1 x1) (* n2 x2)))
+     (make-list n2 x2))))
+
+(defun ks-traverse (tree walker &optional recur-key)
+  "Traverse TREE generated by `ks-tree'.
+WALKER is a function that takes KEYS and LEAF.
+
+RECUR-KEY is used in recursion.
+
+LEAF is a member of LST argument of `ks-tree'.
+
+KEYS is the path from the root of `ks-tree' to LEAF."
+  (dolist (br tree)
+    (let ((key (cons (car br) recur-key)))
+      (if (eq (cadr br) 'leaf)
+          (funcall walker key (cddr br))
+        (ks-traverse (cdr br) walker key)))))
+#+end_src
+
+** Read loop & dispatch state
+#+begin_src emacs-lisp
+(defvar ks-action nil
+  "Function to call at the end of select.")
+
+(defvar ks-action-oneshot nil
+  "Function to call once at the end of select.")
+
+(defun ks-handler-default (char)
+  "The default handler for a bad CHAR."
+  (let (dispatch)
+    (cond ((setq dispatch (assoc char ks-dispatch-alist))
+           (unless (eq ks-style 'words)
+             (setq ks-action (cdr dispatch)))
+           (throw 'done 'restart))
+          ((memq char ks-escape-chars)
+           ;; exit silently
+           (throw 'done 'abort))
+          ((eq char ??)
+           (ks-show-dispatch-help)
+           (throw 'done 'restart))
+          ((mouse-event-p char)
+           (signal 'user-error (list "Mouse event not handled" char)))
+          (t
+           (message "No such candidate: %s, hit `C-g' to quit."
+                    (if (characterp char) (string char) char))))))
+
+(defun ks-show-dispatch-help ()
+  "Display action shortucts in echo area."
+  (let ((len (length "ks-action-")))
+    (message "%s" (mapconcat
+                   (lambda (x)
+                     (format "%s: %s"
+                             (propertize
+                              (char-to-string (car x))
+                              'face 'aw-key-face)
+                             (substring (symbol-name (cdr x)) len)))
+                   ks-dispatch-alist
+                   " "))))
+
+(defvar ks-handler-function 'ks-handler-default
+  "A function to call for a bad `read-key' in `ks-read'.")
+
+(defvar ks-current-path ""
+  "Store the current incomplete path during `ks-read'.")
+
+(defun ks-mouse-event-window (char)
+  "Return the window of mouse event CHAR if any or the selected window.
+Return nil if CHAR is not a mouse event."
+  (when (mouse-event-p char)
+    (cond ((windowp (posn-window (event-start char)))
+           (posn-window (event-start char)))
+          ((framep (posn-window (event-start char)))
+           (frame-selected-window (posn-window (event-start char))))
+          (t (selected-window)))))
+
+(defun ks-read (tree display-fn cleanup-fn)
+  "Select a leaf from TREE using consecutive `read-key'.
+
+DISPLAY-FN should take CHAR and LEAF and signify that LEAFs
+associated with CHAR will be selected if CHAR is pressed.  This is
+commonly done by adding a CHAR overlay at LEAF position.
+
+CLEANUP-FN should take no arguments and remove the effects of
+multiple DISPLAY-FN invocations."
+  (catch 'done
+    (setq ks-current-path "")
+    (while tree
+      (let ((ks--leafs nil))
+        (ks-traverse tree
+                      (lambda (path leaf)
+                        (push (cons path leaf) ks--leafs)))
+        (dolist (x ks--leafs)
+          (funcall display-fn (car x) (cdr x))))
+      (let ((char (funcall ks-translate-char-function (read-key)))
+            window
+            branch)
+        (funcall cleanup-fn)
+        (if (setq window (ks-mouse-event-window char))
+            (throw 'done (cons char window))
+          (if (setq branch (assoc char tree))
+              (progn
+                ;; Ensure ks-current-path stores the full path prior to
+                ;; exit so other packages can utilize its value.
+                (setq ks-current-path
+                      (concat ks-current-path (string (ks--key-to-char char))))
+                (if (eq (car (setq tree (cdr branch))) 'leaf)
+                    (throw 'done (cdr tree))))
+            (funcall ks-handler-function char)))))))
+
+(defun ks-read-de-bruijn (lst keys)
+  "Select from LST dispatching on KEYS."
+  ;; In theory, the De Bruijn sequence B(k,n) has k^n subsequences of length n
+  ;; (the path length) usable as paths, thus that's the lower bound.  Due to
+  ;; partially overlapping matches, not all subsequences may be usable, so it's
+  ;; possible that the path-len must be incremented, e.g., if we're matching
+  ;; for x and a buffer contains xaxbxcx only every second subsequence is
+  ;; usable for the four matches.
+  (catch 'done
+    (let* ((path-len (ceiling (log (length lst) (length keys))))
+           (alist (ks--path-alist-1 lst path-len keys)))
+      (while (not alist)
+        (cl-incf path-len)
+        (setq alist (ks--path-alist-1 lst path-len keys)))
+      (let* ((len (length (caar alist)))
+             (i 0))
+        (setq ks-current-path "")
+        (while (< i len)
+          (dolist (x (reverse alist))
+            (ks--overlay-at-full (reverse (car x)) (cdr x)))
+          (let ((char (funcall ks-translate-char-function (read-key))))
+            (ks--remove-leading-chars)
+            (setq alist
+                  (delq nil
+                        (mapcar (lambda (x)
+                                  (when (eq (caar x) char)
+                                    (cons (cdr (car x)) (cdr x))))
+                                alist)))
+            (setq ks-current-path
+                  (concat ks-current-path (string (ks--key-to-char char))))
+            (cl-incf i)
+            (unless alist
+              (funcall ks-handler-function char))))
+        (cdar alist)))))
+
+(defun ks-read-words (lst words)
+  "Select from LST using WORDS."
+  (catch 'done
+    (let ((num-words (length words))
+          (num-entries (length lst))
+          alist)
+      ;; If there are not enough words to cover all the candidates,
+      ;; we use a De Bruijn sequence to generate the remaining ones.
+      (when (< num-words num-entries)
+        (let ((keys ks-keys)
+              (bad-keys '(?a ?e ?i ?o ?u ?y))
+              (path-len 1)
+              (num-remaining (- num-entries num-words))
+              tmp-alist)
+          ;; Delete all keys which could lead to duplicates.
+          ;; We want at least three keys left to work with.
+          (dolist (x bad-keys)
+            (when (memq x keys)
+              (setq keys (delq ?a keys))))
+          (when (< (length keys) 3)
+            (signal 'user-error
+                    '("Please add more keys to the variable `ks-keys'.")))
+          ;; Generate the sequence and add the keys to the existing words.
+          (while (not tmp-alist)
+            (cl-incf path-len)
+            (setq tmp-alist (ks--path-alist-1 lst path-len keys)))
+          (while (>= (cl-decf num-remaining) 0)
+            (push (mapconcat 'string (caar tmp-alist) nil) (cdr (last words)))
+            (setq tmp-alist (cdr tmp-alist)))))
+      (dolist (x lst)
+        (push (cons (string-to-list (pop words)) x) alist))
+      (setq ks-current-path "")
+      (while (or (> (length alist) 1)
+                 (caar alist))
+        (dolist (x (reverse alist))
+          (ks--overlay-at-full (reverse (car x)) (cdr x)))
+        (let ((char (funcall ks-translate-char-function (read-key))))
+          (ks--remove-leading-chars)
+          (setq alist
+                (delq nil
+                      (mapcar (lambda (x)
+                                (when (eq (caar x) char)
+                                  (cons (cdr (car x)) (cdr x))))
+                              alist)))
+          (setq ks-current-path
+                (concat ks-current-path (string (ks--key-to-char char))))
+          (unless alist
+            (funcall ks-handler-function char))))
+      (cdar alist))))
+#+end_src
+
+** Window helpers & macros
+#+begin_src emacs-lisp
+(defun ks-window-list ()
+  "Return a list of windows depending on `ks-all-windows'."
+  (cond ((eq ks-all-windows 'all-frames)
+         (cl-mapcan #'window-list (frame-list)))
+
+        ((eq ks-all-windows t)
+         (window-list))
+
+        ((null ks-all-windows)
+         (list (selected-window)))
+
+        (t
+         (error "Unrecognized option: %S" ks-all-windows))))
+
+(defcustom ks-all-windows-alt nil
+  "The alternative `ks-all-windows' for use with \\[universal-argument]."
+  :type '(choice
+          (const :tag "Current window" nil)
+          (const :tag "All windows on the current frame" t)
+          (const :tag "All windows on all frames" all-frames)))
+
+(defmacro ks-dowindows (flip &rest body)
+  "Depending on FLIP and `ks-all-windows' run BODY in each or selected window."
+  (declare (indent 1)
+           (debug (form body)))
+  `(let ((ks-all-windows (if ,flip
+                              ks-all-windows-alt
+                            ks-all-windows)))
+     (dolist (wnd (ks-window-list))
+       (with-selected-window wnd
+         (unless (memq major-mode ks-ignored-modes)
+           ,@body)))))
+
+(defun ks-resume ()
+  "Stub to hold last ks command.
+Commands using `ks-with' macro can be resumed."
+  (interactive))
+
+(defmacro ks-with (command &rest body)
+  "Set `ks-keys' according to COMMAND and execute BODY.
+Set `ks-style' according to COMMAND as well."
+  (declare (indent 1)
+           (debug (form body)))
+  `(let ((ks-keys (or (cdr (assq ',command ks-keys-alist))
+                       ks-keys))
+         (ks-style (or (cdr (assq ',command ks-styles-alist))
+                        ks-style))
+         (ks-command ',command))
+     (setq ks-action nil)
+     (setf (symbol-function 'ks-resume)
+           (lambda ()
+             (interactive)
+             ,@(if (eq command 'ks-goto-char-timer)
+                   (cdr body)
+                 body)))
+     ,@body))
+#+end_src
+
+** Actions
+#+begin_src emacs-lisp
+(defun ks-action-goto (pt)
+  "Goto PT."
+  (let ((frame (window-frame (selected-window))))
+    (unless (equal frame (selected-frame))
+      (select-frame-set-input-focus frame)
+      (raise-frame frame))
+    (goto-char pt)))
+
+(defun ks-forward-item ()
+  (if (eq ks-command 'ks-goto-line)
+      (end-of-line)
+    (forward-sexp))
+  (point))
+
+(defun ks-action-mark (pt)
+  "Mark sexp at PT."
+  (goto-char pt)
+  (set-mark (point))
+  (ks-forward-item))
+
+(defun ks-action-copy (pt)
+  "Copy sexp starting on PT."
+  (save-excursion
+    (let (str)
+      (goto-char pt)
+      (ks-forward-item)
+      (setq str (buffer-substring pt (point)))
+      (kill-new str)
+      (message "Copied: %s" str)))
+  (let ((dat (ring-ref ks-ring 0)))
+    (select-frame-set-input-focus
+     (window-frame (cdr dat)))
+    (select-window (cdr dat))
+    (goto-char (car dat))))
+
+(defun ks-action-yank (pt)
+  "Yank sexp starting at PT at the current point."
+  (ks-action-copy pt)
+  (yank)
+  t)
+
+(defun ks-action-yank-line (pt)
+  "Yank sexp starting at PT at the current point."
+  (let ((ks-command 'ks-goto-line))
+    (ks-action-yank pt)))
+
+(defun ks-action-kill-move (pt)
+  "Kill sexp at PT and move there."
+  (goto-char pt)
+  (ks-forward-item)
+  (kill-region pt (point))
+  (message "Killed: %s" (current-kill 0))
+  (point))
+
+(defun ks-action-kill-stay (pt)
+  "Kill sexp at PT."
+  (save-excursion
+    (goto-char pt)
+    (ks-forward-item)
+    (kill-region pt (point))
+    (just-one-space))
+  (message "Killed: %s" (current-kill 0))
+  (select-window
+   (cdr
+    (ring-ref ks-ring 0)))
+  t)
+
+(defun ks-action-zap-to-char (pt)
+  "Kill from point up to PT."
+  (if (> pt (point))
+      (kill-region (point) pt)
+    (kill-region pt (point))))
+
+(defun ks-action-teleport (pt)
+  "Kill sexp starting on PT and yank into the current location."
+  (ks-action-kill-stay pt)
+  (select-window
+   (cdr
+    (ring-ref ks-ring 0)))
+  (save-excursion
+    (yank))
+  t)
+#+end_src
+
+** Actions: ispell
+#+begin_src emacs-lisp
+(declare-function flyspell-correct-word-before-point "flyspell")
+
+(defcustom ks-flyspell-correct-function #'flyspell-correct-word-before-point
+  "Function called to correct word by `ks-action-ispell' when
+`flyspell-mode' is enabled."
+  :type 'function)
+
+(defun ks-action-ispell (pt)
+  "Auto correct word at PT."
+  (save-excursion
+    (goto-char pt)
+    (cond
+      ((eq ks-command 'ks-goto-line)
+       (ispell-region
+        (line-beginning-position)
+        (line-end-position)))
+      ((bound-and-true-p flyspell-mode)
+       (funcall ks-flyspell-correct-function))
+      ((looking-at-p "\\b")
+       (ispell-word))
+      (t
+       (progn
+         (backward-word)
+         (when (looking-at-p "\\b")
+           (ispell-word)))))))
+#+end_src
+
+** Selection pipeline
+#+begin_src emacs-lisp
+(defvar ks-pre-action #'ks-pre-action-default
+  "Function to call before `ks-action' is called.")
+
+(defun ks-pre-action-default (res)
+  (ks-push-mark)
+  (when (and (consp res)
+             (windowp (cdr res)))
+    (let* ((window (cdr res))
+           (frame (window-frame window)))
+      (unless (equal frame (selected-frame))
+        (select-frame-set-input-focus frame))
+      (select-window window))))
+
+(defun ks--process-1 (candidates overlay-fn &optional cleanup-fn)
+  (let ((len (length candidates)))
+    (cond ((= len 0)
+           nil)
+          ((and (= len 1) ks-single-candidate-jump)
+           (car candidates))
+          (t
+           (unwind-protect
+                (progn
+                  (ks--make-backgrounds
+                   (ks-window-list))
+                  (cond ((eq ks-style 'de-bruijn)
+                         (ks-read-de-bruijn
+                          candidates ks-keys))
+                        ((eq ks-style 'words)
+                         (ks-read-words
+                          candidates ks-words))
+                        (t
+                         (ks-read (ks-tree candidates ks-keys)
+                                    overlay-fn
+                                    (or cleanup-fn #'ks--remove-leading-chars)))))
+             (ks--done))))))
+
+(defvar ks-last-candidates nil
+  "Store the last candidate list.")
+
+(defun ks--last-candidates-cycle (advancer)
+  (let* ((ks-last-candidates
+          (cl-remove-if-not
+           (lambda (x) (equal (cdr x) (selected-window)))
+           ks-last-candidates))
+         (min-dist
+          (apply #'min
+                 (mapcar (lambda (x) (abs (- (if (listp (car x)) (caar x) (car x)) (point)))) ks-last-candidates)))
+         (pos
+          (cl-position-if
+           (lambda (x)
+             (= (- (if (listp (car x)) (caar x) (car x)) (point)) min-dist))
+           ks-last-candidates)))
+    (funcall advancer pos ks-last-candidates)))
+
+(defun ks-prev ()
+  "Go to the previous candidate of the last `ks-read'."
+  (interactive)
+  (ks--last-candidates-cycle
+   (lambda (pos lst)
+     (when (> pos 0)
+       (let ((candidate (nth (1- pos) lst)))
+         (goto-char (if (listp (car candidate)) (caar candidate) (car candidate))))))))
+
+(defun ks-next ()
+  "Go to the next candidate of the last `ks-read'."
+  (interactive)
+  (ks--last-candidates-cycle
+   (lambda (pos lst)
+     (when (< pos (1- (length lst)))
+       (let ((candidate (nth (1+ pos) lst)))
+         (goto-char (if (listp (car candidate)) (caar candidate) (car candidate))))))))
+
+;;;###autoload
+(defun ks-process (candidates &optional overlay-fn cleanup-fn)
+  "Select one of CANDIDATES using `ks-read'.
+Use OVERLAY-FN to visualize the decision overlay.
+CLEANUP-FN should take no arguments and remove the effects of
+multiple OVERLAY-FN invocations."
+  (setq overlay-fn (or overlay-fn (ks--style-fn ks-style)))
+  (setq cleanup-fn (or cleanup-fn #'ks--remove-leading-chars))
+  (unless (and (consp (car candidates))
+               (windowp (cdar candidates)))
+    (setq candidates
+          (mapcar (lambda (x) (cons x (selected-window)))
+                  candidates)))
+  (setq ks-last-candidates (copy-sequence candidates))
+  (let ((original-cands (copy-sequence candidates))
+        (res (ks--process-1 candidates overlay-fn cleanup-fn)))
+    (cond
+      ((null res)
+       (if (and (eq ks-style 'words) candidates)
+           (ks-process original-cands overlay-fn cleanup-fn)
+         (message "zero candidates")
+         t))
+      ((eq res 'restart)
+       (ks-process original-cands overlay-fn cleanup-fn))
+      ;; ignore exit from `ks-handler-function'
+      ((eq res 'exit))
+      ((eq res 'abort)
+       nil)
+      (t
+       (funcall ks-pre-action res)
+       (setq res (car res))
+       (let ((action (or ks-action ks-action-oneshot 'ks-action-goto)))
+         (funcall action
+                  (if (consp res)
+                      (car res)
+                    res)))
+       res))))
+
+(define-obsolete-function-alias 'ks--process 'ks-process
+  "0.4.0")
+#+end_src
+
+** Overlay: backgrounds & visibility
+#+begin_src emacs-lisp
+(defvar ks--overlays-back nil
+  "Hold overlays for when `ks-background' is t.")
+
+(defun ks--make-backgrounds (wnd-list)
+  "Create a dim background overlay for each window on WND-LIST."
+  (when ks-background
+    (setq ks--overlays-back
+          (mapcar (lambda (w)
+                    (let ((ol (make-overlay
+                               (window-start w)
+                               (window-end w)
+                               (window-buffer w))))
+                      (overlay-put ol 'face 'ks-background-face)
+                      (overlay-put ol 'window w)
+                      ol))
+                  wnd-list))))
+
+(defun ks--done ()
+  "Clean up overlays."
+  (mapc #'delete-overlay ks--overlays-back)
+  (setq ks--overlays-back nil)
+  (ks--remove-leading-chars))
+
+(defun ks--visible-p (s)
+  (let ((invisible (get-char-property s 'invisible)))
+    (or (null invisible)
+        (eq t buffer-invisibility-spec)
+        (null (assoc invisible buffer-invisibility-spec)))))
+
+(defun ks--next-visible-point ()
+  "Return the next closest point without `invisible' property."
+  (let ((s (point)))
+    (while (and (not (= (point-max) (setq s (next-char-property-change s))))
+                (not (ks--visible-p s))))
+    s))
+
+(defun ks--next-invisible-point ()
+  "Return the next closest point with `invisible' property."
+  (let ((s (point)))
+    (while (and (not (= (point-max) (setq s (next-char-property-change s))))
+                (ks--visible-p s)))
+    s))
+
+(defun ks--find-visible-regions (rbeg rend)
+  "Return a list of all visible regions between RBEG and REND."
+  (setq rbeg (max rbeg (point-min)))
+  (setq rend (min rend (point-max)))
+  (when (< rbeg rend)
+    (let (visibles beg)
+      (save-excursion
+        (save-restriction
+          (narrow-to-region rbeg rend)
+          (setq beg (goto-char (point-min)))
+          (while (not (= (point) (point-max)))
+            (goto-char (ks--next-invisible-point))
+            (push (cons beg (point)) visibles)
+            (setq beg (goto-char (ks--next-visible-point))))
+          (nreverse visibles))))))
+
+(defun ks--regex-candidates (regex &optional beg end pred group)
+  "Return all elements that match REGEX.
+Each element of the list is ((BEG . END) . WND)
+When PRED is non-nil, it's a filter for matching point positions.
+When GROUP is non-nil, (BEG . END) should delimit that regex group."
+  (setq group (or group 0))
+  (let ((case-fold-search (or ks-case-fold-search
+                              (string= regex (downcase regex))))
+        candidates)
+    (ks-dowindows current-prefix-arg
+      (dolist (pair (ks--find-visible-regions
+                     (or beg (window-start))
+                     (or end (window-end (selected-window) t))))
+        (save-excursion
+          (goto-char (car pair))
+          (while (re-search-forward regex (cdr pair) t)
+            (when (ks--visible-p (1- (point)))
+              (when (or (null pred)
+                        (funcall pred))
+                (push (cons
+                       (if (numberp group)
+                           (cons (match-beginning group)
+                                 (match-end group))
+                         (funcall group))
+                       wnd) candidates)))))))
+    (nreverse candidates)))
+#+end_src
+
+** Overlay: display
+#+begin_src emacs-lisp
+(defvar ks--overlay-offset 0
+  "The offset to apply in `ks--overlay'.")
+
+(defvar ks--overlays-lead nil
+  "Hold overlays for leading chars.")
+
+(defun ks--remove-leading-chars ()
+  "Remove leading char overlays."
+  (mapc #'delete-overlay ks--overlays-lead)
+  (setq ks--overlays-lead nil))
+
+(defun ks--old-str (pt wnd)
+  "Return a one-char string at PT in WND."
+  (let ((old-str (with-selected-window wnd
+                   (buffer-substring pt (1+ pt)))))
+    (if ks-background
+        (propertize old-str 'face 'ks-background-face)
+      old-str)))
+
+(defun ks--overlay (str beg end wnd &optional compose-fn)
+  "Create an overlay with STR from BEG to END in WND.
+COMPOSE-FN is a lambda that concatenates the old string at BEG with STR."
+  (let ((eob (with-selected-window wnd (point-max))))
+    (when (<= beg eob)
+      (let* ((beg (+ beg ks--overlay-offset))
+             (ol (make-overlay beg (or end (1+ beg)) (window-buffer wnd)))
+             (old-str (if (eq beg eob) "" (ks--old-str beg wnd)))
+             (os-line-prefix (get-text-property 0 'line-prefix old-str))
+             (os-wrap-prefix (get-text-property 0 'wrap-prefix old-str))
+             other-ol)
+        (unless (= (length str) 0)
+          (when os-line-prefix
+            (add-text-properties 0 1 `(line-prefix ,os-line-prefix) str))
+          (when os-wrap-prefix
+            (add-text-properties 0 1 `(wrap-prefix ,os-wrap-prefix) str)))
+        (when (setq other-ol (cl-find-if
+                              (lambda (o) (overlay-get o 'goto-address))
+                              (overlays-at beg)))
+          (add-text-properties
+           0 (length old-str)
+           `(face ,(overlay-get other-ol 'face)) old-str))
+        (overlay-put ol 'window wnd)
+        (overlay-put ol 'category 'ks)
+        (overlay-put ol (if (eq beg eob)
+                            'after-string
+                          'display)
+                     (funcall
+                      (or compose-fn #'concat)
+                      str old-str))
+        (push ol ks--overlays-lead)))))
+
+(defcustom ks-highlight-first nil
+  "When non-nil highlight the first decision char with `ks-lead-face-0'.
+Do this even when the char is terminating."
+  :type 'boolean)
+
+(defun ks--key-to-char (c)
+  "If C is no character, translate it using `ks-key-to-char-alist'."
+  (cond ((characterp c) c)
+        ((cdr (assoc c ks-key-to-char-alist)))
+        ((mouse-event-p c) c)
+        (t
+         (error "Unknown key %s" c))))
+
+(defun ks-candidate-beg (leaf)
+  "Return the start position for LEAF."
+  (cond ((numberp leaf)
+         leaf)
+        ((consp (car leaf))
+         (caar leaf))
+        (t
+         (car leaf))))
+
+(defun ks-candidate-end (leaf)
+  "Return the end position for LEAF."
+  (cond ((numberp leaf)
+         leaf)
+        ((consp (car leaf))
+         (cdar leaf))
+        (t
+         (car leaf))))
+
+(defun ks-candidate-wnd (leaf)
+  "Return the window for LEAF."
+  (if (consp leaf)
+      (cdr leaf)
+    (selected-window)))
+
+(defun ks--overlay-pre (path leaf)
+  "Create an overlay with PATH at LEAF.
+PATH is a list of keys from tree root to LEAF.
+LEAF is normally ((BEG . END) . WND)."
+  (if (with-selected-window (cdr leaf)
+        (bound-and-true-p visual-line-mode))
+      (ks--overlay-at-full path leaf)
+    (let* ((path (mapcar #'ks--key-to-char path))
+           (str (propertize (apply #'string (reverse path))
+                            'face 'ks-lead-face)))
+      (when (or ks-highlight-first (> (length str) 1))
+        (set-text-properties 0 1 '(face ks-lead-face-0) str))
+      (setq str (concat
+                 (propertize ks-current-path
+                             'face 'ks-lead-face-1)
+                 str))
+      (ks--overlay
+       str
+       (ks-candidate-beg leaf) nil
+       (ks-candidate-wnd leaf)))))
+
+(defun ks--overlay-at (path leaf)
+  "Create an overlay with PATH at LEAF.
+PATH is a list of keys from tree root to LEAF.
+LEAF is normally ((BEG . END) . WND)."
+  (let* ((path (mapcar #'ks--key-to-char path))
+         (str (propertize
+               (string (car (last path)))
+               'face 'ks-lead-face)))
+    (ks--overlay
+     str
+     (ks-candidate-beg leaf) nil
+     (ks-candidate-wnd leaf)
+     (lambda (str old-str)
+       (cond ((string= old-str "\n")
+              (concat str "\n"))
+             ;; add padding for wide-width character
+             ((eq (string-width old-str) 2)
+              (concat str " "))
+             (t
+              str))))))
+
+(defun ks--overlay-at-full (path leaf)
+  "Create an overlay with PATH at LEAF.
+PATH is a list of keys from tree root to LEAF.
+LEAF is normally ((BEG . END) . WND)."
+  (let* ((path (mapcar #'ks--key-to-char path))
+         (str (propertize
+               (apply #'string (reverse path))
+               'face 'ks-lead-face))
+         (len (length path))
+         (beg (ks-candidate-beg leaf))
+         (wnd (cdr leaf))
+         end)
+    (dotimes (i len)
+      (set-text-properties i (1+ i)
+                           `(face ,(nth i ks-lead-faces))
+                           str))
+    (when (eq ks-style 'de-bruijn)
+      (setq str (concat
+                 (propertize ks-current-path
+                             'face 'ks-lead-face-1)
+                 str))
+      (setq len (length str)))
+    (with-selected-window wnd
+      (save-excursion
+        (goto-char beg)
+        (let* ((lep (if (bound-and-true-p visual-line-mode)
+                        (save-excursion
+                          (end-of-visual-line)
+                          (point))
+                      (line-end-position)))
+               ;; `end-of-visual-line' is bugged sometimes
+               (lep (if (< lep beg)
+                        (line-end-position)
+                      lep))
+               (len-and-str (ks--update-offset-and-str len str lep)))
+          (setq len (car len-and-str))
+          (setq str (cdr len-and-str))
+          (setq end (if (= beg lep)
+                        (1+ beg)
+                      (min (+ beg
+                              (if (eq (char-after) ?\t)
+                                  1
+                                len))
+                           lep)))
+          (when (and (bound-and-true-p visual-line-mode)
+                     (> len (- end beg))
+                     (not (eq lep beg)))
+            (setq len (- end beg))
+            (let ((old-str (apply #'string (reverse path))))
+              (setq str
+                    (substring
+                     (propertize
+                      old-str
+                      'face
+                      (if (= (length old-str) 1)
+                          'ks-lead-face
+                        'ks-lead-face-0))
+                     0 len)))))))
+    (ks--overlay
+     str beg end wnd
+     (lambda (str old-str)
+       (cond ((string= old-str "\n")
+              (concat str "\n"))
+             ((string= old-str "\t")
+              (concat str (make-string (max (- tab-width len) 0) ?\ )))
+             (t
+              ;; add padding for wide-width character
+              (if (eq (string-width old-str) 2)
+                  (concat str " ")
+                str)))))))
+
+(defun ks--overlay-post (path leaf)
+  "Create an overlay with PATH at LEAF.
+PATH is a list of keys from tree root to LEAF.
+LEAF is normally ((BEG . END) . WND)."
+  (let* ((path (mapcar #'ks--key-to-char path))
+         (str (propertize (apply #'string (reverse path))
+                          'face 'ks-lead-face)))
+    (when (or ks-highlight-first (> (length str) 1))
+      (set-text-properties 0 1 '(face ks-lead-face-0) str))
+    (setq str (concat
+               (propertize ks-current-path
+                           'face 'ks-lead-face-1)
+               str))
+    (ks--overlay
+     str
+     (ks-candidate-end leaf) nil
+     (ks-candidate-wnd leaf))))
+
+(defun ks--update-offset-and-str (offset str lep)
+  "Recalculate the length of the new overlay at point.
+
+OFFSET is the previous overlay length.
+STR is the overlay string that we wish to add.
+LEP is the line end position.
+
+We want to add an overlay between point and END=point+OFFSET.
+When other overlays already exist between point and END, set
+OFFSET to be the difference between the start of the first
+overlay and point.  This is equivalent to truncating our new
+overlay, so that it doesn't intersect with overlays that already
+exist."
+  (let* ((wnd (selected-window))
+         (beg (point))
+         (oov (delq nil
+                    (mapcar
+                     (lambda (o)
+                       (and (eq (overlay-get o 'category) 'ks)
+                            (eq (overlay-get o 'window) wnd)
+                            (overlay-start o)))
+                     (overlays-in beg (min (+ beg offset) lep))))))
+    (when oov
+      (setq offset (- (apply #'min oov) beg))
+      (setq str (substring str 0 offset)))
+    (let ((other-ov (cl-find-if
+                     (lambda (o)
+                       (and (eq (overlay-get o 'category) 'ks)
+                            (eq (overlay-start o) beg)
+                            (not (eq (overlay-get o 'window) wnd))))
+                     (overlays-in (point) (min (+ (point) offset) lep)))))
+      (when (and other-ov
+                 (> (overlay-end other-ov)
+                    (+ beg offset)))
+        (setq str (concat str (buffer-substring
+                               (+ beg offset)
+                               (overlay-end other-ov))))
+        (setq offset (- (overlay-end other-ov)
+                        beg))))
+    (cons offset str)))
+
+(defun ks--style-fn (style)
+  "Transform STYLE symbol to a style function."
+  (cl-case style
+    (pre #'ks--overlay-pre)
+    (at #'ks--overlay-at)
+    (at-full 'ks--overlay-at-full)
+    (post #'ks--overlay-post)
+    (de-bruijn #'ks--overlay-at-full)
+    (words #'ks--overlay-at-full)
+    (ignore #'ignore)
+    (t (error "Unexpected style %S" style))))
+
+(cl-defun ks-jump (regex &key window-flip beg end action pred group)
+  "Jump to REGEX.
+The window scope is determined by `ks-all-windows'.
+When WINDOW-FLIP is non-nil, do the opposite of `ks-all-windows'.
+BEG and END narrow the scope where candidates are searched.
+ACTION is a function that takes point position as an argument.
+When PRED is non-nil, it's a filter for matching point positions.
+When GROUP is non-nil, it's either a match group in REGEX, or a function
+that returns a cons of match beginning and end."
+  (setq ks-action (or action ks-action))
+  (let ((ks-all-windows
+         (if window-flip
+             (not ks-all-windows)
+           ks-all-windows)))
+    (ks-process
+     (ks--regex-candidates regex beg end pred group))))
+
+(defun ks--generic-jump (regex window-flip &optional beg end)
+  "Jump to REGEX.
+The window scope is determined by `ks-all-windows'.
+When WINDOW-FLIP is non-nil, do the opposite of `ks-all-windows'.
+BEG and END narrow the scope where candidates are searched."
+  (declare (obsolete ks-jump "0.4.0"))
+  (let ((ks-all-windows
+         (if window-flip
+             (not ks-all-windows)
+           ks-all-windows)))
+    (ks-process
+     (ks--regex-candidates regex beg end))))
+#+end_src
+
+** Commands: goto-char
+#+begin_src emacs-lisp
+;;;###autoload
+(defun ks-goto-char (char &optional arg)
+  "Jump to the currently visible CHAR.
+The window scope is determined by `ks-all-windows' (ARG negates it)."
+  (interactive (list (read-char "char: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-char
+    (ks-jump
+     (if (= 13 char)
+         "\n"
+       (regexp-quote (string char)))
+     :window-flip arg)))
+
+;;;###autoload
+(defun ks-goto-char-in-line (char)
+  "Jump to the currently visible CHAR in the current line."
+  (interactive (list (read-char "char: " t)))
+  (ks-with ks-goto-char
+    (ks-jump
+     (regexp-quote (string char))
+     :beg (line-beginning-position)
+     :end (line-end-position))))
+
+;;;###autoload
+(defun ks-goto-char-2 (char1 char2 &optional arg beg end)
+  "Jump to the currently visible CHAR1 followed by CHAR2.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'.
+BEG and END narrow the scope where candidates are searched."
+  (interactive (list (let ((c1 (read-char "char 1: " t)))
+                       (if (memq c1 '(? ?\b))
+                           (keyboard-quit)
+                         c1))
+                     (let ((c2 (read-char "char 2: " t)))
+                       (cond ((eq c2 ?)
+                              (keyboard-quit))
+                             ((memq c2 ks-del-last-char-by)
+                              (keyboard-escape-quit)
+                              (call-interactively 'ks-goto-char-2))
+                             (t
+                              c2)))
+                     current-prefix-arg
+                     nil nil))
+  (when (eq char1 ?
+)
+    (setq char1 ?\n))
+  (when (eq char2 ?
+)
+    (setq char2 ?\n))
+  (ks-with ks-goto-char-2
+    (ks-jump
+     (regexp-quote (string char1 char2))
+     :window-flip arg
+     :beg beg
+     :end end)))
+
+;;;###autoload
+(defun ks-goto-char-2-above (char1 char2 &optional arg)
+  "Jump to the currently visible CHAR1 followed by CHAR2.
+This is a scoped version of `ks-goto-char-2', where the scope is
+the visible part of the current buffer up to point.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive (list (read-char "char 1: " t)
+                     (read-char "char 2: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-char-2-above
+    (ks-goto-char-2
+     char1 char2 arg
+     (window-start) (point))))
+
+;;;###autoload
+(defun ks-goto-char-2-below (char1 char2 &optional arg)
+  "Jump to the currently visible CHAR1 followed by CHAR2.
+This is a scoped version of `ks-goto-char-2', where the scope is
+the visible part of the current buffer following point.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive (list (read-char "char 1: " t)
+                     (read-char "char 2: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-char-2-below
+    (ks-goto-char-2
+     char1 char2 arg
+     (point) (window-end (selected-window) t))))
+#+end_src
+
+** Commands: isearch / word / symbol
+#+begin_src emacs-lisp
+;;;###autoload
+(defun ks-isearch ()
+  "Jump to one of the current isearch candidates."
+  (interactive)
+  (ks-with ks-isearch
+    (let ((ks-background nil)
+          (ks-case-fold-search case-fold-search))
+      (prog1
+          (ks-process
+           (ks--regex-candidates (if isearch-regexp
+                                       isearch-string
+                                     (regexp-quote isearch-string))))
+        (isearch-done)))))
+
+;;;###autoload
+(defun ks-goto-word-0 (arg &optional beg end)
+  "Jump to a word start.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'.
+BEG and END narrow the scope where candidates are searched."
+  (interactive "P")
+  (ks-with ks-goto-word-0
+    (ks-jump ks-goto-word-0-regexp
+              :window-flip arg
+              :beg beg
+              :end end)))
+
+;;;###autoload
+(defun ks-goto-whitespace-end (arg &optional beg end)
+  "Jump to the end of a whitespace sequence.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'.
+BEG and END narrow the scope where candidates are searched."
+  (interactive "P")
+  (ks-with ks-goto-whitespace-end
+    (ks-jump "[ \t]+\\|\n[ \t]*"
+              :window-flip arg
+              :beg beg
+              :end end
+              :group (lambda () (cons (point) (1+ (point)))))))
+
+(defun ks-goto-word-0-above (arg)
+  "Jump to a word start between window start and point.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive "P")
+  (ks-with ks-goto-word-0
+    (ks-goto-word-0 arg (window-start) (point))))
+
+(defun ks-goto-word-0-below (arg)
+  "Jump to a word start between point and window end.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive "P")
+  (ks-with ks-goto-word-0
+    (ks-goto-word-0 arg (point) (window-end (selected-window) t))))
+
+(defun ks-goto-whitespace-end-above (arg)
+  "Jump to the end of a whitespace sequence between point and window end.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive "P")
+  (ks-with ks-goto-whitespace-end
+    (ks-goto-whitespace-end arg (window-start) (point))))
+
+(defun ks-goto-whitespace-end-below (arg)
+  "Jump to the end of a whitespace sequence between window start and point.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive "P")
+  (ks-with ks-goto-whitespace-end
+    (ks-goto-whitespace-end arg (point) (window-end (selected-window) t))))
+#+end_src
+
+** Commands: word-1 / symbol-1 / subword
+#+begin_src emacs-lisp
+;;;###autoload
+(defun ks-goto-word-1 (char &optional arg beg end symbol)
+  "Jump to the currently visible CHAR at a word start.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'.
+BEG and END narrow the scope where candidates are searched.
+When SYMBOL is non-nil, jump to symbol start instead of word start."
+  (interactive (list (read-char "char: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-word-1
+    (let* ((str (string char))
+           (regex (cond ((string= str ".")
+                         "\\.")
+                        ((and ks-word-punc-regexp
+                              (string-match ks-word-punc-regexp str))
+                         (regexp-quote str))
+                        ((<= char 26)
+                         str)
+                        (t
+                         (concat
+                          (if symbol "\\_<" "\\b")
+                          str)))))
+      (ks-jump regex
+                :window-flip arg
+                :beg beg
+                :end end))))
+
+;;;###autoload
+(defun ks-goto-word-1-above (char &optional arg)
+  "Jump to the currently visible CHAR at a word start.
+This is a scoped version of `ks-goto-word-1', where the scope is
+the visible part of the current buffer up to point.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive (list (read-char "char: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-word-1
+    (ks-goto-word-1 char arg (window-start) (point))))
+
+;;;###autoload
+(defun ks-goto-word-1-below (char &optional arg)
+  "Jump to the currently visible CHAR at a word start.
+This is a scoped version of `ks-goto-word-1', where the scope is
+the visible part of the current buffer following point.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive (list (read-char "char: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-word-1
+    (ks-goto-word-1 char arg (point) (window-end (selected-window) t))))
+
+;;;###autoload
+(defun ks-goto-symbol-1 (char &optional arg)
+  "Jump to the currently visible CHAR at a symbol start.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive (list (read-char "char: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-symbol-1
+    (ks-goto-word-1 char arg nil nil t)))
+
+;;;###autoload
+(defun ks-goto-symbol-1-above (char &optional arg)
+  "Jump to the currently visible CHAR at a symbol start.
+This is a scoped version of `ks-goto-symbol-1', where the scope is
+the visible part of the current buffer up to point.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive (list (read-char "char: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-symbol-1-above
+    (ks-goto-word-1 char arg (window-start) (point) t)))
+
+;;;###autoload
+(defun ks-goto-symbol-1-below (char &optional arg)
+  "Jump to the currently visible CHAR at a symbol start.
+This is a scoped version of `ks-goto-symbol-1', where the scope is
+the visible part of the current buffer following point.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive (list (read-char "char: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-symbol-1-below
+    (ks-goto-word-1 char arg (point) (window-end (selected-window) t) t)))
+
+(declare-function subword-backward "subword")
+(defvar subword-backward-regexp)
+
+(defcustom ks-subword-extra-word-chars '(?{ ?= ?} ?* ?: ?> ?<)
+  "A list of characters that should temporarily match \"\\w\".
+This variable is used by `ks-goto-subword-0' and `ks-goto-subword-1'."
+  :type '(repeat character))
+
+;;;###autoload
+(defun ks-goto-subword-0 (&optional arg predicate beg end)
+  "Jump to a word or subword start.
+The window scope is determined by `ks-all-windows' (ARG negates it).
+
+When PREDICATE is non-nil it's a function of zero parameters that
+should return true.
+
+BEG and END narrow the scope where candidates are searched."
+  (interactive "P")
+  (require 'subword)
+  (ks-with ks-goto-subword-0
+    (let ((case-fold-search nil)
+          (subword-backward-regexp
+           "\\(\\(\\W\\|[[:lower:][:digit:]]\\)\\([!-/:@`~[:upper:]]+\\W*\\)\\|\\W\\w+\\)")
+          candidates)
+      (ks-dowindows arg
+        (let ((syn-tbl (copy-syntax-table)))
+          (dolist (char ks-subword-extra-word-chars)
+            (modify-syntax-entry char "w" syn-tbl))
+          (with-syntax-table syn-tbl
+            (let ((ws (or beg (window-start)))
+                  window-cands)
+              (save-excursion
+                (goto-char (or end (window-end (selected-window) t)))
+                (subword-backward)
+                (while (> (point) ws)
+                  (when (or (null predicate)
+                            (and predicate (funcall predicate)))
+                    (unless (not (ks--visible-p (point)))
+                      (push (cons (cons (point) (1+ (point)))
+                                  (selected-window)) window-cands)))
+                  (subword-backward))
+                (and (= (point) ws)
+                     (or (null predicate)
+                         (and predicate (funcall predicate)))
+                     (not (get-char-property (point) 'invisible))
+                     (push (cons (cons (point) (1+ (point)))
+                                 (selected-window)) window-cands)))
+              (setq candidates (nconc candidates window-cands))))))
+      (ks-process candidates))))
+
+;;;###autoload
+(defun ks-goto-subword-1 (char &optional arg)
+  "Jump to the currently visible CHAR at a subword start.
+The window scope is determined by `ks-all-windows' (ARG negates it).
+The case of CHAR is ignored."
+  (interactive (list (read-char "char: " t)
+                     current-prefix-arg))
+  (ks-with ks-goto-subword-1
+    (let ((char (downcase char)))
+      (ks-goto-subword-0
+       arg (lambda ()
+             (and (char-after)
+                  (eq (downcase (char-after)) char)))))))
+
+;;;###autoload
+(defun ks-goto-word-or-subword-1 ()
+  "Forward to `ks-goto-subword-1' or `ks-goto-word-1'.
+Which one depends on variable `subword-mode'."
+  (interactive)
+  (if (bound-and-true-p subword-mode)
+      (call-interactively #'ks-goto-subword-1)
+      (call-interactively #'ks-goto-word-1)))
+#+end_src
+
+** Line commands
+#+begin_src emacs-lisp
+(defvar visual-line-mode)
+
+(defcustom ks-indent-line-overlay nil
+  "When non-nil, display line overlay next to the first non-whitespace character.
+This affects `ks-goto-line'."
+  :type 'boolean)
+
+(defun ks--line-cands (&optional arg beg end bottom-up)
+  "Get candidates for selecting a line.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'.
+BEG and END narrow the scope where candidates are searched.
+When BOTTOM-UP is non-nil, display ks candidates from top to bottom"
+  (let (candidates)
+    (ks-dowindows arg
+      (let ((ws (or beg (window-start))))
+        (save-excursion
+          (save-restriction
+            (narrow-to-region ws (or end (window-end (selected-window) t)))
+            (goto-char (point-min))
+            (while (< (point) (point-max))
+              (when (member (get-char-property
+                             (max (1- (point)) ws) 'invisible) '(nil org-link))
+                (push (cons
+                       (if (eq ks-style 'post)
+                           (line-end-position)
+                         (save-excursion
+                           (when ks-indent-line-overlay
+                             (skip-chars-forward " \t"))
+                           (point)))
+                       (selected-window)) candidates))
+              (if visual-line-mode
+                  (line-move-visual 1 t)
+                (forward-line 1)))))))
+    (if bottom-up
+        candidates
+      (nreverse candidates))))
+
+(defun ks--linum-strings ()
+  "Get strings for `ks-linum-mode'."
+  (let* ((lines (mapcar #'car (ks--line-cands)))
+         (line-tree (ks-tree lines ks-keys))
+         (line-list nil))
+    (ks-traverse
+     line-tree
+     (lambda (path _leaf)
+       (let ((str (propertize (apply #'string (reverse path))
+                              'face 'ks-lead-face)))
+         (when (> (length str) 1)
+           (set-text-properties 0 1 '(face ks-lead-face-0) str))
+         (push str line-list))))
+    (nreverse line-list)))
+
+(defvar linum-available)
+(defvar linum-overlays)
+(defvar linum-format)
+(declare-function linum--face-width "linum")
+(declare-function linum-mode "linum")
+
+(define-minor-mode ks-linum-mode
+  "Minor mode that uses ks hints for `linum-mode'."
+  :group 'key-selection
+  (if ks-linum-mode
+      (progn
+        (require 'linum)
+        (advice-add 'linum-update-window :around 'ks--linum-update-window)
+        (linum-mode 1))
+    (advice-remove 'linum-update-window 'ks--linum-update-window)
+    (linum-mode -1)))
+
+(defun ks--linum-update-window (_ win)
+  "Update line numbers for the portion visible in window WIN."
+  (goto-char (window-start win))
+  (let ((line (line-number-at-pos))
+        (limit (window-end win t))
+        (fmt (cond ((stringp linum-format) linum-format)
+                   ((eq linum-format 'dynamic)
+                    (let ((w (length (number-to-string
+                                      (count-lines (point-min) (point-max))))))
+                      (concat "%" (number-to-string w) "d")))))
+        (width 0)
+        (ks-strs (when ks-linum-mode
+                   (ks--linum-strings))))
+    (run-hooks 'linum-before-numbering-hook)
+    ;; Create an overlay (or reuse an existing one) for each
+    ;; line visible in this window, if necessary.
+    (while (and (not (eobp)) (< (point) limit))
+      (let* ((str
+              (cond (ks-linum-mode
+                     (pop ks-strs))
+                    (fmt
+                     (propertize (format fmt line) 'face 'linum))
+                    (t
+                     (funcall linum-format line))))
+             (visited (catch 'visited
+                        (dolist (o (overlays-in (point) (point)))
+                          (when (equal-including-properties
+                                 (overlay-get o 'linum-str) str)
+                            (unless (memq o linum-overlays)
+                              (push o linum-overlays))
+                            (setq linum-available (delq o linum-available))
+                            (throw 'visited t))))))
+        (setq width (max width (length str)))
+        (unless visited
+          (let ((ov (if (null linum-available)
+                        (make-overlay (point) (point))
+                      (move-overlay (pop linum-available) (point) (point)))))
+            (push ov linum-overlays)
+            (overlay-put ov 'before-string
+                         (propertize " " 'display `((margin left-margin) ,str)))
+            (overlay-put ov 'linum-str str))))
+      ;; Text may contain those nasty intangible properties, but that
+      ;; shouldn't prevent us from counting those lines.
+      (let ((inhibit-point-motion-hooks t))
+        (forward-line))
+      (setq line (1+ line)))
+    (when (display-graphic-p)
+      (setq width (ceiling
+                   (/ (* width 1.0 (linum--face-width 'linum))
+                      (frame-char-width)))))
+    (set-window-margins win width (cdr (window-margins win)))))
+
+(defun ks--line (&optional arg beg end bottom-up)
+  "Select a line.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'.
+BEG and END narrow the scope where candidates are searched.
+When BOTTOM-UP is non-nil, display ks candidates from top to bottom"
+  (setq ks-action (or ks-action #'identity))
+  (let ((ks-style (if ks-linum-mode
+                      (progn
+                        (message "Goto line:")
+                        'ignore)
+                    ks-style)))
+    (ks-process
+     (ks--line-cands arg beg end bottom-up))))
+
+;;;###autoload
+(defun ks-goto-line (&optional arg)
+  "Jump to a line start in current buffer.
+
+When ARG is 1, jump to lines currently visible, with the option
+to cancel to `goto-line' by entering a number.
+
+When ARG is 4, negate the window scope determined by
+`ks-all-windows'.
+
+Otherwise, forward to `goto-line' with ARG."
+  (interactive "p")
+  (setq arg (or arg 1))
+  (if (not (memq arg '(1 4)))
+      (progn
+        (goto-char (point-min))
+        (forward-line (1- arg)))
+    (ks-with ks-goto-line
+      (let* ((ks-handler-old ks-handler-function)
+             (ks-handler-function
+              (lambda (char)
+                (if (or (< char ?0)
+                        (> char ?9))
+                    (funcall ks-handler-old char)
+                  (let ((line (read-from-minibuffer
+                               "Goto line: " (string char))))
+                    (when line
+                      (ks-push-mark)
+                      (save-restriction
+                        (widen)
+                        (goto-char (point-min))
+                        (forward-line (1- (string-to-number line))))
+                      (throw 'done 'exit))))))
+             (r (ks--line (eq arg 4))))
+        (when (and (not (memq r '(t nil))) (eq ks-action #'identity))
+          (ks-action-goto r))))))
+
+;;;###autoload
+(defun ks-goto-line-above (&optional offset bottom-up)
+  "Goto visible line above the cursor.
+OFFSET changes the distance between the closest key to the cursor and
+the cursor
+When BOTTOM-UP is non-nil, display ks candidates from top to bottom"
+  (interactive)
+  (if offset
+    (setq offset (+ 2 (- offset))))
+  (let* ((ks-all-windows nil)
+         (r (ks--line nil (window-start)
+                       (line-beginning-position (or offset 1))
+		       bottom-up)))
+    (unless (eq r t)
+      (ks-action-goto r))))
+
+;;;###autoload
+(defun ks-goto-line-below (&optional offset bottom-up)
+  "Goto visible line below the cursor.
+OFFSET changes the distance between the closest key to the cursor and
+the cursor
+When BOTTOM-UP is non-nil, display ks candidates from top to bottom"
+  (interactive)
+  (if offset
+    (setq offset (+ offset 1)))
+  (let* ((ks-all-windows nil)
+         (r (ks--line
+             nil (line-beginning-position (or offset 2))
+             (window-end (selected-window) t)
+	     bottom-up)))
+    (unless (eq r t)
+      (ks-action-goto r))))
+
+(defcustom ks-line-insert-style 'above
+  "How to insert the newly copied/cut line."
+  :type '(choice
+          (const :tag "Above" above)
+          (const :tag "Below" below)))
+
+;;;###autoload
+(defun ks-goto-end-of-line (&optional arg)
+  "Call `ks-goto-line' and move to the end of the line."
+  (interactive "p")
+  (ks-goto-line arg)
+  (end-of-line))
+
+;;;###autoload
+(defun ks-copy-line (arg)
+  "Copy a selected line above the current line.
+ARG lines can be used."
+  (interactive "p")
+  (let ((initial-window (selected-window)))
+    (ks-with ks-copy-line
+      (let* ((start (ks--line))
+             (str (buffer-substring-no-properties
+                   start
+                   (save-excursion
+                     (goto-char start)
+                     (move-end-of-line arg)
+                     (point)))))
+        (select-window initial-window)
+        (cond ((eq ks-line-insert-style 'above)
+               (beginning-of-line)
+               (save-excursion
+                 (insert str "\n")))
+              ((eq ks-line-insert-style 'below)
+               (end-of-line)
+               (insert "\n" str)
+               (beginning-of-line))
+              (t
+               (user-error "Unexpected `ks-line-insert-style'")))))))
+
+;;;###autoload
+(defun ks-move-line (arg)
+  "Move a selected line above the current line.
+ARG lines can be used."
+  (interactive "p")
+  (let ((initial-window (selected-window)))
+    (ks-with ks-move-line
+      (let ((start (ks--line)))
+        (save-excursion
+          (goto-char start)
+          (kill-whole-line arg))
+        (select-window initial-window)
+        (cond ((eq ks-line-insert-style 'above)
+               (beginning-of-line)
+               (save-excursion
+                 (insert
+                  (current-kill 0))))
+              ((eq ks-line-insert-style 'below)
+               (end-of-line)
+               (newline)
+               (save-excursion
+                 (insert (substring (current-kill 0) 0 -1))))
+              (t
+               (user-error "Unexpected `ks-line-insert-style'")))))))
+
+;;;###autoload
+(defun ks-copy-region (arg)
+  "Select two lines and copy the text between them to point.
+
+The window scope is determined by `ks-all-windows' or
+`ks-all-windows-alt' when ARG is non-nil."
+  (interactive "P")
+  (let ((initial-window (selected-window)))
+    (ks-with ks-copy-region
+      (let* ((beg (save-selected-window
+                    (ks--line arg)))
+             (end (ks--line arg))
+             (str (buffer-substring-no-properties
+                   beg
+                   (save-excursion
+                     (goto-char end)
+                     (line-end-position)))))
+        (select-window initial-window)
+        (cond ((eq ks-line-insert-style 'above)
+               (beginning-of-line)
+               (save-excursion
+                 (insert str "\n")))
+              ((eq ks-line-insert-style 'below)
+               (end-of-line)
+               (newline)
+               (save-excursion
+                 (insert str)))
+              (t
+               (user-error "Unexpected `ks-line-insert-style'")))))))
+
+;;;###autoload
+(defun ks-move-region ()
+  "Select two lines and move the text between them above the current line."
+  (interactive)
+  (ks-with ks-move-region
+    (let* ((initial-window (selected-window))
+           (beg (ks--line))
+           (end (ks--line))
+           text)
+      (when (> beg end)
+        (cl-rotatef beg end))
+      (setq end (save-excursion
+                  (goto-char end)
+                  (1+ (line-end-position))))
+      (setq text (buffer-substring beg end))
+      (move-beginning-of-line nil)
+      (delete-region beg end)
+      (select-window initial-window)
+      (insert text))))
+
+;;;###autoload
+(defun ks-kill-region (arg)
+  "Select two lines and kill the region between them.
+
+The window scope is determined by `ks-all-windows' or
+`ks-all-windows-alt' when ARG is non-nil."
+  (interactive "P")
+  (let ((initial-window (selected-window)))
+    (ks-with ks-kill-region
+      (let* ((beg (save-selected-window
+                    (list (ks--line arg) (selected-window))))
+             (end (list (ks--line arg) (selected-window))))
+        (cond
+          ((not (numberp (car beg)))
+           (user-error "Fail to select the beginning of region"))
+          ((not (numberp (car end)))
+           (user-error "Fail to select the end of region"))
+          ;; Restrict operation to same window. It's better if it can be
+          ;; different windows but same buffer; however, then the cloned
+          ;; buffers with different narrowed regions might cause problem.
+          ((not (equal (cdr beg) (cdr end)))
+           (user-error "Selected points are not in the same window"))
+          ((< (car beg) (car end))
+           (save-excursion
+             (kill-region
+              (car beg)
+              (progn (goto-char (car end)) (forward-visible-line 1) (point)))))
+          (t
+           (save-excursion
+             (kill-region
+              (progn (goto-char (car beg)) (forward-visible-line 1) (point))
+              (car end)))))))
+    (select-window initial-window)))
+
+;;;###autoload
+(defun ks-kill-ring-save-region (arg)
+  "Select two lines and save the region between them to the kill ring.
+The window scope is determined by `ks-all-windows'.
+When ARG is non-nil, do the opposite of `ks-all-windows'."
+  (interactive "P")
+  (let ((initial-window (selected-window)))
+    (ks-with ks-kill-ring-save-region
+      (let* ((beg (save-selected-window
+                    (list (ks--line arg) (selected-window))))
+             (end (list (ks--line arg) (selected-window))))
+        (cond
+          ((not (numberp (car beg)))
+           (user-error "Fail to select the beginning of region"))
+          ((not (numberp (car end)))
+           (user-error "Fail to select the end of region"))
+          ((not (equal (cdr beg) (cdr end)))
+           (user-error "Selected points are not in the same window"))
+          ((< (car beg) (car end))
+           (save-excursion
+             (kill-ring-save
+              (car beg)
+              (progn (goto-char (car end)) (forward-visible-line 1) (point)))))
+          (t
+           (save-excursion
+             (kill-ring-save
+              (progn (goto-char (car beg)) (forward-visible-line 1) (point))
+              (car end)))))))
+    (select-window initial-window)))
+
+;;;###autoload
+(defun ks-kill-whole-line (arg)
+  "Select line and kill the whole selected line.
+
+With a numerical prefix ARG, kill ARG line(s) starting from the
+selected line.  If ARG is negative, kill backward.
+
+If ARG is zero, kill the selected line but exclude the trailing
+newline.
+
+\\[universal-argument] 3 \\[ks-kill-whole-line] kill three lines
+starting from the selected line.  \\[universal-argument] -3
+
+\\[ks-kill-whole-line] kill three lines backward including the
+selected line."
+  (interactive "P")
+  (let ((initial-window (selected-window)))
+    (ks-with ks-kill-whole-line
+      (let* ((start (ks--line)))
+        (if (not (numberp start))
+            (user-error "Fail to select the line to kill")
+          (save-excursion (goto-char start)
+                          (kill-whole-line arg)))))
+    (select-window initial-window)))
+
+;;;###autoload
+(defun ks-kill-ring-save-whole-line (arg)
+  "Select line and save the whole selected line as if killed, but don’t kill it.
+
+This command is similar to `ks-kill-whole-line', except that it
+saves the line(s) as if killed, but does not kill it(them).
+
+With a numerical prefix ARG, kill ARG line(s) starting from the
+selected line.  If ARG is negative, kill backward.
+
+If ARG is zero, kill the selected line but exclude the trailing
+newline."
+  (interactive "P")
+  (let ((initial-window (selected-window)))
+    (ks-with ks-kill-ring-save-whole-line
+      (let* ((start (ks--line)))
+        (if (not (numberp start))
+            (user-error "Fail to select the line to kill")
+          (save-excursion
+            (let ((kill-read-only-ok t)
+                  (buffer-read-only t))
+              (goto-char start)
+              (kill-whole-line arg))))))
+    (select-window initial-window)))
+#+end_src
+
+** Timer + marks
+#+begin_src emacs-lisp
+;;;###autoload
+(defun ks-setup-default ()
+  "Setup the default shortcuts."
+  (eval-after-load "isearch"
+    '(define-key isearch-mode-map (kbd "C-'") 'ks-isearch)))
+
+(defcustom ks-timeout-seconds 0.5
+  "How many seconds to wait for the second char."
+  :type 'float)
+
+(defcustom ks-enter-times-out t
+  "Whether enter exits ks-goto-char-timer early. If nil it matches newline"
+  :type 'boolean)
+
+(defvar ks-text ""
+  "Store the input read by `ks--read-candidates'.")
+
+(defun ks--read-candidates (&optional re-builder)
+  "Read as many chars as possible and return their occurrences.
+At least one char must be read, and then repeatedly one next char
+may be read if it is entered before `ks-timeout-seconds'.  DEL
+deletes the last char entered, and RET exits with the currently
+read string immediately instead of waiting for another char for
+`ks-timeout-seconds'.
+The format of the result is the same as that of `ks--regex-candidates'.
+This function obeys `ks-all-windows' setting.
+RE-BUILDER is a function that takes a string and returns a regex.
+When nil, `regexp-quote' is used.
+If a group is captured, the first group is highlighted.
+Otherwise, the whole regex is highlighted."
+  (setq ks-text "")
+  (let ((re-builder (or re-builder #'regexp-quote))
+        char break overlays regex)
+    (unwind-protect
+         (progn
+           (ks--make-backgrounds
+            (ks-window-list))
+           (while (and (not break)
+                       (setq char
+                             (read-char (format "%d  char%s: "
+                                                (length overlays)
+                                                (if (string= ks-text "")
+                                                    ks-text
+                                                  (format " (%s)" ks-text)))
+                                        t
+                                        (and (not (string= ks-text ""))
+                                             ks-timeout-seconds))))
+             ;; Unhighlight
+             (dolist (ov overlays)
+               (delete-overlay ov))
+             (setq overlays nil)
+             (cond
+               ;; Handle RET
+               ((= char 13)
+                (if ks-enter-times-out
+                    (setq break t)
+                  (setq ks-text (concat ks-text (list ?\n)))))
+               ;; Handle C-h, DEL
+               ((memq char ks-del-last-char-by)
+                (let ((l (length ks-text)))
+                  (when (>= l 1)
+                    (setq ks-text (substring ks-text 0 (1- l))))))
+               ;; Handle ESC
+               ((= char 27)
+                (keyboard-quit))
+               (t
+                (setq ks-text (concat ks-text (list char)))))
+             ;; Highlight
+             (when (>= (length ks-text) 1)
+               (let ((case-fold-search
+                      (or ks-case-fold-search (string= ks-text (downcase ks-text))))
+                     found)
+                 (ks-dowindows current-prefix-arg
+                   (dolist (pair (ks--find-visible-regions
+                                  (window-start)
+                                  (window-end (selected-window) t)))
+                     (save-excursion
+                       (goto-char (car pair))
+                       (setq regex (funcall re-builder ks-text))
+                       (while (re-search-forward regex (cdr pair) t)
+                         (unless (not (ks--visible-p (1- (point))))
+                           (let* ((idx (if (= (length (match-data)) 4) 1 0))
+                                  (ov (make-overlay
+                                       (match-beginning idx) (match-end idx))))
+                             (setq found t)
+                             (push ov overlays)
+                             (overlay-put
+                              ov 'window (selected-window))
+                             (overlay-put
+                              ov 'face 'ks-goto-char-timer-face)))))))
+                 ;; No matches at all, so there's surely a typo in the input.
+                 (unless found (beep)))))
+           (nreverse (mapcar (lambda (ov)
+                               (cons (cons (overlay-start ov)
+                                           (overlay-end ov))
+                                     (overlay-get ov 'window)))
+                             overlays)))
+      (dolist (ov overlays)
+        (delete-overlay ov))
+      (ks--done))))
+
+(defvar ks--old-cands nil)
+
+;;;###autoload
+(defun ks-goto-char-timer (&optional arg)
+  "Read one or many consecutive chars and jump to the first one.
+The window scope is determined by `ks-all-windows' (ARG negates it)."
+  (interactive "P")
+  (let ((ks-all-windows (if arg
+                             (not ks-all-windows)
+                           ks-all-windows)))
+    (ks-with ks-goto-char-timer
+      (setq ks--old-cands (ks--read-candidates))
+      (ks-process ks--old-cands))))
+
+(defun ks-push-mark ()
+  "Store the current point and window."
+  (let ((inhibit-message t))
+    (ring-insert ks-ring
+                 (cons (point) (selected-window)))
+    (unless (region-active-p)
+      (push-mark))))
+
+(defun ks-pop-mark ()
+  "Jump back to the last location of `ks-push-mark'."
+  (interactive)
+  (let (res)
+    (condition-case nil
+        (progn
+          (while (not (window-live-p
+                       (cdr (setq res (ring-remove ks-ring 0))))))
+          (let* ((window (cdr res))
+                 (frame (window-frame window)))
+            (when (and (frame-live-p frame)
+                       (not (eq frame (selected-frame))))
+              (select-frame-set-input-focus frame))
+            (select-window window)
+            (goto-char (car res))))
+      (error
+       (set-mark-command 4)))))
+
+;;;###autoload
+(defun ks-transpose-lines-in-region ()
+  "Transpose lines in the active region."
+  (interactive)
+  (when (and (use-region-p) (> (count-lines (region-beginning) (region-end)) 1))
+    (let ((ks-all-windows nil)
+          (fst-line-point (ks--line nil (region-beginning) (region-end))))
+      (when fst-line-point
+        (let ((snd-line-point (ks--line nil (region-beginning) (region-end))))
+          (when snd-line-point
+            (save-mark-and-excursion
+              (push-mark fst-line-point)
+              (goto-char snd-line-point)
+              (transpose-lines 0))
+            (ks-transpose-lines-in-region)))))))
+#+end_src
+
+** Org-mode helpers
+#+begin_src emacs-lisp
+(defvar org-reverse-note-order)
+(declare-function org-refile "org")
+(declare-function org-back-to-heading "org")
+(declare-function org-reveal "org")
+
+(defvar org-after-refile-insert-hook)
+
+(defun ks-org-refile-as-child ()
+  "Refile current heading as first child of heading selected with `ks'."
+  ;; Inspired by `org-teleport': http://kitchingroup.cheme.cmu.edu/blog/2016/03/18/Org-teleport-headlines/
+  (interactive)
+  (let* ((org-reverse-note-order t)
+         (marker (save-excursion
+                   (ks-with ks-goto-line
+                     (unless (eq 't (ks-jump (rx bol (1+ "*") (1+ space))))
+                       ;; `ks-jump' returns t when aborted with C-g.
+                       (point-marker)))))
+         (filename (buffer-file-name (or (buffer-base-buffer (marker-buffer marker))
+                                         (marker-buffer marker))))
+         (rfloc (list nil filename nil marker))
+         ;; Ensure the refiled heading is visible.
+         (org-after-refile-insert-hook (if (member 'org-reveal org-after-refile-insert-hook)
+                                           org-after-refile-insert-hook
+                                         (cons #'org-reveal org-after-refile-insert-hook))))
+    (when marker
+      ;; Only attempt refile if ks session was not aborted.
+      (org-refile nil nil rfloc))))
+
+(defun ks-org-goto-heading-timer (&optional arg)
+  "Read one or many characters and jump to matching Org headings.
+The window scope is determined by `ks-all-windows' (ARG negates it)."
+  (interactive "P")
+  (let ((ks-all-windows (if arg
+                             (not ks-all-windows)
+                           ks-all-windows)))
+    (ks-with ks-goto-char-timer
+      (ks-process
+       (ks--read-candidates
+        (lambda (input)
+          (format "^\\*+ .*\\(%s\\)" input))))
+      (org-back-to-heading))))
+
+(provide 'key-selection)
+#+end_src
+

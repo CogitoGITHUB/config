@@ -1,8 +1,7 @@
-;;; capture.el --- Avy region & heading capture for manifolding-atlas v2 -*- lexical-binding: t; -*-
+;;; capture.el --- Key-selection region & heading capture for manifolding-atlas v2 -*- lexical-binding: t; -*-
 
 (require 'manifolding-atlas)
 (require 'manifolding-atlas-db)
-(require 'avy)
 (require 'org)
 
 (defun my/manifolding-atlas--heading-subtree-text ()

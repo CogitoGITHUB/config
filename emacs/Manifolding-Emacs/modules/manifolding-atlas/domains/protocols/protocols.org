@@ -2,8 +2,9 @@
 #+priority: 15
 
 Turns any heading into a protocol step. Steps are assembled into protocol
-documents via the BUILD command, which uses avy for multi-select and
-writes live transclusion pointers into topic-indexed protocol files.
+documents via the BUILD command, which uses key selection for
+multi-select and writes live transclusion pointers into topic-indexed
+protocol files.
 
 Protocol steps share a heading's RULE status (dual-mark) — a heading can
 be both a rule and a protocol step.
@@ -13,7 +14,6 @@ be both a rule and a protocol step.
 ;;; manifolding-atlas-protocols.el --- Protocol assembly -*- lexical-binding: t; -*-
 (require 'manifolding-atlas)
 (require 'manifolding-atlas-db)
-(require 'avy)
 (require 'org)
 (require 'transient)
 #+end_src
@@ -294,14 +294,14 @@ Only strips protocol-specific properties; preserves :RULE: t if set."
 
 *** Build — assemble a protocol from multiple headings
 
-**** Avy collection
+**** Key-selection collection
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-protocols--collect-headings-avy ()
-  "Select headings via avy-goto-line. C-g to finish."
+(defun my/manifolding-atlas-protocols--collect-headings-ks ()
+  "Select headings via ks-goto-line. C-g to finish."
   (let ((collected nil))
     (while (condition-case nil
                (progn
-                 (avy-goto-line)
+                 (ks-goto-line)
                  (unless (org-at-heading-p)
                    (user-error "Not a heading"))
                  (org-id-get-create)
@@ -382,7 +382,7 @@ pointers for each selected step."
                                    my/manifolding-atlas-protocols--protocols-directory))))
     (make-directory (file-name-directory file) t)
     (message "Pick headings to add to protocol.  C-g when done.")
-    (let* ((collected (my/manifolding-atlas-protocols--collect-headings-avy))
+    (let* ((collected (my/manifolding-atlas-protocols--collect-headings-ks))
            (count (length collected))
            (order-counter 1))
       (unless (> count 0)

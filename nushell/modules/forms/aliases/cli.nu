@@ -5,13 +5,13 @@ def zellij-clean [] {
 
 
 def e [...args] {
-  ^emacsclient -n -s /run/user/1000/emacs/server ...$args
+  ^emacs ...$args
 }
 def d [...args] {
-  ^emacsclient -n -s /run/user/1000/emacs/server . ...$args
+  ^emacs . ...$args
 }
 def t [...args] {
-  ^emacsclient -n -s /run/user/1000/emacs/server TODO.org ...$args
+  ^emacs TODO.org ...$args
 }
 
 # needs sudo to work

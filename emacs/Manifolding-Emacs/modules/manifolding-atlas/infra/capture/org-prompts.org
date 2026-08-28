@@ -670,19 +670,18 @@ saving with C-x C-s writes the file itself."
   (when (fboundp 'modaled-set-state)
     (modaled-set-state nil))
   (message "Editing property file in place — C-x C-s to save"))
-** Avy to option
-Manual one-shot jump: pick an option with avy and the cursor lands on
-it (no auto-mark). The auto-armed marking loop (below) is the default
-in sessions; this is the standalone / fallback jump.
+** Key selection to option
+Manual one-shot jump: pick an option with key selection and the cursor
+lands on it (no auto-mark). The auto-armed marking loop (below) is the
+default in sessions; this is the standalone / fallback jump.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-org-prompt--avy-to-option ()
-  "Select an option line with avy; the cursor lands on it.
+(defun my/manifolding-atlas-org-prompt--ks-to-option ()
+  "Select an option line with key selection; the cursor lands on it.
 Marking is manual afterwards — use buffer-mark on that line."
   (interactive)
-  (require 'avy)
-  (avy-with my/manifolding-atlas-org-prompt-avy
-    (let ((r (avy--line (eq current-prefix-arg 4))))
-      (when (and (not (memq r '(t nil))) (eq avy-action #'identity))
+  (ks-with my/manifolding-atlas-org-prompt-ks
+    (let ((r (ks--line (eq current-prefix-arg 4))))
+      (when (and (not (memq r '(t nil))) (eq ks-action #'identity))
         (goto-char r)
         (if (and (org-at-heading-p) (>= (org-outline-level) 2))
             (message "Option: %s"
@@ -691,30 +690,30 @@ Marking is manual afterwards — use buffer-mark on that line."
           (user-error "Not an option heading"))))))
 
 #+end_src
-** Avy marking loop
-The session picker opens with avy ARMED BY DEFAULT. Letters are ONLY
-jump targets — press an option's letter and it jumps there and marks
-it live immediately. Avy stays alive: after each jump you can press
-another option's letter to jump and mark that too (multi-select or
-change selection). Only level-2 option headings can be marked.
+** Key-selection marking loop
+The session picker opens with key selection ARMED BY DEFAULT. Letters
+are ONLY jump targets — press an option's letter and it jumps there
+and marks it live immediately. The selector stays alive: after each
+jump you can press another option's letter to jump and mark that too
+(multi-select or change selection). Only level-2 option headings can
+be marked.
 Control keys (never letters): RET advances ONLY when something is
 marked (else inert); SPC steps back; C-q quits; C-l makes the marked
 option live; C-e edits the property file in place; C-g aborts all.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-org-prompt--avy-mark-loop (buf)
-  "Avy-first marking loop over picker BUF.
-Avy stays armed the whole time the picker is open: typing letters
-jumps to an option and applies it live; you can keep jumping and re-
-mark to change the selection. RET advances only when something is
-marked; C-q quits, C-l makes live, C-e edits the property file."
-  (require 'avy)
+(defun my/manifolding-atlas-org-prompt--ks-mark-loop (buf)
+  "Key-selection-first marking loop over picker BUF.
+The selector stays armed the whole time the picker is open: typing
+letters jumps to an option and applies it live; you can keep jumping
+and re-mark to change the selection. RET advances only when something
+is marked; C-q quits, C-l makes live, C-e edits the property file."
   (let ((exit-loop nil))
     (while (and (not exit-loop) (buffer-live-p buf))
       (when-let ((win (get-buffer-window buf)))
         (with-selected-window win
-          (let ((avy-all-windows nil))
+          (let ((ks-all-windows nil))
             (condition-case nil
-                (progn (avy-goto-line)
+                (progn (ks-goto-line)
                        (when (and (org-at-heading-p)
                                   (>= (org-outline-level) 2))
                          (my/manifolding-atlas-org-prompt--buffer-mark)))
@@ -1203,9 +1202,9 @@ value so revisits highlight correctly.
         (ignore-errors (recenter-top-bottom))))
     (message "%s — letters jump+mark · RET advance · C-q quit · C-l live · C-e edit"
              (plist-get spec :label))
-    ;; Arm the avy-first marking loop: letters jump and mark by
-    ;; default, only RET advances, C-q/C-l/C-e are the controls.
-    (my/manifolding-atlas-org-prompt--avy-mark-loop buf)))
+    ;; Arm the key-selection-first marking loop: letters jump and mark
+    ;; by default, only RET advances, C-q/C-l/C-e are the controls.
+    (my/manifolding-atlas-org-prompt--ks-mark-loop buf)))
 
 #+end_src
 ** Session value

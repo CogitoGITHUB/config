@@ -179,7 +179,7 @@
 (defun manifold/nuke-backgrounds ()
   (dolist (face (face-list))
     (when (and (not (memq face '(region cursor)))
-               (not (string-match-p "avy-lead-face" (symbol-name face))))
+               (not (string-match-p "ks-lead-face" (symbol-name face))))
       (set-face-attribute face nil :background 'unspecified))))
 
 (manifold/pure-red)

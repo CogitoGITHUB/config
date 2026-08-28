@@ -47,7 +47,7 @@ $env._ZO_DATA_DIR = ($env.XDG_DATA_HOME | path join "zoxide")
 
 # --- Editor ---
 
-$env.EDITOR = "emacsclient -n"
+$env.EDITOR = "emacs"
 
 # --- Runtime ---
 

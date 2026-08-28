@@ -765,22 +765,21 @@ Opens =*routines-report*= in an org buffer.
 #+end_src
 
 *** Heading Collection
-Select headings via avy-goto-line. C-g finishes collection. Each
+Select headings via ks-goto-line. C-g finishes collection. Each
 selected heading gets an ID created if missing, saved immediately.
 
-**** Avy collection
+**** Key-selection collection
 Created IDs are saved to disk immediately so SOURCE references
 never dangle.
 #+begin_src emacs-lisp
-(defun my/manifolding-atlas-routines--collect-headings-avy ()
-  "Select headings via avy-goto-line. C-g finishes collection.
+(defun my/manifolding-atlas-routines--collect-headings-ks ()
+  "Select headings via ks-goto-line. C-g finishes collection.
 Created IDs are saved to disk immediately so SOURCE references never
 dangle."
-  (require 'avy)
   (let ((collected nil))
     (while (condition-case nil
                (progn
-                 (avy-goto-line)
+                 (ks-goto-line)
                  (unless (org-at-heading-p) (user-error "Not a heading"))
                  (org-id-get-create)
                  ;; Persist the new ID now — the routine will reference
@@ -822,11 +821,11 @@ Empty input finishes. Returns (id . title) conses in pick order."
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-routines--collect ()
   "Ask for an entry source and collect (id . title) items.
-b = avy over the current buffer, v = vault-wide selection."
+b = key selection over the current buffer, v = vault-wide selection."
   (pcase (read-char-choice
-          "Collect entries from: b=avy this buffer v=vault notes: "
+          "Collect entries from: b=key sel this buffer v=vault notes: "
           '(?b ?v))
-    (?b (my/manifolding-atlas-routines--collect-headings-avy))
+    (?b (my/manifolding-atlas-routines--collect-headings-ks))
     (?v (my/manifolding-atlas-routines--collect-vault))
     (_ nil)))
 #+end_src
@@ -914,8 +913,8 @@ BADGE is nil when the note is not in the review pool."
 
 *** Creation
 Creates an atomic or composite routine from interactively selected
-headings. Entry source: b = avy over the current buffer, v = vault-wide
-selection via completing-read.
+headings. Entry source: b = key selection over the current buffer,
+v = vault-wide selection via completing-read.
 
 **** Context properties assembly
 WARNING answers are simply omitted rather than stored.
@@ -966,7 +965,7 @@ Empty input finishes; duplicates and unknown picks are ignored.
          (temporal (my/manifolding-atlas-prompt-routine-temporal))
          (props (my/manifolding-atlas-routines--context-props
                  rtype domain temporal)))
-    (message "Select source headings. b=avy this buffer, v=vault notes.")
+    (message "Select source headings. b=key sel this buffer, v=vault notes.")
     (let* ((collected (my/manifolding-atlas-routines--collect))
            (ordered (my/manifolding-atlas-routines--reorder collected))
            (details (my/manifolding-atlas-routines--prompt-details ordered)))

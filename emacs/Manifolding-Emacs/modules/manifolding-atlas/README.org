@@ -366,7 +366,7 @@ Every prompt is a live editor, not a question.
 |---------+---------------------------------------------------------------|
 | m       | apply the option under cursor — again removes it from the note |
 | l       | make it live: create the ref-note and edit its content         |
-| a       | avy-jump straight to any option line                           |
+| a       | key-selection-jump straight to any option line             |
 | RET     | next prompt — refused until something was applied              |
 | q       | skip this prompt (WARNING default)                             |
 | b / B   | step back one · revisit any answered prompt                    |
@@ -381,9 +381,9 @@ Multi-choice prompts accumulate marks; clearing them all removes the
 property.  Reopened prompts restore their applied value, highlighted
 in bold, so changes are always visible before they become real.
 
-Session pickers open with an avy loop already armed: typing letters
-of an option jumps there and applies it live; pausing surfaces the
-key hints instead.
+Session pickers open with a key-selection loop already armed: typing
+letters of an option jumps there and applies it live; pausing surfaces
+the key hints instead.
 
 * Schema is data
 

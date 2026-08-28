@@ -100,13 +100,15 @@ Strips Org link brackets so values stay readable; WARNING stays visible.
 **** Capture grid — entries
 Dedicated buffer engine for capture AND updates: we own all input,
 so SPC and picking keys can never conflict. Rows are plain display;
-REAL avy overlays handle jumping (normal avy behavior — any number
-of rows, automatic narrowing, no code bookkeeping).
+REAL key-selection overlays handle jumping (normal key-selection
+behavior — any number of rows, automatic narrowing, no code
+bookkeeping).
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--capture-grid-entries ()
   "Build grid entries: plists (:key :label :selected :pos).
 Starting selection depends on mode: captures open ALL-selected
-(first avy pick then SOLO-selects), updates open UNSELECTED."
+(first key-selection pick then SOLO-selects), updates open
+UNSELECTED."
   (let* ((prompts (seq-filter
                    (lambda (s)
                      (let ((k (plist-get s :key)))
@@ -129,8 +131,8 @@ Starting selection depends on mode: captures open ALL-selected
 **** Capture grid — rendering
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--capture-grid-line (e)
-  "Render entry E as one grid line (gutter for avy overlays)."
-  (format "   [%s] %s"
+  "Render entry E as one grid line (gutter for key-selection overlays)."
+  (format ".  [%s] %s"
           (if (plist-get e :selected) "✓" " ")
           (plist-get e :label)))
 
@@ -382,7 +384,8 @@ to the property drawer when no description-list value exists."
 *** Shared Toggle Menu
 ONE engine serves both flows: SPC v P (update mode — starts empty,
 confirm applies picked prompts) and captures (starts all-selected,
-first avy pick solos). The mode flag switches starting state and
+first key-selection pick solos). The mode flag switches starting state
+and
 what confirm does; rows always follow the schema registry.
 #+begin_src emacs-lisp
 (defvar my/manifolding-atlas--capture-selection-mode nil
@@ -409,9 +412,10 @@ what confirm does; rows always follow the schema registry.
 
 (defun my/manifolding-atlas--capture-grid-loop ()
   "Run the property grid. Returns 'confirm or 'cancel.
-REAL avy overlays every row: jump to a row to toggle it (the first
-jump SOLO-selects in capture mode). SPC flips all/none without
-leaving avy; pausing surfaces RET/q."
+REAL key-selection overlays only the row dots (not every line in the
+window): jump to a dot to toggle that row (the first jump SOLO-selects
+in capture mode). SPC is handled independently of the selector
+(flips all/none); pausing surfaces RET/q."
   (let* ((entries (my/manifolding-atlas--capture-grid-entries))
          (buf (get-buffer-create "*Atlas Grid*"))
          (solo my/manifolding-atlas--capture-selection-mode))
@@ -424,11 +428,40 @@ leaving avy; pausing surfaces RET/q."
           (unless win
             (throw 'exit 'cancel))
            (with-selected-window win
-             (let* ((avy-all-windows nil)
-                    (avy-dispatch-alist
-                     (append (list (cons ?\s (lambda (_) (message "atlas-grid SPC dispatch") (setq spc t) t)) (cons ?\r (lambda (_) (message "atlas-grid RET dispatch") (setq ret t) t)) (cons ?\n (lambda (_) (message "atlas-grid RET dispatch \\n") (setq ret t) t)) (cons ?q (lambda (_) (message "atlas-grid Q dispatch") (setq quit t) t))) avy-dispatch-alist)))
+             (let* ((ks-all-windows nil)
+                    (ks-dispatch-alist
+                     (append (list (cons ?\r (lambda (_) (setq ret t) t))
+                                   (cons ?\n (lambda (_) (setq ret t) t))
+                                   (cons ?q  (lambda (_) (setq quit t) t)))
+                             ks-dispatch-alist))
+                    ;; Mouse clicks (mouse-1) and wheel events (wheel-down)
+                    ;; resolve in key-selection as a candidate whose "position"
+                    ;; is the event symbol, which would crash `ks-action-goto'.
+                    ;; Ignore any non-integer position (no-op, stay in grid).
+                    (ks-action (lambda (pt)
+                                  (if (integerp pt)
+                                      (ks-action-goto pt)
+                                    (ignore))))
+                    ;; Keep SPC completely out of the selector: this runs
+                    ;; before the tree lookup, dispatch-alist, or handler
+                    ;; function ever see the key. Translate SPC to a real
+                    ;; abort char so it exits cleanly (res = 'abort, no
+                    ;; "No such candidate" message). `spc' is set here and
+                    ;; handled by the `(when spc ...)' block below.
+                    (ks-translate-char-function
+                     (lambda (char)
+                       (if (eq char ?\s)
+                           (progn (setq spc t) ?\C-g)
+                         char)))))
                (condition-case err
-                   (progn (avy-goto-line)
+                   (progn (ks-process
+                           ;; Target ONLY the row dots, not every line
+                           ;; in the window (header/blank/labels stay out).
+                           (delq nil
+                                 (mapcar (lambda (e)
+                                           (when-let ((p (plist-get e :pos)))
+                                             (cons p win)))
+                                         entries)))
                           (let ((e (my/manifolding-atlas--capture-grid-row-at
                                     entries)))
                            (when e
@@ -444,7 +477,7 @@ leaving avy; pausing surfaces RET/q."
                                 (setq jumped t)
                                 (my/manifolding-atlas--capture-grid-refresh
                                  entries buf))))
-                 (error (warn "atlas-grid avy: %s" (error-message-string err)) nil))))
+                 (error (warn "atlas-grid key-selection: %s" (error-message-string err)) nil))))
            (when spc
              (setq spc nil)
              (setq solo nil)
@@ -468,6 +501,8 @@ leaving avy; pausing surfaces RET/q."
                               'confirm 'cancel)))
               (?q  (setq my/manifolding-atlas--selected-keys nil)
                    (throw 'exit 'cancel))
+              (?\s (setq solo nil)
+                   (my/manifolding-atlas--capture-grid-toggle-all entries buf))
               (_ nil))))))))
 
 (defun my/manifolding-atlas--update-grid-session ()
