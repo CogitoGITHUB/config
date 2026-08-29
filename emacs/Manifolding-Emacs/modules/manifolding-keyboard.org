@@ -1920,6 +1920,319 @@ double-tap chord is defined once."
   (my/chord-define (current-local-map) keys nil))
 #+end_src
 
+** Chord help (key-chord-extracted, ~my/chord-describe~)
+Extracted from ~key-chord-describe~ (key-chord.el:275–281), from key-chord (GPLv2,
+David Andersson). The mechanism lists all defined chords in a help buffer by
+describing the ~my/chord~ pseudo-prefix's map. Deps: builtins (~describe-bindings~).
+Layout-independent, Dvorak-safe. Bound ~my/chord-describe~ → plain key ~7~ in
+normal + motion states.
+#+begin_src emacs-lisp
+(defun my/chord-describe ()
+  "List all defined key chords in a help buffer."
+  (interactive)
+  (describe-bindings [my/chord]))
+#+end_src
+
+** Act-on-thing-at-point (Embark-extracted, ~my/act~)
+Extracted from ~embark-act~ (embark.el:2353–2444) + the target layer
+~embark--targets~ (embark.el:2260–2307) + a reduced thing-at-point target-finder
+set, from Embark (GPLv3, Omar Antolín Camarena). Embark's core mechanism is
+CONTEXTUAL ACTION-DISPATCH: determine the thing at point (file / URL / buffer /
+symbol / word / region), classify its type, and run a type-appropriate action on
+it. This port keeps the target-detection + dispatch WITHOUT Embark's minibuffer
+injection / completion prompter machinery (rejected for M-K). Per the
+no-duplication plan, the per-type default actions REUSE existing M-K machinery
+instead of inventing parallel copies: region → ~ks-kill-ring-save-region~
+(native copy-region), existing file → ~find-file~, URL → ~browse-url~, live
+buffer → ~switch-to-buffer~, symbol/word → ~my/jump-to-symbol~ (native symbol
+occurrence search-jump). If no type matches, it just reports the detected target
+in the echo area. Deps: builtins only (~thing-at-point~,
+~bounds-of-thing-at-point~, ~region-active-p~, ~buffer-substring-no-properties~,
+~file-exists-p~, ~get-buffer~) + reuse of existing native ~my/*~ / ~ks-*~.
+Layout-independent, Dvorak-safe. Bound ~my/act~ → plain key ~8~ in normal +
+motion states.
+#+begin_src emacs-lisp
+(defun my/act ()
+  "Act on the thing at point.
+Find the contextual target under point, classify its type, and run a
+type-appropriate default action (Embark-extracted). The per-type actions REUSE
+existing M-K functions where they already cover a type — no parallel duplicates:
+
+  - active region     -> ks-kill-ring-save-region (copy region)
+  - existing file     -> find-file (open it)
+  - URL               -> browse-url
+  - live buffer       -> switch-to-buffer
+  - symbol / word     -> my/jump-to-symbol (search-jump to its occurrence)
+
+If nothing matches, reports the detected target and type in the echo area."
+  (interactive)
+  (let* ((bounds (or (and (region-active-p)
+                          (cons (region-beginning) (region-end)))
+                     (bounds-of-thing-at-point 'filename)
+                     (bounds-of-thing-at-point 'url)
+                     (bounds-of-thing-at-point 'buffer)
+                     (bounds-of-thing-at-point 'symbol)
+                     (bounds-of-thing-at-point 'word)))
+         (value (and bounds
+                     (buffer-substring-no-properties (car bounds) (cdr bounds))))
+         (act (cond
+               ((region-active-p) 'ks-kill-ring-save-region)
+               ((and value (file-exists-p value)) 'find-file)
+               ((and value (string-prefix-p "http" value)) 'browse-url)
+               ((and value (get-buffer value)) 'switch-to-buffer)
+               (value 'my/jump-to-symbol))))
+    (cond
+     (act
+      (when bounds (goto-char (car bounds)))
+      (message "Act on %s: %s"
+               (if (region-active-p) "region" "thing")
+               value)
+      (call-interactively act))
+     (t
+      (message "No known target at point%s"
+               (if value (format ": %s" value) ""))))))
+#+end_src
+
+** Default-action DWIM (Embark-extracted, ~my/dwim~)
+Extracted from ~embark-dwim~ (embark.el:2605–2643) + ~embark--default-action~
+(embark.el:2309–2326) + ~embark--rotate~ (2328–2331), from Embark (GPLv3, Omar
+Antolín Camarena). Embark's DWIM runs the target type's DEFAULT action with one
+key and NO action menu, injecting the target so the user does not re-type it.
+This port is ~my/act~'s (E01) no-prompt sibling: it detects the thing at point,
+classifies its type, and runs the default action IMMEDIATELY with the target
+pre-supplied. Per the no-duplication plan the per-type defaults REUSE existing
+M-K / builtin machinery exactly like E01: region → ~ks-kill-ring-save-region~
+(native copy-region, no prompt), existing file → ~(find-file value)~, URL →
+~(browse-url value)~, live buffer → ~(switch-to-buffer value)~, symbol/word →
+next-occurrence ~re-search-forward~ jump (no prompt). If nothing matches,
+reports the detected target in the echo area. Deps: builtins only
+(~thing-at-point~, ~bounds-of-thing-at-point~, ~region-active-p~,
+~buffer-substring-no-properties~, ~file-exists-p~, ~get-buffer~, ~find-file~,
+~browse-url~, ~switch-to-buffer~, ~re-search-forward~, ~regexp-quote~) + reuse
+of native ~ks-kill-ring-save-region~. Layout-independent, Dvorak-safe. Bound
+~my/dwim~ → plain key ~9~ in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/dwim ()
+  "Run the default action on the thing at point (Do What I Mean).
+Like my/act (E01) but runs the target type's DEFAULT action immediately, with
+the target pre-supplied (no action menu, no re-typing). Reuses existing M-K /
+builtin machinery per the no-duplication plan:
+
+  - active region   -> ks-kill-ring-save-region (copy region, no prompt)
+  - existing file   -> find-file on it (no prompt)
+  - URL             -> browse-url on it (no prompt)
+  - live buffer     -> switch-to-buffer on it (no prompt)
+  - symbol / word   -> jump to the next occurrence (no prompt, wraps)
+
+If nothing matches, reports the detected target and type in the echo area."
+  (interactive)
+  (let* ((bounds (or (and (region-active-p)
+                          (cons (region-beginning) (region-end)))
+                     (bounds-of-thing-at-point 'filename)
+                     (bounds-of-thing-at-point 'url)
+                     (bounds-of-thing-at-point 'buffer)
+                     (bounds-of-thing-at-point 'symbol)
+                     (bounds-of-thing-at-point 'word)))
+         (value (and bounds
+                     (buffer-substring-no-properties (car bounds) (cdr bounds)))))
+    (cond
+     ((and bounds (region-active-p))
+      (call-interactively 'ks-kill-ring-save-region)
+      (message "Copied region (%d chars)" (- (cdr bounds) (car bounds))))
+     ((and value (file-exists-p value))
+      (find-file value))
+     ((and value (string-prefix-p "http" value))
+      (browse-url value))
+     ((and value (get-buffer value))
+      (switch-to-buffer value))
+     ((and bounds value)
+      (goto-char (cdr bounds))          ; past the current thing
+      (or (re-search-forward (regexp-quote value) nil t)
+          (progn (goto-char (point-min))
+                 (re-search-forward (regexp-quote value) nil t)))
+      (goto-char (match-beginning 0))
+      (message "Next: %s" value))
+     (t
+      (message "No known target at point%s"
+               (if value (format ": %s" value) ""))))))
+#+end_src
+
+** Shadowed-target cycling (Embark-extracted, ~my/act-cycle~)
+Extracted from ~embark-cycle~ (embark.el:2595–2599) + ~embark--rotate~
+(embark.el:2328–2331) + the multi-target :bounds list of ~embark--targets~
+(2260–2307), from Embark (GPLv3, Omar Antolín Camarena). Embark collects ALL
+candidate target types at point (a word inside a symbol inside a sexp, etc.) and
+lets the user CYCLE among them; the current one becomes the target of the
+following action. This port adds the shared collector ~my/act-targets~ and the
+rotator ~my/act-cycle~. ~my/act-cycle~ moves point to the start of the NEXT
+candidate (wrapping) and reports its type + value; a following ~my/act~ (~8~) or
+~my/dwim~ (~9~) then operates on the now-current target. Reuses builtin
+~thing-at-point~ only — no duplication. Deps: builtins (~bounds-of-thing-at-point~,
+~cl-position-if~, ~cl-delete-duplicates~). Layout-independent, Dvorak-safe. Bound
+~my/act-cycle~ → plain key ~C~ in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/act-targets ()
+  "Return candidate things at point as a list (TYPE BEG END).
+Embark-style target collection via builtin ~thing-at-point~, ordered by
+specificity (sexp, symbol, word) and deduplicated by bounds. Used by
+~my/act-cycle~ to walk alternate interpretations of the thing at point."
+  (let (result)
+    (dolist (type '(sexp symbol word))
+      (when-let* ((b (bounds-of-thing-at-point type)))
+        (push (list type (car b) (cdr b)) result)))
+    (nreverse
+     (cl-delete-duplicates result :test (lambda (a c)
+                                          (and (equal (cadr a) (cadr c))
+                                               (equal (caddr a) (caddr c))))))))
+
+(defun my/act-cycle ()
+  "Cycle to the next candidate thing at point (Embark-extracted).
+When several things overlap at point (a word inside a symbol inside a sexp),
+Embark lets you cycle among them; the current one becomes the target of a
+following my/act (8) / my/dwim (9). This port moves point to the start of the
+NEXT candidate (wrapping) and reports its type and value."
+  (interactive)
+  (let* ((cands (my/act-targets))
+         (pt (point)))
+    (if (null cands)
+        (message "No candidate things at point")
+      (let* ((idx (or (cl-position-if
+                       (lambda (c) (and (<= (nth 1 c) pt) (< pt (nth 2 c))))
+                       cands)
+                      -1))
+             (chosen (nth (mod (1+ idx) (length cands)) cands)))
+        (goto-char (nth 1 chosen))
+(message "%s: %s"
+                  (nth 0 chosen)
+                  (buffer-substring-no-properties (nth 1 chosen)
+                                                  (nth 2 chosen)))))))
+#+end_src
+
+** Target-highlight indicator (Embark-extracted, ~my/act-highlight~)
+Extracted from ~embark-highlight-indicator~ (embark.el:2560–2573), from Embark
+(GPLv3, Omar Antolín Camarena). Embark draws an overlay over the target's
+:bounds while acting and removes it on cleanup. This port toggles a highlight
+overlay on the thing at point using the SAME target priority as ~my/act~ (~8~) /
+~my/dwim~ (~9~) — region, file, URL, buffer, symbol, word — so the "current
+target" is visually explicit (consistent with M-K's canvas discipline).
+Re-invoking removes the overlay. Deps: builtins (~make-overlay~, ~delete-overlay~,
+~overlay-put~, ~overlay-buffer~, ~thing-at-point~, ~bounds-of-thing-at-point~,
+~region-active-p~) + one module-local defvar. Layout-independent, Dvorak-safe.
+Bound ~my/act-highlight~ → plain key ~R~ (free in both normal + motion) in
+normal + motion states.
+#+begin_src emacs-lisp
+(defvar my/act-highlight-overlay nil
+  "Overlay used by my/act-highlight to mark the current act target.")
+
+(defun my/act-highlight ()
+  "Highlight (or clear) the current act target at point.
+Embark-extracted: Embark draws an overlay over the target's bounds while acting
+and removes it on cleanup. This port toggles a highlight overlay on the thing at
+point, using the same target priority as my/act (8) / my/dwim (9) — region,
+file, URL, buffer, symbol, word — so the 'current target' is visually explicit.
+Re-invoking removes the overlay."
+  (interactive)
+  (if (and my/act-highlight-overlay
+           (overlay-buffer my/act-highlight-overlay))
+      (progn
+        (delete-overlay my/act-highlight-overlay)
+        (setq my/act-highlight-overlay nil)
+        (message "Highlight cleared"))
+    (let* ((bounds (or (and (region-active-p)
+                            (cons (region-beginning) (region-end)))
+                       (bounds-of-thing-at-point 'filename)
+                       (bounds-of-thing-at-point 'url)
+                       (bounds-of-thing-at-point 'buffer)
+                       (bounds-of-thing-at-point 'symbol)
+                       (bounds-of-thing-at-point 'word))))
+      (if bounds
+          (progn
+            (setq my/act-highlight-overlay
+                  (make-overlay (car bounds) (cdr bounds)))
+            (overlay-put my/act-highlight-overlay 'face 'highlight)
+            (overlay-put my/act-highlight-overlay 'priority 1000)
+            (message "Highlight: %s"
+                     (buffer-substring-no-properties (car bounds)
+                                                     (cdr bounds))))
+        (message "No target at point")))))
+#+end_src
+
+** Act-on-all-candidates (Embark-extracted, ~my/act-all~)
+Extracted from ~embark-act-all~ (embark.el:2482–2558) + the candidate
+collection of ~embark--maybe-transform-candidates~ (embark.el:2445–2480,
+reduced to same-buffer occurrences for M-K), from Embark (GPLv3, Omar Antolín
+Camarena). Embark's act-all performs ONE action on EVERY candidate, not just the
+one at point. This port collects all buffer occurrences of the symbol/word at
+point and offers a plain-key choice of actions on them all: ~k~ kill all
+(destructive — asks confirmation, matching Embark's ~embark-confirm-act-all~),
+~c~ copy all to the kill ring (non-destructive), anything else cancels.
+Distinct from the existing occurrence machinery: B06 (~my/hl-*~, ~/~) highlights
++ navigates, Meow #04 (~my/jump-to-symbol~, ~f~) jumps — ~my/act-all~ ACTS
+(batches a mutation/copy) on every occurrence, which nothing else does.
+Internal helpers ~my/act-all-markers~ / ~my/act-all-delete~ / ~my/act-all-copy~
+are consumed only by the bound ~my/act-all~ (bound-command rule). Deps: builtins
+(~thing-at-point~, ~bounds-of-thing-at-point~, ~re-search-forward~,
+~regexp-quote~, ~copy-marker~, ~delete-region~, ~kill-new~, ~read-char-choice~).
+Layout-independent, Dvorak-safe. Bound ~my/act-all~ → plain key ~M~ (free in
+both normal + motion) in normal + motion states.
+#+begin_src emacs-lisp
+(defun my/act-all-markers (thing)
+  "Return markers for every occurrence of THING in the buffer, in order."
+  (let (markers)
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward (regexp-quote thing) nil t)
+        (push (cons (copy-marker (match-beginning 0))
+                    (copy-marker (match-end 0)))
+              markers)))
+    (nreverse markers)))
+
+(defun my/act-all-delete (thing markers)
+  "Delete every occurrence of THING marked by MARKERS."
+  (dolist (m markers)
+    (let ((beg (car m)) (end (cdr m)))
+      (when (and (marker-buffer beg) (<= (point-min) beg end (point-max)))
+        (delete-region beg end))))
+  (message "Deleted all %s" thing))
+
+(defun my/act-all-copy (thing markers)
+  "Copy every occurrence of THING marked by MARKERS to the kill ring."
+  (let ((text (mapconcat (lambda (m)
+                           (buffer-substring-no-properties (car m) (cdr m)))
+                         markers "\n")))
+    (kill-new text)
+    (message "Copied %s: %d occurrence(s)" thing (length markers))))
+
+(defun my/act-all ()
+  "Act on all occurrences of the thing at point (Embark-extracted).
+Embark's act-all performs one action on EVERY candidate, not just the thing at
+point. This port collects all buffer occurrences of the symbol/word at point and
+offers a plain-key action on all of them:
+
+  k  kill all occurrences (destructive — asks confirmation)
+  c  copy all occurrences to the kill ring (non-destructive)
+
+Any other key cancels. Distinct from the occurrence highlighters/jumpers (B06,
+Meow #04): this batches an action on every occurrence."
+  (interactive)
+  (let* ((b (or (bounds-of-thing-at-point 'symbol)
+                (bounds-of-thing-at-point 'word)))
+         (thing (and b (buffer-substring-no-properties (car b) (cdr b)))))
+    (if (null thing)
+        (message "No symbol/word at point")
+      (let* ((markers (my/act-all-markers thing))
+             (n (length markers)))
+        (message "%s: %d occurrence%s" thing n (if (= n 1) "" "s"))
+        (when (> n 1)
+          (let ((choice (read-char-choice "Act on all: (k)ill, (c)opy, any key cancels"
+                                          '(?k ?c))))
+            (pcase choice
+              (?k (when (y-or-n-p (format "Kill all %d occurrences of %s? " n thing))
+                     (my/act-all-delete thing markers)))
+              (?c (my/act-all-copy thing markers))
+              (_ (message "Canceled")))))))))
+#+end_src
+
 * KEYBOARD — Setup
 
 ** Requires
@@ -2127,7 +2440,13 @@ Own block: an error here must never abort the core rebuild above.
     ("3"    . my/modal-bindings)
     ("4"    . my/set-key)
     ("5"    . my/command-then-modal)
-    ("6"    . my/chord-define-global)))
+    ("6"    . my/chord-define-global)
+    ("7"    . my/chord-describe)
+    ("8"    . my/act)
+    ("9"    . my/dwim)
+    ("C"    . my/act-cycle)
+    ("R"    . my/act-highlight)
+    ("M"    . my/act-all)))
 #+end_src
 
 ** Insert
@@ -2350,7 +2669,13 @@ armed.
     ("3"    . my/modal-bindings)
     ("4"    . my/set-key)
     ("5"    . my/command-then-modal)
-    ("6"    . my/chord-define-global)))
+    ("6"    . my/chord-define-global)
+    ("7"    . my/chord-describe)
+    ("8"    . my/act)
+    ("9"    . my/dwim)
+    ("C"    . my/act-cycle)
+    ("R"    . my/act-highlight)
+    ("M"    . my/act-all)))
 #+end_src
 
 ** Magit

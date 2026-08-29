@@ -48,5 +48,5 @@
     }
   },
   "instructions": ["~/.config/opencode/instructions/emacs.md"],
-  "plugin": ["opencode-mem", "context-mode", "oh-my-opencode-slim"]
+ "plugin": ["opencode-mem", "context-mode", "oh-my-opencode-slim"]
 }
