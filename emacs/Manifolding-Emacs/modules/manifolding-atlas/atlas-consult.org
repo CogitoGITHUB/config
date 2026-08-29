@@ -1,3 +1,0 @@
-# REMOVED: consult integration is retired from the Atlas.
-# Native manifolding-atlas-select is used for note selection.
-# Safe to delete this file.

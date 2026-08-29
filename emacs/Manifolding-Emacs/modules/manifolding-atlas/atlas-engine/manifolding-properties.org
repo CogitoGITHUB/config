@@ -1,0 +1,1503 @@
+#+title: Properties Update Plugin
+#+priority: 15
+
+*** Require
+#+begin_src emacs-lisp
+(require 'transient)
+#+end_src
+*** State
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas--current-note nil
+  "The manifolding-atlas note being updated.")
+
+(defvar my/manifolding-atlas--current-context nil
+  "'file or 'heading — derived from note level.")
+
+(defvar my/manifolding-atlas--current-contexts nil
+  "List of contexts applicable to the current note: the base
+'file/'heading context plus any tag-derived contexts (contact,
+dictionary, rule, task) matched from the note's tags.")
+
+(defvar my/manifolding-atlas--selected-keys nil
+  "List of :key symbols toggled for update.")
+#+end_src
+*** Note Contexts
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--note-contexts (note)
+  "Return contexts applicable to NOTE.
+If the note carries a tag matching a specialized registered context
+(contact, dictionary, rule), return only those specialized contexts so
+the menu adapts to the note's kind.  Otherwise return the base
+'file/'heading context derived from the note's level."
+  (let* ((level (manifolding-atlas-note-level note))
+         (base (if (and level (> level 0)) 'heading 'file))
+         (tags (manifolding-atlas-note-tags note))
+         (registered (delete-dups
+                      (seq-mapcat (lambda (s) (plist-get s :contexts))
+                                  my/manifolding-atlas-prompt-registry)))
+         (specialized (cl-remove-if-not (lambda (c) (member (symbol-name c) tags))
+                                        (cl-remove 'file (cl-remove 'heading registered)))))
+    (if specialized specialized (list base))))
+#+end_src
+*** Prompt Lookup
+
+**** Context-aware spec lookup
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--update-prompt-spec (key)
+  "Find prompt spec with KEY matching the current note context."
+  (seq-find (lambda (s)
+              (and (eq (plist-get s :key) key)
+                   (seq-intersection
+                    my/manifolding-atlas--current-contexts
+                    (plist-get s :contexts) #'eq)))
+            my/manifolding-atlas-prompt-registry))
+#+end_src
+
+**** Menu line formatting
+Strips Org link brackets so values stay readable; WARNING stays visible.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--clean-display-val (val)
+  "Return clean display for property value VAL."
+  (cond
+   ((null val) "—")
+   ((string-empty-p val) "—")
+   ((string-match "\\]\\[\\([^]]+\\)\\]" val)
+    (match-string-no-properties 1 val))
+   (t val)))
+
+(defun my/manifolding-atlas--update-short-label (spec)
+  "Return SPEC's display label without any KEY: prefix."
+  (let ((label (or (plist-get spec :label) "")))
+    (if (string-match "^[^:]+: \\(.*\\)" label)
+        (match-string 1 label)
+      label)))
+
+(defun my/manifolding-atlas--update-format-prompt (key)
+  "Return description string for prompt KEY: toggle state, label, current value."
+  (let* ((spec (my/manifolding-atlas--update-prompt-spec key))
+         (short (my/manifolding-atlas--update-short-label spec))
+         (current (when-let ((fn (plist-get spec :read-current-fn)))
+                    (condition-case nil
+                        ;; read-current-fn may run while a non-Org
+                        ;; buffer is current (e.g. dired captures) —
+                        ;; org-element warns instead of signaling, so
+                        ;; hush just that type around the call.
+                        (let ((warning-suppress-types
+                               (cons '(org-element)
+                                     warning-suppress-types)))
+                          (funcall fn))
+                      (error nil))))
+         (display (my/manifolding-atlas--clean-display-val
+                   (pcase current
+                     ((pred listp) (string-join current ", "))
+                     ((pred stringp) current)
+                     (_ nil))))
+         (mark (if (memq key my/manifolding-atlas--selected-keys) "✓" " ")))
+    (format "[%s] %-15s %s" mark short display)))
+#+end_src
+*** Dynamic Suffixes
+
+**** Capture grid — entries
+Dedicated buffer engine for capture AND updates: we own all input,
+so SPC and picking keys can never conflict. Rows are plain display;
+REAL key-selection overlays handle jumping (normal key-selection
+behavior — any number of rows, automatic narrowing, no code
+bookkeeping).
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--capture-grid-entries ()
+  "Build grid entries: plists (:key :label :selected :pos).
+Starting selection depends on mode: captures open ALL-selected
+(first key-selection pick then SOLO-selects), updates open
+UNSELECTED."
+  (let* ((prompts (seq-filter
+                   (lambda (s)
+                     (let ((k (plist-get s :key)))
+                       (and (not (memq k '(position)))
+                            (plist-get s :read-current-fn)
+                            (plist-get s :prompt-fn)
+                            (seq-intersection
+                             my/manifolding-atlas--current-contexts
+                             (plist-get s :contexts) #'eq))))
+                    my/manifolding-atlas-prompt-registry)))
+    (mapcar
+     (lambda (s)
+       (list :key (plist-get s :key)
+             :label (my/manifolding-atlas--update-short-label s)
+             :selected (and my/manifolding-atlas--capture-selection-mode t)
+             :pos nil))
+     prompts)))
+#+end_src
+
+**** Capture grid — rendering
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--capture-grid-line (e)
+  "Render entry E as one grid line (gutter for key-selection overlays)."
+  (format ".  [%s] %s"
+          (if (plist-get e :selected) "✓" " ")
+          (plist-get e :label)))
+
+(defun my/manifolding-atlas--capture-grid-render (buf entries)
+  "Paint the whole grid BUF from ENTRIES."
+  (with-current-buffer buf
+    (erase-buffer)
+    (insert "Properties — letters jump+toggle · SPC all/none · RET done · q cancel\n\n")
+    (dolist (e entries)
+      (plist-put e :pos (point-marker))
+      (insert (my/manifolding-atlas--capture-grid-line e) "\n"))
+    (goto-char (point-min))))
+
+(defun my/manifolding-atlas--capture-grid-redraw (e)
+  "Repaint one entry's line in place."
+  (save-excursion
+    (goto-char (plist-get e :pos))
+    (delete-region (point) (line-end-position))
+    (insert (my/manifolding-atlas--capture-grid-line e))))
+
+(defun my/manifolding-atlas--capture-grid-refresh (entries buf)
+  "Repaint every entry and re-point at the grid top."
+  (with-current-buffer buf
+    (dolist (e entries)
+      (my/manifolding-atlas--capture-grid-redraw e))
+    (goto-char (point-min))))
+#+end_src
+*** Grid placement
+Responsive placement keeps pickers stable across frame sizes and reuses the same window so toggling with SPC does not flick placement.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--grid-display (buf)
+  "Show BUF in a dedicated bottom window, sized to fit safely.
+Never falls back to `pop-to-buffer', which would clobber whatever
+window currently has focus (dired, an org buffer, etc.)."
+  (let ((height-frac (if (> (frame-width) 140) 0.5 0.35)))
+    (display-buffer
+     buf
+     `((display-buffer-reuse-window display-buffer-at-bottom)
+       (window-height . ,height-frac)
+       (window-min-height . 4)))))
+#+end_src
+*** Transient window cleanup
+Killing a transient buffer without managing its window makes that window revert to its previous buffer (often Dired), duplicating it.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--kill-buffer-reuse-window (buf &optional note-buf)
+  "Kill BUF. For windows showing it: place NOTE-BUF into exactly one
+of them if it's the last window on its frame, delete the rest."
+  (when (buffer-live-p buf)
+    (let ((placed nil))
+      (dolist (win (get-buffer-window-list buf nil t))
+        (when (window-live-p win)
+          (if (and (not placed)
+                   (= 1 (length (window-list (window-frame win) 'no-minibuf)))
+                   note-buf (buffer-live-p note-buf))
+              (progn (set-window-buffer win note-buf) (setq placed t))
+            (ignore-errors (delete-window win)))))
+      (kill-buffer buf))))
+#+end_src
+*** Org-element guard
+Downstream symptom of window bug — ensure Org APIs never run in Dired.
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  (advice-add 'org-element-at-point :around
+              (lambda (orig &rest args)
+                (when (derived-mode-p 'org-mode)
+                  (apply orig args)))))
+#+end_src
+*** Confirm / Cancel
+
+**** Per-key prompt run
+WARNING answers count as "unchanged" and apply nothing.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--run-update-key (key)
+  "Run prompt KEY against the current context and apply its fragment."
+  (let (spec val frag)
+    (setq spec (my/manifolding-atlas--update-prompt-spec key))
+    (setq val (condition-case nil
+                 (funcall (plist-get spec :prompt-fn))
+               (quit nil)))
+    ;; skip the WARNING sentinel — user didn't change anything
+    (when (and (stringp val) (string-equal val "WARNING"))
+      (setq val nil))
+    (setq frag (funcall (plist-get spec :to-plist) val
+                        my/manifolding-atlas--current-context))
+    (when frag
+      (my/manifolding-atlas--apply-fragment frag spec))))
+#+end_src
+
+*** Buffer Note Helper
+
+**** Point-based lookup
+Walks up to the enclosing heading if the cursor is in the
+body/drawer, so it targets exactly the note you are on.
+#+begin_src emacs-lisp
+ (defun my/manifolding-atlas--note-at-point ()
+   "Return the manifolding-atlas note for the heading under (or enclosing) point."
+   (when (derived-mode-p 'org-mode)
+     (let (id)
+       (unless (org-at-heading-p)
+         (ignore-errors (org-back-to-heading t)))
+       (setq id (org-entry-get nil "ID"))
+       (and id (manifolding-atlas-db-get-by-id id)))))
+#+end_src
+
+**** Buffer fallback
+Prefers the note under the cursor, falls back to the deepest note at
+or before point in the file.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--buffer-note ()
+  "Return the manifolding-atlas note for the current buffer, or nil."
+  (or (my/manifolding-atlas--note-at-point)
+      (when-let ((file (buffer-file-name))
+                 (notes (manifolding-atlas-db-query-by-file-path (file-truename file))))
+        (let ((pos-point (point)))
+          (or (let ((best nil))
+                (dolist (n notes best)
+                  (let ((npos (manifolding-atlas-note-pos n)))
+                    (when (and npos (<= npos pos-point)
+                               (or (null best) (> npos (manifolding-atlas-note-pos best))))
+                      (setq best n)))))
+              (car notes))))))
+#+end_src
+*** Property Drawer Fallback
+Schema validation reads from the description list (meta), but we store
+state values in the property drawer.  This advice makes validation fall
+back to the property drawer when no description list value exists.
+
+**** Drawer value resolution
+Visits the note's file only when the current buffer isn't already it.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--drawer-value-for-note (note key)
+  "Return KEY's drawer value for NOTE from whichever buffer holds it."
+  (let* ((file (manifolding-atlas-note-path note)))
+    (if (and (buffer-file-name)
+             (equal (file-truename (buffer-file-name))
+                    (file-truename file)))
+        ;; current buffer is already the note's file
+        (save-excursion
+          (when-let ((pos (manifolding-atlas-note-pos note)))
+            (ignore-errors (goto-char pos)))
+          (org-entry-get nil key))
+      ;; visit the note's file
+      (with-current-buffer (find-file-noselect file)
+        (save-excursion
+          (when-let ((pos (manifolding-atlas-note-pos note)))
+            (ignore-errors (goto-char pos)))
+          (org-entry-get nil key))))))
+
+(defun my/manifolding-atlas--meta-get-fallback (orig-fun note prop &optional type)
+  "Fall back to the property drawer when the description list has no value for PROP.
+Skips non-string types to avoid interfering with note/link resolution."
+  (or (funcall orig-fun note prop type)
+      (when (memq type '(nil string))
+        (when-let* ((file (manifolding-atlas-note-path note))
+                    (key (if (symbolp prop) (symbol-name prop) prop))
+                    (val (my/manifolding-atlas--drawer-value-for-note note key)))
+          (unless (string-empty-p val)
+            (list val))))))
+
+(advice-add 'manifolding-atlas-note-meta-get-list :around #'my/manifolding-atlas--meta-get-fallback)
+#+end_src
+*** Fix Violations Suffix
+
+**** Schema field collection
+Builds the key→field lookup from every schema applicable to NOTE.
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--schema-field-lookup (note)
+  "Return (ALL-FIELDS . LOOKUP) for all schema fields of NOTE."
+  (let ((all-fields
+         (cl-loop for name in (manifolding-atlas-blueprint-applicable note)
+                  append (manifolding-atlas-blueprint-fields (manifolding-atlas-blueprint-get name))))
+        (lookup (make-hash-table :test 'equal)))
+    (dolist (f all-fields)
+      (puthash (plist-get f :key) f lookup))
+    (cons all-fields lookup)))
+#+end_src
+
+**** Schema field repair
+Prompts once per missing or WARNING-valued field; one-of fields get
+completion, free fields get read-string.
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--fix-schema-fields (schema-keys field-lookup)
+  "Prompt for each missing/WARNING schema field. Returns count fixed."
+  (let ((prompted 0))
+    (dolist (key schema-keys)
+      (let* ((val (org-entry-get nil key))
+             (field (gethash key field-lookup)))
+        (when (or (null val) (and (stringp val) (string-match-p "WARNING" val)))
+          (condition-case nil
+              (let* ((one-of (plist-get field :one-of))
+                     (new-val (if one-of
+                                  (completing-read
+                                   (format "%s: " key) one-of nil t nil nil)
+                                (read-string (format "%s: " key)))))
+                (unless (string-empty-p new-val)
+                  (org-entry-put nil key new-val)
+                  (setq prompted (1+ prompted))))
+            (quit nil)))))
+    prompted))
+#+end_src
+
+**** Legacy WARNING property repair
+Non-schema properties still carrying the old sentinel get one last
+chance before being left visible.
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--fix-warning-props (schema-keys)
+  "Prompt for non-schema drawer entries with WARNING values."
+  (let ((prompted 0))
+    (dolist (pair (org-entry-properties nil 'standard))
+      (let* ((key (car pair))
+             (val (cdr pair)))
+        (when (and (stringp val) (string-match-p "WARNING" val)
+                   (not (member key schema-keys))
+                   (not (member key '("ID"))))
+          (condition-case nil
+              (let ((new-val (read-string (format "%s: " key))))
+                (unless (string-empty-p new-val)
+                  (org-entry-put nil key new-val)
+                  (setq prompted (1+ prompted))))
+            (quit nil)))))
+    prompted))
+#+end_src
+
+**** Fix violations command
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--fix-violations ()
+  "Prompt for each missing or WARNING-valued schema field.
+Writes the value to the property drawer only; the
+`manifolding-atlas-note-meta-get-list' advice makes schema validation fall back
+to the property drawer when no description-list value exists."
+  (interactive)
+  (let* ((note (my/manifolding-atlas--buffer-note))
+         (fields-and-lookup (my/manifolding-atlas--schema-field-lookup note))
+         (all-fields (car fields-and-lookup))
+         (field-lookup (cdr fields-and-lookup))
+         (schema-keys (hash-table-keys field-lookup))
+         prompted)
+    (unless note
+      (user-error "Not in a manifolding-atlas note buffer"))
+    (setq prompted (my/manifolding-atlas--fix-schema-fields schema-keys field-lookup))
+    (setq prompted (+ prompted (my/manifolding-atlas--fix-warning-props schema-keys)))
+    (save-buffer)
+    (message "Updated %d properties in drawer." prompted)))
+;; Clear stale transient property from old transient-define-suffix;
+;; this symbol is called from a hydra, not transient's own machinery.
+(put 'my/manifolding-atlas--fix-violations 'transient--suffix nil)
+#+end_src
+*** Shared Toggle Menu
+ONE engine serves both flows: SPC v P (update mode — starts empty,
+confirm applies picked prompts) and captures (starts all-selected,
+first key-selection pick solos). The mode flag switches starting state
+and
+what confirm does; rows always follow the schema registry.
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas--capture-selection-mode nil
+  "Non-nil while capture flows run their dedicated property grid.")
+#+end_src
+
+**** Grid commands
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--capture-grid-toggle-all (entries buf)
+  "SPC: if anything is selected, deselect all; else select all."
+  (let ((any (seq-some (lambda (e) (plist-get e :selected)) entries)))
+    (dolist (e entries)
+      (plist-put e :selected (not any))
+      (my/manifolding-atlas--capture-grid-redraw e))))
+
+(defun my/manifolding-atlas--capture-grid-row-at (entries)
+  "Return the entry whose label appears on the current line."
+  (let ((line (buffer-substring-no-properties
+               (line-beginning-position) (line-end-position))))
+    (seq-find (lambda (e)
+                (string-match-p
+                 (regexp-quote (plist-get e :label)) line))
+              entries)))
+
+(defun my/manifolding-atlas--capture-grid-loop ()
+  "Run the property grid. Returns 'confirm or 'cancel.
+Letters jump+toggle rows via key-selection overlays (no other keys
+reach the selector). SPC all/none, RET confirm, q/ESC cancel are
+translated into selector-abort chars BEFORE the tree/handler see
+them, so they can never collide with key-selection."
+  (let* ((entries (my/manifolding-atlas--capture-grid-entries))
+         (buf (get-buffer-create "*Atlas Grid*"))
+         (solo my/manifolding-atlas--capture-selection-mode))
+    (my/manifolding-atlas--capture-grid-render buf entries)
+    (my/manifolding-atlas--grid-display buf)
+    (catch 'exit
+      (while t
+        (let ((win (get-buffer-window buf t))
+              action)
+          (unless win (throw 'exit 'cancel))
+          (setq action nil)
+          (with-selected-window win
+            (let* ((ks-all-windows nil)
+                   (ks-action (lambda (pt)
+                                (if (integer-or-marker-p pt)
+                                    (ks-action-goto pt)
+                                  (ignore))))
+                   (ks-translate-char-function
+                    (lambda (char)
+                      (pcase char
+                        (?\s (setq action 'spc) ?\C-g)
+                        ((or ?\r ?\n) (setq action 'ret) ?\C-g)
+                        (?q  (setq action 'quit) ?\C-g)
+                        (?\e (setq action 'quit) ?\C-g)
+                        (_ char)))))
+              (when (and (condition-case err
+                             (ks-process
+                              (delq nil
+                                    (mapcar (lambda (e)
+                                              (when-let ((p (plist-get e :pos)))
+                                                (cons p win)))
+                                            entries)))
+                           (error (warn "atlas-grid key-selection: %s"
+                                        (error-message-string err))
+                                  nil))
+                         (let ((e (my/manifolding-atlas--capture-grid-row-at
+                                   entries)))
+                           (when e
+                             (if solo
+                                 (progn
+                                   (dolist (x entries)
+                                     (unless (eq x e)
+                                       (plist-put x :selected nil)))
+                                   (plist-put e :selected t)
+                                   (setq solo nil))
+                               (plist-put e :selected
+                                          (not (plist-get e :selected))))
+                             (my/manifolding-atlas--capture-grid-refresh
+                              entries buf)))))))
+          (pcase action
+            ('spc  (setq solo nil)
+                   (my/manifolding-atlas--capture-grid-toggle-all entries buf))
+            ('ret  (setq my/manifolding-atlas--selected-keys
+                         (mapcar (lambda (e) (plist-get e :key))
+                                 (seq-filter (lambda (e) (plist-get e :selected))
+                                             entries)))
+                   (throw 'exit
+                          (if my/manifolding-atlas--selected-keys
+                              'confirm 'cancel)))
+            ('quit (setq my/manifolding-atlas--selected-keys nil)
+                   (throw 'exit 'cancel))
+            (_ nil)))))))
+
+(defun my/manifolding-atlas--update-grid-session ()
+  "SPC v P: run the grid UNSELECTED until cancel.
+Confirm applies every picked prompt to the note, then reopens the
+grid so more properties can be updated in the same sitting."
+  (catch 'done
+    (while t
+      (unless (eq 'confirm (my/manifolding-atlas--capture-grid-loop))
+        (throw 'done nil))
+      (let ((keys my/manifolding-atlas--selected-keys))
+        (setq my/manifolding-atlas--selected-keys nil)
+        (dolist (key keys)
+          (my/manifolding-atlas--run-update-key key))
+        (when (fboundp 'my/manifolding-atlas--add-live-transcludes)
+          (my/manifolding-atlas--add-live-transcludes
+           my/manifolding-atlas--current-note))
+        (save-buffer)
+        (message "Updated properties on %s"
+                 (manifolding-atlas-note-title
+                  my/manifolding-atlas--current-note))))))
+
+#+end_src
+
+**** Selection review
+Confirming the grid opens this review: a small buffer listing every
+toggled property. RET starts the capture with those picks, SPC steps
+back into the grid with checkmarks intact, q cancels outright.
+C-g at any point unwinds to the quit handler = skip everything.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--selection-review-buffer ()
+  "Render the pending selection list; return the buffer."
+  (let ((buf (get-buffer-create "*Atlas Selection*"))
+        (n 0))
+    (with-current-buffer buf
+      (erase-buffer)
+      (org-mode)
+      (insert "* Selected properties\n\n")
+      (dolist (k my/manifolding-atlas--selected-keys)
+        (setq n (1+ n))
+        (insert (format "- %s\n"
+                        (or (plist-get
+                             (my/manifolding-atlas--update-prompt-spec k)
+                             :label)
+                            (symbol-name k)))))
+      (insert (format "\n%d propert%s will be asked; everything else gets WARNING.\n"
+                      n (if (= n 1) "y" "ies"))))
+    buf))
+#+end_src
+
+**** Review loop
+Synchronous and deliberately not a transient: it runs inside the
+confirm suffix, so nesting another transient here would fight the
+grid's own teardown. read-key keeps it bulletproof.
+#+begin_src emacs-lisp
+ (defun my/manifolding-atlas--selection-review ()
+   "Review the picks. Returns 'start, 'back or 'cancel.
+ 'start stores the picks in `my/manifolding-atlas--selection-result'."
+   (let ((buf (my/manifolding-atlas--selection-review-buffer))
+         action)
+     (condition-case nil
+         (display-buffer buf '((display-buffer-reuse-window display-buffer-at-bottom) (window-height . 0.30)))
+       (error (pop-to-buffer buf)))
+     (when-let ((win (get-buffer-window buf)))
+       (select-window win))
+    (while (not action)
+      (pcase (read-key "RET start · SPC back to menu · q cancel")
+        ((or ?\r ?\n)
+         (setq my/manifolding-atlas--selection-result
+               (reverse my/manifolding-atlas--selected-keys)
+               action 'start))
+        (?\s (setq action 'back))
+         (?q  (setq action 'cancel))))
+    (unless (eq action 'start)
+      (my/manifolding-atlas--kill-buffer-reuse-window buf))
+    action))
+#+end_src
+
+**** Return to confirmation
+SPC in the note buffer after start returns to the persisted selection
+buffer, so the confirmation stays reachable until the flow ends.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--show-selection-review ()
+  "Display the persisted selection-confirmation buffer."
+  (interactive)
+  (let ((buf (get-buffer "*Atlas Selection*")))
+    (if (buffer-live-p buf)
+        (pop-to-buffer buf)
+      (user-error "No confirmation buffer — select properties first"))))
+#+end_src
+
+**** Selection entry
+Sets the mode flag, arms the one-shot launcher, then blocks in
+`recursive-edit' — the grid opens from inside the loop, Confirm and
+Cancel exit it via `my/manifolding-atlas--selection-recursing', and
+C-g unwinds to the quit handler = skip everything.
+**** Selection entry
+Runs the custom grid loop, then the review; SPC from review reopens
+the grid with checkmarks intact until the user starts or cancels.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-select-properties-menu (contexts)
+  "Open the capture property grid for CONTEXTS; return picked keys."
+  (setq my/manifolding-atlas--current-note nil
+        my/manifolding-atlas--current-context 'file
+        my/manifolding-atlas--current-contexts contexts
+        my/manifolding-atlas--selected-keys nil
+        my/manifolding-atlas--selection-result nil
+        my/manifolding-atlas--capture-selection-mode t)
+  (unwind-protect
+      (condition-case err
+          (catch 'done
+            (while t
+              (unless (eq 'confirm
+                          (my/manifolding-atlas--capture-grid-loop))
+                (setq my/manifolding-atlas--selected-keys nil)
+                (message "Cancelled — every property gets WARNING.")
+                (throw 'done nil))
+              (when-let ((gbuf (get-buffer "*Atlas Grid*")))
+                 (my/manifolding-atlas--kill-buffer-reuse-window gbuf (when my/manifolding-atlas--current-note (when-let ((f (manifolding-atlas-note-path my/manifolding-atlas--current-note))) (get-file-buffer f)))))
+               (pcase (my/manifolding-atlas--selection-review)
+                ('start
+                 (when-let ((note my/manifolding-atlas--current-note)
+                            (f (manifolding-atlas-note-path note))
+                            (nbuf (get-file-buffer f)))
+                   (with-current-buffer nbuf
+                     (local-set-key (kbd "SPC")
+                                    #'my/manifolding-atlas--show-selection-review)))
+                 (throw 'done t))
+                ('back   nil)
+                ('cancel (setq my/manifolding-atlas--selected-keys nil
+                               my/manifolding-atlas--selection-result nil)
+                 (throw 'done nil)))))
+        (quit
+         (message "Toggle grid cancelled — all properties get WARNING."))
+        (error
+         (warn "Manifolding Atlas: toggle grid failed: %s"
+               (error-message-string err))
+         (my/manifolding-atlas-collect--fallback-choose contexts)))
+      (when-let ((gbuf (get-buffer "*Atlas Grid*")))
+        (my/manifolding-atlas--kill-buffer-reuse-window gbuf (when my/manifolding-atlas--current-note (when-let ((f (manifolding-atlas-note-path my/manifolding-atlas--current-note))) (get-file-buffer f)))))
+      (setq my/manifolding-atlas--capture-selection-mode nil))
+  my/manifolding-atlas--selection-result)
+#+end_src
+*** Fragment Applier
+
+**** File-level property writer
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--set-file-property (key value strategy)
+  "Set KEY to VALUE in the file-level property drawer using STRATEGY."
+  (save-excursion
+    (goto-char (point-min))
+    (if (re-search-forward "^:PROPERTIES:$" nil t)
+        (let ((end (save-excursion
+                     (or (re-search-forward "^:END:$" nil t) (point-max)))))
+          (goto-char (match-end 0))
+          (if (re-search-forward (format "^:%s: ?" (regexp-quote key)) end t)
+              (if (string-empty-p value)
+                  (delete-region (line-beginning-position) (1+ (line-end-position)))
+                (when (eq strategy 'replace)
+                  (replace-match (format ":%s: %s" key value) t t)))
+            (unless (string-empty-p value)
+              (re-search-forward "^:END:$" nil t)
+              (beginning-of-line)
+              (insert (format ":%s: %s\n" key value)))))
+      (unless (string-empty-p value)
+        (insert ":PROPERTIES:\n")
+        (insert (format ":%s: %s\n" key value))
+        (insert ":END:\n")))))
+#+end_src
+
+**** TODO fragment handling
+A nil/empty TODO strips the keyword from the heading.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--apply-todo-fragment (todo)
+  "Apply or clear the TODO keyword per fragment value TODO."
+  (if (and (stringp todo) (not (string-empty-p todo)))
+      (progn
+        (org-todo todo)
+        (org-entry-delete nil "TODO"))
+    (save-excursion
+      (org-back-to-heading t)
+      (org-entry-delete nil "TODO")
+      (let ((case-fold-search nil))
+        (looking-at org-complex-heading-regexp)
+        (replace-match
+         (concat (match-string 1) " " (match-string 4)
+                 (when (match-string 5)
+                   (concat " " (match-string 5))))
+         t t)))))
+#+end_src
+
+**** Fragment application
+Dispatches a prompt's output plist across todo/tags/properties/body/
+post-apply, honoring heading vs file-level notes.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--apply-fragment (frag spec)
+  "Apply FRAG plist from SPEC to the current buffer."
+  (let ((strategy (or (plist-get spec :merge-strategy) 'replace))
+        (at-heading (org-at-heading-p)))
+    (unless at-heading
+      (setq at-heading (ignore-errors (org-back-to-heading t) t))
+      (unless at-heading
+        (setq at-heading (ignore-errors (org-next-visible-heading 1) t))))
+    (when (plist-member frag :todo)
+      (my/manifolding-atlas--apply-todo-fragment (plist-get frag :todo)))
+    (when-let ((tags (plist-get frag :tags)))
+      (if at-heading
+          (pcase strategy
+            ('merge (org-set-tags (cl-union (org-get-tags nil t) tags :test #'string=)))
+            ('replace (org-set-tags tags)))
+        (user-error "Tags on file-level notes not supported yet")))
+    (when-let ((props (plist-get frag :properties)))
+      (dolist (pair props)
+        (if at-heading
+            (let ((v (cdr pair)))
+              (if (string-empty-p v)
+                  (org-entry-delete nil (car pair))
+                (pcase strategy
+                  ('merge (unless (org-entry-get nil (car pair))
+                            (org-entry-put nil (car pair) v)))
+                  ('replace (org-entry-put nil (car pair) v)))))
+          (my/manifolding-atlas--set-file-property (car pair) (cdr pair) strategy))))
+    (when-let ((body (plist-get frag :body)))
+      (save-excursion
+        (goto-char (point-max))
+        (insert "\n" body)))
+    (when-let ((fns (plist-get frag :post-apply)))
+      (let ((file (buffer-file-name)))
+        (dolist (fn fns)
+          (funcall fn my/manifolding-atlas--current-note))
+        (unless (and file (eq (current-buffer) (get-file-buffer file)))
+          (when file (find-file file)))))))
+#+end_src
+*** Main Command
+
+**** Context file resolution
+Works from a note buffer and from dired (file under the cursor).
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--context-file ()
+  "Return the note file for the current context, or nil."
+  (or (buffer-file-name)
+      (and (derived-mode-p 'dired-mode)
+           (ignore-errors (dired-get-file-for-visit)))))
+#+end_src
+
+**** On-demand indexing
+If the DB has no row for the file (sync lag), re-index and re-query
+so the menu always opens on the note you are actually on.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--index-ensure-note ()
+  "Return the note for the current buffer, indexing the file on demand.
+From dired, resolves the file under the cursor first."
+  (or (my/manifolding-atlas--note-at-point)
+      (when-let ((file (my/manifolding-atlas--context-file)))
+        (condition-case nil
+            (progn
+              (manifolding-atlas-db-update-file (file-truename file))
+              (or (my/manifolding-atlas--note-at-point)
+                  (car (manifolding-atlas-db-query-by-file-path (file-truename file)))))
+          (error nil)))))
+#+end_src
+
+**** Update properties command
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas-update-properties ()
+  "Update properties on an existing manifolding-atlas note.
+When called interactively, check for schema violations first and offer
+to open the update menu.  When called from MISSING PROMPTS advice,
+skip the prompt and open the menu directly."
+  (interactive)
+  (let (buffer-note note file pos level)
+    (setq buffer-note (my/manifolding-atlas--index-ensure-note))
+    (setq note (or buffer-note
+                   (when (manifolding-atlas-db-query)
+                     (manifolding-atlas-select "Update properties for: "))))
+    (unless note
+      (user-error "No manifolding-atlas note here%s"
+                  (if-let ((file (my/manifolding-atlas--context-file)))
+                      (format " (%s not indexed)" file)
+                    "")))
+    (setq file (manifolding-atlas-note-path note))
+    (setq pos (manifolding-atlas-note-pos note))
+    (setq level (manifolding-atlas-note-level note))
+    (unless file
+      (user-error "Note has no file path"))
+    (setq my/manifolding-atlas--current-note note
+          my/manifolding-atlas--current-context (if (and level (> level 0)) 'heading 'file)
+          my/manifolding-atlas--current-contexts (my/manifolding-atlas--note-contexts note)
+          my/manifolding-atlas--selected-keys nil
+          my/manifolding-atlas--capture-selection-mode nil)
+    (find-file file)
+    (goto-char (or (and pos (> pos 0) pos) (point-min)))
+      (unless (org-at-heading-p)
+        (ignore-errors (org-back-to-heading t))
+        (unless (org-at-heading-p)
+          (ignore-errors (org-next-visible-heading 1))))
+    (setq my/manifolding-atlas--capture-selection-mode nil)
+    (my/manifolding-atlas--update-grid-session)))
+#+end_src
+
+
+#+title: Manifolding Atlas — Live Properties
+#+priority: -5
+
+* Live Properties
+:PROPERTIES:
+:CATEGORY: editing
+:END:
+
+Replaces static property values with Org links to canonical or scoped ref notes.
+Three ref types: ~'closed~ (shared, deduped), ~'scoped~ (per-entity), ~nil~ (plain string).
+
+** Canonicalize Value
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--canonicalize (value)
+  "Downcase, dasherize, strip non-alphanumeric for use as a filename."
+  (let ((s (downcase value)))
+    (setq s (replace-regexp-in-string "[^a-z0-9]+" "-" s))
+    (replace-regexp-in-string "^-+\\|-+$" "" s)))
+#+end_src
+
+** Make ID Link
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--make-id-link (id label)
+  "Return [[id:ID][LABEL]]."
+  (format "[[id:%s][%s]]" id label))
+#+end_src
+
+** Note ID by Path
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--note-id-by-path (path)
+  "Return the ID of the note at PATH, or nil."
+  (when (file-exists-p path)
+    (with-temp-buffer
+      (insert-file-contents path)
+      (org-mode)
+      (goto-char (point-min))
+      (when (re-search-forward "^:ID:[[:blank:]]+\\(.+\\)" nil t)
+        (match-string-no-properties 1)))))
+#+end_src
+
+** Tolerant Drawer Access
+
+*** Drawer region locator
+Finds the property drawer of the heading at point without org's own
+strict parsing — vault notes carry raw transclude lines in drawers.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--drawer-region ()
+  (save-excursion
+    (when (condition-case nil (org-back-to-heading t) (error nil))
+      (let* ((beg (line-beginning-position))
+             (hend (save-excursion
+                     (goto-char beg)
+                     (forward-line 1)
+                     (if (re-search-forward "^\\*+[ \t]" (point-max) t)
+                         (line-beginning-position)
+                       (point-max)))))
+        (goto-char beg)
+        (when (re-search-forward "^:PROPERTIES:[ \t]*$" hend t)
+          (let ((a (line-beginning-position 2)))
+            (when (re-search-forward "^:END:[ \t]*$" hend t)
+              (cons a (line-beginning-position)))))))))
+#+end_src
+
+*** Drawer read
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--drawer-get (key)
+  (save-excursion
+    (when-let ((r (my/manifolding-atlas--drawer-region)))
+      (goto-char (car r))
+      (or (when (re-search-forward
+                 (format "^:%s:[[:blank:]]+\\(.*\\)$" (regexp-quote key))
+                 (cdr r) t)
+            (match-string-no-properties 1))
+          (progn
+            (goto-char (car r))
+            (when (re-search-forward
+                   "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
+                   (cdr r) t)
+              (let ((label (match-string-no-properties 2)))
+                (when (string-equal key (my/manifolding-atlas--key-from-label label))
+                  (format "[[id:%s][%s]]"
+                          (match-string-no-properties 1) label)))))))))
+#+end_src
+
+*** Drawer write
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--drawer-put (key value)
+  (save-excursion
+    (let ((r (my/manifolding-atlas--drawer-region)))
+      (if r
+          (progn
+            (goto-char (car r))
+            (if (re-search-forward
+                 (format "^:%s:[[:blank:]]*\\(.*\\)$" (regexp-quote key))
+                 (cdr r) t)
+                (progn (beginning-of-line)
+                       (delete-region (line-beginning-position)
+                                      (line-end-position))
+                       (insert (format ":%s: %s" key value)))
+              (goto-char (cdr r))
+              (beginning-of-line)
+              (insert (format ":%s: %s\n" key value))))
+        (org-back-to-heading t)
+        (end-of-line)
+        (forward-line 1)
+        (unless (bolp) (insert "\n"))
+        (insert (format ":PROPERTIES:\n:%s: %s\n:END:\n" key value))))))
+#+end_src
+
+*** Drawer delete and key conversions
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--drawer-delete (key)
+  (save-excursion
+    (when-let ((r (my/manifolding-atlas--drawer-region)))
+      (goto-char (car r))
+      (when (re-search-forward
+             (format "^:%s:[[:blank:]]*\\(.*\\)$" (regexp-quote key))
+             (cdr r) t)
+        (beginning-of-line)
+        (delete-region (line-beginning-position)
+                       (1+ (line-end-position)))))))
+
+(defun my/manifolding-atlas--property-key-from-type (property-type)
+  (upcase (string-replace "-" "_"
+                          (if (symbolp property-type)
+                              (symbol-name property-type)
+                            property-type))))
+
+(defun my/manifolding-atlas--key-from-label (label)
+  (when (string-match "^\\([A-Z][A-Z ]*\\): " label)
+    (upcase (string-replace " " "_" (match-string-no-properties 1 label)))))
+
+(defun my/manifolding-atlas--drawer-insert-point ()
+  (when-let ((r (my/manifolding-atlas--drawer-region)))
+    (cdr r)))
+#+end_src
+
+*** org-entry fallbacks
+Drawer storage stays transparent: org-entry-get/put fall through to
+the tolerant primitives when the standard paths find nothing.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--org-entry-get-fallback (orig-fn pom property &optional inherit literal-nil)
+  (or (funcall orig-fn pom property inherit literal-nil)
+      (when (and property
+                 (or (null pom)
+                     (and (integerp pom)
+                          (<= (point-min) pom) (<= pom (point-max)))))
+        (save-excursion
+          (when (integerp pom) (goto-char pom))
+          (my/manifolding-atlas--drawer-get
+           (if (symbolp property) (symbol-name property) property))))))
+
+(defun my/manifolding-atlas--org-entry-put-fallback (orig-fn pom property value)
+  (if (and (or (null pom)
+               (and (integerp pom)
+                    (<= (point-min) pom) (<= pom (point-max))))
+           (my/manifolding-atlas--drawer-region))
+      (my/manifolding-atlas--drawer-put
+       (if (symbolp property) (symbol-name property) property)
+       value)
+    (funcall orig-fn pom property value)))
+
+(advice-add 'org-entry-get :around #'my/manifolding-atlas--org-entry-get-fallback)
+(advice-add 'org-entry-put :around #'my/manifolding-atlas--org-entry-put-fallback)
+#+end_src
+
+** Ensure Ref Note (closed vocab)
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--property-display-name (property-type)
+  (upcase (string-replace "-" " "
+                          (if (symbolp property-type)
+                              (symbol-name property-type)
+                            property-type))))
+
+(defun my/manifolding-atlas--ensure-ref-note (property-type value &optional _note)
+  (when (and value (not (string-equal value "WARNING")))
+    (let* ((slug (my/manifolding-atlas--canonicalize value))
+           (root (expand-file-name (format "admin/refs/%s/" property-type) (my/manifolding-atlas-root-dir)))
+           (path (expand-file-name slug root))
+           (id (my/manifolding-atlas--note-id-by-path path))
+           (title (format "%s: %s" (my/manifolding-atlas--property-display-name property-type) value)))
+      (if id
+          (my/manifolding-atlas--make-id-link id title)
+        (make-directory root t)
+        (let ((manifolding-atlas-create-default-function (lambda (_) '())))
+          (let ((note (manifolding-atlas-create title path
+                       :tags nil :properties nil :body nil)))
+            (when note
+              (my/manifolding-atlas--make-id-link (manifolding-atlas-note-id note) title))))))))
+#+end_src
+
+** Scoped To-Plist Factory
+
+*** Cross-buffer property writer
+NOTE may live in a different buffer than the one being edited:
+locate its heading by file, level, and pos first.
+Uses drawer-put directly for live-properties domain's transclude handling.
+#+begin_src emacs-lisp
+(require 'cl)
+
+(defun my/manifolding-atlas--property-put (note key value)
+  "Set property KEY to VALUE in NOTE's file on disk using drawer-put."
+  (let* ((file (manifolding-atlas-note-path note))
+         (level (manifolding-atlas-note-level note))
+         (pos   (manifolding-atlas-note-pos note)))
+    (when file
+      (with-current-buffer (find-file-noselect file)
+        (save-excursion
+          (if (and level (> level 0) pos)
+              (progn (goto-char pos) (org-back-to-heading t))
+            (goto-char (point-min)))
+          (my/manifolding-atlas--drawer-put key value))
+        (save-buffer)))))
+#+end_src
+
+*** Scoped post-apply and factory
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--apply-scoped-post (property-type drawer-key label note)
+  (let ((link (my/manifolding-atlas--create-scoped-note
+                property-type label
+                (manifolding-atlas-note-id note))))
+    (when link
+      (my/manifolding-atlas--property-put note drawer-key link))))
+
+(defun my/manifolding-atlas--make-scoped-to-plist (property-type drawer-key)
+  (let ((pt property-type) (dk drawer-key))
+    (lambda (val _ctx)
+      (when (and val (not (string-equal val "WARNING")))
+        `(:properties ((,dk . ,val))
+          :post-apply (,(apply-partially
+                         #'my/manifolding-atlas--apply-scoped-post
+                         pt dk val)))))))
+#+end_src
+
+** Aliases To-Plist Factory
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--apply-aliases-post (labels note)
+  (let* ((id (manifolding-atlas-note-id note))
+         (links (delq nil (mapcar (lambda (v)
+                                    (my/manifolding-atlas--create-scoped-note
+                                      'alias v id))
+                                  labels)))
+         (str (mapconcat #'identity links ", ")))
+    (unless (string-empty-p str)
+      (my/manifolding-atlas--property-put note "ALIAS" str))))
+
+(defun my/manifolding-atlas--make-aliases-to-plist ()
+  (lambda (val _ctx)
+    (when val
+      (let ((labels (copy-sequence val)))
+        `(:properties (("ALIAS" . ,(mapconcat #'identity val ", ")))
+          :post-apply (,(apply-partially
+                         #'my/manifolding-atlas--apply-aliases-post labels)))))))
+#+end_src
+
+** Transclude live refs into the owning file
+
+*** Link and anchor helpers
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--ref-link-value (value)
+  (when (and (stringp value)
+             (string-match "\\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]" value))
+    (cons (match-string-no-properties 1 value)
+          (match-string-no-properties 2 value))))
+
+(defun my/manifolding-atlas--live-transclude-p (id)
+  (save-excursion
+    (goto-char (point-min))
+    (re-search-forward (format "#\\+transclude:.*\\[\\[id:%s\\]\\["
+                               (regexp-quote id))
+                       nil t)))
+
+(defun my/manifolding-atlas--body-anchor ()
+  (org-back-to-heading t)
+  (end-of-line)
+  (forward-line 1)
+  (when (looking-at "^:PROPERTIES:")
+    (forward-line 1)
+    (re-search-forward "^:END:" nil t)
+    (forward-line 1))
+  (point))
+#+end_src
+
+*** Heading property scan
+Reads plain drawer entries AND in-drawer transclude lines as
+uniform (KEY . VALUE) pairs.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--props-in-region (beg end props)
+  "Collect (KEY . VALUE) pairs between BEG/END into PROPS."
+  (goto-char beg)
+  (while (re-search-forward
+          "^:\\([A-Z][A-Z0-9_]*\\):[[:blank:]]+\\(.*\\)$"
+          end t)
+    (push (cons (match-string-no-properties 1)
+                (match-string-no-properties 2))
+          props))
+  (goto-char beg)
+  (while (re-search-forward
+          "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
+          end t)
+    (let ((key (my/manifolding-atlas--key-from-label
+                (match-string-no-properties 2))))
+      (when key
+        (push (cons key
+                    (format "[[id:%s][%s]]"
+                            (match-string-no-properties 1)
+                            (match-string-no-properties 2)))
+              props))))
+  props)
+
+(defun my/manifolding-atlas--heading-properties ()
+  (let (props)
+    (org-back-to-heading t)
+    (save-excursion
+      (let* ((beg (progn (org-back-to-heading t)
+                         (line-beginning-position)))
+             (end (save-excursion
+                    (goto-char beg)
+                    (forward-line 1)
+                    (if (re-search-forward "^\\*+[ \t]" (point-max) t)
+                        (line-beginning-position)
+                      (point-max)))))
+        (goto-char beg)
+        (when (re-search-forward "^:PROPERTIES:" end t)
+          (let ((dr-beg (line-beginning-position 2)))
+            (when (re-search-forward "^:END:" end t)
+              (setq props
+                    (my/manifolding-atlas--props-in-region
+                     dr-beg (line-beginning-position) props)))))))
+    props))
+#+end_src
+
+*** Live transclude insertion
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--add-live-transcludes (note)
+  (let* ((file (manifolding-atlas-note-path note))
+         (level (manifolding-atlas-note-level note))
+         (pos   (manifolding-atlas-note-pos note)))
+    (when file
+      (with-current-buffer (find-file-noselect file)
+        (save-excursion
+          (cond ((and level (> level 0) pos)
+                 (goto-char pos)
+                 (org-back-to-heading t))
+                (t (goto-char (point-min))))
+          (let ((props (my/manifolding-atlas--heading-properties))
+                (anchor (or (my/manifolding-atlas--drawer-insert-point)
+                            (my/manifolding-atlas--body-anchor))))
+            (dolist (pair props)
+              (when-let ((m (my/manifolding-atlas--ref-link-value (cdr pair))))
+                (let ((id (car m)) (label (cdr m)))
+                  (unless (my/manifolding-atlas--live-transclude-p id)
+                    (goto-char anchor)
+                    (beginning-of-line)
+                    (unless (bolp) (insert "\n"))
+                    (insert (format "#+transclude: [[id:%s][%s]] :property\n"
+                                    id label))))))))
+        (save-buffer)))))
+
+(defun my/manifolding-atlas--live-transcludes-after-create (note)
+  (when (manifolding-atlas-note-p note)
+    (my/manifolding-atlas--add-live-transcludes note))
+  note)
+(advice-add 'manifolding-atlas-create :filter-return #'my/manifolding-atlas--live-transcludes-after-create)
+#+end_src
+
+** State Property Factory (plain value + transclude)
+
+*** Link and type predicates
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--id-from-link (link)
+  (when-let ((m (my/manifolding-atlas--ref-link-value link)))
+    (car m)))
+
+(defun my/manifolding-atlas--ref-of-type-p (property-type id)
+  (when-let ((file (org-id-find-id-file id)))
+    (string-prefix-p
+     (expand-file-name (format "admin/refs/%s/" property-type)
+                       (my/manifolding-atlas-root-dir))
+     (expand-file-name file))))
+
+(defun my/manifolding-atlas--transclude-exists-p (id)
+  (save-excursion
+    (goto-char (point-min))
+    (re-search-forward
+     (format "^#\\+transclude:.*\\[\\[id:%s\\]\\[" (regexp-quote id))
+     nil t)))
+#+end_src
+
+*** Transclude removal sweep
+Drops stale :property transclude lines of this type, keeping REF-ID,
+and reports which ids were removed for later cleanup.
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--remove-other-type-transcludes (property-type ref-id)
+  "Delete PROPERTY-TYPE transclude lines except REF-ID; return removed ids."
+  (let (removed)
+    (goto-char (point-min))
+    (while (re-search-forward
+            "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[" nil t)
+      (let ((lid (match-string-no-properties 1)))
+        (when (and (my/manifolding-atlas--ref-of-type-p property-type lid)
+                   (not (string-equal lid ref-id)))
+          (push lid removed)
+          (delete-region (line-beginning-position)
+                         (1+ (line-end-position))))))
+    removed))
+#+end_src
+
+*** Transclude insertion
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--insert-property-transclude (property-type drawer-value ref-id)
+  "Insert the :property transclude line for REF-ID if absent."
+  (unless (my/manifolding-atlas--transclude-exists-p ref-id)
+    (goto-char (point-min))
+    (org-back-to-heading t)
+    (end-of-line)
+    (forward-line 1)
+    (when (looking-at "^:PROPERTIES:")
+      (forward-line 1)
+      (re-search-forward "^:END:" nil t)
+      (forward-line 1))
+    (beginning-of-line)
+    (unless (bolp) (insert "\n"))
+    (insert (format "#+transclude: [[id:%s][%s: %s]] :property\n"
+                    ref-id
+                    (my/manifolding-atlas--property-display-name property-type)
+                    drawer-value))))
+#+end_src
+
+*** Refresh orchestration
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--refresh-property-transclude (property-type drawer-value ref-id)
+  (let (removed)
+    (save-excursion
+      (org-back-to-heading t)
+      (my/manifolding-atlas--drawer-delete (my/manifolding-atlas--property-key-from-type property-type))
+      (let ((marker (let ((pt (my/manifolding-atlas--drawer-insert-point)))
+                      (when pt (copy-marker pt)))))
+        (setq removed (my/manifolding-atlas--remove-other-type-transcludes
+                       property-type ref-id))
+        (goto-char (or (and (marker-position marker) marker)
+                       (point-min)))
+        (my/manifolding-atlas--insert-property-transclude
+         property-type drawer-value ref-id)
+        (when marker (set-marker marker nil)))
+      (save-buffer))
+    removed))
+#+end_src
+
+*** Ref usage checks and orphan sweep
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--ref-in-use-p (id)
+  (let* ((root (my/manifolding-atlas-root-dir))
+         (refs-dir (expand-file-name "admin/refs/" root))
+         (files (nconc (directory-files-recursively root "\\.org\\'")
+                       (directory-files-recursively root "[^./]+\\'")))
+         (in-use nil))
+    (dolist (f files)
+      (unless in-use
+        (let ((exp (expand-file-name f)))
+          (when (and (not (file-in-directory-p exp refs-dir))
+                     (my/manifolding-atlas-links--ref-id-in-file-p id exp))
+            (setq in-use t)))))
+    in-use))
+
+(defun my/manifolding-atlas--cleanup-unused-ref (id)
+  (when (and id (not (my/manifolding-atlas--ref-in-use-p id)))
+    (let ((path (ignore-errors (org-id-find-id-file id))))
+      (when (and path
+                 (file-exists-p path)
+                 (file-in-directory-p
+                  path
+                  (expand-file-name "admin/refs/" (my/manifolding-atlas-root-dir))))
+        (message "my/manifolding-atlas: deleting unused ref %s" path)
+        (delete-file path)))))
+
+(defun my/manifolding-atlas--sweep-orphaned-refs ()
+  (interactive)
+  (let* ((root (my/manifolding-atlas-root-dir))
+         (refs-dir (expand-file-name "admin/refs/" root))
+         (files (directory-files-recursively refs-dir "[^./]+\\'" t))
+         count)
+    (dolist (f files)
+      (when (file-regular-p f)
+        (with-temp-buffer
+          (insert-file-contents f)
+          (goto-char (point-min))
+          (when (re-search-forward "^:ID:[[:blank:]]+\\(.+\\)" nil t)
+            (let ((id (string-trim (match-string-no-properties 1))))
+              (unless (my/manifolding-atlas--ref-in-use-p id)
+                (message "my/manifolding-atlas: deleting unused ref %s" f)
+                (delete-file f)
+                (setq count (1+ (or count 0)))))))))
+    (message "my/manifolding-atlas: swept %d orphaned ref%s"
+             (or count 0) (if (and count (= count 1)) "" "s"))))
+#+end_src
+
+*** State post-apply
+The state is represented ONLY by an in-drawer #+transclude: line, so
+this drops the plain drawer entry and refreshes that transcription.
+Transclusion rendering is stripped first so the drawer edits see raw
+#+transclude: directives; after-save-hook re-renders them.
+#+begin_src emacs-lisp :lexical t
+(defun my/manifolding-atlas--apply-state-post (property-type drawer-value ref-id note)
+  "Post-apply wrapper for a live state property.
+Navigates by NOTE's own path, so it works from any buffer."
+  (when-let ((file (manifolding-atlas-note-path note)))
+    (with-current-buffer (find-file-noselect file)
+      (let ((re-render (bound-and-true-p org-transclusion-mode))
+            removed)
+        (when re-render (org-transclusion-remove-all))
+        (unwind-protect
+            (save-excursion
+              (let ((pos (manifolding-atlas-note-pos note)))
+                (when (and pos (> pos 0)) (goto-char pos)))
+              (setq removed
+                    (my/manifolding-atlas--refresh-property-transclude
+                     property-type drawer-value ref-id)))
+          (when re-render
+            (ignore-errors (org-transclusion-add-all))))
+        (dolist (old-id removed)
+          (my/manifolding-atlas--cleanup-unused-ref old-id))))))
+
+(defun my/manifolding-atlas--clear-state-transcribes (property-type _note)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward
+            "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[" nil t)
+      (let ((lid (match-string-no-properties 1)))
+        (when (my/manifolding-atlas--ref-of-type-p property-type lid)
+          (delete-region (line-beginning-position)
+                         (1+ (line-end-position))))))
+    (save-buffer)))
+
+(defun my/manifolding-atlas--make-live-state-to-plist (property-type drawer-key)
+  (let ((pt property-type) (dk drawer-key))
+    (lambda (val _ctx)
+      (when (and val (not (string-equal val "WARNING")))
+        (let* ((link (my/manifolding-atlas--ensure-ref-note pt val))
+               (ref-id (my/manifolding-atlas--id-from-link link)))
+          `(:post-apply (,(apply-partially
+                           #'my/manifolding-atlas--apply-state-post
+                           pt val ref-id))))))))
+#+end_src
+
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--create-scoped-note (property-type value parent-id &optional _note)
+  (when (and value (not (string-equal value "WARNING")))
+    (let* ((slug (my/manifolding-atlas--canonicalize (or parent-id "orphan")))
+           (val-slug (my/manifolding-atlas--canonicalize value))
+           (root (expand-file-name (format "admin/refs/%s/" property-type) (my/manifolding-atlas-root-dir)))
+           (path (expand-file-name (format "%s-%s" slug val-slug) root)))
+      (make-directory root t)
+      (let ((manifolding-atlas-create-default-function (lambda (_) '())))
+        (let ((note (manifolding-atlas-create value path
+                     :tags (when parent-id (list (format "ref-%s" property-type)))
+                     :properties (when parent-id `(("REF_PARENT" . ,parent-id)
+                                                    ("REF_TYPE" . ,(symbol-name property-type))))
+                     :body nil)))
+           (when note
+             (my/manifolding-atlas--make-id-link (manifolding-atlas-note-id note) value)))))))
+#+end_src
+
+** Default Filter — Hide ref notes from manifolding-atlas-find
+
+*** Hidden-path predicate
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--hidden-note-p (path)
+  (or (string-prefix-p
+       (expand-file-name "admin/refs/" (my/manifolding-atlas-root-dir))
+       path)
+      (string-prefix-p
+       (expand-file-name "admin/Journal/" (my/manifolding-atlas-root-dir))
+       path)))
+
+(setq manifolding-atlas-find-default-filter
+      (lambda (note)
+        (not (my/manifolding-atlas--hidden-note-p (manifolding-atlas-note-path note)))))
+#+end_src
+
+*** Select filter advice
+User-supplied filters compose with the hidden-path rule instead of
+replacing it.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--select-filter-advice (orig-fn prompt &rest args)
+  (let ((orig-filter (plist-get args :filter-fn)))
+    (apply orig-fn prompt
+           (plist-put args :filter-fn
+                      (lambda (note)
+                        (and (not (my/manifolding-atlas--hidden-note-p
+                                   (manifolding-atlas-note-path note)))
+                             (or (null orig-filter)
+                                 (funcall orig-filter note))))))))
+
+(advice-add 'manifolding-atlas-select :around #'my/manifolding-atlas--select-filter-advice)
+#+end_src
+
+** Open ref notes in capture by default
+
+*** Capture-style file editor
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--edit-file-in-capture (file)
+  (let* ((org-capture-templates
+          `(("v" "Edit note body"
+             plain
+             (file+function
+              ,file
+              (lambda ()
+                (goto-char (point-max))
+                (skip-chars-backward " \t\n")))
+             "%?"
+             :kill-buffer t
+             :unnarrowed t)))
+         (org-capture-use-indirect-buffer nil))
+    (when-let ((buf (get-file-buffer file)))
+      (when (eq buf (current-buffer))
+        (switch-to-buffer (other-buffer))))
+    (org-capture nil "v")))
+#+end_src
+
+*** org-id-open advice
+Clicking an id: link that lives in a property drawer opens the ref
+in capture instead of plain visit.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--open-ref-link (orig-fun id &optional path)
+  (if-let* ((_ (org-in-regexp org-link-any-re))
+            (start (match-beginning 0))
+            (_ (save-excursion
+                 (goto-char start)
+                 (beginning-of-line)
+                 (looking-at ":\\([A-Z_][A-Z_0-9]*\\):")))
+            (file (org-id-find-id-file id)))
+      (my/manifolding-atlas--edit-file-in-capture file)
+    (funcall orig-fun id path)))
+
+(advice-add 'org-id-open :around #'my/manifolding-atlas--open-ref-link)
+#+end_src
+
+** Index transclude-in-drawer notes
+
+*** Parse tolerance flag
+#+begin_src emacs-lisp
+(defvar my/manifolding-atlas--db-parse nil)
+
+(defun my/manifolding-atlas--parse-file-with-tolerance (orig-fn &rest args)
+  (let ((my/manifolding-atlas--db-parse t))
+    (apply orig-fn args)))
+#+end_src
+
+*** Per-drawer stripping
+Swaps each in-drawer transclude line for a plain `:KEY:` synonym so
+org's parser sees ordinary properties; returns a restore cell.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--strip-one-drawer ()
+  "Strip transclude lines in the drawer at point; return restore cell."
+  (let* ((pbeg (line-beginning-position 2))
+         (pm (save-excursion
+               (if (re-search-forward "^:END:[ \t]*$" nil t)
+                   (copy-marker (line-beginning-position))
+                 nil)))
+         restore)
+    (when pm
+      (goto-char pbeg)
+      (while (re-search-forward "^[^:].*$" pm t)
+        (let* ((text (match-string 0))
+               (m (when (string-match
+                         "^#\\+transclude: \\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
+                         text)
+                    (let* ((label (match-string-no-properties 2 text))
+                           (key (my/manifolding-atlas--key-from-label label)))
+                      (when key
+                        (list key
+                              (match-string-no-properties 1 text)
+                              label)))))
+               (syn (when m
+                      (format ":%s: [[id:%s][%s]]"
+                              (nth 0 m) (nth 1 m) (nth 2 m)))))
+          (push (cons (point-marker) (cons text syn)) restore)
+          (delete-region (line-beginning-position)
+                         (1+ (line-end-position)))
+          (when syn
+            (insert syn "\n"))))
+      (goto-char pm)
+      (set-marker pm nil))
+    restore))
+#+end_src
+
+*** Restore pass
+Puts the raw transclude lines back exactly where they were.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--restore-stripped-lines (restore)
+  (dolist (cell (nreverse restore))
+    (goto-char (car cell))
+    (when (cddr cell)
+      (delete-region (line-beginning-position)
+                     (1+ (line-end-position))))
+    (insert (cadr cell) "\n")
+    (set-marker (car cell) nil)))
+#+end_src
+
+*** Parser advice wiring
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--strip-in-drawer-keywords (orig-fn &rest args)
+  (if (not my/manifolding-atlas--db-parse)
+      (apply orig-fn args)
+    (save-excursion
+      (save-restriction
+        (widen)
+        (let (restore)
+          (goto-char (point-min))
+          (while (re-search-forward "^:PROPERTIES:[ \t]*$" nil t)
+            (setq restore (append (my/manifolding-atlas--strip-one-drawer)
+                                  restore)))          (let ((result (apply orig-fn args)))
+            (my/manifolding-atlas--restore-stripped-lines restore)
+            result))))))
+
+(advice-add 'manifolding-atlas-db--parse-file :around #'my/manifolding-atlas--parse-file-with-tolerance)
+(advice-add 'org-element-parse-buffer :around #'my/manifolding-atlas--strip-in-drawer-keywords)
+#+end_src

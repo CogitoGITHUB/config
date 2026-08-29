@@ -1831,7 +1831,7 @@ a chord event when one matches, else replays FIRST-CHAR."
      ((and my/chord-typing-detection my/chord-in-typing-flow
            (not executing-kbd-macro))
       (list first-char))
-     ((executing-kbd-macro)
+     (executing-kbd-macro
       (my/chord-no-chord first-char))
      ((not (eq first-char my/chord-last-unmatched))
       (my/chord-pause-typing-flow)

@@ -1,3 +1,0 @@
-# REMOVED: core/-13 consult-manifolding-atlas engine is retired.
-# Note selection uses the native manifolding-atlas-select path.
-# Safe to delete this file.

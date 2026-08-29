@@ -135,12 +135,10 @@ It is a structural consequence of the core principle: no current representation 
 
 | Layer     | Location     | Purpose                              |
 |-----------+--------------+--------------------------------------|
-| core      | core/        | vendored engine — the transformation machinery |
-| infra     | infra/       | reusable machinery — capture, prompts, paths   |
-| schema    | schema/      | executable knowledge structures                 |
-| domains   | domains/     | transformations over the common substrate       |
-| templates | templates/   | structural generators                           |
-| UI        | atlas-ui.org | viewport into the current representation        |
+| engine    | atlas-engine/        | vendored engine — the transformation machinery |
+| blueprints    | blueprints/       | executable knowledge structures — properties, templates |
+| workflows | workflows/ | recurring practices — mastering, protocols, routines |
+| UI        | sidebar.org | viewport into the current representation        |
 
 Loading is deterministic.
 Every Org module under modules/ is discovered, sorted by ~#+priority:~, and evaluated in dependency order.
@@ -494,27 +492,36 @@ The reinforcement system provides the global feedback.
 * Domains
 
 The Atlas is not one giant feature.
-It is a collection of transformations operating over the same substrate — a substrate that is already beginning to smell.
+It is a collection of transformations operating over the same substrate.
 
 #+begin_example
-search
-backup
-capture
-citation
-contacts
-dictionary
-links
-live-properties
-manifold
-mastering
-properties
-protocols
-recipes
-routines
-rules
-schema
-schema-reinforcement
-transclusion
+atlas-engine/
+  file-formats/
+    citation
+    contacts
+    dictionary
+    fast-captures
+    recipes
+    rules
+    workflows/
+  blueprint.org
+  core-helpers.org
+  db.org
+  dependencies.org
+  file-creation.org
+  mind-map.org
+  restoration.org
+  search.org
+  sidebar.org
+  transclusion.org
+blueprints/
+  file-formats/
+  properties/
+  templates/
+workflows/
+  mastering.org
+  protocols.org
+  routines.org
 #+end_example
 
 Each domain gets its own territory.  
@@ -715,7 +722,7 @@ That is a feature.
 
 Create:
 
-: schema/<anything>.org
+: blueprints/<anything>.org
 
 Give it a level-one property heading.  
 Done.
@@ -732,7 +739,7 @@ Adding a behavioral prompt requires explicit registration through:
 Adding a domain means:
 
 #+begin_example
-domains/
+atlas-engine/file-formats/
 └── new-domain/
     └── new-domain.org
 #+end_example
@@ -752,7 +759,7 @@ Only the accumulation of new transformations over the common substrate.
 
 There is one authority:
 
-: infra/paths.org
+: atlas-engine/setup.org (defines my/manifolding-atlas-root-dir)
 
 Everything else asks it where things are.  
 No scattered hardcoded module paths.  
@@ -818,7 +825,7 @@ If it is around:
 
 : ~53
 
-the prompt engine probably found the schema tree — for now.
+the prompt engine probably found the blueprints tree — for now.
 
 * The real model
 

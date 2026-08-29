@@ -1,0 +1,1531 @@
+#+TITLE:      Manifolding Atlas — Sidebar
+#+begin_comment
+Sidebar, outline, backlinks, and UI configuration for manifolding-atlas.
+#+end_comment
+
+* Sidebar
+:PROPERTIES:
+:CATEGORY: ui
+:END:
+
+** Config
+#+begin_src emacs-lisp
+(unless (fboundp 'mode-line-invisible-mode)
+  (defun mode-line-invisible-mode (&rest _) nil))
+(with-eval-after-load 'manifolding-atlas
+  (setq manifolding-atlas-ui-sidebar-position 'left
+        manifolding-atlas-ui-sidebar-size     0.20)
+  (setq manifolding-atlas-ui-outline-max-depth 3)
+  (setq manifolding-atlas-ui-backlinks-show-preview t)
+  (setq manifolding-atlas-ui-default-widget-collapsed nil)
+  (setq manifolding-atlas-ui-fast-parse t)
+  (setq manifolding-atlas-ui-auto-refresh t)
+  (add-to-list 'warning-suppress-types '(org-element)))
+#+end_src
+
+** Implementation
+#+begin_src emacs-lisp
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; manifolding-atlas-ui provides a customizable sidebar that displays contextual
+;; information about the currently focused manifolding-atlas note, along with a
+;; set of default widgets and an API for creating custom widgets.
+;;
+;; Features:
+;; - Per-frame sidebar with configurable position and size
+;; - Widget system built on vui components
+;; - Default widgets: outline, backlinks, forward links, stats
+;; - Easy API for creating custom widgets
+;;
+;; Usage:
+;;   (require 'manifolding-atlas-ui)
+;;   (manifolding-atlas-ui-sidebar-open)
+;;
+;; Or add to hooks:
+;;   (add-hook 'org-mode-hook #'manifolding-atlas-ui-sidebar-open)
+
+;;; Code:
+
+(require 'cl-lib)
+(require 'seq)
+(require 'map)
+(require 'subr-x)
+(require 'org-element)
+(require 'manifolding-atlas)
+(require 'vui)
+(require 'vui-components)
+
+
+;;; Custom variables
+
+(defgroup manifolding-atlas-ui nil
+  "Sidebar infrastructure and widget framework for manifolding-atlas notes."
+  :group 'manifolding-atlas
+  :prefix "manifolding-atlas-ui-")
+
+(defcustom manifolding-atlas-ui-sidebar-position 'right
+  "Position of the sidebar in the frame.
+One of `left', `right', `top', or `bottom'."
+  :type '(choice (const :tag "Left" left)
+          (const :tag "Right" right)
+          (const :tag "Top" top)
+          (const :tag "Bottom" bottom))
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-sidebar-size 0.33
+  "Size of the sidebar as a fraction of the frame.
+A float between 0.0 and 1.0 representing the fraction of frame
+width (for left/right position) or height (for top/bottom position)."
+  :type 'float
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-default-widget-collapsed nil
+  "Default collapsed state for all widgets.
+When non-nil, widgets start collapsed."
+  :type 'boolean
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-outline-max-depth nil
+  "Maximum heading depth for the outline widget.
+When nil, show all heading levels."
+  :type '(choice (const :tag "Unlimited" nil)
+          (integer :tag "Max depth"))
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-sidebar-auto-hide t
+  "Whether to auto-hide sidebar when switching to non-manifolding-atlas buffers.
+When non-nil, sidebar is hidden when the main window displays a
+non-manifolding-atlas buffer, and shown again when returning to a manifolding-atlas note.
+When nil, sidebar remains visible with stale content."
+  :type 'boolean
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-backlinks-show-preview t
+  "Whether to show content preview in backlinks widget.
+When non-nil, shows a snippet of text around each backlink mention."
+  :type 'boolean
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-backlinks-prose-chars-before 30
+  "Number of characters to show before link in prose previews."
+  :type 'integer
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-backlinks-prose-chars-after 50
+  "Number of characters to show after link in prose previews."
+  :type 'integer
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-backlinks-note-filter #'identity
+  "Function to filter which notes appear in backlinks.
+Called with a manifolding-atlas-note and should return non-nil to include it."
+  :type 'function
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-backlinks-context-types t
+  "Context types to display in backlinks widget.
+Either t for all types, or a list of allowed types:
+meta, header, table, list, quote, code, footnote, prose."
+  :type '(choice (const :tag "All types" t)
+          (repeat :tag "Selected types"
+           (choice (const meta)
+            (const header)
+            (const table)
+            (const list)
+            (const quote)
+            (const code)
+            (const footnote)
+            (const prose))))
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-backlinks-sort nil
+  "How to sort backlinks in the widget.
+nil means no sorting (order from database query).
+`title-asc' means sort alphabetically by note title (A-Z).
+`title-desc' means sort reverse alphabetically by note title (Z-A).
+A function means use it as comparator (receives two group plists
+with :file-note, :path, and :mentions)."
+  :type '(choice (const :tag "No sorting" nil)
+          (const :tag "By title A-Z" title-asc)
+          (const :tag "By title Z-A" title-desc)
+          (function :tag "Custom comparator"))
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-fast-parse nil
+  "Use fast `org-mode' initialization for parsing.
+When non-nil, skip mode hooks when parsing org files for headings
+and backlinks. This can significantly improve performance but may
+cause issues if your org-element parsing depends on mode hooks.
+Disabled by default for safety."
+  :type 'boolean
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-auto-refresh t
+  "Automatically refresh sidebar content.
+When non-nil, the sidebar will refresh:
+- After saving a buffer (full refresh for backlinks/links)
+- After idle time (stats and outline only)"
+  :type 'boolean
+  :group 'manifolding-atlas-ui)
+
+(defcustom manifolding-atlas-ui-auto-refresh-delay 1.5
+  "Delay in seconds before auto-refreshing on idle.
+Only used when `manifolding-atlas-ui-auto-refresh' is non-nil."
+  :type 'number
+  :group 'manifolding-atlas-ui)
+
+
+;;; Context
+
+(vui-defcontext manifolding-atlas-ui-note nil
+  "The current manifolding-atlas note being displayed in the sidebar.")
+
+
+;;; Widget Registry
+
+(defvar manifolding-atlas-ui--widget-registry (make-hash-table :test 'eq)
+  "Registry of widgets available for the sidebar.
+Keys are widget symbols, values are plists with:
+  :component - the vui component symbol
+  :predicate - function taking note, returns non-nil if widget shows
+  :order - numeric order for sorting (lower = earlier)")
+
+(defun manifolding-atlas-ui-register-widget (name &rest props)
+  "Register a widget NAME with properties PROPS.
+
+NAME is a symbol identifying the widget.
+
+PROPS is a plist with:
+  :component - (required) symbol naming the vui component
+  :predicate - (optional) function (note) -> bool, widget shown when true
+  :order - (optional) numeric order, default 100
+
+Example:
+  (manifolding-atlas-ui-register-widget \\='journal-nav
+    :component \\='manifolding-atlas-journal-widget-nav
+    :predicate #\\='manifolding-atlas-journal-note-p
+    :order 50)"
+  (let ((component (plist-get props :component))
+        (predicate (plist-get props :predicate))
+        (order (or (plist-get props :order) 100)))
+    (unless component
+      (error "Widget %s requires :component" name))
+    (puthash name
+             (list :component component
+                   :predicate predicate
+                   :order order)
+             manifolding-atlas-ui--widget-registry)))
+
+(defun manifolding-atlas-ui-unregister-widget (name)
+  "Remove widget NAME from the registry."
+  (remhash name manifolding-atlas-ui--widget-registry))
+
+(defun manifolding-atlas-ui-widget-set (name prop value)
+  "Set property PROP to VALUE for widget NAME."
+  (when-let ((widget (gethash name manifolding-atlas-ui--widget-registry)))
+    (puthash name (plist-put widget prop value) manifolding-atlas-ui--widget-registry)))
+
+(defun manifolding-atlas-ui--get-widgets-for-note (note)
+  "Return list of widget components to display for NOTE.
+Widgets are filtered by predicate and sorted by order."
+  (let ((widgets nil))
+    ;; Collect applicable widgets
+    (maphash
+     (lambda (name props)
+       (let ((predicate (plist-get props :predicate))
+             (component (plist-get props :component))
+             (order (plist-get props :order)))
+         (when (or (null predicate)
+                   (funcall predicate note))
+           (push (list :name name :component component :order order) widgets))))
+     manifolding-atlas-ui--widget-registry)
+    ;; Sort by order
+    (setq widgets (sort widgets (lambda (a b)
+                                  (< (plist-get a :order)
+                                     (plist-get b :order)))))
+    ;; Return component symbols
+    (mapcar (lambda (w) (plist-get w :component)) widgets)))
+
+
+;;; Faces
+
+(defface manifolding-atlas-ui-widget-header-face
+  '((t :inherit bold))
+  "Face for widget headers."
+  :group 'manifolding-atlas-ui)
+
+(defface manifolding-atlas-ui-widget-count-face
+  '((t :inherit shadow))
+  "Face for widget item counts."
+  :group 'manifolding-atlas-ui)
+
+(defface manifolding-atlas-ui-outline-heading-face
+  '((t :inherit org-level-1))
+  "Face for outline headings."
+  :group 'manifolding-atlas-ui)
+
+(defface manifolding-atlas-ui-stats-face
+  '((t :inherit shadow))
+  "Face for statistics text."
+  :group 'manifolding-atlas-ui)
+
+(defface manifolding-atlas-ui-backlink-preview-face
+  '((t :inherit shadow))
+  "Face for backlink preview text."
+  :group 'manifolding-atlas-ui)
+
+(defface manifolding-atlas-ui-backlink-heading-face
+  '((t :inherit shadow))
+  "Face for backlink heading path."
+  :group 'manifolding-atlas-ui)
+
+(defface manifolding-atlas-ui-backlink-meta-key-face
+  '((t :inherit (shadow bold)))
+  "Face for meta block keys in backlink previews."
+  :group 'manifolding-atlas-ui)
+
+(defface manifolding-atlas-ui-backlink-meta-value-face
+  '((t :inherit shadow))
+  "Face for meta block values in backlink previews."
+  :group 'manifolding-atlas-ui)
+
+(defface manifolding-atlas-ui-backlink-context-face
+  '((t :inherit shadow))
+  "Face for context type indicators (§, •, >, etc.) in backlink previews."
+  :group 'manifolding-atlas-ui)
+
+
+;;; Major mode
+
+(defvar manifolding-atlas-ui-sidebar-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "q") #'manifolding-atlas-ui-sidebar-close)
+    (define-key map (kbd "g") #'manifolding-atlas-ui-sidebar-refresh)
+    map)
+  "Keymap for `manifolding-atlas-ui-sidebar-mode'.")
+
+(define-derived-mode manifolding-atlas-ui-sidebar-mode vui-mode "manifolding-atlas-ui"
+  "Major mode for the manifolding-atlas-ui sidebar buffer.
+\\{manifolding-atlas-ui-sidebar-mode-map}"
+  :group 'manifolding-atlas-ui
+  (setq-local truncate-lines t)
+  (when (fboundp 'mode-line-invisible-mode)
+    (mode-line-invisible-mode 1)))
+
+
+;;; Sidebar state (frame-local)
+
+(defvar manifolding-atlas-ui--sidebar-instances (make-hash-table :test 'eq)
+  "Hash table mapping frames to their sidebar vui instances.")
+
+(defvar manifolding-atlas-ui--sidebar-auto-hidden (make-hash-table :test 'eq)
+  "Hash table tracking frames where sidebar was auto-hidden.")
+
+(defvar manifolding-atlas-ui--rendering nil
+  "Non-nil when sidebar is currently rendering.
+Used to prevent re-entry during render.")
+
+(defvar manifolding-atlas-ui--idle-timer nil
+  "Timer for auto-refreshing sidebar on idle.")
+
+(defun manifolding-atlas-ui--sidebar-buffer-name (&optional frame)
+  "Return the sidebar buffer name for FRAME.
+If FRAME is nil, use the selected frame."
+  (let ((frame (or frame (selected-frame))))
+    (format "*manifolding-atlas-ui-sidebar:%s*" (or (frame-parameter frame 'window-id) ""))))
+
+(defun manifolding-atlas-ui--get-sidebar-buffer (&optional frame)
+  "Get the sidebar buffer for FRAME, or nil if it doesn't exist."
+  (get-buffer (manifolding-atlas-ui--sidebar-buffer-name frame)))
+
+(defun manifolding-atlas-ui--get-sidebar-window (&optional frame)
+  "Get the sidebar window for FRAME, or nil if it doesn't exist."
+  (let ((buf (manifolding-atlas-ui--get-sidebar-buffer frame)))
+    (when buf
+      (get-buffer-window buf frame))))
+
+(defun manifolding-atlas-ui--sidebar-visible-p (&optional frame)
+  "Return non-nil if the sidebar is visible in FRAME."
+  (manifolding-atlas-ui--get-sidebar-window frame))
+
+
+;;; Window management
+
+(defun manifolding-atlas-ui--display-buffer-params ()
+  "Return `display-buffer' parameters for the sidebar."
+  (let ((side manifolding-atlas-ui-sidebar-position)
+        (size manifolding-atlas-ui-sidebar-size))
+    `((side . ,side)
+      (slot . 0)
+      (window-width . ,(if (memq side '(left right)) size nil))
+      (window-height . ,(if (memq side '(top bottom)) size nil))
+      (window-parameters . ((no-delete-other-windows . t)
+                            (dedicated . t)
+                            (no-other-window . nil))))))
+
+(defun manifolding-atlas-ui--create-sidebar-window (buffer)
+  "Create a sidebar window for BUFFER using side window mechanics."
+  (display-buffer-in-side-window buffer (manifolding-atlas-ui--display-buffer-params)))
+
+(defun manifolding-atlas-ui--get-main-window (&optional frame)
+  "Get the most recently used non-sidebar window in FRAME."
+  (let* ((frame (or frame (selected-frame)))
+         (sidebar-win (manifolding-atlas-ui--get-sidebar-window frame))
+         (selected (frame-selected-window frame)))
+    ;; Prefer the currently selected window if it's a valid main window
+    (if (and selected
+             (not (eq selected sidebar-win))
+             (not (window-minibuffer-p selected)))
+        selected
+      ;; Fallback to first valid window
+      (or (seq-find (lambda (win)
+                      (and (not (eq win sidebar-win))
+                           (not (window-minibuffer-p win))))
+                    (window-list frame nil))
+          (frame-first-window frame)))))
+
+
+;;; Content tracking
+
+(defvar-local manifolding-atlas-ui--current-note nil
+  "The manifolding-atlas note currently being displayed in the sidebar.")
+
+(defun manifolding-atlas-ui--get-note-from-buffer (buffer)
+  "Get the manifolding-atlas note from BUFFER, or nil if not a manifolding-atlas note."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when (derived-mode-p 'org-mode)
+        ;; Always get the file-level ID, not the entry at point
+        (save-excursion
+          (goto-char (point-min))
+          (let ((id (org-entry-get nil "ID")))
+            (when id
+              (manifolding-atlas-db-get-by-id id))))))))
+
+(defun manifolding-atlas-ui--should-update-p (note)
+  "Return non-nil if sidebar should update for NOTE."
+  (and note
+       (not (equal (manifolding-atlas-note-id note)
+                   (when manifolding-atlas-ui--current-note
+                     (manifolding-atlas-note-id manifolding-atlas-ui--current-note))))))
+
+(defun manifolding-atlas-ui--on-buffer-change (&optional _frame)
+  "Handle buffer change events and update sidebar if needed.
+Called from `window-buffer-change-functions'."
+  ;; Skip minibuffer interactions and re-entry during render
+  (unless (or (minibufferp) manifolding-atlas-ui--rendering)
+    (let* ((frame (selected-frame))
+           (sidebar-buf (manifolding-atlas-ui--get-sidebar-buffer frame))
+           (auto-hidden-p (gethash frame manifolding-atlas-ui--sidebar-auto-hidden)))
+      (when sidebar-buf
+        (let* ((main-win (manifolding-atlas-ui--get-main-window frame))
+               (main-buf (when main-win (window-buffer main-win)))
+               (note (manifolding-atlas-ui--get-note-from-buffer main-buf))
+               ;; Only auto-hide if we previously had a note displayed
+               (had-note (buffer-local-value 'manifolding-atlas-ui--current-note sidebar-buf))
+               (visible (manifolding-atlas-ui--sidebar-visible-p frame))
+               ;; Compare IDs directly (had-note is from sidebar buffer)
+               (same-note (and note had-note
+                               (equal (manifolding-atlas-note-id note)
+                                      (manifolding-atlas-note-id had-note)))))
+          (cond
+           ;; Non-manifolding-atlas buffer: auto-hide if enabled AND we had a note before
+           ((and (null note)
+                 had-note
+                 manifolding-atlas-ui-sidebar-auto-hide
+                 visible)
+            (manifolding-atlas-ui--hide-sidebar-window frame)
+            (puthash frame t manifolding-atlas-ui--sidebar-auto-hidden))
+           ;; Manifolding Atlas buffer and was auto-hidden: show again
+           ((and note auto-hidden-p)
+            (remhash frame manifolding-atlas-ui--sidebar-auto-hidden)
+            (manifolding-atlas-ui--show-sidebar-window frame)
+            ;; Only re-render if note actually changed
+            (unless same-note
+              (manifolding-atlas-ui--render-sidebar note frame)))
+           ;; Manifolding Atlas buffer and visible: update if needed
+           ((and note visible (not same-note))
+            (manifolding-atlas-ui--render-sidebar note frame))))))))
+
+(defun manifolding-atlas-ui--hide-sidebar-window (&optional frame)
+  "Hide the sidebar window in FRAME without killing the buffer."
+  (let ((win (manifolding-atlas-ui--get-sidebar-window frame)))
+    (when win
+      (delete-window win))))
+
+(defun manifolding-atlas-ui--show-sidebar-window (&optional frame)
+  "Show the sidebar window in FRAME."
+  (let ((buf (manifolding-atlas-ui--get-sidebar-buffer frame)))
+    (when (and buf (not (manifolding-atlas-ui--sidebar-visible-p frame)))
+      (manifolding-atlas-ui--create-sidebar-window buf))))
+
+(defun manifolding-atlas-ui--setup-hooks ()
+  "Set up hooks for sidebar content tracking."
+  (add-hook 'window-buffer-change-functions #'manifolding-atlas-ui--on-buffer-change)
+  (add-hook 'window-selection-change-functions #'manifolding-atlas-ui--on-buffer-change)
+  ;; Auto-refresh hooks
+  (when manifolding-atlas-ui-auto-refresh
+    (add-hook 'after-save-hook #'manifolding-atlas-ui--on-save)
+    (manifolding-atlas-ui--start-idle-timer)))
+
+(defun manifolding-atlas-ui--teardown-hooks ()
+  "Remove hooks for sidebar content tracking."
+  (remove-hook 'window-buffer-change-functions #'manifolding-atlas-ui--on-buffer-change)
+  (remove-hook 'window-selection-change-functions #'manifolding-atlas-ui--on-buffer-change)
+  ;; Auto-refresh hooks
+  (remove-hook 'after-save-hook #'manifolding-atlas-ui--on-save)
+  (manifolding-atlas-ui--stop-idle-timer))
+
+(defun manifolding-atlas-ui--start-idle-timer ()
+  "Start the idle timer for auto-refresh."
+  (manifolding-atlas-ui--stop-idle-timer)
+  (setq manifolding-atlas-ui--idle-timer
+        (run-with-idle-timer manifolding-atlas-ui-auto-refresh-delay t
+                             #'manifolding-atlas-ui--on-idle)))
+
+(defun manifolding-atlas-ui--stop-idle-timer ()
+  "Stop the idle timer for auto-refresh."
+  (when manifolding-atlas-ui--idle-timer
+    (cancel-timer manifolding-atlas-ui--idle-timer)
+    (setq manifolding-atlas-ui--idle-timer nil)))
+
+(defun manifolding-atlas-ui--on-save ()
+  "Handle buffer save - refresh sidebar if visible."
+  (when (and (manifolding-atlas-ui--sidebar-visible-p)
+             (manifolding-atlas-ui--get-note-from-buffer (current-buffer)))
+    (manifolding-atlas-ui-sidebar-refresh)))
+
+(defun manifolding-atlas-ui--on-idle ()
+  "Handle idle timeout - soft refresh preserving memos.
+Only widgets whose deps changed (e.g. `buffer-modified-tick' for
+stats and outline) will recompute."
+  (when (manifolding-atlas-ui--sidebar-visible-p)
+    (let* ((frame (selected-frame))
+           (main-win (manifolding-atlas-ui--get-main-window frame))
+           (main-buf (when main-win (window-buffer main-win)))
+           (note (manifolding-atlas-ui--get-note-from-buffer main-buf))
+           (instance (gethash frame manifolding-atlas-ui--sidebar-instances)))
+      (when (and note instance
+                 (vui-instance-buffer instance)
+                 (buffer-live-p (vui-instance-buffer instance)))
+        (with-current-buffer (vui-instance-buffer instance)
+          (setq manifolding-atlas-ui--current-note note))
+        (vui-update-props instance (list :note note))))))
+
+
+;;; Utility functions
+
+(defun manifolding-atlas-ui--setup-org-mode ()
+  "Set up `org-mode' for parsing, respecting `manifolding-atlas-ui-fast-parse'.
+When fast parsing is enabled, skip mode hooks for better performance.
+All startup actions (inline images, LaTeX previews, visibility
+cycling) are inhibited since these buffers are used only for
+parsing.  Using `org-inhibit-startup' prevents `org-mode' from
+processing buffer-level #+STARTUP keywords (e.g. inlineimages)
+which would otherwise override let-bound variable suppression."
+  (let ((org-inhibit-startup t))
+    (if manifolding-atlas-ui-fast-parse
+        (delay-mode-hooks (org-mode))
+      (org-mode))))
+
+(defun manifolding-atlas-ui-clean-org-markup (text)
+  "Clean `org-mode' markup from TEXT for display purposes.
+
+This function removes or simplifies various `org-mode' constructs:
+
+- Links: [[url][title]] becomes title, [[url]] becomes url
+- Drawers: :PROPERTIES:...:END: blocks are removed
+- Metadata: #+TITLE:, #+FILETAGS:, etc. lines are removed
+- Whitespace: multiple spaces/tabs are collapsed to single space
+
+Returns the cleaned string, or nil if TEXT is nil."
+  (when text
+    (let ((result text))
+      ;; Remove drawers (:PROPERTIES:...:END:, :LOGBOOK:...:END:, etc.)
+      (setq result (replace-regexp-in-string
+                    "^[ \t]*:[A-Z_]+:[ \t]*\n\\(?:.*\n\\)*?[ \t]*:END:[ \t]*\n?"
+                    ""
+                    result))
+      ;; Remove metadata lines (#+TITLE:, #+FILETAGS:, etc.)
+      (setq result (replace-regexp-in-string
+                    "^[ \t]*#\\+[A-Za-z_]+:.*\n?"
+                    ""
+                    result))
+      ;; Replace [[link][description]] with description (any link type)
+      (setq result (replace-regexp-in-string
+                    "\\[\\[\\([^]]+\\)\\]\\[\\([^]]+\\)\\]\\]"
+                    "\\2"
+                    result))
+      ;; Replace bare [[link]] with the link target
+      ;; For id: links, remove them; for URLs, keep the URL
+      (setq result (replace-regexp-in-string
+                    "\\[\\[id:[^]]+\\]\\]"
+                    ""
+                    result))
+      (setq result (replace-regexp-in-string
+                    "\\[\\[\\([^]]+\\)\\]\\]"
+                    "\\1"
+                    result))
+      ;; Clean up multiple spaces/tabs
+      (setq result (replace-regexp-in-string "[ \t]+" " " result))
+      ;; Clean up multiple newlines (but keep paragraph breaks)
+      (setq result (replace-regexp-in-string "\n\\{3,\\}" "\n\n" result))
+      (string-trim result))))
+
+(defun manifolding-atlas-ui-current-note ()
+  "Get the current note from context.
+For use within widget components."
+  (use-manifolding-atlas-ui-note))
+
+(defun manifolding-atlas-ui-visit-note (note)
+  "Navigate to NOTE in the main window, preserving sidebar layout."
+  (when note
+    (let ((main-win (manifolding-atlas-ui--get-main-window)))
+      (when main-win
+        (select-window main-win)
+        (find-file (manifolding-atlas-note-path note))
+        (when (> (manifolding-atlas-note-level note) 0)
+          (goto-char (manifolding-atlas-note-pos note)))))))
+
+(defun manifolding-atlas-ui-follow-link-at-point ()
+  "Follow the link or item under point."
+  (interactive)
+  (let ((widget (widget-at (point))))
+    (when widget
+      (widget-apply widget :action))))
+
+(defun manifolding-atlas-ui-widget-toggle-at-point ()
+  "Toggle the widget collapse state at point."
+  (interactive)
+  (manifolding-atlas-ui-follow-link-at-point))
+
+
+;;; Widget wrapper component
+
+(vui-defcomponent manifolding-atlas-ui-widget (title count)
+  "Standard widget wrapper with collapsible header.
+TITLE is the widget title string.
+COUNT is an optional count to display in the header.
+CHILDREN (implicit) is a function returning the widget content."
+  :render
+  (let ((display-title (if count
+                           (format "%s (%s)" title count)
+                         title)))
+    (vui-collapsible
+      :title display-title
+      :initially-expanded (not manifolding-atlas-ui-default-widget-collapsed)
+      :title-face 'manifolding-atlas-ui-widget-header-face
+      :indent 2
+      (when children
+        (funcall children)))))
+
+
+;;; Shared components
+
+(vui-defcomponent manifolding-atlas-ui-note-link (note on-click)
+  "Clickable link component for a manifolding-atlas note.
+NOTE is the manifolding-atlas-note struct.
+ON-CLICK is an optional callback (defaults to `manifolding-atlas-ui-visit-note')."
+  :render
+  (when note
+    (vui-button (or (manifolding-atlas-note-title note) "(untitled)")
+      :on-click (lambda ()
+                  (funcall (or on-click #'manifolding-atlas-ui-visit-note) note))
+      :help-echo nil)))
+
+(vui-defcomponent manifolding-atlas-ui-note-preview (note max-lines strip-drawers strip-metadata)
+  "Rendered preview of note content.
+NOTE is the manifolding-atlas-note struct.
+MAX-LINES limits the preview length (default: 10).
+STRIP-DRAWERS removes property drawers (default: t).
+STRIP-METADATA removes #+TITLE, #+FILETAGS, etc. (default: t)."
+  :render
+  (let* ((max-lines (or max-lines 10))
+         (strip-drawers (if (null strip-drawers) t strip-drawers))
+         (strip-metadata (if (null strip-metadata) t strip-metadata))
+         (content (manifolding-atlas-ui--get-note-preview note max-lines strip-drawers strip-metadata)))
+    (when content
+      (vui-text content))))
+
+(defun manifolding-atlas-ui--get-note-preview (note max-lines strip-drawers strip-metadata)
+  "Get preview text for NOTE.
+MAX-LINES limits the number of lines.
+STRIP-DRAWERS removes property drawers when non-nil.
+STRIP-METADATA removes org metadata lines when non-nil."
+  (when (and note (manifolding-atlas-note-path note))
+    (let ((path (manifolding-atlas-note-path note)))
+      (with-temp-buffer
+        (insert-file-contents path)
+        (goto-char (manifolding-atlas-note-pos note))
+        ;; Skip the heading line itself if it's a heading note
+        (when (> (manifolding-atlas-note-level note) 0)
+          (forward-line 1))
+        (let ((lines nil)
+              (count 0))
+          (while (and (< count max-lines)
+                      (not (eobp)))
+            (let ((line (buffer-substring-no-properties
+                         (line-beginning-position)
+                         (line-end-position))))
+              ;; Filter lines based on settings
+              (unless (or (and strip-drawers
+                               (or (string-match-p "^[ \t]*:PROPERTIES:$" line)
+                                   (string-match-p "^[ \t]*:END:$" line)
+                                   (string-match-p "^[ \t]*:[A-Z_]+:.*$" line)))
+                          (and strip-metadata
+                               (string-match-p "^#\\+" line))
+                          (string-empty-p (string-trim line)))
+                (push line lines)
+                (cl-incf count)))
+            (forward-line 1))
+          (when lines
+            (string-join (nreverse lines) "\n")))))))
+
+
+;;; Stats widget
+
+(vui-defcomponent manifolding-atlas-ui-widget-stats ()
+  "Widget displaying statistics about the current note."
+  :render
+  (let ((note (use-manifolding-atlas-ui-note)))
+    (when note
+      (let* ((note-buf (when (manifolding-atlas-note-path note)
+                         (find-buffer-visiting (manifolding-atlas-note-path note))))
+             (tick (when note-buf (buffer-modified-tick note-buf)))
+             (stats (vui-use-memo (note tick)
+                      (manifolding-atlas-ui--compute-stats note)))
+             (chars (plist-get stats :chars))
+             (words (plist-get stats :words))
+             (links (plist-get stats :links)))
+        (vui-component 'manifolding-atlas-ui-widget
+          :title "Stats"
+          :children
+          (lambda ()
+            (vui-text
+                (format "%s chars · %s words · %d links"
+                        (manifolding-atlas-ui--format-number chars)
+                        (manifolding-atlas-ui--format-number words)
+                        links)
+              :face 'manifolding-atlas-ui-stats-face)))))))
+
+(defun manifolding-atlas-ui--compute-stats (note)
+  "Compute statistics for NOTE.
+Returns a plist with :chars, :words, and :links.
+If the note's file is open in a buffer, reads from buffer for live stats.
+Otherwise reads from disk."
+  (if (and note (manifolding-atlas-note-path note))
+      (let ((path (manifolding-atlas-note-path note))
+            (links (seq-filter (lambda (link)
+                                 (equal "id" (plist-get link :type)))
+                               (manifolding-atlas-note-links note)))
+            (existing-buf (find-buffer-visiting (manifolding-atlas-note-path note))))
+        (let* ((content (if existing-buf
+                            (with-current-buffer existing-buf
+                              (buffer-substring-no-properties (point-min) (point-max)))
+                          (with-temp-buffer
+                            (insert-file-contents path)
+                            (buffer-substring-no-properties (point-min) (point-max)))))
+               (chars (length content))
+               (words (length (split-string content "\\W+" t))))
+          (list :chars chars :words words :links (length links))))
+    (list :chars 0 :words 0 :links 0)))
+
+(defun manifolding-atlas-ui--format-number (n)
+  "Format number N with thousands separators."
+  (let ((s (number-to-string n)))
+    (if (< n 1000)
+        s
+      (let ((result nil)
+            (i 0))
+        (dolist (c (reverse (string-to-list s)))
+          (when (and (> i 0) (= (mod i 3) 0))
+            (push ?, result))
+          (push c result)
+          (cl-incf i))
+        (apply #'string result)))))
+
+
+;;; Outline widget
+
+(vui-defcomponent manifolding-atlas-ui-widget-outline ()
+  "Widget displaying the heading structure of the current note."
+  :render
+  (let ((note (use-manifolding-atlas-ui-note)))
+    (when note
+      (let* ((note-buf (when (manifolding-atlas-note-path note)
+                         (find-buffer-visiting (manifolding-atlas-note-path note))))
+             (tick (when note-buf (buffer-modified-tick note-buf)))
+             (headings (vui-use-memo (note tick)
+                         (manifolding-atlas-ui--parse-headings note))))
+        (vui-component 'manifolding-atlas-ui-widget
+          :title "Outline"
+          :count (length headings)
+          :children
+          (lambda ()
+            (if headings
+                (seq-map
+                 (lambda (heading)
+                   (manifolding-atlas-ui--render-outline-heading heading note))
+                 headings)
+              (vui-muted "No headings"))))))))
+
+(defun manifolding-atlas-ui--heading-archived-p (hl archive-tag)
+  "Return non-nil if HL or any of its ancestors has ARCHIVE-TAG."
+  (let ((current hl)
+        (archived nil))
+    (while (and current (not archived))
+      (when (member archive-tag (org-element-property :tags current))
+        (setq archived t))
+      (setq current (org-element-property :parent current)))
+    archived))
+
+(defun manifolding-atlas-ui--parse-headings (note)
+  "Parse headings from NOTE using org-element.
+Returns a list of plists with :title, :level, and :pos."
+  (when (and note (manifolding-atlas-note-path note))
+    (let ((path (manifolding-atlas-note-path note))
+          (max-depth manifolding-atlas-ui-outline-max-depth)
+          (existing-buf (find-buffer-visiting (manifolding-atlas-note-path note))))
+      (with-temp-buffer
+        (if existing-buf
+            (insert (with-current-buffer existing-buf
+                      (buffer-substring-no-properties (point-min) (point-max))))
+          (insert-file-contents path))
+        (manifolding-atlas-ui--setup-org-mode)
+        (let ((headings nil)
+              (archive-tag org-archive-tag))
+          (org-element-map (org-element-parse-buffer 'headline) 'headline
+            (lambda (hl)
+              (let ((level (org-element-property :level hl))
+                    (title (manifolding-atlas-ui--clean-org-links
+                            (org-element-property :raw-value hl)))
+                    (pos (org-element-property :begin hl)))
+                (when (and (not (manifolding-atlas-ui--heading-archived-p hl archive-tag))
+                           (or (null max-depth) (<= level max-depth)))
+                  (push (list :title title :level level :pos pos) headings)))))
+          (nreverse headings))))))
+
+(defun manifolding-atlas-ui--render-outline-heading (heading note)
+  "Render a single HEADING for outline widget.
+NOTE is the parent note for navigation."
+  (let* ((title (plist-get heading :title))
+         (level (plist-get heading :level))
+         (pos (plist-get heading :pos))
+         ;; Indent based on level: level 1 = 0, level 2 = 5, etc.
+         (indent (* (1- level) 5)))
+    (vui-vstack
+     :indent indent
+     (vui-button (concat "· " title)
+       :face 'shadow
+       :no-decoration t
+       :on-click (lambda ()
+                   (manifolding-atlas-ui--jump-to-position note pos))
+       :help-echo nil))))
+
+(defun manifolding-atlas-ui--jump-to-position (note pos)
+  "Jump to position POS in NOTE's file."
+  (when (and note pos)
+    (let ((main-win (manifolding-atlas-ui--get-main-window)))
+      (when main-win
+        (select-window main-win)
+        (find-file (manifolding-atlas-note-path note))
+        (goto-char pos)
+        (org-fold-show-entry)
+        (recenter)))))
+
+
+;;; Backlinks widget
+
+(vui-defcomponent manifolding-atlas-ui-widget-backlinks ()
+  "Widget displaying notes that link to the current note.
+Groups backlinks by file and shows heading context with optional previews."
+  :render
+  (let ((note (use-manifolding-atlas-ui-note)))
+    (when note
+      (let* ((result (vui-use-memo (note)
+                       (manifolding-atlas-ui--get-grouped-backlinks note)))
+             (groups (plist-get result :groups))
+             (filtered-count (plist-get result :filtered-count))
+             (total-count (plist-get result :total-count))
+             (count-display (if (= filtered-count total-count)
+                                filtered-count
+                              (format "%d/%d" filtered-count total-count))))
+        (vui-component 'manifolding-atlas-ui-widget
+          :title "Backlinks"
+          :count count-display
+          :children
+          (lambda ()
+            (if groups
+                (vui-vstack
+                 :spacing 1
+                 (seq-map #'manifolding-atlas-ui--render-backlink-group groups))
+              (vui-muted "No backlinks"))))))))
+
+(defun manifolding-atlas-ui--get-grouped-backlinks (note)
+  "Get backlinks to NOTE grouped by file.
+Returns a plist with :groups, :filtered-count, and :total-count.
+Each group has :file-note, :path, and :mentions.
+Each mention has :heading-path, :pos, and :preview.
+Applies `manifolding-atlas-ui-backlinks-note-filter' and
+`manifolding-atlas-ui-backlinks-context-types'."
+  (if (null note)
+      (list :groups nil :filtered-count 0 :total-count 0)
+    (let* ((target-id (manifolding-atlas-note-id note))
+           (backlinks (manifolding-atlas-db-query-by-links-some
+                       (list (cons "id" target-id))))
+           ;; Group backlinks by file path
+           (by-path (make-hash-table :test 'equal))
+           (total-count 0))
+      ;; Collect all mentions grouped by path (deduplicate by position)
+      (let ((seen-positions (make-hash-table :test 'equal)))
+        (dolist (bl backlinks)
+          (let* ((path (manifolding-atlas-note-path bl))
+                 (links (manifolding-atlas-note-links bl))
+                 ;; Find links pointing to our target
+                 (target-links (seq-filter
+                                (lambda (link)
+                                  (and (equal "id" (plist-get link :type))
+                                       (equal target-id (plist-get link :dest))))
+                                links)))
+            (dolist (link target-links)
+              (let* ((pos (plist-get link :pos))
+                     (key (cons path pos)))
+                ;; Only add if we haven't seen this path+position combo
+                (unless (gethash key seen-positions)
+                  (puthash key t seen-positions)
+                  (cl-incf total-count)
+                  (push (list :pos pos :source-note bl)
+                        (gethash path by-path))))))))
+      ;; Batch fetch file-level notes
+      (let* ((paths (hash-table-keys by-path))
+             (file-notes (when paths
+                           (manifolding-atlas-db-query-by-file-paths paths 0)))
+             (file-notes-by-path (make-hash-table :test 'equal)))
+        ;; Index file notes by path
+        (dolist (fn file-notes)
+          (puthash (manifolding-atlas-note-path fn) fn file-notes-by-path))
+        ;; Build grouped result with filtering
+        (let ((result nil)
+              (filtered-count 0))
+          (dolist (path paths)
+            (let* ((file-note (gethash path file-notes-by-path))
+                   ;; Apply note filter
+                   (note-allowed (funcall manifolding-atlas-ui-backlinks-note-filter file-note)))
+              (when note-allowed
+                (let* ((mentions (gethash path by-path))
+                       ;; Sort mentions by position
+                       (sorted-mentions (seq-sort
+                                         (lambda (a b)
+                                           (< (plist-get a :pos) (plist-get b :pos)))
+                                         mentions))
+                       ;; Enrich mentions with heading context and preview
+                       ;; (context type filtering now happens inside this function)
+                       (enriched (manifolding-atlas-ui--enrich-backlink-mentions
+                                  path sorted-mentions target-id)))
+                  (when enriched
+                    (cl-incf filtered-count (length enriched))
+                    (push (list :file-note file-note
+                                :path path
+                                :mentions enriched)
+                          result))))))
+          ;; Sort groups according to configuration
+          (list :groups (manifolding-atlas-ui--sort-backlink-groups result)
+                :filtered-count filtered-count
+                :total-count total-count))))))
+
+(defun manifolding-atlas-ui--sort-backlink-groups (groups)
+  "Sort GROUPS according to `manifolding-atlas-ui-backlinks-sort'."
+  (pcase manifolding-atlas-ui-backlinks-sort
+    ('nil groups)
+    ('title-asc (seq-sort (lambda (a b)
+                            (string< (or (manifolding-atlas-note-title (plist-get a :file-note)) "")
+                                     (or (manifolding-atlas-note-title (plist-get b :file-note)) "")))
+                          groups))
+    ('title-desc (seq-sort (lambda (a b)
+                             (string> (or (manifolding-atlas-note-title (plist-get a :file-note)) "")
+                                      (or (manifolding-atlas-note-title (plist-get b :file-note)) "")))
+                           groups))
+    ((pred functionp) (seq-sort manifolding-atlas-ui-backlinks-sort groups))
+    (_ groups)))
+
+(defun manifolding-atlas-ui--enrich-backlink-mentions (path mentions target-id)
+  "Enrich MENTIONS with heading context and preview from file at PATH.
+TARGET-ID is the ID of the note being linked to (for prose context extraction).
+Filters by `manifolding-atlas-ui-backlinks-context-types' BEFORE expensive operations.
+Deduplicates mentions with identical heading-path and preview text."
+  (when (and path mentions)
+    (with-temp-buffer
+      (insert-file-contents path)
+      (manifolding-atlas-ui--setup-org-mode)
+      ;; First pass: detect context types (cheap) and filter early
+      (let* ((mentions-with-type
+              (seq-map
+               (lambda (mention)
+                 (let* ((pos (plist-get mention :pos))
+                        (line (save-excursion
+                                (goto-char pos)
+                                (buffer-substring-no-properties
+                                 (line-beginning-position)
+                                 (line-end-position))))
+                        (context-type (manifolding-atlas-ui--detect-context-type pos line)))
+                   (list :pos pos :context-type context-type)))
+               mentions))
+             ;; Filter by context type BEFORE expensive operations
+             (filtered
+              (if (eq manifolding-atlas-ui-backlinks-context-types t)
+                  mentions-with-type
+                (seq-filter
+                 (lambda (m)
+                   (memq (plist-get m :context-type)
+                         manifolding-atlas-ui-backlinks-context-types))
+                 mentions-with-type))))
+        ;; Only parse headings if we have any filtered mentions
+        (when filtered
+          (let ((headings (manifolding-atlas-ui--parse-all-headings))
+                (seen (make-hash-table :test 'equal))
+                (result nil))
+            (dolist (mention filtered)
+              (let* ((pos (plist-get mention :pos))
+                     (heading-path (manifolding-atlas-ui--find-heading-path headings pos))
+                     (preview (when manifolding-atlas-ui-backlinks-show-preview
+                                (manifolding-atlas-ui--extract-preview pos target-id)))
+                     ;; Create dedup key from heading-path and preview text
+                     (preview-text (when preview (plist-get preview :text)))
+                     (dedup-key (list heading-path preview-text)))
+                ;; Only add if we haven't seen this heading+preview combo
+                (unless (gethash dedup-key seen)
+                  (puthash dedup-key t seen)
+                  (push (list :pos pos
+                              :heading-path heading-path
+                              :preview preview)
+                        result))))
+            (nreverse result)))))))
+
+(defun manifolding-atlas-ui--parse-all-headings ()
+  "Parse all headings in current buffer.
+Returns list of (:title :level :begin :end) plists sorted by position."
+  (let ((headings nil)
+        (archive-tag org-archive-tag))
+    (org-element-map (org-element-parse-buffer 'headline) 'headline
+      (lambda (hl)
+        (unless (manifolding-atlas-ui--heading-archived-p hl archive-tag)
+          (push (list :title (org-element-property :raw-value hl)
+                      :level (org-element-property :level hl)
+                      :begin (org-element-property :begin hl)
+                      :end (org-element-property :end hl))
+                headings))))
+    (seq-sort (lambda (a b) (< (plist-get a :begin) (plist-get b :begin)))
+              headings)))
+
+(defun manifolding-atlas-ui--find-heading-path (headings pos)
+  "Find the heading path for position POS given HEADINGS.
+Returns a list of heading titles from outermost to innermost."
+  (let ((path nil)
+        (current-level 0))
+    (dolist (h headings)
+      (let ((begin (plist-get h :begin))
+            (end (plist-get h :end))
+            (level (plist-get h :level))
+            (title (plist-get h :title)))
+        (when (and (<= begin pos) (< pos end))
+          ;; This heading contains our position
+          (cond
+           ;; New top-level heading, reset path
+           ((= level 1)
+            (setq path (list title)
+                  current-level 1))
+           ;; Deeper heading, add to path
+           ((> level current-level)
+            (setq path (append path (list title))
+                  current-level level))
+           ;; Same or shallower level, replace at this level
+           ((<= level current-level)
+            (setq path (append (seq-take path (1- level)) (list title))
+                  current-level level))))))
+    path))
+
+(defun manifolding-atlas-ui--extract-preview (pos target-id)
+  "Extract preview info around POS in current buffer.
+TARGET-ID is the ID of the note being linked to.
+Returns a plist with :type and type-specific content:
+  - :type meta    -> :key :value
+  - :type header  -> :text
+  - :type table   -> :text
+  - :type list    -> :text
+  - :type quote   -> :text
+  - :type code    -> :text
+  - :type footnote -> :text
+  - :type prose   -> :text"
+  (save-excursion
+    (goto-char pos)
+    (let* ((line (buffer-substring-no-properties
+                  (line-beginning-position)
+                  (line-end-position)))
+           (context-type (manifolding-atlas-ui--detect-context-type pos line)))
+      (pcase context-type
+        ('meta (manifolding-atlas-ui--extract-meta pos line))
+        ('header (manifolding-atlas-ui--extract-header line))
+        ('table (manifolding-atlas-ui--extract-table pos))
+        ('list (manifolding-atlas-ui--extract-list line))
+        ('quote (manifolding-atlas-ui--extract-quote line))
+        ('code (manifolding-atlas-ui--extract-code line))
+        ('footnote (manifolding-atlas-ui--extract-footnote line))
+        (_ (manifolding-atlas-ui--extract-prose pos target-id))))))
+
+(defun manifolding-atlas-ui--detect-context-type (pos line)
+  "Detect the context type at POS given LINE content."
+  (cond
+   ;; Meta block: - key :: value
+   ((string-match-p "^[ \t]*- [^:]+[ \t]+::" line) 'meta)
+   ;; Header: starts with *
+   ((string-match-p "^\\*+ " line) 'header)
+   ;; Table: starts with |
+   ((string-match-p "^[ \t]*|" line) 'table)
+   ;; Quote block: check if inside #+BEGIN_QUOTE
+   ((manifolding-atlas-ui--inside-block-p pos "QUOTE") 'quote)
+   ;; Code/src block
+   ((or (manifolding-atlas-ui--inside-block-p pos "SRC")
+        (manifolding-atlas-ui--inside-block-p pos "EXAMPLE"))
+    'code)
+   ;; Footnote: [fn:...]
+   ((string-match-p "^\\[fn:" line) 'footnote)
+   ;; List item (non-meta): - item or + item or 1. item
+   ((string-match-p "^[ \t]*[-+*] [^:]" line) 'list)
+   ((string-match-p "^[ \t]*[0-9]+[.)] " line) 'list)
+   ;; Default: prose
+   (t 'prose)))
+
+(defun manifolding-atlas-ui--inside-block-p (pos block-type)
+  "Return non-nil if POS is inside a block of BLOCK-TYPE."
+  (save-excursion
+    (goto-char pos)
+    (let ((case-fold-search t)
+          (begin-re (format "^[ \t]*#\\+BEGIN_%s" block-type))
+          (end-re (format "^[ \t]*#\\+END_%s" block-type)))
+      (and (re-search-backward begin-re nil t)
+           (progn
+             (re-search-forward end-re nil t)
+             (> (point) pos))))))
+
+(defun manifolding-atlas-ui--extract-meta (_pos line)
+  "Extract meta block info from LINE."
+  (when (string-match "^[ \t]*- \\([^:]+\\)[ \t]+:: *\\(.*\\)$" line)
+    (let ((key (string-trim (match-string 1 line)))
+          (value (manifolding-atlas-ui--clean-org-links (match-string 2 line))))
+      (list :type 'meta :key key :value value))))
+
+(defun manifolding-atlas-ui--extract-header (line)
+  "Extract header info from LINE."
+  (when (string-match "^\\*+ \\(.*\\)$" line)
+    (list :type 'header
+          :text (manifolding-atlas-ui--clean-org-links (match-string 1 line)))))
+
+(defun manifolding-atlas-ui--extract-table (pos)
+  "Extract table cell info around POS."
+  (save-excursion
+    (goto-char pos)
+    (let ((line (buffer-substring-no-properties
+                 (line-beginning-position)
+                 (line-end-position))))
+      ;; Find which cell contains the link
+      (let ((cells (split-string line "|" t "[ \t]*")))
+        (list :type 'table
+              :text (manifolding-atlas-ui--clean-org-links
+                     (string-join cells " | ")))))))
+
+(defun manifolding-atlas-ui--extract-list (line)
+  "Extract list item info from LINE."
+  (let ((text (replace-regexp-in-string
+               "^[ \t]*[-+*] \\|^[ \t]*[0-9]+[.)] "
+               ""
+               line)))
+    (list :type 'list
+          :text (manifolding-atlas-ui--clean-org-links (string-trim text)))))
+
+(defun manifolding-atlas-ui--extract-quote (line)
+  "Extract quote info from LINE."
+  (list :type 'quote
+        :text (manifolding-atlas-ui--clean-org-links (string-trim line))))
+
+(defun manifolding-atlas-ui--extract-code (line)
+  "Extract code/example info from LINE."
+  (list :type 'code
+        :text (string-trim line)))
+
+(defun manifolding-atlas-ui--extract-footnote (line)
+  "Extract footnote info from LINE."
+  (let ((text (replace-regexp-in-string "^\\[fn:[^]]*\\] *" "" line)))
+    (list :type 'footnote
+          :text (manifolding-atlas-ui--clean-org-links (string-trim text)))))
+
+(defun manifolding-atlas-ui--extract-prose (pos target-id)
+  "Extract prose context around POS for link to TARGET-ID."
+  (save-excursion
+    (goto-char pos)
+    ;; Find the paragraph boundaries
+    (let* ((para-start (save-excursion
+                         (backward-paragraph)
+                         (skip-chars-forward " \t\n")
+                         (point)))
+           (para-end (save-excursion
+                       (forward-paragraph)
+                       (point)))
+           (para-text (buffer-substring-no-properties para-start para-end))
+           ;; Find the link position within paragraph
+           (link-re (format "\\[\\[id:%s\\]\\(?:\\[[^]]*\\]\\)?\\]" target-id))
+           (link-start (when (string-match link-re para-text)
+                         (match-beginning 0)))
+           (link-end (when link-start (match-end 0))))
+      (if link-start
+          ;; Extract context around the link (including the link itself)
+          (let* ((context-start (max 0 (- link-start manifolding-atlas-ui-backlinks-prose-chars-before)))
+                 (context-end (min (length para-text)
+                                   (+ link-end manifolding-atlas-ui-backlinks-prose-chars-after)))
+                 (context-text (substring para-text context-start context-end))
+                 ;; Clean links and add ellipsis
+                 (clean-text (manifolding-atlas-ui--clean-org-links context-text))
+                 (ellipsis-before (if (> context-start 0) "..." ""))
+                 (ellipsis-after (if (< context-end (length para-text)) "..." "")))
+            (list :type 'prose
+                  :text (format "%s%s%s"
+                                ellipsis-before
+                                (string-trim clean-text)
+                                ellipsis-after)))
+        ;; Fallback: just get the line
+        (list :type 'prose
+              :text (manifolding-atlas-ui--clean-org-links
+                     (string-trim
+                      (buffer-substring-no-properties
+                       (line-beginning-position)
+                       (line-end-position)))))))))
+
+(defun manifolding-atlas-ui--clean-org-links (text)
+  "Clean org link syntax from TEXT.
+This is an internal wrapper around `manifolding-atlas-ui-clean-org-markup'."
+  (manifolding-atlas-ui-clean-org-markup text))
+
+(defun manifolding-atlas-ui--render-backlink-group (group)
+  "Render a backlink GROUP with file note and mentions."
+  (let* ((file-note (plist-get group :file-note))
+         (mentions (plist-get group :mentions))
+         (path (plist-get group :path))
+         ;; Group mentions by heading path
+         (grouped (manifolding-atlas-ui--group-mentions-by-heading mentions)))
+    (vui-vstack
+     :spacing 0
+     ;; File-level note link
+     (if file-note
+         (vui-component 'manifolding-atlas-ui-note-link :note file-note)
+       (vui-muted (file-name-nondirectory path)))
+     ;; Mentions grouped by heading
+     (when grouped
+       (vui-vstack
+        :spacing 1
+        :indent 2
+        (seq-map (lambda (hg) (manifolding-atlas-ui--render-heading-group hg path))
+                 grouped))))))
+
+(defun manifolding-atlas-ui--group-mentions-by-heading (mentions)
+  "Group MENTIONS by their heading path.
+Returns list of (:heading-path :depth :mentions) plists."
+  (let ((groups (make-hash-table :test 'equal))
+        (order nil))
+    (dolist (m mentions)
+      (let* ((heading-path (plist-get m :heading-path))
+             (key (or heading-path 'file-level)))
+        (unless (gethash key groups)
+          (push key order))
+        (push m (gethash key groups))))
+    ;; Build result in original order
+    (seq-map (lambda (key)
+               (list :heading-path (if (eq key 'file-level) nil key)
+                     :depth (if (eq key 'file-level) 0 (length key))
+                     :mentions (nreverse (gethash key groups))))
+             (nreverse order))))
+
+(defun manifolding-atlas-ui--render-heading-group (hg path)
+  "Render a heading group HG from file at PATH."
+  (let* ((heading-path (plist-get hg :heading-path))
+         (depth (plist-get hg :depth))
+         (mentions (plist-get hg :mentions))
+         ;; Extra indent for nested headings (2 per level after first)
+         (heading-indent (if (> depth 1) (* (1- depth) 2) 0))
+         ;; Only show the last heading in the path (cleaned of org links)
+         (display-heading (when heading-path
+                            (manifolding-atlas-ui--clean-org-links (car (last heading-path))))))
+    (vui-vstack
+     :spacing 0
+     :indent heading-indent
+     ;; Heading text (if any) - bold, not clickable
+     (when display-heading
+       (vui-text display-heading :face 'manifolding-atlas-ui-backlink-heading-face))
+     ;; Mentions under this heading
+     (vui-vstack
+      :spacing 0
+      :indent (if display-heading 2 0)
+      (seq-map (lambda (m) (manifolding-atlas-ui--render-backlink-mention m path))
+               mentions)))))
+
+(defun manifolding-atlas-ui--render-backlink-mention (mention path)
+  "Render a single backlink MENTION from file at PATH.
+Renders the preview as a clickable button to jump to the mention."
+  (let* ((preview (plist-get mention :preview))
+         (pos (plist-get mention :pos)))
+    (when preview
+      (manifolding-atlas-ui--render-preview-button preview path pos))))
+
+(defun manifolding-atlas-ui--render-preview-button (preview path pos)
+  "Render PREVIEW as a clickable button to jump to PATH at POS."
+  (let ((type (plist-get preview :type))
+        (on-click (lambda () (manifolding-atlas-ui--jump-to-file-position path pos))))
+    (let ((indicator (pcase type
+                       ('meta "⊢")
+                       ('header "§")
+                       ('table "▤")
+                       ('list "·")
+                       ('quote ">")
+                       ('code "λ")
+                       ('footnote "†")
+                       (_ nil)))
+          (text (pcase type
+                  ('meta (concat (plist-get preview :key) ": "
+                                 (or (plist-get preview :value) "")))
+                  (_ (or (plist-get preview :text) "")))))
+      (if indicator
+          (vui-hstack
+           :spacing 1
+           (vui-text indicator :face 'manifolding-atlas-ui-backlink-context-face)
+           (vui-button text
+             :face 'manifolding-atlas-ui-backlink-preview-face
+             :no-decoration t
+             :on-click on-click
+             :help-echo nil))
+        (vui-button text
+          :face 'manifolding-atlas-ui-backlink-preview-face
+          :no-decoration t
+          :on-click on-click
+          :help-echo nil)))))
+
+(defun manifolding-atlas-ui--jump-to-file-position (path pos)
+  "Jump to position POS in file at PATH."
+  (when (and path pos)
+    (let ((main-win (manifolding-atlas-ui--get-main-window)))
+      (when main-win
+        (select-window main-win)
+        (find-file path)
+        (goto-char pos)
+        (org-fold-show-entry)
+        (recenter)))))
+
+
+;;; Forward links widget
+
+(vui-defcomponent manifolding-atlas-ui-widget-links ()
+  "Widget displaying notes that the current note links to."
+  :render
+  (let ((note (use-manifolding-atlas-ui-note)))
+    (when note
+      (let ((forward-links (vui-use-memo (note)
+                             (manifolding-atlas-ui--get-forward-links note))))
+        (vui-component 'manifolding-atlas-ui-widget
+          :title "Links"
+          :count (length forward-links)
+          :children
+          (lambda ()
+            (if forward-links
+                (vui-vstack
+                 :spacing 0
+                 (seq-map
+                  (lambda (link-info)
+                    (let ((link-note (plist-get link-info :note))
+                          (count (plist-get link-info :count)))
+                      (vui-hstack
+                       :spacing 1
+                       (vui-component 'manifolding-atlas-ui-note-link :note link-note)
+                       (vui-text (format "(%d)" count)
+                         :face 'manifolding-atlas-ui-widget-count-face))))
+                  forward-links))
+              (vui-muted "No links"))))))))
+
+(defun manifolding-atlas-ui--get-forward-links (note)
+  "Get all notes linked from NOTE's file with counts.
+Collects links from all headings in the file, not just the current note.
+Returns a list of plists with :note and :count, sorted by title."
+  (when note
+    (let* ((path (manifolding-atlas-note-path note))
+           ;; Get all notes in this file (file-level and all headings)
+           (file-notes (manifolding-atlas-db-query-by-file-paths (list path)))
+           ;; Collect all links from all notes
+           (all-links (seq-mapcat #'manifolding-atlas-note-links file-notes))
+           ;; Filter to id links only
+           (id-links (seq-filter (lambda (link)
+                                   (equal "id" (plist-get link :type)))
+                                 all-links))
+           ;; Count occurrences of each destination ID
+           (id-counts (make-hash-table :test 'equal)))
+      (dolist (link id-links)
+        (let ((dest (plist-get link :dest)))
+          (puthash dest (1+ (gethash dest id-counts 0)) id-counts)))
+      ;; Fetch notes and build result with counts
+      (let* ((ids (hash-table-keys id-counts))
+             (notes (when ids (manifolding-atlas-db-query-by-ids ids)))
+             (result (seq-map (lambda (n)
+                                (list :note n
+                                      :count (gethash (manifolding-atlas-note-id n) id-counts)))
+                              notes)))
+        ;; Sort by title
+        (seq-sort (lambda (a b)
+                    (string< (or (manifolding-atlas-note-title (plist-get a :note)) "")
+                             (or (manifolding-atlas-note-title (plist-get b :note)) "")))
+                  result)))))
+
+
+;;; Root component
+
+(vui-defcomponent manifolding-atlas-ui-sidebar-content ()
+  "Content component for the sidebar (uses context)."
+  :render
+  (let ((note (use-manifolding-atlas-ui-note)))
+    (if note
+        (let ((widgets (manifolding-atlas-ui--get-widgets-for-note note)))
+          (vui-vstack
+           :spacing 1
+           (seq-map (lambda (widget-sym)
+                      (vui-component widget-sym :key widget-sym))
+                    widgets)))
+      (vui-muted "No manifolding-atlas note selected"))))
+
+(vui-defcomponent manifolding-atlas-ui-sidebar-root (note)
+  "Root component for the sidebar with NOTE context."
+  :render
+  (manifolding-atlas-ui-note-provider note
+    (vui-component 'manifolding-atlas-ui-sidebar-content)))
+
+
+;;; Rendering
+
+(defun manifolding-atlas-ui--render-sidebar (note &optional frame)
+  "Render the sidebar with NOTE as context in FRAME."
+  (let* ((manifolding-atlas-ui--rendering t)  ; Prevent re-entry
+         (frame (or frame (selected-frame)))
+         (buf-name (manifolding-atlas-ui--sidebar-buffer-name frame))
+         (buf (get-buffer-create buf-name))
+         (sidebar-win (manifolding-atlas-ui--get-sidebar-window frame))
+         (original-window (selected-window))
+         (existing-instance (gethash frame manifolding-atlas-ui--sidebar-instances)))
+    ;; Select sidebar window before mount (vui-mount calls switch-to-buffer)
+    (when sidebar-win
+      (select-window sidebar-win t))
+    (with-current-buffer buf
+      (if (and existing-instance
+               (vui-instance-buffer existing-instance)
+               (buffer-live-p (vui-instance-buffer existing-instance)))
+          ;; Reuse existing instance - update props, preserve memos
+          (vui-update-props existing-instance (list :note note))
+        ;; Mount fresh - first render or instance was lost
+        (let ((new-instance
+               (vui-mount
+                (vui-component 'manifolding-atlas-ui-sidebar-root :note note)
+                buf-name)))
+          (puthash frame new-instance manifolding-atlas-ui--sidebar-instances)))
+      ;; Set current note AFTER render (vui-mount kills local variables)
+      (setq manifolding-atlas-ui--current-note note)
+      (goto-char (point-min)))
+    ;; Restore original window
+    (when (window-live-p original-window)
+      (select-window original-window t))))
+
+
+;;; Commands
+
+;;;###autoload
+(defun manifolding-atlas-ui-sidebar-open ()
+  "Open or show the manifolding-atlas-ui sidebar in the current frame."
+  (interactive)
+  (let* ((frame (selected-frame))
+         (buf-name (manifolding-atlas-ui--sidebar-buffer-name frame))
+         (buf (get-buffer-create buf-name)))
+    ;; Set up the buffer
+    (with-current-buffer buf
+      (unless (derived-mode-p 'manifolding-atlas-ui-sidebar-mode)
+        (manifolding-atlas-ui-sidebar-mode)))
+    ;; Create window if not visible
+    (unless (manifolding-atlas-ui--sidebar-visible-p frame)
+      (manifolding-atlas-ui--create-sidebar-window buf))
+    ;; Set up hooks
+    (manifolding-atlas-ui--setup-hooks)
+    ;; Initial render with current note
+    (let* ((main-win (manifolding-atlas-ui--get-main-window frame))
+           (main-buf (when main-win (window-buffer main-win)))
+           (note (manifolding-atlas-ui--get-note-from-buffer main-buf)))
+      (manifolding-atlas-ui--render-sidebar note frame))))
+
+;;;###autoload
+(defun manifolding-atlas-ui-sidebar-close ()
+  "Close the manifolding-atlas-ui sidebar in the current frame."
+  (interactive)
+  (let* ((frame (selected-frame))
+         (win (manifolding-atlas-ui--get-sidebar-window frame))
+         (buf (manifolding-atlas-ui--get-sidebar-buffer frame)))
+    (when win
+      (delete-window win))
+    (when buf
+      (kill-buffer buf))
+    ;; Clean up state
+    (remhash frame manifolding-atlas-ui--sidebar-instances)
+    (remhash frame manifolding-atlas-ui--sidebar-auto-hidden)
+    ;; Teardown hooks if no more sidebars
+    (when (hash-table-empty-p manifolding-atlas-ui--sidebar-instances)
+      (manifolding-atlas-ui--teardown-hooks))))
+
+;;;###autoload
+(defun manifolding-atlas-ui-sidebar-toggle ()
+  "Toggle the manifolding-atlas-ui sidebar visibility in the current frame."
+  (interactive)
+  (if (manifolding-atlas-ui--sidebar-visible-p)
+      (manifolding-atlas-ui-sidebar-close)
+    (manifolding-atlas-ui-sidebar-open)))
+
+;;;###autoload
+(defun manifolding-atlas-ui-sidebar-refresh ()
+  "Force refresh the sidebar, invalidating all caches."
+  (interactive)
+  (let* ((frame (selected-frame))
+         (main-win (manifolding-atlas-ui--get-main-window frame))
+         (main-buf (when main-win (window-buffer main-win)))
+         (note (manifolding-atlas-ui--get-note-from-buffer main-buf))
+         (instance (gethash frame manifolding-atlas-ui--sidebar-instances)))
+    (when (and note instance
+               (vui-instance-buffer instance)
+               (buffer-live-p (vui-instance-buffer instance)))
+      (with-current-buffer (vui-instance-buffer instance)
+        (setq manifolding-atlas-ui--current-note note))
+      (vui-update instance (list :note note)))))
+
+
+;;; Built-in widget registration
+
+(manifolding-atlas-ui-register-widget 'stats
+                           :component 'manifolding-atlas-ui-widget-stats
+                           :order 100)
+
+(manifolding-atlas-ui-register-widget 'outline
+                           :component 'manifolding-atlas-ui-widget-outline
+                           :order 200)
+
+(manifolding-atlas-ui-register-widget 'backlinks
+                           :component 'manifolding-atlas-ui-widget-backlinks
+                           :order 300)
+
+(manifolding-atlas-ui-register-widget 'links
+                           :component 'manifolding-atlas-ui-widget-links
+                           :order 400)
+
+(provide 'manifolding-atlas-ui)
+#+end_src
+
