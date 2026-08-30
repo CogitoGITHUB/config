@@ -846,19 +846,12 @@ PROPERTIES (alist)."
 (defun manifolding-atlas-find-create-note (title &optional _props)
   "Create a new note with TITLE selected in `manifolding-atlas-find'.
 
-Prompts for subdir and file name, then creates the note immediately
-with TODO_STATE defaulted to WARNING -- so if you quit right after
-picking the subdir, the file already exists on disk for real.
-
 Creates a file-level note via `manifolding-atlas-create' and returns the
 resulting `manifolding-atlas-note'. PROPS mirrors the capture properties
 argument of `manifolding-atlas-insert' CREATE-FN and is currently unused.
 
 This is the default value of `manifolding-atlas-find-default-create-fn'."
-  (let* ((subdir (my/manifolding-atlas-prompt-subdir))
-         (fname (my/manifolding-atlas-prompt-file-name title subdir)))
-    (manifolding-atlas-create title fname
-                  :properties '(("TODO_STATE" . "WARNING")))))
+  (manifolding-atlas-create title))
 
 ;;;###autoload
 (cl-defun manifolding-atlas-find (&key other-window

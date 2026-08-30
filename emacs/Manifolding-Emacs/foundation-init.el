@@ -13,7 +13,7 @@
 (defun my/init-note (fmt &rest args)
   (let ((message-log-max nil)) (apply #'message fmt args)))
 
-(my/init-note "[init] straight bootstrap…")
+;; (my/init-note "[init] straight bootstrap…")
 (defvar bootstrap-version)
 (let ((bootstrap-file
        (expand-file-name
@@ -21,7 +21,7 @@
       (bootstrap-version 6))
   (when (file-exists-p bootstrap-file)
     (load bootstrap-file nil 'nomessage)))
-(my/init-note "[init] straight ready")
+;; (my/init-note "[init] straight ready")
 
 (let ((straight-build-dir
        (expand-file-name "straight/build/" user-emacs-directory)))
@@ -74,16 +74,16 @@
       (doom-modeline-mode 1)
       (doom-modeline-set-modeline 'my-modeline t))
   (error nil))
-(my/init-note "[init] modeline ready")
+;; (my/init-note "[init] modeline ready")
 
-(my/init-note "[init] loading org + leaf…")
+;; (my/init-note "[init] loading org + leaf…")
 (straight-use-package 'org)
 
 (straight-use-package 'leaf)
 (straight-use-package 'leaf-keywords)
 (eval-and-compile
   (leaf-keywords-init))
-(my/init-note "[init] core ready")
+;; (my/init-note "[init] core ready")
 
 (defun my/load-literate-loader (&optional file)
   "Tangle the loader org to .el, then load it."
@@ -94,17 +94,16 @@
   (unless (file-exists-p file)
     (error "[init] literate loader missing: %s" file))
   (let ((el (concat (file-name-sans-extension file) ".el")))
-    (my/init-note "[init] tangling loader…")
+    ;; (my/init-note "[init] tangling loader…")
     (with-demoted-errors "[init] tangle failed: %s"
       (org-babel-tangle-file file))
-    (my/init-note "[init] loading literate loader…")
-    (load el nil t)
-    (my/init-note "[init] literate loader ready")))
+    ;; (my/init-note "[init] loading literate loader…")
+    (load el nil t)))
 
 (add-to-list 'load-path (expand-file-name "lisp/" user-emacs-directory))
 (my/load-literate-loader)
 
-(my/init-note "[init] loader ready — booting modules…")
+;; (my/init-note "[init] loader ready — booting modules…")
 
 (setq manifolding-emacs--boot-warnings '())
 (advice-add 'manifolding-emacs-boot :before

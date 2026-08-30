@@ -33,6 +33,7 @@ require chain so dependencies always precede their users.
 (require 'url)
 (require 'recentf)
 (require 'ffap)
+(setq recentf-auto-cleanup 'never)
 
 (defvar straight-current-profile)
 #+end_src

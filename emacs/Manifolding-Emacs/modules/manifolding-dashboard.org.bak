@@ -1410,7 +1410,7 @@ REST is for widget creation."
   (dashboard-mute-apply
     (recentf-mode 1)
     (when dashboard-remove-missing-entry
-      (let ((inhibit-message t)) (ignore-errors (recentf-cleanup)))))
+      (ignore-errors (recentf-cleanup))))
   (dashboard-insert-section
    "Recent Files:"
    (dashboard-shorten-paths recentf-list 'dashboard-recentf-alist 'recents)

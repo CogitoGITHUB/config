@@ -192,7 +192,7 @@ Must be here — loading straight.el must happen before any
 straight-use-package call.
 
 #+begin_src emacs-lisp
-(my/init-note "[init] straight bootstrap…")
+;; (my/init-note "[init] straight bootstrap…")
 (defvar bootstrap-version)
 (let ((bootstrap-file
        (expand-file-name
@@ -200,7 +200,7 @@ straight-use-package call.
       (bootstrap-version 6))
   (when (file-exists-p bootstrap-file)
     (load bootstrap-file nil 'nomessage)))
-(my/init-note "[init] straight ready")
+;; (my/init-note "[init] straight ready")
 #+end_src
 
 ** Straight build dirs → load-path
@@ -268,7 +268,7 @@ just mean the modules re-apply everything later in boot.
       (doom-modeline-mode 1)
       (doom-modeline-set-modeline 'my-modeline t))
   (error nil))
-(my/init-note "[init] modeline ready")
+;; (my/init-note "[init] modeline ready")
 #+end_src
 
 ** Org from GNU ELPA
@@ -277,7 +277,7 @@ If this runs too late, the built-in Org loads first and causes
 version-mismatch warnings.
 
 #+begin_src emacs-lisp
-(my/init-note "[init] loading org + leaf…")
+;; (my/init-note "[init] loading org + leaf…")
 (straight-use-package 'org)
 #+end_src
 
@@ -289,7 +289,7 @@ Must be here — manifolding-emacs-boot generates leaf forms.
 (straight-use-package 'leaf-keywords)
 (eval-and-compile
   (leaf-keywords-init))
-(my/init-note "[init] core ready")
+;; (my/init-note "[init] core ready")
 #+end_src
 
 ** Literate loader
@@ -307,17 +307,16 @@ loads the .el directly.  If the .el is already fresh, skips tangle.
   (unless (file-exists-p file)
     (error "[init] literate loader missing: %s" file))
   (let ((el (concat (file-name-sans-extension file) ".el")))
-    (my/init-note "[init] tangling loader…")
+    ;; (my/init-note "[init] tangling loader…")
     (with-demoted-errors "[init] tangle failed: %s"
       (org-babel-tangle-file file))
-    (my/init-note "[init] loading literate loader…")
-    (load el nil t)
-    (my/init-note "[init] literate loader ready")))
+    ;; (my/init-note "[init] loading literate loader…")
+    (load el nil t)))
 
 (add-to-list 'load-path (expand-file-name "lisp/" user-emacs-directory))
 (my/load-literate-loader)
 
-(my/init-note "[init] loader ready — booting modules…")
+;; (my/init-note "[init] loader ready — booting modules…")
 
 (setq manifolding-emacs--boot-warnings '())
 (advice-add 'manifolding-emacs-boot :before

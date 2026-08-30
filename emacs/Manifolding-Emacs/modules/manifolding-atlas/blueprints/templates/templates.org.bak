@@ -40,6 +40,5 @@ Delegates to the central module path helper."
 (let ((snippets-dir (expand-file-name "snippets/" (my/templates-directory))))
   (make-directory snippets-dir t)
   (setq yas-snippet-dirs (list snippets-dir)))
-(setq yas-verbosity 1)
 (yas-global-mode 1)
 #+end_src

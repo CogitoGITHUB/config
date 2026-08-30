@@ -1,5 +1,5 @@
 #+TITLE: Manifolding Atlas — Database
-#+priority: -17
+#+priority: 3
 
 * Database
 
@@ -775,9 +775,13 @@ Returns plist with :hash, :mtime, :size or nil if not tracked."
 (require 'org-id)
 (require 'seq)
 (require 'cl-lib)
-(require 'manifolding-atlas-db)
-(require 'manifolding-atlas-note)
-(require 'manifolding-atlas-buffer)
+
+(declare-function manifolding-atlas-db-get-by-id "manifolding-atlas-db")
+(declare-function manifolding-atlas-note-path "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-level "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-pos "manifolding-atlas-note")
+(declare-function manifolding-atlas-buffer-meta-get-list "manifolding-atlas-buffer")
+(declare-function manifolding-atlas-buffer-meta-get "manifolding-atlas-buffer")
 
 (declare-function org-attach-dir "org-attach"
                   (&optional create-if-not-exists-p no-fs-check))
@@ -2314,6 +2318,7 @@ registered."
 ** Query
 #+begin_src emacs-lisp
 ;;; manifolding-atlas-db-query.el --- Query layer for Manifolding Atlas -*- lexical-binding: t; -*-
+(provide 'manifolding-atlas-db-query)
 ;;
 ;; Copyright (c) 2015-2026 Boris Buliga <boris@d12frosted.io>
 ;;
@@ -2358,8 +2363,11 @@ registered."
 ;;
 ;;; Code:
 
-(require 'manifolding-atlas-db)
-(require 'manifolding-atlas-note)
+(declare-function manifolding-atlas-db-get-by-id "manifolding-atlas-db")
+(declare-function manifolding-atlas-note-id "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-title "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-path "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-level "manifolding-atlas-note")
 (require 'json)
 
 ;;; Row Conversion
@@ -3232,11 +3240,10 @@ which case links of any listed type are counted."
 ;;
 ;;; Code:
 
-(require 'manifolding-atlas-db)
-(require 'manifolding-atlas-db-extract)
-
 (declare-function manifolding-atlas-db-sync--enqueue "manifolding-atlas-db-sync"
                   (path &optional force))
+(declare-function manifolding-atlas-db-extract--file "manifolding-atlas-db-extract")
+(declare-function manifolding-atlas-db-extract--heading "manifolding-atlas-db-extract")
 
 ;;; Customization
 
@@ -4559,10 +4566,9 @@ database afterwards."
 
 (require 'filenotify)
 (require 'seq)
-(require 'manifolding-atlas-db)
-(require 'manifolding-atlas-db-extract)
-(require 'manifolding-atlas-db-query)
-(require 'manifolding-atlas-db-worker)
+
+(declare-function manifolding-atlas-db-sync--enqueue "manifolding-atlas-db-sync")
+(declare-function manifolding-atlas-db-extract--file "manifolding-atlas-db-extract")
 
 ;;; Customization
 
@@ -6169,8 +6175,6 @@ Returns list of files found in DIR."
 (require 'subr-x)
 (require 'json)
 (require 'ol)
-(require 'manifolding-atlas-note)
-(require 'manifolding-atlas-db-query)
 
 (defvar manifolding-atlas-db-sync-directories)     ; defined in manifolding-atlas-db-sync
 
@@ -6591,15 +6595,7 @@ target a specific buffer."
 (require 'org-element)
 (require 'seq)
 (require 's)
-(require 'manifolding-atlas-utils)
-(require 'manifolding-atlas-db)
-(require 'manifolding-atlas-db-query)
-(require 'manifolding-atlas-buffer)
-(require 'manifolding-atlas-select)
 
-;; Defined in manifolding-atlas.el, which requires this file; declared here to
-;; avoid a load-time circular dependency.  Reached at runtime via the
-;; `manifolding-atlas-utils-process-notes' macro used by the batch operations.
 (declare-function manifolding-atlas-visit "manifolding-atlas")
 
 (defun manifolding-atlas-meta (note-or-id)
@@ -6943,7 +6939,14 @@ Returns the count of notes processed."
 ;;; Code:
 
 (require 'org)
-(require 'manifolding-atlas-note)
+
+(declare-function manifolding-atlas-note-id "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-path "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-level "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-pos "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-title "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-aliases "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-primary-title "manifolding-atlas-note")
 
 ;; Avoid circular dependency: manifolding-atlas-db-extract -> manifolding-atlas-buffer -> manifolding-atlas-utils
 (declare-function manifolding-atlas-db-update-file "manifolding-atlas-db-extract")
@@ -7216,10 +7219,15 @@ ARGS are passed to FN."
 ;;; Code:
 
 (require 'seq)
-(require 'manifolding-atlas-utils)
-(require 'manifolding-atlas-db)
-(require 'manifolding-atlas-db-query)
-(require 'manifolding-atlas-buffer)
+
+(declare-function manifolding-atlas-utils-with-note "manifolding-atlas-utils")
+(declare-function manifolding-atlas-utils-process-notes "manifolding-atlas-utils")
+(declare-function manifolding-atlas-db-get-by-id "manifolding-atlas-db")
+(declare-function manifolding-atlas-db-query-by-tags-some "manifolding-atlas-db-query")
+(declare-function manifolding-atlas-buffer-tags-get "manifolding-atlas-buffer")
+(declare-function manifolding-atlas-buffer-tags-add "manifolding-atlas-buffer")
+(declare-function manifolding-atlas-buffer-tags-remove "manifolding-atlas-buffer")
+(declare-function manifolding-atlas-buffer-tags-set "manifolding-atlas-buffer")
 
 ;; Defined in manifolding-atlas.el, which requires this file; declared here to
 ;; avoid a load-time circular dependency.  Reached at runtime via the
@@ -7402,10 +7410,15 @@ with the tag query functions, e.g.
 ;;
 ;;; Code:
 
-(require 'manifolding-atlas-utils)
-(require 'manifolding-atlas-note)
-(require 'manifolding-atlas-db)
-(require 'manifolding-atlas-db-query)
+(declare-function manifolding-atlas-note-id "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-title "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-primary-title "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-level "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-tags "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-aliases "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-expand-aliases "manifolding-atlas-note")
+(declare-function manifolding-atlas-db-query "manifolding-atlas-db")
+(declare-function manifolding-atlas-db-query-by-ids "manifolding-atlas-db-query")
 
 (defvar manifolding-atlas-select-describe-fn #'manifolding-atlas-note-title
   "Function to describe a note for completion.

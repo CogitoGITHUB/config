@@ -36,7 +36,7 @@ strings or text-derived modes, returning nil in a plain temp buffer).
 (require 'consult)
 (require 'hl-todo)
 (require 'cl-lib)
-(require 'cl-lib)
+(require 'cl)
 
 (declare-function project-root "project")
 

@@ -143,7 +143,9 @@ general prompts (state, tags, etc.)."
          (_ (make-directory root t))
          (added (format-time-string "[%Y-%m-%d]"))
          (slug (my/manifolding-atlas-dictionary--slugify word))
-         (subdir "")
+         (subdir (my/manifolding-atlas-choose-subdir
+                  (expand-file-name "dictionary/" (my/manifolding-atlas-root-dir))
+                  "Subdirectory under dictionary/: "))
           (file-name (concat "dictionary/" subdir slug))
          (path-tags (if (string-empty-p subdir)
                         '()

@@ -1,5 +1,5 @@
 #+TITLE: Manifolding Atlas — Blueprint
-#+priority: 15
+#+priority: 2
 
 * Blueprint Core Library
 :PROPERTIES:
@@ -94,9 +94,10 @@
 
 (require 'cl-lib)
 (require 'ol)
-(require 'manifolding-atlas-note)
-(require 'manifolding-atlas-utils)
-(require 'manifolding-atlas-db-query)
+
+(declare-function manifolding-atlas-note-id "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-title "manifolding-atlas-note")
+(declare-function manifolding-atlas-db-query "manifolding-atlas-db")
 
 ;;; Schema structure
 
@@ -364,10 +365,8 @@ custom :validate function.  Returns the first problem found."
          (required (manifolding-atlas-blueprint--call-or-value (plist-get field :required) note))
          (raws (manifolding-atlas-note-meta-get-list note key 'string)))
     (cond
-     ((and required (null raws))
-      (list (manifolding-atlas-blueprint--violation
-             note schema field 'missing-required
-             (format "Required field %S is missing" key) nil)))
+((and required (null raws))
+       nil)
      ((null raws) nil)
      (t (delq nil
               (mapcar (lambda (raw)
@@ -555,9 +554,8 @@ default `manifolding-atlas-db-query'; pass NOTES to aggregate an explicit set."
 ;;
 ;;; Code:
 
-(require 'manifolding-atlas-note)
-(require 'manifolding-atlas-blueprint)
-(require 'manifolding-atlas-db-extract)
+(declare-function manifolding-atlas-db-extract--heading "manifolding-atlas-db-extract")
+(declare-function manifolding-atlas-db-extract--file "manifolding-atlas-db-extract")
 
 (defcustom manifolding-atlas-db-blueprint-validation-action 'warning
   "How to react when an indexed note violates an applicable schema.
@@ -673,10 +671,11 @@ conforms or that no schema applies to."
 
 (require 'flymake)
 (require 'org-element)
-(require 'manifolding-atlas-note)
-(require 'manifolding-atlas-blueprint)
-(require 'manifolding-atlas-buffer)
-(require 'manifolding-atlas-db-extract)
+
+(declare-function manifolding-atlas-note-id "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-level "manifolding-atlas-note")
+(declare-function manifolding-atlas-note-path "manifolding-atlas-note")
+(declare-function manifolding-atlas-db-extract--heading "manifolding-atlas-db-extract")
 
 (defun manifolding-atlas-blueprint-flymake--note-region (level pos)
   "Return (BEG . END) of the header line of a note at LEVEL and POS.
@@ -888,22 +887,18 @@ When REQUIRED is non-nil, the field is mandatory."
           (when keys
             (push (cons name keys) result)))))
     (nreverse result)))
-(with-eval-after-load 'manifolding-atlas
+(let ((props-dir (expand-file-name "properties/" (my/manifolding-atlas-blueprint--prompt-dir)))
+      (fields '()))
+  (when (file-directory-p props-dir)
+    (dolist (file (directory-files props-dir t "\\.org\\'"))
+      (let ((name (file-name-sans-extension (file-name-nondirectory file))))
+        (push (my/manifolding-atlas-blueprint--field-from-prompt (intern name) t)
+              fields))))
   (manifolding-atlas-blueprint-define
    'base
    :predicate (lambda (_note) t)
-   :fields
-   (list (my/manifolding-atlas-blueprint--field-from-prompt 'state-work t)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'state-general t)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'state-intelligence t)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'state-operational t)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'state-validation t)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'state-source t)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'state-dependency)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'state-checklist)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'rules)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'traps-external)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'traps-internal))))
+   :fields (nreverse fields)))))
+
 (defun my/manifolding-atlas-blueprint--required-validator ()
   "Validator flagging missing or WARNING-valued required fields."
   (lambda (val _note)
@@ -922,42 +917,32 @@ When REQUIRED is non-nil, the field is mandatory."
                         (my/manifolding-atlas--capture-file-hash name)
                       nil)))
       (cond ((and val current (not (string-equal val current)))
-             "template-outdated")
-            ((null val) "missing-required")
-            (t t)))))
-(with-eval-after-load 'manifolding-atlas
-  (cl-loop for (template-name . keys) in (my/manifolding-atlas-blueprint--template-props)
-           for schema-name = (intern (concat "template-" template-name))
-           do (manifolding-atlas-blueprint-define
-               schema-name
-               :predicate
-               `(lambda (note)
-                  (or (member ,template-name
-                              (manifolding-atlas-note-meta-get-list note 'TEMPLATE 'string))
-                      (equal ,template-name
-                             (cdr (assoc "TEMPLATE"
-                                         (manifolding-atlas-note-properties note))))))
-               :include 'base
-               :fields
-               `((:key "TEMPLATE_HASH"
-                  :type string
-                  :required t
-                  :validate ,(my/manifolding-atlas-blueprint--hash-validator))
-                 ,@(cl-loop for key in keys
-                            collect
-                            `(:key ,key :type string
-                              :required t
-                              :validate ,(my/manifolding-atlas-blueprint--required-validator)))))))
-(with-eval-after-load 'manifolding-atlas
-  (manifolding-atlas-blueprint-define
-   'task
-   :predicate (lambda (note) (member "task" (manifolding-atlas-note-tags note)))
-   :include 'base
-   :fields
-   (list (my/manifolding-atlas-blueprint--field-from-prompt 'todo)
-         (my/manifolding-atlas-blueprint--field-from-prompt 'priority))))
-(with-eval-after-load 'manifolding-atlas
-  (setq manifolding-atlas-db-blueprint-validation-action 'silent))
+              "template-outdated")
+             ((null val) "missing-required")
+             (t t)))))
+(cl-loop for (template-name . keys) in (my/manifolding-atlas-blueprint--template-props)
+         for schema-name = (intern (concat "template-" template-name))
+         do (manifolding-atlas-blueprint-define
+             schema-name
+             :predicate
+             `(lambda (note)
+                (or (member ,template-name
+                            (manifolding-atlas-note-meta-get-list note 'TEMPLATE 'string))
+                    (equal ,template-name
+                           (cdr (assoc "TEMPLATE"
+                                       (manifolding-atlas-note-properties note))))))
+             :include 'base
+             :fields
+             `((:key "TEMPLATE_HASH"
+                :type string
+                :required t
+manifolding-atlas-blueprint-define
+             'task
+             :predicate (lambda (note) (member "task" (manifolding-atlas-note-tags note)))
+             :include 'base
+             :fields
+             (list (my/manifolding-atlas-blueprint--field-from-prompt 'todo)
+                   (my/manifolding-atlas-blueprint--field-from-prompt 'priority))))
 (defun my/manifolding-atlas-blueprint--migrate-note-warnings (level pos)
   "Clean WARNING sentinels at one heading anchor; return count deleted."
   (let ((count 0))
@@ -1018,10 +1003,8 @@ Deleting the WARNING sentinel lets the description-list metadata
              (+ count (my/manifolding-atlas-blueprint--migrate-file-warnings
                        file notes))))
      files)
-    (message "Migration complete: deleted %d WARNING property values (existing metadata preserved)." count)))
-(require 'manifolding-atlas)
-(require 'manifolding-atlas-db)
-(require 'manifolding-atlas-blueprint)
+     (message "Migration complete: deleted %d WARNING property values (existing metadata preserved)." count)))
+
 (defvar my/manifolding-atlas-reinforce--timer nil
   "Debounced idle timer handle for scheduled sweeps.")
 

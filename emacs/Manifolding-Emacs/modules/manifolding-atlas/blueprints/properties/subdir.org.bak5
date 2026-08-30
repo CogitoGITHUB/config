@@ -43,27 +43,27 @@ dictionary, recipes, routines). Returns a relative path string ending in
 "/" (or "" for ROOT itself), so callers can safely (concat prefix subdir slug).
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-choose-subdir (&optional root prompt)
-  "Interactively choose a subdirectory under ROOT via `read-file-name'.
+  "Interactively choose a subdirectory under ROOT via `read-directory-name'.
 ROOT defaults to `my/manifolding-atlas-root-dir'. PROMPT overrides the
 default minibuffer prompt. Uses `my/manifolding-atlas--active-dir' as the
 initial choice when set. Returns the empty string for ROOT itself,
 otherwise a relative path ending in a trailing slash. The admin
-directory is filtered out of the completion candidates entirely at
-every level of browsing -- it is reserved for internal bookkeeping,
-not user notes, and should never even appear as an option."
+directory (and anything under it) is never offered as a valid choice --
+it is reserved for internal bookkeeping, not user notes."
   (let* ((root (file-name-as-directory (or root (my/manifolding-atlas-root-dir))))
          (default (if my/manifolding-atlas--active-dir
                       (expand-file-name my/manifolding-atlas--active-dir root)
                     root))
-         (choice (read-file-name
-                  (or prompt "Subdirectory: ")
-                  root default t nil
-                  (lambda (f)
-                    (let ((name (file-name-nondirectory (directory-file-name f))))
-                      (and (file-directory-p f)
-                           (not (string-prefix-p "." name))
-                           (not (member name (list "admin" "dictionary"))))))))
-         (rel (file-relative-name choice root)))
+         rel)
+    (while (progn
+             (setq rel (file-relative-name
+                        (read-directory-name (or prompt "Subdirectory: ") root default)
+                        root))
+             (when (or (string-equal rel "admin")
+                       (string-prefix-p "admin/" rel))
+               (message "That directory is reserved for internal use -- choose something else")
+               (sit-for 1.2)
+               t)))
     (if (or (string-equal rel ".") (string-equal rel "./"))
         ""
       (file-name-as-directory rel))))

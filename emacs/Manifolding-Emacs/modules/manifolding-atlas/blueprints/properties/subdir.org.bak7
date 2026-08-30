@@ -59,10 +59,10 @@ not user notes, and should never even appear as an option."
                   (or prompt "Subdirectory: ")
                   root default t nil
                   (lambda (f)
-                    (let ((name (file-name-nondirectory (directory-file-name f))))
-                      (and (file-directory-p f)
-                           (not (string-prefix-p "." name))
-                           (not (member name (list "admin" "dictionary"))))))))
+                    (and (file-directory-p f)
+                         (not (member
+                               (file-name-nondirectory (directory-file-name f))
+                               (list "admin" "dictionary")))))))
          (rel (file-relative-name choice root)))
     (if (or (string-equal rel ".") (string-equal rel "./"))
         ""

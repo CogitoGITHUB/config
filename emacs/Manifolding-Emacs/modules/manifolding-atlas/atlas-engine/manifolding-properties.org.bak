@@ -979,7 +979,7 @@ NOTE may live in a different buffer than the one being edited:
 locate its heading by file, level, and pos first.
 Uses drawer-put directly for live-properties domain's transclude handling.
 #+begin_src emacs-lisp
-(require 'cl-lib)
+(require 'cl)
 
 (defun my/manifolding-atlas--property-put (note key value)
   "Set property KEY to VALUE in NOTE's file on disk using drawer-put."

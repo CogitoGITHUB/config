@@ -27,7 +27,8 @@ items and many files.
 (setq org-todo-keywords
       '((sequence "TODO" "DOING" "WAIT" "|" "DONE" "CANCELED")))
 
-(org-super-agenda-mode 1)
+(let ((message-log-max nil))
+  (org-super-agenda-mode 1))
 
 (setq org-super-agenda-groups
       '((:name "Today"

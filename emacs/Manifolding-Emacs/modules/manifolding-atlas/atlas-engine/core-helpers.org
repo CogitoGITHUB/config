@@ -1,5 +1,5 @@
 #+title: Manifolding Atlas — Core Helpers
-#+priority: -10
+#+priority: 4
 
 Shared utility functions used across multiple domains.
 
@@ -11,10 +11,9 @@ Walks up to the enclosing heading if the cursor is in the body/drawer.
 (defun my/manifolding-atlas--note-at-point ()
   "Return the manifolding-atlas note for the heading under (or enclosing) point."
   (when (derived-mode-p 'org-mode)
-    (let (id)
-      (unless (org-at-heading-p)
-        (ignore-errors (org-back-to-heading t)))
-      (setq id (org-entry-get nil "ID"))
+    (unless (org-at-heading-p)
+      (ignore-errors (org-back-to-heading t)))
+    (let ((id (org-entry-get nil "ID")))
       (and id (manifolding-atlas-db-get-by-id id)))))
 #+end_src
 
@@ -55,7 +54,7 @@ Finds the property drawer of the heading at point without org's own strict parsi
         (when (re-search-forward "^:PROPERTIES:[ \t]*$" hend t)
           (let ((a (line-beginning-position 2)))
             (when (re-search-forward "^:END:[ \t]*$" hend t)
-              (cons a (line-beginning-position))))))))
+              (cons a (line-beginning-position)))))))))
 #+end_src
 
 ** Drawer read
