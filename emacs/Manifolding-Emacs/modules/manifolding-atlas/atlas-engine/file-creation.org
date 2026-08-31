@@ -856,9 +856,12 @@ argument of `manifolding-atlas-insert' CREATE-FN and is currently unused.
 
 This is the default value of `manifolding-atlas-find-default-create-fn'."
   (let* ((subdir (my/manifolding-atlas-prompt-subdir))
-         (fname (my/manifolding-atlas-prompt-file-name title subdir)))
+         (fname (my/manifolding-atlas-prompt-file-name title subdir))
+         (prompts (my/manifolding-atlas-collect-prompts-with-fast '(file) '(file))))
     (manifolding-atlas-create title fname
-                  :properties '(("TODO_STATE" . "WARNING")))))
+                  :tags (plist-get prompts :tags)
+                  :properties (plist-get prompts :properties)
+                  :body (plist-get prompts :body))))
 
 ;;;###autoload
 (cl-defun manifolding-atlas-find (&key other-window

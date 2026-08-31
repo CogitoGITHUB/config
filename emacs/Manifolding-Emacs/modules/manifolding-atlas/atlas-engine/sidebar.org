@@ -11,15 +11,7 @@ Sidebar, outline, backlinks, and UI configuration for manifolding-atlas.
 ** Config
 #+begin_src emacs-lisp
 (unless (fboundp 'mode-line-invisible-mode)
-  (defun mode-line-invisible-mode (&rest _) nil))
-(with-eval-after-load 'manifolding-atlas
-  (setq manifolding-atlas-ui-sidebar-position 'left
-        manifolding-atlas-ui-sidebar-size     0.20)
-  (setq manifolding-atlas-ui-outline-max-depth 3)
-  (setq manifolding-atlas-ui-backlinks-show-preview t)
-  (setq manifolding-atlas-ui-default-widget-collapsed nil)
-  (setq manifolding-atlas-ui-fast-parse t)
-  (setq manifolding-atlas-ui-auto-refresh t)
+  (defun mode-line-invisible-mode (&rest _) nil)
   (add-to-list 'warning-suppress-types '(org-element)))
 #+end_src
 
@@ -67,6 +59,9 @@ Sidebar, outline, backlinks, and UI configuration for manifolding-atlas.
   :group 'manifolding-atlas
   :prefix "manifolding-atlas-ui-")
 
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom manifolding-atlas-ui-sidebar-position 'right
   "Position of the sidebar in the frame.
 One of `left', `right', `top', or `bottom'."
@@ -164,6 +159,9 @@ Disabled by default for safety."
   :type 'boolean
   :group 'manifolding-atlas-ui)
 
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom manifolding-atlas-ui-auto-refresh t
   "Automatically refresh sidebar content.
 When non-nil, the sidebar will refresh:
@@ -332,6 +330,9 @@ Used to prevent re-entry during render.")
 (defvar manifolding-atlas-ui--idle-timer nil
   "Timer for auto-refreshing sidebar on idle.")
 
+#+end_src
+
+#+begin_src emacs-lisp
 (defun manifolding-atlas-ui--sidebar-buffer-name (&optional frame)
   "Return the sidebar buffer name for FRAME.
 If FRAME is nil, use the selected frame."
@@ -463,6 +464,9 @@ Called from `window-buffer-change-functions'."
     (when (and buf (not (manifolding-atlas-ui--sidebar-visible-p frame)))
       (manifolding-atlas-ui--create-sidebar-window buf))))
 
+#+end_src
+
+#+begin_src emacs-lisp
 (defun manifolding-atlas-ui--setup-hooks ()
   "Set up hooks for sidebar content tracking."
   (add-hook 'window-buffer-change-functions #'manifolding-atlas-ui--on-buffer-change)
@@ -651,6 +655,9 @@ STRIP-METADATA removes #+TITLE, #+FILETAGS, etc. (default: t)."
     (when content
       (vui-text content))))
 
+#+end_src
+
+#+begin_src emacs-lisp
 (defun manifolding-atlas-ui--get-note-preview (note max-lines strip-drawers strip-metadata)
   "Get preview text for NOTE.
 MAX-LINES limits the number of lines.
@@ -1048,6 +1055,9 @@ Returns a list of heading titles from outermost to innermost."
                   current-level level))))))
     path))
 
+#+end_src
+
+#+begin_src emacs-lisp
 (defun manifolding-atlas-ui--extract-preview (pos target-id)
   "Extract preview info around POS in current buffer.
 TARGET-ID is the ID of the note being linked to.
@@ -1074,7 +1084,7 @@ Returns a plist with :type and type-specific content:
         ('quote (manifolding-atlas-ui--extract-quote line))
         ('code (manifolding-atlas-ui--extract-code line))
         ('footnote (manifolding-atlas-ui--extract-footnote line))
-        (_ (manifolding-atlas-ui--extract-prose pos target-id)))))
+        (_ (manifolding-atlas-ui--extract-prose pos target-id))))))
 
 (defun manifolding-atlas-ui--detect-context-type (pos line)
   "Detect the context type at POS given LINE content."
@@ -1144,7 +1154,7 @@ Returns a plist with :type and type-specific content:
                ""
                line)))
     (list :type 'list
-          :text (manifolding-atlas-ui--clean-org-links (string-trim text))))
+          :text (manifolding-atlas-ui--clean-org-links (string-trim text)))))
 
 (defun manifolding-atlas-ui--extract-quote (line)
   "Extract quote info from LINE."
@@ -1208,6 +1218,9 @@ Returns a plist with :type and type-specific content:
 This is an internal wrapper around `manifolding-atlas-ui-clean-org-markup'."
   (manifolding-atlas-ui-clean-org-markup text))
 
+#+end_src
+
+#+begin_src emacs-lisp
 (defun manifolding-atlas-ui--render-backlink-group (group)
   "Render a backlink GROUP with file note and mentions."
   (let* ((file-note (plist-get group :file-note))
