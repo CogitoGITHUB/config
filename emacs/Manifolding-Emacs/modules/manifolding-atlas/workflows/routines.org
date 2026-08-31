@@ -10,7 +10,6 @@ org. Chains are routines whose sources are themselves routines.
 
 *** Require
 #+begin_src emacs-lisp
-(require 'manifolding-atlas)
 (require 'manifolding-atlas-db)
 (require 'manifolding-atlas-db-query)
 (require 'org-id)
@@ -654,6 +653,7 @@ newest first."
                         :order :by [(desc session-date)]]
                        routine-id)))
     (if limit (seq-take rows limit) rows)))
+#+end_src
 
 *** Streaks
 Temporal-aware streak counting: the period unit derives from the
@@ -711,6 +711,7 @@ quarter/season, or year for the matching temporal contexts)."
               anchor (1- anchor)
               buckets (cdr buckets))))
     streak))
+#+end_src
 
 *** Report
 Per-routine compliance: last session, streak, last-7-days count.

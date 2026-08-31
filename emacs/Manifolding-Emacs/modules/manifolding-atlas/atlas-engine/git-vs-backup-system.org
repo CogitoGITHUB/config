@@ -331,6 +331,8 @@ it plus its orphaned refs, then cleans up the queue entries.
                 (when (y-or-n-p (format "Open restored file %s? " target-file))
                   (find-file (expand-file-name target-file (my/manifolding-atlas-root-dir)))))
             (user-error "Git restore failed for %s" target-file)))))))
+#+end_src
+
 *** Restore From Deleted Files
 
 **** Broken-links entry cleanup

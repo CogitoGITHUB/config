@@ -56,7 +56,6 @@ Sidebar, outline, backlinks, and UI configuration for manifolding-atlas.
 (require 'map)
 (require 'subr-x)
 (require 'org-element)
-(require 'manifolding-atlas)
 (require 'vui)
 (require 'vui-components)
 
@@ -1075,7 +1074,7 @@ Returns a plist with :type and type-specific content:
         ('quote (manifolding-atlas-ui--extract-quote line))
         ('code (manifolding-atlas-ui--extract-code line))
         ('footnote (manifolding-atlas-ui--extract-footnote line))
-        (_ (manifolding-atlas-ui--extract-prose pos target-id))))))
+        (_ (manifolding-atlas-ui--extract-prose pos target-id)))))
 
 (defun manifolding-atlas-ui--detect-context-type (pos line)
   "Detect the context type at POS given LINE content."
@@ -1145,7 +1144,7 @@ Returns a plist with :type and type-specific content:
                ""
                line)))
     (list :type 'list
-          :text (manifolding-atlas-ui--clean-org-links (string-trim text)))))
+          :text (manifolding-atlas-ui--clean-org-links (string-trim text))))
 
 (defun manifolding-atlas-ui--extract-quote (line)
   "Extract quote info from LINE."

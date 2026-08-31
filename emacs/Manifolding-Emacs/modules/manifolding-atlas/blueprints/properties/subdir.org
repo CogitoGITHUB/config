@@ -55,10 +55,10 @@ not user notes, and should never even appear as an option."
          (default (if my/manifolding-atlas--active-dir
                       (expand-file-name my/manifolding-atlas--active-dir root)
                     root))
-         (choice (read-file-name
-                  (or prompt "Subdirectory: ")
-                  root default t nil
-                  (lambda (f)
+          (choice (read-file-name
+                   (or prompt "Subdirectory: ")
+                   root default nil nil
+                   (lambda (f)
                     (let ((name (file-name-nondirectory (directory-file-name f))))
                       (and (file-directory-p f)
                            (not (string-prefix-p "." name))

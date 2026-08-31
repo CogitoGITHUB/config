@@ -897,7 +897,7 @@ When REQUIRED is non-nil, the field is mandatory."
   (manifolding-atlas-blueprint-define
    'base
    :predicate (lambda (_note) t)
-   :fields (nreverse fields)))))
+    :fields (nreverse fields))))
 
 (defun my/manifolding-atlas-blueprint--required-validator ()
   "Validator flagging missing or WARNING-valued required fields."

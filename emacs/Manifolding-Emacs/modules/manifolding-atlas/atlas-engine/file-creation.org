@@ -1869,7 +1869,6 @@ This is the headless building block UIs use to offer one-key fixes for a
       (manifolding-atlas-buffer-meta-set (plist-get field :key) value 'append (or bound 'heading))
       value)))
 
-(provide 'manifolding-atlas)
 #+end_src
 #+title: Manifolding Atlas Capture Plugin
 #+priority: 15

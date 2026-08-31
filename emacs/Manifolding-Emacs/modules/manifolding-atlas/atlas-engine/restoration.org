@@ -61,6 +61,9 @@ Lives in `my/manifolding-atlas-root-dir'. Auto-created if missing.")
 
 **** Admin file inventory and empty cleanup
 #+begin_src emacs-lisp
+(defvar my/manifolding-atlas-missing--file "admin/MISSING PROMPTS"
+  "Filename for missing prompts queue. Lives in `my/manifolding-atlas-root-dir'.")
+
 (defun my/manifolding-atlas-links--admin-file-paths ()
   "Absolute paths of all managed admin queue files."
   (mapcar (lambda (f) (expand-file-name f (my/manifolding-atlas-root-dir)))

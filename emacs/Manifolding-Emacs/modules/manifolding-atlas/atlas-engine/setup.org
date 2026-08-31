@@ -41,8 +41,6 @@ Change only this path to relocate the entire vault."
 (setq manifolding-atlas-db-sync-external-method 'poll)
 (setq manifolding-atlas-db-sync-verbose nil)
 
-(require 'manifolding-atlas)
-
 (defvar my/manifolding-atlas-db--location-used nil
   "Location used when the current DB connection was opened.")
 

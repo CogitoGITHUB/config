@@ -1068,7 +1068,7 @@ Can be negative when point is before the indentation column."
   (dotimes (_number count)
     (next-logical-line)
     (while (< (my/col-relative-to-indent) 0) (next-logical-line)))
-  (back-to-indentation)))
+  (back-to-indentation))
 #+end_src
 
 ** Region algebra (Boon-extracted, ~my/reg-*~)

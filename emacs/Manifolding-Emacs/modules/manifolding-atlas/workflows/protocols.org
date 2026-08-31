@@ -12,7 +12,6 @@ be both a rule and a protocol step.
 *** Dependencies
 #+begin_src emacs-lisp
 ;;; manifolding-atlas-protocols.el --- Protocol assembly -*- lexical-binding: t; -*-
-(require 'manifolding-atlas)
 (require 'manifolding-atlas-db)
 (require 'org)
 (require 'transient)
