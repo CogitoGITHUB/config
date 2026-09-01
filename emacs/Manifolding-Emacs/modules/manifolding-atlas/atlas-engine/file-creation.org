@@ -846,9 +846,10 @@ PROPERTIES (alist)."
 (defun manifolding-atlas-find-create-note (title &optional _props)
   "Create a new note with TITLE selected in `manifolding-atlas-find'.
 
-Prompts for subdir and file name, then creates the note immediately
-with TODO_STATE defaulted to WARNING -- so if you quit right after
-picking the subdir, the file already exists on disk for real.
+Prompts for subdir and file name, then runs the property grid
+(collect-prompts-with-fast) and creates the note with whatever tags,
+properties, and body it gathers. Any property left unanswered/skipped
+defaults to WARNING via the normal missing-prompts mechanism.
 
 Creates a file-level note via `manifolding-atlas-create' and returns the
 resulting `manifolding-atlas-note'. PROPS mirrors the capture properties
@@ -4199,6 +4200,12 @@ fragment on both sides. Later duplicates are dropped, first wins.
 **** Fast dispatch
 
 #+begin_src emacs-lisp
+(defun my/manifolding-atlas--fast-level ()
+  "Compatibility stub: capture speed is always custom -- the property
+grid asks directly, no separate fast/slow menu. Keeps historical call
+sites (this numeric contract) working now that the speed menu is gone."
+  4)
+
 (defun my/manifolding-atlas-collect-prompts-with-fast (specialized-contexts general-contexts &optional fast-level)
   "Collect prompts using fast mode levels."
   (setq my/manifolding-atlas-org-prompt--deferred nil)
