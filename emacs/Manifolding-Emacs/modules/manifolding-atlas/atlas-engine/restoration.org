@@ -121,8 +121,7 @@ RET follows links; saves trigger the cleanup sweep.
         (progn
           (delete-other-windows)
           (apply orig-fun args)
-          (delete-other-windows)
-          (my/manifolding-atlas-update-properties))
+          (delete-other-windows))
       (apply orig-fun args))))
 (advice-add 'org-open-at-point :around #'my/manifolding-atlas-missing--around-open)
 #+end_src

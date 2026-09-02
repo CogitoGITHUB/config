@@ -36,7 +36,6 @@
 (require 'websocket)
 (require 'org-id)
 (require 'cl-lib)
-(require 'manifolding-atlas)
 (require 'ox-html)
 
 (defgroup manifolding-mind-map nil

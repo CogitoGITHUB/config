@@ -40,27 +40,47 @@ strings or text-derived modes, returning nil in a plain temp buffer).
 
 (declare-function project-root "project")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defgroup atlas-search-todo nil
   "Search hl-todo keywords in consult."
   :group 'atlas-search-todo)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom atlas-search-todo-narrow nil
   "Alist of (NARROW . KEYWORD) to display."
   :type '(repeat (cons (character :tag "Narrow")
                        (string :tag "Keyword")))
   :group 'atlas-search-todo)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom atlas-search-todo-other (cons ?. "OTHER")
   "Cons mapping for narrow and missing keywords."
   :type '(cons character string)
   :group 'atlas-search-todo)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom atlas-search-todo-only-comment nil
   "If non-nil, only search todo keywords in comments.
 Only effective on buffers."
   :type 'boolean
   :group 'atlas-search-todo)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom atlas-search-todo-dir-preview-key nil
   "Preview trigger keys for `atlas-search-todo-dir' related command.
 Value can be nil, `any', a single key or a list of keys."
@@ -74,17 +94,29 @@ Value can be nil, `any', a single key or a list of keys."
                  (repeat :tag "List of keys" key))
   :group 'atlas-search-todo)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom atlas-search-todo-cache-threshold 3
   "The time threshold in seconds for using cache when grepping is time-consuming."
   :type 'number
   :group 'atlas-search-todo)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom atlas-search-todo-dir-function #'atlas-search-todo--scan-dir
   "The function used to scan keywords in directory.
 Accept one argument: the directory to search in."
   :type 'function
   :group 'atlas-search-todo)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defconst atlas-search-todo--narrow
   '((?t . "TODO")
     (?f . "FIXME")
@@ -92,13 +124,25 @@ Accept one argument: the directory to search in."
     (?h . "HACK"))
   "Default mapping of narrow and keywords.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar atlas-search-todo--narrow-extend nil
   "Default mapping of narrow and keywords include OTHER if exists.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo--narrow ()
   "Return narrow alist."
   (or atlas-search-todo-narrow atlas-search-todo--narrow))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo--narrow-extend ()
   "Return narrow alist include `atlas-search-todo-other' if it's non-nil."
   (or atlas-search-todo--narrow-extend
@@ -114,6 +158,10 @@ Accept one argument: the directory to search in."
          "Atlas-search-todo-other: format error or conflicts with atlas-search-todo-narrow")
         (setq atlas-search-todo--narrow-extend nil))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo--format (candidates)
   "Return formatted string according to CANDIDATES."
   (if candidates
@@ -136,6 +184,10 @@ Accept one argument: the directory to search in."
        candidates)
     (user-error "No hl-todo keywords")))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo-grep-state ()
   "Lookup SELECTED in CANDIDATES list of `consult-location' category.
 Return the location marker."
@@ -152,6 +204,10 @@ Return the location marker."
                                          (nth 0 cand)))
                               (nth 1 cand) (nth 2 cand)))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo--parse-bufs (buffers)
   "Return list of hl-todo keywords in BUFFERS."
   (cl-loop for buf in (ensure-list (or buffers (current-buffer)))
@@ -186,14 +242,26 @@ Return the location marker."
                                                 (point)
                                                 (line-end-position)))))))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo--notes-directory ()
   "Return the atlas notes directory (with trailing slash)."
   (file-name-as-directory (my/manifolding-atlas-root-dir)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar atlas-search-todo--skip-dirs
   '(".git" ".cache" "admin")
   "Directories under the notes directory to skip when scanning.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo--dir-files (dir)
   "Return note files under DIR, skipping `atlas-search-todo--skip-dirs'."
   (cl-remove-if
@@ -207,6 +275,10 @@ Return the location marker."
            file)))
    (directory-files-recursively dir "^[^.]" nil nil)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo--parse-file (file)
   "Return list of hl-todo matches in FILE."
   (with-temp-buffer
@@ -233,6 +305,10 @@ Return the location marker."
          found))
       (nreverse found))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo--dir (formatted-candidates)
   "Jump to hl-todo keywords with FORMATTED-CANDIDATES."
   (consult--forbid-minibuffer)
@@ -248,18 +324,34 @@ Return the location marker."
    :lookup #'consult--lookup-member
    :state (atlas-search-todo-grep-state)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar atlas-search-todo--cache nil)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo-clear-cache (&optional all)
   "Clear cache stored in `atlas-search-todo--cache'."
   (interactive "P")
   (setq atlas-search-todo--cache nil))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo--scan-dir (dir)
   "Return raw hl-todo matches from all non-skipped files under DIR."
   (cl-loop for file in (atlas-search-todo--dir-files dir)
            append (atlas-search-todo--parse-file file)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo-dir (&optional directory)
   "Jump to hl-todo keywords in the notes DIRECTORY."
   (interactive)
@@ -268,6 +360,10 @@ Return the location marker."
      (atlas-search-todo--format
       (atlas-search-todo--scan-dir dir)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo (&optional buffers)
   "Jump to hl-todo keywords in BUFFERS.
 If BUFFERS is nil, use current buffer instead."
@@ -285,6 +381,10 @@ If BUFFERS is nil, use current buffer instead."
    :lookup #'consult--lookup-location
    :state (consult--jump-state)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun atlas-search-todo-all ()
   "Jump to hl-todo keywords in all notes-directory buffers."
   (interactive)
@@ -294,7 +394,9 @@ If BUFFERS is nil, use current buffer instead."
                       (string-prefix-p (atlas-search-todo--notes-directory)
                                        (or (buffer-file-name x) ""))))
                (buffer-list))))
+
 #+end_src
+
 ** Config
 #+begin_src emacs-lisp
 (setq atlas-search-todo-narrow

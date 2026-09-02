@@ -60,21 +60,37 @@ property so it wins over org-mindmap-mode's minor-mode map.
 
 ;;;; Variables
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar text-clone-overlays nil
   "Global variable to keep track of all the text-clone.
 overlays.  Used primarily by `text-clone-delete-overlays'.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar text-clone-live-sync-in-progress nil
   "Global variable used by `text-clone-live-sync' function.")
 
 ;;;; Functions
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun text-clone-make-overlay (beg end &optional buf)
   "Wrapper for `make-ovelay' to standardize the parameters passed to it.
 BEG and END can be point or marker.  Optionally BUF can be
 passed.  FRONT-ADVANCE is nil, and REAR-ADVANCE is t."
   (make-overlay beg end buf nil t))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun text-clone-set-overlays (&rest overlays)
   "Add text-clone properties to OVERLAYS.
 This function directly modifies the OVERLAYS passed and returns
@@ -115,6 +131,10 @@ faces to visually differentiate them."
     (setq text-clone-overlays overlays)
     overlays))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun text-clone-post-command-h ()
   "Delete all the text-clone overlays when any one is non-existent."
   (when-let ((ovs text-clone-overlays))
@@ -126,6 +146,10 @@ faces to visually differentiate them."
       (when deleted
         (text-clone-delete-overlays)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun text-clone-delete-overlays ()
   "Remove all live-sync overlays.
 Return a list of the buffer, beginning and ending points of the
@@ -161,6 +185,10 @@ up text-clone:
       ;; As push is used to construct the list, the sequence needs to be reversed
       (nreverse deleted-overlays))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun text-clone-live-sync (ol1 after beg end &optional _len)
   "Propagate the change made under the overlay OL1 to the other paired clone.
 This is used on the `modification-hooks' property of text clones.
@@ -205,7 +233,9 @@ This function also works during undo in progress; that is, when
 The text strings in the overlays are not identical"))))))))))))
 
 (provide 'text-clone)
+
 #+end_src
+
 * Vendored org-transclusion engine
 #+begin_src emacs-lisp
 ;;; org-transclusion.el --- Transclude text content via links -*- lexical-binding: t; -*-
@@ -255,6 +285,10 @@ The text strings in the overlays are not identical"))))))))))))
 
 ;;;; Customization
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defgroup org-transclusion nil
   "Insert text contents by way of link references."
   :group 'org
@@ -262,6 +296,10 @@ The text strings in the overlays are not identical"))))))))))))
   :link '(url-link :tag "Github" "https://github.com/nobiot/org-transclusion")
   :package-version '("Org-transclusion" . "1.0.0"))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-set-extensions (var value)
   "Set VAR to VALUE and `org-transclusion-load-extensions-maybe'.
 Intended for :set property for `customize'."
@@ -269,6 +307,10 @@ Intended for :set property for `customize'."
   (when (featurep 'org-transclusion)
     (org-transclusion-load-extensions-maybe 'force)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-extensions
   '(org-transclusion-src-lines org-transclusion-font-lock org-transclusion-transient)
   "Extensions to be loaded with org-transclusion.el."
@@ -287,23 +329,39 @@ Intended for :set property for `customize'."
                org-transclusion-transient)
         (repeat :tag "Other packages" :inline t (symbol :tag "Package"))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-add-all-on-activate t
   "Define whether to add all the transclusions on activation.
 When non-nil, automatically add all on `org-transclusion-activate'."
   :type 'boolean)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-exclude-elements (list 'property-drawer)
   "Define the Org elements that are excluded from transcluded copies.
 It is a list of elements to be filtered out.
 Refer to variable `org-element-all-elements' for names of elements accepted."
   :type '(repeat symbol))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-include-first-section t
   "Define whether or not transclusion for Org files includes \"first section\".
 If t, the section before the first headline is
 transcluded. Default is t."
   :type 'boolean)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-open-source-display-action-list '(nil . nil)
   "Action list used to open source buffer to display.
 
@@ -311,12 +369,20 @@ See `display-buffer' for example options."
   :type display-buffer--action-custom-type
   :risky t)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-mode-lighter
   " OT"
   "Mode-line indicator for minor-mode variable `org-transclusion-mode'."
   :type '(choice (const :tag "No lighter" "") string)
   :safe #'stringp)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-after-add-functions nil
   "Functions to be called after a transclusion content has been added.
 The hook runs after the content and the read-only text property
@@ -328,6 +394,10 @@ and end, pointing to the beginning and end of the transcluded
 content."
   :type '(repeat function))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-after-remove-functions nil
   "Functions to be called after a transclusion has been removed.
 The hook runs after the transclusion overlay has been deleted and
@@ -339,6 +409,10 @@ arguments (src-buf src-beg src-end), pointing to the source buffer
 and the region that was transcluded."
   :type '(repeat function))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-insert-link-functions '(org-insert-link)
   "Functions for `org-transclusion-insert' to insert an Org link.
 It is expected that these functions prompt for user to choose / create a
@@ -346,6 +420,10 @@ link, but as long as the function insert a valid org link in a buffer,
 it will work. Used in `org-transclusion-insert-org-link', which see."
   :type '(repeat function))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defcustom org-transclusion-src-tab-acts-natively t
   "Flag to control how transclusion deals with tabs for org-src.
 The default is t. When it is t, use `org-src-tab-acts-natively' as is.
@@ -400,9 +478,17 @@ The default is no color specification (transparent).")
 
 ;;;; Variables
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-extensions-loaded nil
   "Have the extensions been loaded already?")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar-local org-transclusion-remember-point nil
   "This variable is used to remember the current just before `save-buffer'.
 It is meant to be used to remember and return to the current
@@ -410,6 +496,10 @@ point after `before-save-hook' and `after-save-hook' pair;
 `org-transclusion-before-save-buffer' and
 `org-transclusion-after-save-buffer' use this variable.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar-local org-transclusion-remember-transclusions nil
   "Remember the active transclusions before `save-buffer'.
 It is meant to be used to keep the file the current buffer is
@@ -422,11 +512,19 @@ a text content.
 `org-transclusion-before-save-buffer' and
 `org-transclusion-after-save-buffer' use this variable.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar-local org-transclusion-remember-window-config nil
   "Remember window config (the arrangement of windows) for the current buffer.
 This is for live-sync.  Analogous to
 `org-edit-src-code'.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-add-functions
   '(org-transclusion-add-org-id
     org-transclusion-add-org-file
@@ -454,6 +552,10 @@ payload function should generate a payload plist, then call
 `org-transclusion-add-payload', passing in the payload as well as
 the \\+`link', \\+`keyword-plist', and \\+`copy' arguments.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-keyword-value-functions
   '(org-transclusion-keyword-value-link
     org-transclusion-keyword-value-level
@@ -468,19 +570,39 @@ These functions take a single argument, the whole keyword value
 as a string.  Each function retrieves a property with using a
 regexp from the string.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-keyword-plist-to-string-functions '())
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-content-format-functions
   '(org-transclusion-content-format-org
     org-transclusion-content-format))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-open-source-marker-functions
   '(org-transclusion-open-source-marker))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-live-sync-buffers-functions
   '(org-transclusion-live-sync-buffers-org
     org-transclusion-live-sync-buffers-others-default))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map org-mode-map)
@@ -498,6 +620,10 @@ As the transcluded text content is read-only, these keybindings
 are meant to be a sort of contextual menu to trigger different
 functions on the transclusion.")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-live-sync-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map org-mode-map)
@@ -511,11 +637,19 @@ specific keybindings; namely:
 - `org-transclusion-live-sync-paste'
 - `org-transclusion-live-sync-exit'")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-yank-excluded-properties
   '(org-transclusion-type org-transclusion-id org-transclusion-pair
     org-transclusion-orig-keyword wrap-prefix line-prefix
     :parent front-sticky rear-nonsticky))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-yank-remember-user-excluded-props '())
 
 (define-fringe-bitmap 'org-transclusion-fringe-bitmap
@@ -532,6 +666,10 @@ specific keybindings; namely:
 ;;;; Macro
 ;;;; Defining macros before they are used in the rest of package
 ;;;; Flycheck warns with "macro X defined too late"
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defmacro org-transclusion-with-inhibit-read-only (&rest body)
   "Run BODY with `'inhibit-read-only` t.
 This macro is used instead of `with-silent-modifications' because
@@ -564,6 +702,10 @@ Org mode's caching relies upon modification hooks to function."
     (org-transclusion-deactivate)))
 
 ;;;###autoload
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-activate ()
   "Activate Org-transclusion hooks and other setups in the current buffer.
 This function does not add transclusions; it merely sets up hooks
@@ -580,6 +722,10 @@ and variables."
   (org-transclusion-yank-excluded-properties-set)
   (org-transclusion-load-extensions-maybe))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-deactivate ()
   "Deactivate Org-transclusion hooks and other setups in the current buffer.
 This function also removes all the transclusions in the current buffer."
@@ -596,6 +742,10 @@ This function also removes all the transclusions in the current buffer."
   (org-transclusion-yank-excluded-properties-remove))
 
 ;;;###autoload
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-make-from-link (&optional arg)
   "Make a transclusion keyword from a link at point.
 
@@ -644,6 +794,10 @@ transclusion keyword."
           (insert (format " :level %d" arg)))
         (when auto-transclude-p (org-transclusion-add))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-insert (&optional insert-above)
   "Insert #+TRANSCLUDE: from a link at point or new link to a blank line.
 If the point is not at a link but has text, this command will try to
@@ -685,6 +839,10 @@ current one. Otherwise, to the line below."
        (point) (line-end-position) 'pulse-highlight-start-face))))
 
 ;;;###autoload
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-add (&optional copy)
   "Transclude text content for the #+transclude at point.
 When minor-mode `org-transclusion-mode' is inactive in the
@@ -778,6 +936,10 @@ does not support all the elements.
                                      beg end))))))))
 
 ;;;###autoload
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-add-all (&optional narrowed)
   "Add all active transclusions in the current buffer.
 
@@ -812,6 +974,10 @@ the rest of the buffer unchanged."
       (move-marker marker nil) ; point nowhere for GC
       t)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-remove ()
   "Remove transcluded text at point.
 When success, return the beginning point of the keyword re-inserted."
@@ -856,6 +1022,10 @@ When success, return the beginning point of the keyword re-inserted."
           ;; Keep the buffer-modified-p flag as it was before removal.
           (restore-buffer-modified-p buffer-modified-p)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-detach ()
   "Make the transcluded region normal copied text content."
   (interactive)
@@ -863,6 +1033,10 @@ When success, return the beginning point of the keyword re-inserted."
   ;; to go back to the #+transclusion before detach.
   (org-transclusion-refresh 'detach))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-remove-all (&optional narrowed)
   "Remove all transcluded text regions in the current buffer.
 Return the list of points for the transclusion keywords
@@ -894,6 +1068,10 @@ the rest of the buffer unchanged."
       (move-marker current-marker nil) ; point nowhere for GC
       list)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-refresh (&optional detach)
   "Refresh the transcluded text at point.
 With using `universal-argument' (\\[universal-argument]), you can
@@ -908,16 +1086,28 @@ TODO: Support asynchronous transclusions (set point correctly)."
       (goto-char pos))
     t))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-promote-subtree ()
   "Promote transcluded subtree at point."
   (interactive)
   (org-transclusion-promote-or-demote-subtree))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-demote-subtree ()
   "Demote transcluded subtree at point."
   (interactive)
   (org-transclusion-promote-or-demote-subtree 'demote))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-open-source (&optional arg)
   "Open the source buffer of transclusion at point.
 When ARG is non-nil (e.g. \\[universal-argument]), the point will
@@ -951,6 +1141,10 @@ doesn't exist."
                  (goto-char pos)))))
     (move-marker src-mkr nil))) ; point nowhere for GC
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-move-to-source ()
   "Open the source buffer and move point to it.
 It's a function only to enable a keymap to call
@@ -958,6 +1152,10 @@ It's a function only to enable a keymap to call
   (interactive)
   (org-transclusion-open-source t))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-start ()
   "Start live-sync edit on the transclusion at point.
 
@@ -1022,6 +1220,10 @@ TODO: Support asynchronous transclusions."
           (remove-text-properties (1- tc-beg) tc-end '(read-only)))
         t))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-exit ()
   "Exit live-sync at point.
 It attempts to re-arrange the windows for the current buffer to
@@ -1043,6 +1245,10 @@ the state before live-sync started."
         (progn
           (setq org-transclusion-remember-window-config nil))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-paste ()
   "Paste text content from `kill-ring' and inherit the text props.
 This is meant to be used within live-sync overlay as part of
@@ -1054,6 +1260,10 @@ This is meant to be used within live-sync overlay as part of
 ;;;; Private Functions
 ;;;; Functions for Activate / Deactivate / save-buffer hooks
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-before-save-buffer ()
   "Remove transclusions in `before-save-hook'.
 This function is meant to clear the file clear of the
@@ -1063,6 +1273,10 @@ transclusions.  It also remembers the current point for
   (setq org-transclusion-remember-transclusions
         (org-transclusion-remove-all)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-after-save-buffer ()
   "Add transclusions back as they were `before-save-buffer'.
 This function relies on `org-transclusion-remember-transclusions'
@@ -1085,6 +1299,10 @@ set in `before-save-hook'.  It also move the point back to
       (setq org-transclusion-remember-point nil)
       (setq org-transclusion-remember-transclusions nil))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-before-kill ()
   "Remove transclusions before `kill-buffer' or `kill-emacs'.
 Intended to be used with `kill-buffer-hook' and `kill-emacs-hook'
@@ -1105,6 +1323,10 @@ off (removed)."
 ;;;;---------------------------------------------------------------------------
 ;;;; Functions for Transclude Keyword
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-string-to-plist ()
   "Return the \"#+transclude:\" keyword's values if any at point."
   (save-excursion
@@ -1119,6 +1341,10 @@ off (removed)."
                   (setq plist (append plist (funcall fn str)))))
         plist))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-value-link (string)
   "It is a utility function used converting a keyword STRING to plist.
 It is meant to be used by
@@ -1130,6 +1356,10 @@ It is meant to be used by
     (user-error "Error.  Link in #+transclude is mandatory at %d" (point))
     nil))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-value-disable-auto (string)
   "It is a utility function used converting a keyword STRING to plist.
 It is meant to be used by `org-transclusion-get-string-to-plist'.
@@ -1139,6 +1369,10 @@ It needs to be set in
     (list :disable-auto
           (org-strip-quotes (match-string 0 string)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-value-level (string)
   "It is a utility function used converting a keyword STRING to plist.
 It is meant to be used by `org-transclusion-get-string-to-plist'.
@@ -1149,6 +1383,10 @@ It needs to be set in
              (val (if (string-empty-p match) "auto" (string-to-number match))))
     (list :level val)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-value-only-contents (string)
   "It is a utility function used converting a keyword STRING to plist.
 It is meant to be used by `org-transclusion-get-string-to-plist'.
@@ -1158,6 +1396,10 @@ It needs to be set in
     (list :only-contents
           (org-strip-quotes (match-string 0 string)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-value-exclude-elements (string)
   "It is a utility function used converting a keyword STRING to plist.
 It is meant to be used by `org-transclusion-get-string-to-plist'.
@@ -1168,6 +1410,10 @@ Double quotations are mandatory."
     (list :exclude-elements
           (org-trim (org-strip-quotes (match-string 1 string))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-current-indentation (_)
   "It is a utility function used converting a keyword STRING to plist.
 It is meant to be used by `org-transclusion-get-string-to-plist'.
@@ -1175,6 +1421,10 @@ It needs to be set in
 `org-transclusion-keyword-value-functions'."
   (list :current-indentation (current-indentation)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-value-expand-links (string)
   "It is a utility function used converting a keyword STRING to plist.
 It is meant to be used by `org-transclusion-get-string-to-plist'.
@@ -1184,6 +1434,10 @@ It needs to be set in
     (list :expand-links
           (org-strip-quotes (match-string 0 string)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-value-no-first-heading (string)
   "It is a utility function used converting a keyword STRING to plist.
 It is meant to be used by `org-transclusion-get-string-to-plist'.
@@ -1192,6 +1446,10 @@ It needs to be set in
   (when (string-match ":no-first-heading" string)
     (list :no-first-heading (org-strip-quotes (match-string 0 string)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-remove ()
   "Remove the keyword element at point.
 Returns t if successful.  It checks if the element at point is a
@@ -1206,6 +1464,10 @@ keyword.  If not, returns nil."
       (delete-region beg (- end post-blank))
       t)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-plist-to-string (plist)
   "Convert a keyword PLIST to a string."
   (let (;;(active-p (plist-get plist :active-p))
@@ -1238,6 +1500,10 @@ keyword.  If not, returns nil."
             custom-properties-string
             "\n")))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-keyword-plist-to-exclude-elements (plist)
   "Return list of symbols from PLIST when applicable.
 If PLIST does not have :exclude-elements, return nil.
@@ -1259,6 +1525,10 @@ inserted when more than one space is inserted between symbols."
 (make-obsolete 'org-transclusion-add-payload
                "Use `org-transclusion-add' directly." "2.0.0")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-add-payload (payload link keyword-plist copy)
   "Insert transcluded content with error handling.
 
@@ -1301,6 +1571,10 @@ returned by hooks in `org-transclusion-add-functions'."
         (run-hook-with-args 'org-transclusion-after-add-functions beg end))
       t)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-add-source-marker (link)
   "Return the marker of transclusion source by opening LINK.
 LINK must be Org's link object that `org-link-open' can act on. As long
@@ -1351,6 +1625,10 @@ offsets from file beginning, not from cursor position."
               "Org-transclusion: `org-link-open' cannot open link, %s"
               (org-element-property :raw-link link))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-source-point-beginning-of-buffer-p (link)
   "Return non-nil when point should be at the beginning of the buffer.
 LINK must be Org's link object that `org-link-open' can act on.
@@ -1377,6 +1655,10 @@ because:
   (and (string-equal "file" (org-element-property :type link))
        (not (org-element-property :search-option link))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-add-org-id (link plist)
   "Return a list for Org-ID LINK object and PLIST.
 Return nil if not found."
@@ -1395,6 +1677,10 @@ Return nil if not found."
                  (org-transclusion-content-org-filtered
                   'only-element plist)))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-add-org-file (link plist)
   "Return a list for Org file LINK object and PLIST.
 Return nil if not found."
@@ -1430,6 +1716,10 @@ Return nil if not found."
                  (org-transclusion-content-org-filtered
                   nil plist)))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-add-other-file (link _plist)
   "Return a list for non-Org file LINK object and PLIST.
 Return nil if not found."
@@ -1448,6 +1738,10 @@ Return nil if not found."
 ;;-----------------------------------------------------------------------------
 ;;;; Functions for inserting content
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-insert (content)
   "Insert CONTENT and return cons cell of BEG and END."
   (let ((beg (line-beginning-position))
@@ -1472,6 +1766,10 @@ Return nil if not found."
       (move-marker end-mkr nil)
       (cons beg end))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-add-text-props-and-overlay (payload keyword-values beg end)
   "
 BEG: before the text is inserted
@@ -1526,6 +1824,10 @@ current buffer."
     ;; Return t
     t))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-highest-org-headline ()
   "Return the highest level as an integer of all the headlines in buffer.
 Returns nil if there is no headline.  Note that level 1 is the
@@ -1539,6 +1841,10 @@ This function assumes the buffer is an Org buffer."
         (push (org-element-property :level h) list)))
     (when list (seq-min list))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-format-org (type content keyword-values)
   "Format text CONTENT from source before transcluding.
 Return content modified (or unmodified, if not applicable).
@@ -1574,6 +1880,10 @@ This function is the default for org-transclusion-type (TYPE)
         ;; Return the temp-buffer's string
         (buffer-string)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-format-org-headlines (_type _content keyword-values)
   "Adjust org headline levels for CONTENT.
 KEYWORD-VALUES is a plist of transclusion properties. This
@@ -1603,6 +1913,10 @@ active."
                (org-map-entries (lambda ()
                                   (dotimes (_ diff) (org-do-promote))))))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-format (_type content keyword-values)
   "Format text CONTENT from source before transcluding.
 Return content modified (or unmodified, if not applicable).
@@ -1617,6 +1931,10 @@ KEYWORD-VALUES is a plist of transclusion properties."
                      (plist-get keyword-values :current-indentation))
     (buffer-string)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-content-filter-org-functions '())
 
 (add-hook 'org-transclusion-content-filter-org-functions
@@ -1628,6 +1946,10 @@ KEYWORD-VALUES is a plist of transclusion properties."
 (make-obsolete 'org-transclusion-content-org-buffer-or-element
                'org-transclusion-content-org-filtered "1.4.1")
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-org-filtered (only-element plist)
   "Return a list of payload for transclusion.
 This function assumes the point is at the beginning of the org
@@ -1668,6 +1990,10 @@ property controls the filter applied to the transclusion."
               :src-beg (point-min)
               :src-end (point-max))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-org-filter (only-element obj plist)
   ;; Apply `org-transclusion-exclude-elements'
   ;; Appending exclude-elements can duplicate symbols
@@ -1690,11 +2016,19 @@ property controls the filter applied to the transclusion."
       (when obj-returned (setq obj obj-returned))))
   obj)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-filter-org-expand-links-function (obj plist)
   (when (plist-get plist :expand-links)
     (org-element-map obj 'link #'org-transclusion-content-filter-org-expand-links)
     obj))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-filter-org-expand-links (link)
   "Convert LINK to an absolute filename.
 LINK is assumed to be an Org element. This function does nothing
@@ -1711,6 +2045,10 @@ transclusion."
           path
           (file-name-directory (buffer-file-name (current-buffer)))))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-filter-org-exclude-elements (data)
   "Exclude specific elements from DATA.
 The elements to be excluded are defined by customizing variable
@@ -1720,6 +2058,10 @@ The elements to be excluded are defined by customizing variable
     (lambda (d) (org-element-extract-element d)))
   data)
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-filter-org-first-section (data)
   "Exclude the first section from DATA.
 The first section is the part before the first headline of an Org
@@ -1730,12 +2072,20 @@ is non-nil."
       nil
     data))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-filter-org-only-contents-function (obj plist)
   (when-let ((only-contents (plist-get plist :only-contents)))
     (org-element-map obj org-element-all-elements
       #'org-transclusion-content-filter-org-only-contents
       nil nil 'section nil)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-content-filter-org-only-contents (data)
   "Exclude headlines from DATA to include only contents."
   (if (eq (org-element-type data) 'headline)
@@ -1744,6 +2094,10 @@ is non-nil."
 
 ;;-----------------------------------------------------------------------------
 ;;; Helper Functions
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion--fringe-spec-p (prop-value)
   "Return non-nil if PROP-VALUE represents a transclusion fringe indicator.
 Checks both graphical fringe (display property) and
@@ -1764,6 +2118,10 @@ terminal fringe (face property)."
            org-transclusion-source
            org-transclusion))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion--make-fringe-indicator (face)
   "Create fringe indicator string for FACE.
 Handles both graphical and terminal display modes.
@@ -1776,6 +2134,10 @@ for transclusion fringe to match original overlay-based appearance."
         (propertize "x" 'display `(left-fringe ,bitmap ,face)))
     (propertize "| " 'face face)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion--update-line-prefix (line-beg line-end prop-name new-value)
   "Update text property PROP-NAME to NEW-VALUE for line at LINE-BEG.
 LINE-END is the end of the region to update.
@@ -1788,6 +2150,10 @@ If NEW-VALUE is nil, removes the property entirely."
 
 ;;;; Fringe Detection
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-prefix-has-fringe-p (prefix)
   "Return non-nil if PREFIX string contains a transclusion fringe indicator.
 Checks for both graphical fringe (display property) and terminal
@@ -1815,6 +2181,10 @@ fringe (face property within the string)."
         nil))))
 
 ;;;; Fringe Creation
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-append-fringe-to-prefix (existing-prefix face)
   "Append fringe indicator to EXISTING-PREFIX, preserving it.
 FACE determines the fringe color (org-transclusion-source-fringe or
@@ -1832,6 +2202,10 @@ In graphical mode, appends fringe to preserve indentation alignment."
           (concat fringe-indicator existing-prefix))
       fringe-indicator)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-add-fringe-to-region (buffer beg end face)
   "Add fringe indicator to each line in BUFFER between BEG and END.
 FACE determines the fringe color.
@@ -1878,6 +2252,10 @@ adds fringe-only prefix."
               (throw 'done nil))))))))
 
 ;;;; Fringe Removal
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-remove-fringe-from-prefix (prefix)
   "Remove fringe indicator from PREFIX string.
 Returns the cleaned prefix, or nil if prefix was only the fringe indicator."
@@ -1898,6 +2276,10 @@ Returns the cleaned prefix, or nil if prefix was only the fringe indicator."
       ;; Return nil if nothing left, otherwise return cleaned prefix
       (if (string-empty-p cleaned) nil cleaned))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-remove-fringe-from-region (buffer beg end)
   "Remove fringe indicators from each line in BUFFER between BEG and END.
 This restores `line-prefix' and `wrap-prefix' to their state before
@@ -1935,6 +2317,10 @@ entirely since they were added solely for fringe display."
             (forward-line 1)))))))
 
 ;;;; Hook
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-source-overlay-modified (ov after-p _beg _end &optional _len)
   "Update source overlay OV indentation after modification.
 Called by overlay modification hooks. AFTER-P is t after modification.
@@ -1951,6 +2337,10 @@ dynamic updates."
 
 ;;;; Utility Functions
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-insert-org-link ()
   "Return org link string from another org link function.
 The function is an element in `org-transclusion-insert-link-functions'.
@@ -1967,6 +2357,10 @@ it will work."
         (funcall function)
         (buffer-string)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-find-source-marker (beg end)
   "Return marker that points to source begin point for transclusion.
 It works on the transclusion region at point.  BEG and END are
@@ -2007,6 +2401,10 @@ changes, the logic in this function will need to reviewed."
                           src-buf)))
     m))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-search-or-add-next-empty-line ()
   "Move point to the next empty line.
 If no empty line exists before the next org heading or the end of
@@ -2018,6 +2416,10 @@ the buffer, stop there and add a newline."
                (backward-char))
       (forward-line))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-wrap-path-to-link (path)
   "Return Org link object for PATH string."
   (with-temp-buffer
@@ -2025,6 +2427,10 @@ the buffer, stop there and add a newline."
     (insert path)
     (org-element-context)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-org-file-p (path)
   "Return non-nil if PATH is an Org file.
 It does so by confirming that the extension is either `org' or `org.gpg'.
@@ -2039,12 +2445,20 @@ The latter form of extension ending with .gpg means it is an encrypted org file.
                                     (string= last-substring "gpg"))))
       (or org-file encrpyted-org-file))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-not-nil (v)
   "Return t or nil.
 It is like `org-not-nil', but when the V is non-nil or not
 string \"nil\", return symbol t."
   (when (org-not-nil v) t))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-check-add ()
   "Return t if `org-transclusion-add' should work on the point.
 Error if transclusion is not allowed.
@@ -2067,6 +2481,10 @@ Case 2. #+transclude inside another transclusion"
      (point) (org-current-line)))
    (t t)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-at-point (&optional point)
   "Return plist representing the transclusion at point.
 This function returns a plist of this form:
@@ -2098,6 +2516,10 @@ used."
                (beg (prop-match-beginning prop-match-backward)))
       (list :id id :location (cons beg end)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-at-keyword-p ()
   "Return non-nil if the current line is on #+TRANSCLUDE: keyword."
   ;;
@@ -2123,16 +2545,28 @@ used."
                 (string-equal "TRANSCLUDE"
                               (org-element-property :key element)))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-within-transclusion-p ()
   "Return t if the current point is within a transclusion region."
   (when (get-char-property (point) 'org-transclusion-type) t))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-within-live-sync-p ()
   "Return t if the current point is within a transclusion in live-sync."
   (when (and (org-transclusion-within-transclusion-p)
              (get-char-property (point) 'text-clones))
     t))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-type-is-org (type)
   "Return non-nil if TYPE begins with \"org\".
 TYPE is assumed to be a text-property \"org-transclusion-type\"
@@ -2142,6 +2576,10 @@ and is a string."
 ;;-----------------------------------------------------------------------------
 ;;;; Functions for open-source
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-open-source-marker (_type)
   "Return a marker pointing to the position and source buffer.
 It is intended to be used for `org-transclusion-open-source' and
@@ -2171,6 +2609,10 @@ the transcluded region is large."
 ;;-----------------------------------------------------------------------------
 ;;;; Functions for live-sync
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-source-range-markers (beg end)
   "Find and return source range based on transclusion's BEG and END.
 Return \"(src-beg-mkr . src-end-mkr)\"."
@@ -2191,6 +2633,10 @@ Return \"(src-beg-mkr . src-end-mkr)\"."
            (move-marker (make-marker) src-beg)
            (move-marker (make-marker) src-end)))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-source-content (beg end)
   "Return text content between BEG and END.
 BEG and END are assumed to be markers for the transclusion's source buffer."
@@ -2198,6 +2644,10 @@ BEG and END are assumed to be markers for the transclusion's source buffer."
     (with-current-buffer (marker-buffer beg)
       (buffer-substring-no-properties beg end))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-modify-overlays (overlays)
   "Add overlay properties specific Org-transclusion for OVERLAYS.
 This must be done after `text-clone-set-overlays'.
@@ -2210,6 +2660,10 @@ Org-transclusion always works with a pair of overlays."
     (overlay-put tc-ov 'face 'org-transclusion-edit)
     (overlay-put tc-ov 'local-map org-transclusion-live-sync-map)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-enclosing-element (beg end)
   "Return an enclosing Org element between BEG and END.
 This function is intended for live-sync.
@@ -2268,6 +2722,10 @@ paragraph."
             (user-error (format "Live sync cannot start here: point %d"
                                 (point)))))))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-refresh-after-exit (list)
   "Refresh the transclusion after live-sync has ended.
 This must be done before starting a new live-sync.  LIST is
@@ -2284,6 +2742,10 @@ transclusion in this structure:
          (org-transclusion-refresh))
         (goto-char current-p)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-display-buffer (buffer)
   "Display the source buffer upon entering live-sync edit.
 It remembers the current arrangement of windows (window
@@ -2304,6 +2766,10 @@ attempts to bring back the original window configuration."
     (recenter-top-bottom)
     (select-window win)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-buffers ()
   "Return cons cell of overlays for source and transclusion.
 The cons cell to be returned is in this form:
@@ -2319,6 +2785,10 @@ org-transclusion overlay."
     (run-hook-with-args-until-success
      'org-transclusion-live-sync-buffers-functions type)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-buffers-org (type)
   "Return cons cell of overlays for source and transclusion.
 The cons cell to be returned is in this form:
@@ -2363,6 +2833,10 @@ links and IDs."
           (setq tc-ov (text-clone-make-overlay beg end))))
       (cons src-ov tc-ov))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-live-sync-buffers-others-default (_type)
   "Return cons cell of overlays for source and transclusion.
 The cons cell to be returned is in this format:
@@ -2387,6 +2861,10 @@ This function is for non-Org text files."
 ;;-----------------------------------------------------------------------------
 ;;;; Functions for yank/paste a region within transclusion
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-yank-excluded-properties-set ()
   "Set `yank-excluded-properties' for pasting transcluded text.
 This way, the pasted text will not inherit the text props that
@@ -2411,6 +2889,10 @@ ensure the settings revert to the user's setting prior to
     (setq yank-excluded-properties
           (append yank-excluded-properties excluded-props)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-yank-excluded-properties-remove ()
   "Remove transclusion-specific text props from `yank-excluded-properties'.
 List variable
@@ -2430,6 +2912,10 @@ ensure the settings revert to the user's setting prior to
 ;;-----------------------------------------------------------------------------
 ;;;; Functions for promote/demote a transcluded subtree
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-promote-adjust-after ()
   "Adjust the level information after promote/demote."
   (let* ((pos (next-property-change (point) nil (line-end-position)))
@@ -2445,6 +2931,10 @@ ensure the settings revert to the user's setting prior to
       (goto-char pos)
       (org-transclusion-refresh))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-promote-or-demote-subtree (&optional demote)
   "Promote or demote transcluded subtree.
 When DEMOTE is non-nil, demote."
@@ -2463,6 +2953,10 @@ When DEMOTE is non-nil, demote."
 ;;-----------------------------------------------------------------------------
 ;;;; Functions to support Org-export
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-inhibit-read-only (&rest _args)
   "Set `inhibit-read-only' to t for Org export functions.
 Org export may need the buffer not to contain read-only elements.
@@ -2475,6 +2969,10 @@ read-only."
 ;;;; Functions for extensions
 ;;   It's based on `org-modules'
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-load-extensions-maybe (&optional force)
   "Load all extensions listed in `org-transclusion-extensions'.
 FORCE will let this function ignore
@@ -2493,6 +2991,10 @@ FORCE will let this function ignore
 Problems while trying to load feature `%s'" ext)))))
     (setq org-transclusion-extensions-loaded t)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-extension-set-a-hook-functions (add-or-remove list)
   "Add/remove functions to an abnormal hook.
 LIST must be a cons cell for an extension. CAR is a symbol name
@@ -2507,6 +3009,10 @@ functions to be set to the abnormal hook. ADD-OR-REMOVE must either
     (mapc (lambda (symbol) (funcall add-or-remove hook-name symbol))
           symbols)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun org-transclusion-extension-functions-add-or-remove (extension-functions &optional remove)
   "Add or remove functions to abnormal hooks for extensions.
 EXTENSION-FUNCTIONS is an alist. CAR of each cons cell is a
@@ -2525,7 +3031,9 @@ abnormal hooks; otherwise, added to them."
 (org-transclusion-load-extensions-maybe)
 
 (provide 'org-transclusion)
+
 #+end_src
+
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-transclusion-add (&optional only-body)
   "Select a manifolding-atlas note and insert a live transclusion at point.
@@ -2582,7 +3090,15 @@ the current heading:
 ;; buffer-local value, but that var is only defined by the unloaded
 ;; org-transclusion-indent-mode extension — declare it so capture
 ;; buffers (whose source overlays fire modification hooks) don't error.
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defvar org-transclusion-indent-mode nil)
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-transclusion-open ()
   "Open the source of the transclusion at point.
 Ref notes open in org-capture (fast editing); otherwise fall back to
@@ -2615,6 +3131,10 @@ is an internal pairing UUID, so the real source id is parsed from
 ;; a source headline (`* X') inside a drawer breaks org's drawer parsing, so
 ;; this keyword strips the leading asterisk, turning the transcluded content
 ;; into org-safe plain text inside the drawer.
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-transclusion-keyword-value-property (string)
   (when (string-match ":property" string)
     (list :property t)))
@@ -2624,6 +3144,10 @@ is an internal pairing UUID, so the real source id is parsed from
              (lambda (plist)
                (when (plist-get plist :property) " :property")))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun my/org-transclusion-content-format-property (_type content keyword-values)
   (when (plist-get keyword-values :property)
     (with-temp-buffer
@@ -2638,6 +3162,10 @@ is an internal pairing UUID, so the real source id is parsed from
 ;; Refresh transclusions in all open org buffers after any save.
 ;; Uses remove-all + add-all (the same pattern org-transclusion uses
 ;; internally for before-save / after-save).
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun my/org-transclusion-refresh-all ()
   (dolist (buf (buffer-list))
     (with-current-buffer buf
@@ -2645,7 +3173,9 @@ is an internal pairing UUID, so the real source id is parsed from
         (org-transclusion-remove-all)
         (org-transclusion-add-all)))))
 (add-hook 'after-save-hook #'my/org-transclusion-refresh-all)
+
 #+end_src
+
 
 *** Transclusion Link Index
 Indexes [[id:...][...]] links inside #+transclude: keywords into a
@@ -2665,6 +3195,10 @@ Also provides a text-based scanner for files not yet indexed by manifolding-atla
              (:foreign-key [dest]   :references notes [id]
               :on-delete :cascade))]))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-extract-transclude-links (ctx note-data)
   "Extract id: links from #+transclude: keywords in CTX."
   (let* ((ast     (manifolding-atlas-parse-ctx-ast ctx))
@@ -2696,6 +3230,10 @@ Also provides a text-based scanner for files not yet indexed by manifolding-atla
     :priority   60
     :extract-fn #'my/manifolding-atlas-extract-transclude-links)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-db-query-transclude-links-to (target-id)
   "Return list of source note IDs that transclude TARGET-ID."
   (mapcar #'car
@@ -2704,6 +3242,10 @@ Also provides a text-based scanner for files not yet indexed by manifolding-atla
                     :where (= dest $s1)]
                    target-id)))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-links--find-transclude-refs (target-id)
   "Search all org files in vault for #+transclude: links to TARGET-ID.
 Returns list of source note IDs. Acts as fallback for files not yet
@@ -2723,4 +3265,6 @@ indexed by the manifolding-atlas DB extractor."
             (when id
               (push id results))))))
     (delete-dups results)))
+
 #+end_src
+

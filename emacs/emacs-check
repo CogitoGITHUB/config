@@ -1,0 +1,13 @@
+#!/bin/bash
+# Quick elisp syntax check using emacs --batch
+# Usage: emacs-check <file.el> [file2.el ...]
+file="$1"
+if [ -z "$file" ]; then
+    echo "Usage: emacs-check <file.el>"
+    exit 1
+fi
+emacs --batch --quick --eval "
+(condition-case err
+    (with-temp-buffer (insert-file-contents \"$file\") (read (buffer-string)) (princ \"OK\n\"))
+  (error (princ (format \"ERROR: %s\n\" (error-message-string err)))))
+" 2>&1 | grep -v "^Loading"

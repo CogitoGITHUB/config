@@ -343,6 +343,10 @@ each review, keeping the file-level state in sync with the DB.
           `((n . ,n) (c-success . ,c-success) (c-fails . ,c-fails)
             (t-success . ,t-success) (t-fails . ,t-fails)))))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--update (note-id success result)
   "Update mastering_schedule and note properties for NOTE-ID review."
   (let* ((next-rev (nth 0 result))
@@ -371,11 +375,17 @@ each review, keeping the file-level state in sync with the DB.
      success c-succ c-fails t-succ t-fails score)
     next-rev))
 
+
+#+end_src
+
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-mastering--apply-grade (id success)
   "Run the algorithm for ID and dual-write the result."
   (my/manifolding-atlas-mastering--update id success
    (my/manifolding-atlas-mastering--review-algorithm id success)))
+
 #+end_src
+
 
 *** Due Queries
 Due = next-rev ≤ today and not suspended. Overdue additionally requires

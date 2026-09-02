@@ -684,7 +684,7 @@ is the opening token's position and end is just past the closing token."
 Finds the nearest balanced delimiter pair surrounding point, sets point and
 mark to the text strictly between the delimiters, and enters visual state."
   (interactive)
-  (let ((pairs '(("\\(" . "\\)") ("\\[" . "\\]") ("{" . "}") ("<" . ">")))
+  (let ((pairs '(("\\\\(" . "\\\\)") ("\\\\[" . "\\\\]") ("{" . "}") ("<" . ">")))
         (best nil))
     (dolist (p pairs)
       (let* ((found (my/thing-pair-function (car p) (cdr p) nil))
@@ -2885,11 +2885,10 @@ All navigation menus.  See SPC → submenu → key.  Defined via `my/defhydra-st
   (("h" my/manifolding-atlas-capture-heading "new heading" :exit t)
    ("c" my/manifolding-atlas-insert-heading "at point" :exit t)
    ("H" my/manifolding-atlas-heading-to-note "heading→note" :exit t))
-  "Meta"
-  (("f" my/manifolding-atlas--fix-violations "fix warnings" :exit t)
-   ("P" my/manifolding-atlas-update-properties "update props" :exit t)
-   ("u" manifolding-atlas-ui-sidebar-toggle "sidebar" :exit t)
-   ("E" my/manifolding-atlas-reinforce-sweep "schema sweep" :exit t))
+   "Meta"
+   (("f" my/manifolding-atlas--fix-violations "fix warnings" :exit t)
+    ("u" manifolding-atlas-ui-sidebar-toggle "sidebar" :exit t)
+    ("E" my/manifolding-atlas-reinforce-sweep "schema sweep" :exit t))
   "Rules"
   (("k" my/manifolding-atlas-rules-mark-as-rule "mark rule" :exit t)
    ("K" my/manifolding-atlas-rules-goto-routed-file "rule file" :exit t)

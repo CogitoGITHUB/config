@@ -280,35 +280,178 @@ clean.  REL-LINE is 1-based relative to the start of STRING."
             (forward-comment (point-max))
             (unless (eobp) (forward-sexp)))
           nil)
-      (scan-error
-       (list (line-number-at-pos (point))
-             (string-trim
-              (buffer-substring (line-beginning-position)
-                                (line-end-position))))))))
+       (scan-error
+        (list (line-number-at-pos (point))
+              (string-trim
+               (buffer-substring (line-beginning-position)
+                                 (line-end-position)))))
+
+
+(defun manifolding-emacs--validate-block-parens (string file line)
+  "Validate STRING for balanced parens, strings, and comments.
+Returns nil if valid, or a detailed error plist with:
+  :file    - source file path
+  :line    - block starting line number
+  :type    - error type (unbalanced-parens, unterminated-string, etc.)
+  :opens   - total open parens (outside strings/comments)
+  :closes  - total close parens (outside strings/comments)
+  :diff    - difference (opens - closes)
+  :depth   - paren depth at point of failure
+  :context - text around the error location"
+  (let ((opens 0) (closes 0) (max-depth 0) (depth 0)
+        (in-string nil) (string-char nil) (in-comment nil)
+        (pos 0) (error-pos nil) (error-depth nil) (error-context nil)
+        type)
+    (cl-block nil
+      (while (< pos (length string))
+        (let ((char (aref string pos)))
+          (cond
+           (in-comment
+            (when (eq char ?\n) (setq in-comment nil)))
+           (in-string
+            (cond ((eq char ?\\) (setq pos (1+ pos)))
+                  ((eq char string-char)
+                   (setq in-string nil string-char nil))))
+           ((and (eq char ?\;) (not in-string))
+            (setq in-comment t))
+           ((and (eq char ?\") (not in-string))
+            (setq in-string t string-char ?\"))
+           ((eq char ?\()
+            (setq depth (1+ depth))
+            (setq max-depth (max max-depth depth))
+            (setq opens (1+ opens)))
+           ((eq char ?\))
+            (setq closes (1+ closes))
+            (setq depth (1- depth))
+            (when (< depth 0)
+              (setq error-pos pos)
+              (setq error-depth depth)
+              (setq type 'unbalanced-close)
+              (setq error-context
+                    (string-trim
+                     (buffer-substring
+                      (max 0 (- pos 40))
+                      (min (length string) (+ pos 40)))))
+              (cl-return nil))))
+          (setq pos (1+ pos))))
+    (cond
+     (in-string
+      (list :file file :line line :type 'unterminated-string
+            :opens opens :closes closes :diff (- opens closes)
+            :depth depth
+            :context (string-trim
+                      (buffer-substring
+                       (max 0 (- (length string) 40))
+                       (length string)))
+            :message (format "Unterminated string starting with %c" string-char)))
+     ((> opens closes)
+      (list :file file :line line :type 'unbalanced-parens
+            :opens opens :closes closes :diff (- opens closes)
+            :depth depth
+            :context (string-trim
+                      (buffer-substring
+                       (max 0 (- (length string) 40))
+                       (length string)))
+            :message (format "Missing %d closing paren(s)" (- opens closes))))
+     ((< opens closes)
+      (list :file file :line line :type 'unbalanced-parens
+            :opens opens :closes closes :diff (- opens closes)
+            :depth depth
+            :context (string-trim
+                      (buffer-substring
+                       (max 0 (- (length string) 40))
+                       (length string)))
+            :message (format "Extra %d closing paren(s)" (- closes opens))))
+     (t nil))))
 
 (defun manifolding-emacs-safe-read (string file &optional line)
   "Read STRING, tagging any read error with FILE/LINE for context.
-Read failures are pinpointed with `manifolding-emacs--first-bad-line'
-so the reported message names the exact line and shows its text,
-instead of a bare \"End of file during parsing\"."
+Pre-validates block for balanced parens with extreme detail.
+Read failures pinpoint the exact location, show context, and display
+the problematic code block."
+  ;; First: detailed paren validation
+  (when-let ((err (manifolding-emacs--validate-block-parens string file line)))
+    (let* ((msg (format "PAREN ERROR in %s:%s\n  Type: %s\n  Opens: %d  Closes: %d  Diff: %d\n  Depth: %d\n  Context: %s\n  Message: %s"
+                        (file-name-nondirectory file)
+                        (or line "?")
+                        (plist-get err :type)
+                        (plist-get err :opens)
+                        (plist-get err :closes)
+                        (plist-get err :diff)
+                        (plist-get err :depth)
+                        (plist-get err :context)
+                        (plist-get err :message)))
+           ;; Extract the actual code block content for display
+           (code-snippet (manifolding-emacs--extract-error-code string file line)))
+      (signal 'error (list (concat msg "\n\n--- CODE BLOCK ---\n" code-snippet)))))
+  ;; Then: safe read with error context
   (condition-case err
       (read string)
     (error
-     (let ((base (concat (if line
-                             (format "Read error in %s:%s" file line)
-                           (format "Read error in %s" file))
-                         ": "
-                         (error-message-string err))))
-       (signal 'error
-               (list
-                (if-let* ((scan (and (memq (car err)
-                                            '(end-of-file invalid-read-syntax
-                                              scan-error))
-                                     (manifolding-emacs--first-bad-line
-                                      string))))
-                    (format "%s — bad form at +%d: %s"
-                            base (nth 0 scan) (nth 1 scan))
-                  base)))))))
+     (let* ((base (concat (if line
+                              (format "Read error in %s:%s" file line)
+                            (format "Read error in %s" file))
+                          ": "
+                          (error-message-string err)))
+            (scan (and (memq (car err)
+                             '(end-of-file invalid-read-syntax scan-error))
+                       (manifolding-emacs--first-bad-line string)))
+            (code-snippet (manifolding-emacs--extract-error-code string file line))
+            (msg (concat base
+                        (when scan (format " — bad form at +%d: %s"
+                                           (nth 0 scan) (nth 1 scan)))
+                        "\n\n--- CODE BLOCK ---\n" code-snippet)))
+       (signal 'error (list msg))))))
+
+(defun manifolding-emacs--extract-error-code (string file line)
+  "Extract the problematic code block from FILE at LINE for display.
+Returns a string with the code block content, truncated if very long."
+  (condition-case nil
+      (with-temp-buffer
+        (insert string)
+        (goto-char (point-min))
+        ;; Truncate very long blocks for readability
+        (if (> (buffer-size) 500)
+            (progn
+              (goto-char 500)
+              (buffer-substring (point-min) (point)))
+          (buffer-string)))
+    (error "Could not extract code block")))
+
+(defun manifolding-emacs-jump-to-error (file line)
+  "Open FILE at LINE to jump to the problematic code block.
+If FILE is nil, prompt for the file. If LINE is nil, search for
+the last error location."
+  (interactive
+   (list (read-file-name "File: ")
+         (read-number "Line: ")))
+  (when file
+    (find-file file)
+    (when line
+      (goto-char (point-min))
+      (forward-line (1- line)))
+    (recenter)))
+
+(defun manifolding-emacs--find-block-at-line (file line)
+  "Find the begin_src block containing LINE in FILE.
+Returns (START . END) of the block, or nil if not found."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (goto-char (point-min))
+    (let ((start nil)
+          (end nil)
+          (current-line 1))
+      (while (and (not end) (<= current-line line))
+        (cond
+         ((looking-at "^#+begin_src")
+          (setq start current-line))
+         ((looking-at "^#+end_src")
+          (when start
+            (setq end current-line))))
+        (forward-line 1)
+        (setq current-line (1+ current-line)))
+      (when start
+        (cons start (or end line))))))
 
 (defun manifolding-emacs-wrap-in-condition (file part
                                              &optional package keyword)

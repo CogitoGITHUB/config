@@ -1,0 +1,76 @@
+#!/bin/bash
+# emacs-cli-test - Emacs config testing utilities
+#
+# Usage:
+#   emacs-cli-test tangle    - Tangle manifolding-emacs.org (fast)
+#   emacs-cli-test load      - Load .el and check for errors (medium)
+#   emacs-cli-test modules   - Load all modules and check functions (slow)
+#   emacs-cli-test boot      - Full boot with *Messages* dump (very slow)
+
+ROOT="/data/data/com.termux/files/home/.config/emacs"
+INIT="$ROOT/init.el"
+ORG="$ROOT/Manifolding-Emacs/manifolding-emacs.org"
+EL="$ROOT/Manifolding-Emacs/manifolding-emacs.el"
+
+case "${1:-load}" in
+  tangle)
+    emacs --batch --quick --eval "
+(progn
+  (require 'org)
+  (setq org-confirm-babel-evaluate nil)
+  (condition-case err
+      (let ((result (org-babel-tangle-file \"$ORG\")))
+        (princ (format \"Tangled %d files\\n\" (length result))))
+    (error (princ (format \"ERROR: %s\\n\" (error-message-string err))))))"
+    ;;
+
+  load)
+    emacs --batch --quick --eval "
+(progn
+  (require 'org)
+  (setq org-confirm-babel-evaluate nil)
+  (princ \"Tangling...\\n\")
+  (org-babel-tangle-file \"$ORG\")
+  (princ \"Loading .el...\\n\")
+  (condition-case err
+      (progn
+        (load \"$EL\" t t)
+        (princ \"Load successful\\n\"))
+    (error (princ (format \"ERROR: %s\\n\" (error-message-string err))))))"
+    ;;
+
+  modules)
+    emacs --batch --quick --eval "
+(progn
+  (require 'org)
+  (setq org-confirm-babel-evaluate nil)
+  (setq user-emacs-directory \"$ROOT/\")
+  (load \"$EL\" t t)
+  (princ \"Loading modules...\\n\")
+  (manifolding-emacs-compile-directory)
+  (princ \"\\nErrors: %d\\n\" (length (manifolding-emacs-errors-list)))
+  (dolist (e (manifolding-emacs-errors-list))
+    (princ (format \"  %s: %s\\n\"
+                   (manifolding-emacs-error-entry-file e)
+                   (manifolding-emacs-error-entry-message e))))
+  (princ \"\\nFunctions:\\n\")
+  (dolist (fn '(my/manifolding-atlas-org-prompt--ask
+                my/manifolding-atlas-collect-prompts
+                my/manifolding-atlas-routines-run
+                manifolding-keyboard-define-keys
+                manifolding-emacs-safe-read))
+    (princ (format \"  %s: %s\\n\" fn (if (fboundp fn) \"DEFINED\" \"VOID\")))))"
+    ;;
+
+  boot)
+    emacs --batch \
+      -l "$INIT" \
+      --eval "(with-current-buffer \"*Messages*\" (princ (buffer-string)))" \
+      2>&1
+    ;;
+
+  *)
+    echo "Usage: emacs-cli-test {tangle|load|modules|boot}"
+    exit 1
+    ;;
+esac
