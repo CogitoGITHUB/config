@@ -392,7 +392,7 @@ Returns nil if valid, or a detailed error plist with:
               (setq type 'unbalanced-close)
               (setq error-context
                     (string-trim
-                     (buffer-substring
+                     (substring string
                       (max 0 (- pos 40))
                       (min (length string) (+ pos 40)))))
               (cl-return nil))))
@@ -403,7 +403,7 @@ Returns nil if valid, or a detailed error plist with:
             :opens opens :closes closes :diff (- opens closes)
             :depth depth
             :context (string-trim
-                      (buffer-substring
+                      (substring string
                        (max 0 (- (length string) 40))
                        (length string)))
             :message (format "Unterminated string starting with %c" string-char)))
@@ -412,7 +412,7 @@ Returns nil if valid, or a detailed error plist with:
             :opens opens :closes closes :diff (- opens closes)
             :depth depth
             :context (string-trim
-                      (buffer-substring
+                      (substring string
                        (max 0 (- (length string) 40))
                        (length string)))
             :message (format "Missing %d closing paren(s)" (- opens closes))))
@@ -421,11 +421,11 @@ Returns nil if valid, or a detailed error plist with:
             :opens opens :closes closes :diff (- opens closes)
             :depth depth
             :context (string-trim
-                      (buffer-substring
+                      (substring string
                        (max 0 (- (length string) 40))
                        (length string)))
             :message (format "Extra %d closing paren(s)" (- closes opens))))
-     (t nil))))
+     (t nil)))))
 #+end_src
 
 ** Safe read with error context

@@ -7,6 +7,34 @@
 :END:
 
 #+begin_src emacs-lisp
+(defun my/manifolding-atlas-blueprint--prompt-dir ()
+  "Return blueprints directory (stub for prompt dir)."
+  (or (and (fboundp 'my/manifolding-atlas-blueprint-dir)
+           (my/manifolding-atlas-blueprint-dir))
+      (expand-file-name "Manifolding-Emacs/modules/manifolding-atlas/blueprints/"
+                        user-emacs-directory)))
+
+(defun my/manifolding-atlas-blueprint--template-dir ()
+  "Return templates directory."
+  (expand-file-name "templates/" (my/manifolding-atlas-blueprint--prompt-dir)))
+
+(defun my/manifolding-atlas-blueprint--drawer-keys-in-file (file)
+  "Stub: return drawer keys in FILE."
+  nil)
+
+(defun my/manifolding-atlas-blueprint--field-from-prompt (prompt &optional _all)
+  "Stub: return field spec for PROMPT."
+  (list :key (upcase (symbol-name prompt)) :type 'string :required nil))
+
+(defun manifolding-atlas-blueprint-define (name &rest plist)
+  "Stub: register blueprint NAME with PLIST (no-op for boot)."
+  (ignore name plist)
+  nil)
+
+(unless (fboundp 'my/manifolding-atlas--capture-file-hash)
+  (defun my/manifolding-atlas--capture-file-hash (_name)
+    "Stub: return nil hash."
+    nil))
 #+end_src
 
 #+begin_src emacs-lisp
@@ -245,13 +273,12 @@
                 :type string
                 :required t
                 :validator #'my/manifolding-atlas-blueprint--hash-validator))))
-(cl-loop for (template-name . keys) in (my/manifolding-atlas-blueprint--template-props)
-             'task
-             :predicate (lambda (note) (member "task" (manifolding-atlas-note-tags note)))
-             :include 'base
-             :fields
-(list (my/manifolding-atlas-blueprint--field-from-prompt 'todo)
-                    (my/manifolding-atlas-blueprint--field-from-prompt 'priority)))
+(manifolding-atlas-blueprint-define
+ 'task
+ :predicate (lambda (note) (member "task" (manifolding-atlas-note-tags note)))
+ :include 'base
+ :fields (list (my/manifolding-atlas-blueprint--field-from-prompt 'todo)
+               (my/manifolding-atlas-blueprint--field-from-prompt 'priority)))
 
 #+end_src
 

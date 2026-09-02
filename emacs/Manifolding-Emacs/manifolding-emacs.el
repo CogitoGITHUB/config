@@ -284,7 +284,7 @@ clean.  REL-LINE is 1-based relative to the start of STRING."
         (list (line-number-at-pos (point))
               (string-trim
                (buffer-substring (line-beginning-position)
-                                 (line-end-position)))))
+                                 (line-end-position))))))))
 
 
 (defun manifolding-emacs--validate-block-parens (string file line)
@@ -329,7 +329,7 @@ Returns nil if valid, or a detailed error plist with:
               (setq type 'unbalanced-close)
               (setq error-context
                     (string-trim
-                     (buffer-substring
+                     (substring string
                       (max 0 (- pos 40))
                       (min (length string) (+ pos 40)))))
               (cl-return nil))))
@@ -340,7 +340,7 @@ Returns nil if valid, or a detailed error plist with:
             :opens opens :closes closes :diff (- opens closes)
             :depth depth
             :context (string-trim
-                      (buffer-substring
+                      (substring string
                        (max 0 (- (length string) 40))
                        (length string)))
             :message (format "Unterminated string starting with %c" string-char)))
@@ -349,7 +349,7 @@ Returns nil if valid, or a detailed error plist with:
             :opens opens :closes closes :diff (- opens closes)
             :depth depth
             :context (string-trim
-                      (buffer-substring
+                      (substring string
                        (max 0 (- (length string) 40))
                        (length string)))
             :message (format "Missing %d closing paren(s)" (- opens closes))))
@@ -358,11 +358,11 @@ Returns nil if valid, or a detailed error plist with:
             :opens opens :closes closes :diff (- opens closes)
             :depth depth
             :context (string-trim
-                      (buffer-substring
+                      (substring string
                        (max 0 (- (length string) 40))
                        (length string)))
             :message (format "Extra %d closing paren(s)" (- closes opens))))
-     (t nil))))
+     (t nil)))))
 
 (defun manifolding-emacs-safe-read (string file &optional line)
   "Read STRING, tagging any read error with FILE/LINE for context.

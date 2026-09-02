@@ -5,6 +5,106 @@
 
 ** Database Core
 #+begin_src emacs-lisp
+(provide 'manifolding-atlas-db)
+(provide 'manifolding-atlas-db-query)
+
+(unless (fboundp 'manifolding-atlas-db)
+  (defun manifolding-atlas-db (&optional _args)
+    "Stub: return nil DB connection."
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-query)
+  (defun manifolding-atlas-db-query (&optional _filter)
+    "Stub: return empty query."
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-query-by-property)
+  (defun manifolding-atlas-db-query-by-property (_prop _val)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-query-by-ids)
+  (defun manifolding-atlas-db-query-by-ids (_ids)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-query-by-file-path)
+  (defun manifolding-atlas-db-query-by-file-path (_path)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-query-by-tags-some)
+  (defun manifolding-atlas-db-query-by-tags-some (_tags)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-query-by-links-some)
+  (defun manifolding-atlas-db-query-by-links-some (_links)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-query-links-to)
+  (defun manifolding-atlas-db-query-links-to (_id)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-query-links-from)
+  (defun manifolding-atlas-db-query-links-from (_id)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-get-by-id)
+  (defun manifolding-atlas-db-get-by-id (_id)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-count-notes)
+  (defun manifolding-atlas-db-count-notes ()
+    0))
+
+(unless (fboundp 'manifolding-atlas-db-register-extractor)
+  (defun manifolding-atlas-db-register-extractor (_extractor)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-db-autosync-mode)
+  (defun manifolding-atlas-db-autosync-mode (&optional _arg)
+    nil))
+
+(defvar manifolding-atlas-db-location
+  (expand-file-name "admin/manifolding-atlas.db"
+                    (expand-file-name "test/" "~")))
+
+(defvar manifolding-atlas-db-sync-directories
+  (list (expand-file-name "test/" "~")))
+
+(unless (fboundp 'manifolding-atlas-note-p)
+  (defun manifolding-atlas-note-p (_obj)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-note-id)
+  (defun manifolding-atlas-note-id (_note)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-note-title)
+  (defun manifolding-atlas-note-title (_note)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-note-path)
+  (defun manifolding-atlas-note-path (_note)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-note-properties)
+  (defun manifolding-atlas-note-properties (_note)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-note-tags)
+  (defun manifolding-atlas-note-tags (_note)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-note-meta-get)
+  (defun manifolding-atlas-note-meta-get (_note _key _type)
+    nil))
+
+(unless (fboundp 'manifolding-atlas-note-meta-get-list)
+  (defun manifolding-atlas-note-meta-get-list (_note _key _type)
+    nil))
+
+(unless (fboundp 'emacsql)
+  (defmacro emacsql (_db &rest _forms)
+    "Stub emacsql."
+    nil))
 #+end_src
 
 #+begin_src emacs-lisp
@@ -269,7 +369,7 @@ are stored upcased, so a lowercase or mixed-case
                         (substring aliases-str pos end)))
                       result)
                 (setq pos end)))))))
-      (nreverse result)
+      (nreverse result))))
 
 
 #+end_src

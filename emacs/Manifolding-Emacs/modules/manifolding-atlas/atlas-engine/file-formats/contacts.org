@@ -6,6 +6,14 @@ loader-managed source block (no straight).  Adapted to the Manifolding
 Atlas vault: contacts live one-per-file under
 <admin>/contacts/ inside (my/manifolding-atlas-root-dir).
 #+begin_src emacs-lisp
+(defvar org-contacts-icon-size 16
+  "Icon size for org-contacts avatars (stub).")
+(defvar org-contacts-icon-property "AVATAR")
+(defvar org-contacts-email-property "EMAIL")
+(defvar org-contacts-icon-use-gravatar nil)
+(defun org-contacts-files () nil)
+(defun org-contacts-split-property (_str) nil)
+(defun org-contacts-strip-link (s) s)
 #+end_src
 * Vendored org-contacts engine
 #+begin_src emacs-lisp
@@ -336,17 +344,18 @@ Atlas vault: contacts live one-per-file under
 #+end_src
 
 #+begin_src emacs-lisp
-      (defvar gravatar-size)
-      (let* ((gravatar-size org-contacts-icon-size)
-             (email-list (org-entry-get pom org-contacts-email-property))
-             (gravatar
-              (when email-list
-                (cl-loop for email in (org-contacts-split-property email-list)
-                         for gravatar = (gravatar-retrieve-synchronously (org-contacts-strip-link email))
-                         if (and gravatar
-                                 (not (eq gravatar 'error)))
-                         return gravatar))))
-        (when gravatar (throw 'icon gravatar)))
+(defun my/org-contacts--gravatar-fallback (pom)
+  "Fallback gravatar lookup for POM (stub for split block)."
+  (let* ((gravatar-size org-contacts-icon-size)
+         (email-list (org-entry-get pom org-contacts-email-property))
+         (gravatar
+          (when email-list
+            (cl-loop for email in (org-contacts-split-property email-list)
+                     for gravatar = (gravatar-retrieve-synchronously (org-contacts-strip-link email))
+                     if (and gravatar
+                             (not (eq gravatar 'error)))
+                     return gravatar))))
+    (when gravatar (throw 'icon gravatar))))
 
 
 #+end_src
