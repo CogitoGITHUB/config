@@ -13,8 +13,8 @@ different language for the filename.
 Returns the relative file path (e.g. \"subdir/my-note\")."
   (let* ((raw-name (read-string
                     (format "File name for \"%s\" (blank = slug): " title)))
-         (base (if (string-empty-p raw-name)
+         (base (if (string-empty-p (string-trim raw-name))
                    (manifolding-atlas-title-to-slug title)
-                 (file-name-sans-extension raw-name))))
-    (concat subdir base)))
+                 (file-name-sans-extension (string-trim raw-name)))))
+    (concat (or subdir "") base)))
 #+end_src

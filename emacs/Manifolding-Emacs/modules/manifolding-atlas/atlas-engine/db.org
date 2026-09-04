@@ -8,59 +8,180 @@
 (provide 'manifolding-atlas-db)
 (provide 'manifolding-atlas-db-query)
 
-(unless (fboundp 'manifolding-atlas-db)
-  (defun manifolding-atlas-db (&optional _args)
-    "Stub: return nil DB connection."
-    nil))
+(defvar manifolding-atlas-db--connection nil
+  "DB connection.")
 
-(unless (fboundp 'manifolding-atlas-db-query)
-  (defun manifolding-atlas-db-query (&optional _filter)
-    "Stub: return empty query."
-    nil))
+(defun manifolding-atlas-db (&optional _args)
+  "Return DB connection, opening it if needed."
+  (require 'emacsql)
+  (require 'emacsql-sqlite)
+  (unless (and manifolding-atlas-db--connection
+               (ignore-errors (emacsql-live-p manifolding-atlas-db--connection)))
+    (setq manifolding-atlas-db--connection
+          (ignore-errors (emacsql-sqlite manifolding-atlas-db-location))))
+  manifolding-atlas-db--connection)
 
-(unless (fboundp 'manifolding-atlas-db-query-by-property)
-  (defun manifolding-atlas-db-query-by-property (_prop _val)
-    nil))
+(defun manifolding-atlas-db-query (&optional filter)
+  "Query notes, filtered by FILTER if given."
+  (let* ((db (ignore-errors (manifolding-atlas-db)))
+         (db-result (when db
+                      (if filter
+                          (seq-filter filter (ignore-errors (emacsql db [:select * :from notes])))
+                        (ignore-errors (emacsql db [:select * :from notes]))))))
+    (if (and db-result (consp db-result))
+        db-result
+      ;; Fallback: scan vault directly when DB not available or empty (same fallback as elsewhere tonight)
+      (let* ((root (my/manifolding-atlas-root-dir))
+             (files (ignore-errors (my/manifolding-atlas-db-sync--list-org-files root)))
+             notes)
+        (dolist (file (or files (directory-files-recursively root "^[^.]" t)))
+          (when (and (file-regular-p file)
+                     (not (string-match-p "/\\.git/" file))
+                     (not (string-match-p "/admin/" file)))
+            (let ((id (ignore-errors
+                        (with-temp-buffer
+                          (insert-file-contents file)
+                          (when (re-search-forward "^:ID:[ \t]+\\(.+\\)" nil t)
+                            (string-trim (match-string 1)))))))
+              (when id
+                (let ((title (ignore-errors
+                               (with-temp-buffer
+                                 (insert-file-contents file)
+                                 (when (re-search-forward "^\\*+[ \t]+\\(.*\\)" nil t)
+                                   (let ((raw (string-trim (match-string 1))))
+                                     (if (string-match "^TODO[ \t]+\\(.*\\)" raw)
+                                         (string-trim (match-string 1 raw))
+                                       raw)))))))
+                  (push (list :id id :title (or title (file-name-nondirectory file))
+                              :path file :level 0 :pos 1
+                              :tags nil :properties nil :aliases nil :primary-title nil :meta nil)
+                        notes))))))
+        (if filter
+            (seq-filter filter notes)
+          notes)))))
 
-(unless (fboundp 'manifolding-atlas-db-query-by-ids)
-  (defun manifolding-atlas-db-query-by-ids (_ids)
-    nil))
+(defun manifolding-atlas-db-query-by-property (prop val)
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if db
+        (ignore-errors (emacsql db [:select * :from notes :where (= properties $s1)] (format "\"%s\":\"%s\"" prop val)))
+      ;; Fallback: scan vault and filter by property (uses same vault-scan as db-query)
+      (seq-filter (lambda (n)
+                    (let ((props (manifolding-atlas-note-properties n)))
+                      (equal (cdr (assoc (upcase prop) props)) val)))
+                  (ignore-errors (manifolding-atlas-db-query))))))
 
-(unless (fboundp 'manifolding-atlas-db-query-by-file-path)
-  (defun manifolding-atlas-db-query-by-file-path (_path)
-    nil))
+(defun manifolding-atlas-db-query-by-ids (ids)
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if (and db ids)
+        (ignore-errors (emacsql db [:select * :from notes :where (in id $v1)] (vconcat ids)))
+      ;; Fallback: scan vault and filter by ids
+      (when ids
+        (seq-filter (lambda (n) (member (manifolding-atlas-note-id n) ids))
+                    (ignore-errors (manifolding-atlas-db-query)))))))
 
-(unless (fboundp 'manifolding-atlas-db-query-by-tags-some)
-  (defun manifolding-atlas-db-query-by-tags-some (_tags)
-    nil))
+(defun manifolding-atlas-db-query-by-file-path (path)
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if db
+        (ignore-errors (emacsql db [:select * :from notes :where (= path $s1)] path))
+      ;; Fallback: scan vault and filter by path
+      (seq-filter (lambda (n) (string-equal (manifolding-atlas-note-path n) path))
+                  (ignore-errors (manifolding-atlas-db-query))))))
 
-(unless (fboundp 'manifolding-atlas-db-query-by-links-some)
-  (defun manifolding-atlas-db-query-by-links-some (_links)
-    nil))
+(defun manifolding-atlas-db-query-by-tags-some (tags)
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if db
+        (seq-filter (lambda (n) (seq-intersection tags (manifolding-atlas-note-tags n)))
+                    (ignore-errors (manifolding-atlas-db-query)))
+      ;; Fallback: same filter on vault scan when DB unavailable
+      (seq-filter (lambda (n) (seq-intersection tags (manifolding-atlas-note-tags n)))
+                  (ignore-errors (manifolding-atlas-db-query))))))
 
-(unless (fboundp 'manifolding-atlas-db-query-links-to)
-  (defun manifolding-atlas-db-query-links-to (_id)
-    nil))
+(defun manifolding-atlas-db-query-by-links-some (links)
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if db
+        (ignore-errors (emacsql db [:select * :from links :where (in source $v1)] (vconcat (mapcar #'car links))))
+      ;; Fallback: links require DB, vault scan has no link index
+      (progn
+        (message "manifolding-atlas-db-query-by-links-some: DB unavailable, links not indexed")
+        nil))))
 
-(unless (fboundp 'manifolding-atlas-db-query-links-from)
-  (defun manifolding-atlas-db-query-links-from (_id)
-    nil))
+(defun manifolding-atlas-db-query-links-to (id)
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if db
+        (ignore-errors (emacsql db [:select * :from links :where (= dest $s1)] id))
+      (progn
+        (message "manifolding-atlas-db-query-links-to: DB unavailable")
+        nil))))
 
-(unless (fboundp 'manifolding-atlas-db-get-by-id)
-  (defun manifolding-atlas-db-get-by-id (_id)
-    nil))
+(defun manifolding-atlas-db-query-links-from (id)
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if db
+        (ignore-errors (emacsql db [:select * :from links :where (= source $s1)] id))
+      (progn
+        (message "manifolding-atlas-db-query-links-from: DB unavailable")
+        nil))))
 
-(unless (fboundp 'manifolding-atlas-db-count-notes)
-  (defun manifolding-atlas-db-count-notes ()
-    0))
+(defun manifolding-atlas-db-get-by-id (id)
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if db
+        (or (car (ignore-errors (emacsql db [:select * :from notes :where (= id $s1)] id)))
+            (user-error "manifolding-atlas-db-get-by-id: ID %s not found" id))
+      (let ((file (condition-case nil (org-id-find-id-file id) (error nil))))
+        (if (and file (file-exists-p file))
+            (with-temp-buffer
+              (insert-file-contents file)
+              (let ((title (when (re-search-forward "^\\*+[ \t]+\\(.*\\)" nil t)
+                             (let ((raw (string-trim (match-string 1))))
+                               (if (string-match "^TODO[ \t]+\\(.*\\)" raw)
+                                   (string-trim (match-string 1 raw))
+                                 raw)))))
+                (list :id id
+                      :title (or title (file-name-nondirectory file))
+                      :path file
+                      :level 0 :pos 1
+                      :tags nil :properties nil
+                      :aliases nil :primary-title nil
+                      :meta nil)))
+          (user-error "manifolding-atlas-db-get-by-id: ID %s not found" id))))))
 
-(unless (fboundp 'manifolding-atlas-db-register-extractor)
-  (defun manifolding-atlas-db-register-extractor (_extractor)
-    nil))
+(defun manifolding-atlas-db-update-file (path)
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if db
+        (ignore-errors (manifolding-atlas-db--update-file path))
+      1)))
 
-(unless (fboundp 'manifolding-atlas-db-autosync-mode)
-  (defun manifolding-atlas-db-autosync-mode (&optional _arg)
-    nil))
+(defun manifolding-atlas-db-count-notes ()
+  (let ((db (ignore-errors (manifolding-atlas-db))))
+    (if db
+        (or (caar (ignore-errors (emacsql db [:select (funcall count *) :from notes])))
+            (length (ignore-errors (manifolding-atlas-db-query))))
+      ;; Fallback: count vault files via same scan as db-query
+      (length (ignore-errors (manifolding-atlas-db-query))))))
+
+(defun manifolding-atlas-select-from (prompt candidates &rest _args)
+  "Real select-from: completing-read over CANDIDATES titles, return existing or new plist."
+  (require 'seq)
+  (let* ((titles (mapcar (lambda (n) (or (manifolding-atlas-note-title n) (plist-get n :title) "")) candidates))
+         (choice (completing-read (cond ((string-suffix-p ": " prompt) prompt)
+                                         ((string-suffix-p ":" prompt) (concat prompt " "))
+                                         (t (concat prompt ": ")))
+                                   titles nil nil nil nil nil))
+         (found (seq-find (lambda (n) (string= (or (manifolding-atlas-note-title n) (plist-get n :title) "") choice)) candidates)))
+    (if found
+        found
+      (list :id nil :title choice :path nil :properties nil :tags nil))))
+
+(defun manifolding-atlas-select (prompt candidates &rest args)
+  "Alias to select-from."
+  (apply #'manifolding-atlas-select-from prompt candidates args))
+
+(defun manifolding-atlas-db-register-extractor (extractor)
+  (when (fboundp 'manifolding-atlas--register-extractor)
+    (ignore-errors (manifolding-atlas--register-extractor extractor))))
+
+(defun manifolding-atlas-db-autosync-mode (&optional arg)
+  (when (fboundp 'manifolding-atlas--autosync-mode)
+    (ignore-errors (manifolding-atlas--autosync-mode arg))))
 
 (defvar manifolding-atlas-db-location
   (expand-file-name "admin/manifolding-atlas.db"
@@ -69,42 +190,87 @@
 (defvar manifolding-atlas-db-sync-directories
   (list (expand-file-name "test/" "~")))
 
-(unless (fboundp 'manifolding-atlas-note-p)
-  (defun manifolding-atlas-note-p (_obj)
-    nil))
+(defvar my--orig-note-p (when (fboundp 'manifolding-atlas-note-p) (symbol-function 'manifolding-atlas-note-p)))
+(defun manifolding-atlas-note-p (obj)
+  (or (and (listp obj) (plist-get obj :id))
+      (when (and obj my--orig-note-p) (ignore-errors (funcall my--orig-note-p obj)))))
 
-(unless (fboundp 'manifolding-atlas-note-id)
-  (defun manifolding-atlas-note-id (_note)
-    nil))
+(defvar my--orig-note-id (when (fboundp 'manifolding-atlas-note-id) (symbol-function 'manifolding-atlas-note-id)))
+(defun manifolding-atlas-note-id (note)
+  (or (plist-get note :id)
+      (when (and note my--orig-note-id) (ignore-errors (funcall my--orig-note-id note)))))
 
-(unless (fboundp 'manifolding-atlas-note-title)
-  (defun manifolding-atlas-note-title (_note)
-    nil))
+(defvar my--orig-note-title (when (fboundp 'manifolding-atlas-note-title) (symbol-function 'manifolding-atlas-note-title)))
+(defun manifolding-atlas-note-title (note)
+  (or (plist-get note :title)
+      (when (and note my--orig-note-title) (ignore-errors (funcall my--orig-note-title note)))))
 
-(unless (fboundp 'manifolding-atlas-note-path)
-  (defun manifolding-atlas-note-path (_note)
-    nil))
+(defvar my--orig-note-path (when (fboundp 'manifolding-atlas-note-path) (symbol-function 'manifolding-atlas-note-path)))
+(defun manifolding-atlas-note-path (note)
+  (or (plist-get note :path)
+      (when (and note my--orig-note-path) (ignore-errors (funcall my--orig-note-path note)))))
 
-(unless (fboundp 'manifolding-atlas-note-properties)
-  (defun manifolding-atlas-note-properties (_note)
-    nil))
+(defvar my--orig-note-properties (when (fboundp 'manifolding-atlas-note-properties) (symbol-function 'manifolding-atlas-note-properties)))
+(defun manifolding-atlas-note-properties (note)
+  (or (plist-get note :properties)
+      (when (and note my--orig-note-properties) (ignore-errors (funcall my--orig-note-properties note)))))
 
-(unless (fboundp 'manifolding-atlas-note-tags)
-  (defun manifolding-atlas-note-tags (_note)
-    nil))
+(defvar my--orig-note-tags (when (fboundp 'manifolding-atlas-note-tags) (symbol-function 'manifolding-atlas-note-tags)))
+(defun manifolding-atlas-note-tags (note)
+  (or (plist-get note :tags)
+      (plist-get note :tag)
+      (when (and note my--orig-note-tags) (ignore-errors (funcall my--orig-note-tags note)))))
 
-(unless (fboundp 'manifolding-atlas-note-meta-get)
-  (defun manifolding-atlas-note-meta-get (_note _key _type)
-    nil))
+(defvar my--orig-note-meta-get (when (fboundp 'manifolding-atlas-note-meta-get) (symbol-function 'manifolding-atlas-note-meta-get)))
+(defun manifolding-atlas-note-meta-get (note key type)
+  (or (let ((v (plist-get note :meta)))
+        (when v
+          (let ((pair (assoc key v)))
+            (when pair (cdr pair)))))
+      (when (and note my--orig-note-meta-get) (ignore-errors (funcall my--orig-note-meta-get note key type)))))
 
-(unless (fboundp 'manifolding-atlas-note-meta-get-list)
-  (defun manifolding-atlas-note-meta-get-list (_note _key _type)
-    nil))
+(defvar my--orig-note-meta-get-list (when (fboundp 'manifolding-atlas-note-meta-get-list) (symbol-function 'manifolding-atlas-note-meta-get-list)))
+(defun manifolding-atlas-note-meta-get-list (note key type)
+  (or (let ((v (plist-get note :meta)))
+        (when v
+          (let ((vals (cdr (assoc key v))))
+            (when vals (if (listp vals) vals (list vals))))))
+      (when (and note my--orig-note-meta-get-list) (ignore-errors (funcall my--orig-note-meta-get-list note key type)))))
 
-(unless (fboundp 'emacsql)
-  (defmacro emacsql (_db &rest _forms)
-    "Stub emacsql."
-    nil))
+(defvar my--orig-note-level (when (fboundp 'manifolding-atlas-note-level) (symbol-function 'manifolding-atlas-note-level)))
+(defun manifolding-atlas-note-level (note)
+  (or (plist-get note :level)
+      (when (and note my--orig-note-level) (ignore-errors (funcall my--orig-note-level note)))))
+
+(defvar my--orig-note-pos (when (fboundp 'manifolding-atlas-note-pos) (symbol-function 'manifolding-atlas-note-pos)))
+(defun manifolding-atlas-note-pos (note)
+  (or (plist-get note :pos)
+      (when (and note my--orig-note-pos) (ignore-errors (funcall my--orig-note-pos note)))))
+
+(defvar my--orig-note-aliases (when (fboundp 'manifolding-atlas-note-aliases) (symbol-function 'manifolding-atlas-note-aliases)))
+(defun manifolding-atlas-note-aliases (note)
+  (or (plist-get note :aliases)
+      (when (and note my--orig-note-aliases) (ignore-errors (funcall my--orig-note-aliases note)))))
+
+(defvar my--orig-note-primary-title (when (fboundp 'manifolding-atlas-note-primary-title) (symbol-function 'manifolding-atlas-note-primary-title)))
+(defun manifolding-atlas-note-primary-title (note)
+  (or (plist-get note :primary-title)
+      (when (and note my--orig-note-primary-title) (ignore-errors (funcall my--orig-note-primary-title note)))))
+
+(defvar my--orig-note-outline-path (when (fboundp 'manifolding-atlas-note-outline-path) (symbol-function 'manifolding-atlas-note-outline-path)))
+(defun manifolding-atlas-note-outline-path (note)
+  (or (plist-get note :outline-path)
+      (when (and note my--orig-note-outline-path) (ignore-errors (funcall my--orig-note-outline-path note)))))
+
+(defvar my--orig-links-current-note-id (when (fboundp 'my/manifolding-atlas-links--current-note-id) (symbol-function 'my/manifolding-atlas-links--current-note-id)))
+(defun my/manifolding-atlas-links--current-note-id ()
+  (or (when (and (fboundp 'my/manifolding-atlas--note-at-point) (ignore-errors (my/manifolding-atlas--note-at-point)))
+        (ignore-errors (manifolding-atlas-note-id (my/manifolding-atlas--note-at-point))))
+      (when (and (fboundp 'my/manifolding-atlas--buffer-note) (ignore-errors (my/manifolding-atlas--buffer-note)))
+        (ignore-errors (manifolding-atlas-note-id (my/manifolding-atlas--buffer-note))))
+      (when my--orig-links-current-note-id (ignore-errors (funcall my--orig-links-current-note-id)))))
+
+
 #+end_src
 
 #+begin_src emacs-lisp
@@ -367,7 +533,7 @@ are stored upcased, so a lowercase or mixed-case
                 (push (manifolding-atlas-db--strip-emphasis
                        (org-link-display-format
                         (substring aliases-str pos end)))
-                      result)
+                       result)
                 (setq pos end)))))))
       (nreverse result))))
 

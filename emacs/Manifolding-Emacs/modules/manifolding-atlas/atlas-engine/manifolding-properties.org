@@ -277,14 +277,16 @@ Uses drawer-put directly for live-properties domain's transclude handling.
                        nil t)))
 
 (defun my/manifolding-atlas--body-anchor ()
-  (org-back-to-heading t)
-  (end-of-line)
-  (forward-line 1)
-  (when (looking-at "^:PROPERTIES:")
-    (forward-line 1)
-    (re-search-forward "^:END:" nil t)
-    (forward-line 1))
-  (point))
+  (if (condition-case nil (progn (org-back-to-heading t) t) (error nil))
+      (progn
+        (end-of-line)
+        (forward-line 1)
+        (when (looking-at "^:PROPERTIES:")
+          (forward-line 1)
+          (re-search-forward "^:END:" nil t)
+          (forward-line 1))
+        (point))
+    (point-max)))
 #+end_src
 
 *** Heading property scan
@@ -316,23 +318,22 @@ uniform (KEY . VALUE) pairs.
 
 (defun my/manifolding-atlas--heading-properties ()
   (let (props)
-    (org-back-to-heading t)
-    (save-excursion
-      (let* ((beg (progn (org-back-to-heading t)
-                         (line-beginning-position)))
-             (end (save-excursion
-                    (goto-char beg)
-                    (forward-line 1)
-                    (if (re-search-forward "^\\*+[ \t]" (point-max) t)
-                        (line-beginning-position)
-                      (point-max)))))
-        (goto-char beg)
-        (when (re-search-forward "^:PROPERTIES:" end t)
-          (let ((dr-beg (line-beginning-position 2)))
-            (when (re-search-forward "^:END:" end t)
-              (setq props
-                    (my/manifolding-atlas--props-in-region
-                     dr-beg (line-beginning-position) props)))))))
+    (when (condition-case nil (progn (org-back-to-heading t) t) (error nil))
+      (save-excursion
+        (let* ((beg (condition-case nil (progn (org-back-to-heading t) (line-beginning-position)) (error (point-min))))
+               (end (save-excursion
+                      (goto-char beg)
+                      (forward-line 1)
+                      (if (re-search-forward "^\\*+[ \t]" (point-max) t)
+                          (line-beginning-position)
+                        (point-max)))))
+          (goto-char beg)
+          (when (re-search-forward "^:PROPERTIES:" end t)
+            (let ((dr-beg (line-beginning-position 2)))
+              (when (re-search-forward "^:END:" end t)
+                (setq props
+                      (my/manifolding-atlas--props-in-region
+                       dr-beg (line-beginning-position) props))))))))
     props))
 #+end_src
 

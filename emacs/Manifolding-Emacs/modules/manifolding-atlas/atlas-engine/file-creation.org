@@ -320,10 +320,10 @@ Why: Implementation of ~manifolding-atlas-doctor--monitoring-status~.
 
 #+end_src
 
-#+begin_src emacs-lisp
 ** manifolding-atlas-doctor--issues
 Why: Implementation of ~manifolding-atlas-doctor--issues~.
 
+#+begin_src emacs-lisp
 (defun manifolding-atlas-doctor--issues ()
   "Return a list of detected setup issues as human-readable strings."
   (let ((issues nil)
@@ -446,10 +446,10 @@ Why: Implementation of ~manifolding-atlas-doctor--issues~.
 #+end_src
 
 
-#+begin_src emacs-lisp
 ** manifolding-atlas-doctor--report
 Why: Implementation of ~manifolding-atlas-doctor--report~.
 
+#+begin_src emacs-lisp
 (defun manifolding-atlas-doctor--report ()
   "Build the doctor report as a string."
   (let* ((issues (manifolding-atlas-doctor--issues))
@@ -869,10 +869,10 @@ Resolution order:
 
 #+end_src
 
-#+begin_src emacs-lisp
 ** manifolding-atlas--expand-template
 Why: Implementation of ~manifolding-atlas--expand-template~.
 
+#+begin_src emacs-lisp
 (defun manifolding-atlas--expand-template (template title &optional id context)
   "Expand TEMPLATE with TITLE, optional ID, and CONTEXT.
 TEMPLATE is a string with placeholders:
@@ -1077,49 +1077,6 @@ WARNING as the value instead of an interactive answer."
 
 #+end_src
 
-** manifolding-atlas-find-create-note
-Why: Implementation of ~manifolding-atlas-find-create-note~.
-
-#+begin_src emacs-lisp
-(defun manifolding-atlas-find-create-note (title &optional _props)
-  "Create a new note with TITLE selected in `manifolding-atlas-find'.
-
-Prompts for slug, subdir. Creates the file immediately so tags and
-aliases have somewhere to go. Then prompts for alias, tags, body
-template and applies them to the open buffer.
-
-TITLE is already collected by `manifolding-atlas-find' before this
-function runs.
-
-Creates a file-level note via `manifolding-atlas-create' and returns the
-resulting `manifolding-atlas-note'. PROPS mirrors the capture properties
-argument of `manifolding-atlas-insert' CREATE-FN and is currently unused.
-
-This is the default value of `manifolding-atlas-find-default-create-fn'."
-  (let* ((fname (my/manifolding-atlas-prompt-file-name title nil))
-         (subdir (my/manifolding-atlas-prompt-subdir))
-         (default-props (my/manifolding-atlas--all-warning-defaults 'file))
-         (note (manifolding-atlas-create title fname
-                           :properties default-props)))
-     (find-file (manifolding-atlas-note-path note))
-     (let* ((alias (my/manifolding-atlas-prompt-aliases))
-            (tags (my/manifolding-atlas-org-prompt--ask-tags nil)))
-       (when alias
-         (org-entry-put nil "ALIAS" (mapconcat #'identity alias ", ")))
-       (goto-char (point-min))
-       (when (re-search-forward "^\\* " nil t)
-         (goto-char (match-end 0))
-         (insert "TODO ")
-         (when tags
-           (end-of-line)
-           (insert (concat " :" (mapconcat #'identity tags ":") ":"))))
-(let ((template (my/manifolding-atlas-prompt-template--choose)))
-          (when (and template (not (member template '("WARNING" "none"))))
-            (my/manifolding-atlas--insert-body-template template))))
-     note))
-
-#+end_src
-
 ** my/manifolding-atlas--get-template-content
 Why: Implementation of ~my/manifolding-atlas--get-template-content~.
 
@@ -1159,32 +1116,23 @@ This is the default value of `manifolding-atlas-find-default-create-fn'."
   (let* ((fname (my/manifolding-atlas-prompt-file-name title nil))
          (subdir (my/manifolding-atlas-prompt-subdir))
          (default-props (my/manifolding-atlas--all-warning-defaults 'file))
-         (note (manifolding-atlas-create title fname
+         (note (manifolding-atlas-create title (concat subdir fname)
                            :properties default-props))
-         (file-path (manifolding-atlas-note-path note)))
-    (let* ((alias (my/manifolding-atlas-prompt-aliases))
-           (tags (my/manifolding-atlas-org-prompt--ask-tags nil)))
-      (require 'org-capture)
-      (let ((org-capture-templates
-             `(("n" "New Note" plain (file ,file-path)
-                ,(concat "* TODO"
-                         (if tags (concat " :" (mapconcat #'identity tags ":") ":") "")
-                         "\n\n%?")
-                :unnarrowed t
-                :empty-lines 1))))
-        (org-capture nil "n")
-        (when alias
-          (org-entry-put nil "ALIAS" (mapconcat #'identity alias ", ")))
-        (let* ((template-names (append '("WARNING" "none")
-                                       (my/manifolding-atlas-prompt-template--names)))
-               (template (completing-read "TEMPLATE: " template-names nil t nil nil "WARNING"))
-               (content (my/manifolding-atlas--get-template-content template)))
-          (when content
-            (goto-char (point-max))
-            (insert content)))))
+         (file-path (manifolding-atlas-note-path note))
+         (template (my/manifolding-atlas-prompt-template--choose))
+         (template-content (my/manifolding-atlas--get-template-content template)))
+     ;; Open the newly created file in org-capture so you see title + all WARNING properties immediately
+    (let ((org-capture-templates
+           `(("n" "New Note" plain (file ,file-path) "" :unnarrowed t :empty-lines 1 :kill-buffer t))))
+      (org-capture nil "n")
+      ;; Now in capture buffer visiting file-path — WARNING tag already set like TODO, straight to body
+      (my/manifolding-atlas-org-prompt--write-at-heading
+       (point-min) 0 nil '("WARNING") "WARNING" nil)
+      (when template-content
+        (goto-char (point-max))
+        (unless (bolp) (insert "\n"))
+        (insert template-content)))
     note))
-
-;;;###autoload
 
 #+end_src
 
@@ -1295,7 +1243,8 @@ the file changed since the last sync), point stays at the note."
           (goto-char (match-beginning 0))
           (manifolding-atlas--show-context))))))
 
-
+
+
 
 
 #+end_src
@@ -1353,7 +1302,8 @@ If OTHER-WINDOW, visit the NOTE in another window."
         (org-back-to-heading t))
       (manifolding-atlas--show-context))))
 
-
+
+
 
 
 #+end_src
@@ -1490,7 +1440,8 @@ for the original title and once for each alias."
                    new-note)))))))
     (deactivate-mark)))
 
-
+
+
 
 
 
@@ -1534,10 +1485,10 @@ BODY is optional body text after the property drawer."
 
 #+end_src
 
-#+begin_src emacs-lisp
 ** manifolding-atlas--find-heading-insertion-point
 Why: Implementation of ~manifolding-atlas--find-heading-insertion-point~.
 
+#+begin_src emacs-lisp
 (defun manifolding-atlas--find-heading-insertion-point (parent-note _level after)
   "Move point to where a new child heading should be inserted.
 
@@ -1735,10 +1686,10 @@ Note: Does not support %a or %i from org-capture."
 #+end_src
 
 
-#+begin_src emacs-lisp
 ** manifolding-atlas--create-file
 Why: Implementation of ~manifolding-atlas--create-file~.
 
+#+begin_src emacs-lisp
 (defun manifolding-atlas--create-file (title file-name id head meta body tags properties context)
   "Create a file-level note with TITLE.
 
@@ -1826,10 +1777,10 @@ are as documented in `manifolding-atlas-create'."
 #+end_src
 
 
-#+begin_src emacs-lisp
 ** manifolding-atlas--create-heading
 Why: Implementation of ~manifolding-atlas--create-heading~.
 
+#+begin_src emacs-lisp
 (defun manifolding-atlas--create-heading (title id parent after body tags properties context)
   "Create a heading-level note with TITLE under PARENT.
 
@@ -1878,7 +1829,8 @@ BODY, TAGS, PROPERTIES, and CONTEXT are as in `manifolding-atlas-create'."
     (or (manifolding-atlas-db-get-by-id id)
         (error "manifolding-atlas-create: Heading note with ID %s not found in database after creation" id))))
 
-
+
+
 
 ;;; Title Change Detection Mode
 
@@ -2692,13 +2644,30 @@ Why: Implementation of ~my/manifolding-atlas-prompt-template--choose~.
 
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-prompt-template--choose ()
-  "Ask for TEMPLATE. Returns \"WARNING\" if skipped, \"none\" for none."
+  "Ask for TEMPLATE. Returns \"WARNING\" if skipped, \"none\" for none.
+Uses `consult--read' with live preview when available, otherwise plain `completing-read'."
   (if my/manifolding-atlas-prompt-template--deferred
       "WARNING"
-    (completing-read "TEMPLATE: "
-                     (append '("WARNING" "none")
-                             (my/manifolding-atlas-prompt-template--names))
-                     nil t nil nil "WARNING")))
+    (let ((cands (append '("WARNING" "none") (my/manifolding-atlas-prompt-template--names))))
+      (if (fboundp 'consult--read)
+          (consult--read cands
+                         :prompt "TEMPLATE: "
+                         :require-match t
+                         :default "WARNING"
+                         :preview-key 'any
+                         :state (lambda (action cand)
+                                  (pcase action
+                                    ('preview
+                                     (let ((content (my/manifolding-atlas--get-template-content cand)))
+                                       (with-current-buffer (get-buffer-create "*Template Preview*")
+                                         (erase-buffer)
+                                         (insert (or content (format "No content for %s" (or cand ""))))
+                                         (goto-char (point-min))
+                                         (display-buffer (current-buffer) '((display-buffer-in-side-window) (side . right) (window-width . 0.5))))))
+                                    ('return
+                                     (when (get-buffer "*Template Preview*")
+                                       (kill-buffer "*Template Preview*"))))))
+        (completing-read "TEMPLATE: " cands nil t nil nil "WARNING")))))
 #+end_src
 
 ** TEMPLATE_HASH sync
@@ -3959,10 +3928,11 @@ REMOVE-PROPS lists property keys to delete instead."
     (cond
      ((eq todo 'none)
       (ignore-errors (org-todo 'none)))
-     ((and todo (not (member todo '("WARNING" ""))))
+     ((and todo (not (member todo '("" nil))))
       ;; org-todo only accepts keywords declared in the buffer's TODO
       ;; sequence; schema states (NEXT, DOING, WAIT...) may not be —
       ;; fall back to setting the keyword textually on the heading.
+      ;; Allow "WARNING" as a valid TODO for initial creation.
       (condition-case nil
           (org-todo todo)
          (error
@@ -4778,10 +4748,10 @@ Iterates the registry, matching each spec against the requested
 contexts and dispatching per classification: defer, silent, or
 interactive.
 
-#+begin_src emacs-lisp
 ** my/manifolding-atlas-collect-prompts
 Why: Implementation of ~my/manifolding-atlas-collect-prompts~.
 
+#+begin_src emacs-lisp
 (defun my/manifolding-atlas-collect-prompts (context &rest extra-contexts)
   "Run all registered prompts matching CONTEXT (or any of EXTRA-CONTEXTS).
 When CONTEXT is a list, match prompts whose contexts overlap with it.
@@ -5387,7 +5357,7 @@ and unquoted aliases properly."
                     (push (substring aliases-str (1+ pos) end) result)
                     (setq pos (1+ end)))
                 (error "Unmatched quote in %s" manifolding-atlas-buffer-alias-property))))
-           ;; Unquoted alias - find next space or end of string
+            ;; Unquoted alias - find next space or end of string
            (t
             (let ((end (or (string-match " " aliases-str pos)
                            (length aliases-str))))
