@@ -3046,8 +3046,7 @@ the current heading:
   inside ** H      → :level 3  …"
   (interactive "P")
   (require 'org-transclusion)
-  (let ((org-transclusion-exclude-elements (list 'property-drawer))
-        note id title ctx target opts line directive-pos)
+  (let (note id title ctx target opts line directive-pos)
     (setq note   (manifolding-atlas-select "Transclude note: " :require-match t))
     (setq id     (manifolding-atlas-note-id note))
     (setq title  (manifolding-atlas-note-title note))
@@ -3077,7 +3076,8 @@ the current heading:
 (setq org-transclusion-add-all-on-activate t)
 ;; Hide ref property drawers inside transcluded headings so a live ref
 ;; (e.g. STATE WORK: ACTIVE) renders as a single closed heading.
-(setq org-transclusion-exclude-elements (list 'property-drawer))
+;; Property drawers now included in transclusions (previously excluded).
+(setq org-transclusion-exclude-elements nil)
 (add-hook 'org-mode-hook (lambda () (org-transclusion-mode 1)))
 
 ;; Re-add transclusions after revert (e.g. auto-revert triggered by git ops).

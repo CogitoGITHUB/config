@@ -1,3 +1,4 @@
+(require 'cl-lib)
 #+TITLE: Manifolding Atlas — Database
 #+priority: 3
 
@@ -171,9 +172,15 @@
         found
       (list :id nil :title choice :path nil :properties nil :tags nil))))
 
-(defun manifolding-atlas-select (prompt candidates &rest args)
-  "Alias to select-from."
-  (apply #'manifolding-atlas-select-from prompt candidates args))
+(cl-defun manifolding-atlas-select (prompt &key require-match filter-fn candidates)
+  "Select a note with PROMPT via completing-read.
+CANDIDATES defaults to every note in the database (via
+`manifolding-atlas-db-query'). FILTER-FN, if given, is applied to
+narrow the auto-fetched candidates down first. REQUIRE-MATCH is
+passed through to the underlying prompt."
+  (let* ((cands (or candidates (ignore-errors (manifolding-atlas-db-query))))
+         (cands (if filter-fn (seq-filter filter-fn cands) cands)))
+    (manifolding-atlas-select-from prompt cands :require-match require-match)))
 
 (defun manifolding-atlas-db-register-extractor (extractor)
   (when (fboundp 'manifolding-atlas--register-extractor)

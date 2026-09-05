@@ -10,6 +10,7 @@
 Single source is `org-todo-states.org`; this mirrors it. Font-lock is
 refreshed on every Org buffer via hook so load order never matters.
 #+begin_src emacs-lisp
+(setq org-tags-column 0)
 (with-eval-after-load 'org
   (setq org-todo-keywords
         '((sequence "TODO" "NEXT" "DOING" "TESTING" "WAIT" "WARNING"

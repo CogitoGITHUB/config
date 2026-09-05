@@ -724,3 +724,49 @@ Puts the raw transclude lines back exactly where they were.
 (advice-add 'manifolding-atlas-db--parse-file :around #'my/manifolding-atlas--parse-file-with-tolerance)
 (advice-add 'org-element-parse-buffer :around #'my/manifolding-atlas--strip-in-drawer-keywords)
 #+end_src
+
+** RET on a property — make it live
+Press RET while point is on a property line inside a :PROPERTIES:
+drawer to prompt for a value and convert that property into a live,
+transcluded reference note. Everywhere else, RET behaves normally.
+#+begin_src emacs-lisp
+(defun my/manifolding-atlas--current-property-key ()
+  "Return the property KEY on the current line, or nil if not on one."
+  (save-excursion
+    (beginning-of-line)
+    (when (looking-at "^[ \t]*:\\([A-Za-z_]+\\):")
+      (match-string-no-properties 1))))
+
+(defun my/manifolding-atlas-property-make-live ()
+  "Prompt for a value and convert the property at point into a live,
+transcluded reference note, using the existing ensure-ref-note and
+refresh-property-transclude machinery."
+  (interactive)
+  (let ((key (my/manifolding-atlas--current-property-key)))
+    (unless key
+      (user-error "Not on a property line"))
+    (when (member key '("ID"))
+      (user-error "Cannot make the ID property live"))
+    (let* ((property-type (intern (downcase (string-replace "_" "-" key))))
+           (current (or (org-entry-get nil key) ""))
+           (value (read-string
+                   (format "%s value: " (my/manifolding-atlas--property-display-name property-type))
+                   current))
+           (link (my/manifolding-atlas--ensure-ref-note property-type value))
+           (ref-id (my/manifolding-atlas--id-from-link link)))
+      (unless ref-id
+        (user-error "Could not create or find a reference note for %s" value))
+      (my/manifolding-atlas--refresh-property-transclude property-type value ref-id)
+      (message "%s is now live -> %s" key value))))
+
+(defun my/manifolding-atlas-return-dispatch ()
+  "RET dispatcher: make the property at point live if on one, else
+fall back to normal `org-return' behavior everywhere else."
+  (interactive)
+  (if (org-in-property-drawer-p)
+      (my/manifolding-atlas-property-make-live)
+    (call-interactively #'org-return)))
+
+(with-eval-after-load 'org
+  (define-key org-mode-map (kbd "RET") #'my/manifolding-atlas-return-dispatch))
+#+end_src
