@@ -2582,7 +2582,10 @@ Lives here as a variable; no external banner file needed.
             (when (and (fboundp 'recentf-add-file)
                        buffer-file-name)
               (recentf-add-file buffer-file-name))
-            (when (get-buffer "*dashboard*")
+            (when (and (get-buffer "*dashboard*")
+                       (not (active-minibuffer-window))
+                       (not (cl-some (lambda (b) (buffer-local-value 'org-capture-mode b))
+                                     (buffer-list))))
               (with-current-buffer "*dashboard*"
                 (dashboard-refresh-buffer)))))
 #+end_src

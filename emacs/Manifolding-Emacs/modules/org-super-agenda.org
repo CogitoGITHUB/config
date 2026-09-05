@@ -28,7 +28,7 @@ items and many files.
       '((sequence "TODO" "DOING" "WAIT" "|" "DONE" "CANCELED")))
 
 (let ((message-log-max nil))
-  (org-super-agenda-mode 1))
+  (let ((inhibit-message t)) (org-super-agenda-mode 1)))
 
 (setq org-super-agenda-groups
       '((:name "Today"

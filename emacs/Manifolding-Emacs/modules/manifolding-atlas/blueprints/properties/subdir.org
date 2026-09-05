@@ -43,26 +43,34 @@ dictionary, recipes, routines). Returns a relative path string ending in
 "/" (or "" for ROOT itself), so callers can safely (concat prefix subdir slug).
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-choose-subdir (&optional root prompt)
-  "Interactively choose a subdirectory under ROOT via `read-file-name'.
+  "Choose a subdirectory under ROOT via an explicit completing-read list.
 ROOT defaults to `my/manifolding-atlas-root-dir'. PROMPT overrides the
-default minibuffer prompt. Returns the empty string for ROOT itself,
-otherwise a relative path ending in a trailing slash. The admin
-directory is filtered out of the completion candidates entirely at
-every level of browsing -- it is reserved for internal bookkeeping,
-not user notes, and should never even appear as an option."
+default minibuffer prompt. Blank input or selecting ROOT's own path
+always returns the empty string (root itself), regardless of how many
+subdirectories exist. The admin directory is filtered out entirely --
+reserved for internal bookkeeping."
   (let* ((root (file-name-as-directory (or root (my/manifolding-atlas-root-dir))))
-          (choice (read-file-name
-                   (or prompt "Subdirectory: ")
-                   root root nil nil
-                   (lambda (f)
-                    (let ((name (file-name-nondirectory (directory-file-name f))))
-                      (and (file-directory-p f)
-                           (not (string-prefix-p "." name))
-                           (not (member name (list "admin" "dictionary"))))))))
-         (rel (file-relative-name choice root)))
-    (if (or (string-equal rel ".") (string-equal rel "./"))
+         (root-label (abbreviate-file-name root))
+         (subdirs
+          (when (file-directory-p root)
+            (sort
+             (delq nil
+                   (mapcar
+                    (lambda (f)
+                      (let ((name (file-name-nondirectory (directory-file-name f))))
+                        (when (and (file-directory-p f)
+                                   (not (string-prefix-p "." name))
+                                   (not (member name (list "admin" "dictionary"))))
+                          (file-name-as-directory name))))
+                    (directory-files root t)))
+             #'string-lessp)))
+         (cands (cons root-label subdirs))
+         (choice (completing-read (or prompt "Subdirectory: ")
+                                   cands nil nil nil nil root-label)))
+    (if (or (string-empty-p (string-trim choice))
+            (string-equal choice root-label))
         ""
-      (file-name-as-directory rel))))
+      choice)))
 #+end_src
 
 ** Subdirectory Prompt (Dired)
