@@ -4488,6 +4488,9 @@ Why: Implementation of ~my/manifolding-atlas-org-prompt--fragment-live~.
 
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas-org-prompt--fragment-live (key plist val)
+  "Live-kind properties write the ref-note's id-link as a plain
+property VALUE inside the note's existing :PROPERTIES: drawer --
+never as a separate transcluded block outside it."
   (let ((family (intern
                  (downcase
                   (or (plist-get plist :live)
@@ -4497,11 +4500,8 @@ Why: Implementation of ~my/manifolding-atlas-org-prompt--fragment-live~.
           :post-apply (,(apply-partially
                          #'my/manifolding-atlas--clear-state-transcribes
                          family)))
-      (let* ((link (my/manifolding-atlas--ensure-ref-note family val))
-             (ref-id (my/manifolding-atlas--id-from-link link)))
-        `(:post-apply (,(apply-partially
-                         #'my/manifolding-atlas--apply-state-post
-                         family val ref-id)))))))
+      (let ((link (my/manifolding-atlas--ensure-ref-note family val)))
+        `(:properties ((,key . ,link)))))))
 #+end_src
 ** Fragment dispatch
 ** my/manifolding-atlas-org-prompt--fragment

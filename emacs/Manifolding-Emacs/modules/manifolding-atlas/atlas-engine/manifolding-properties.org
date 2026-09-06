@@ -725,10 +725,13 @@ Puts the raw transclude lines back exactly where they were.
 (advice-add 'org-element-parse-buffer :around #'my/manifolding-atlas--strip-in-drawer-keywords)
 #+end_src
 
-** RET on a property — make it live
-Press RET while point is on a property line inside a :PROPERTIES:
-drawer to prompt for a value and convert that property into a live,
-transcluded reference note. Everywhere else, RET behaves normally.
+** RET on a property -- select/create, open, update or change
+Press RET on a property line inside a :PROPERTIES: drawer. If it is
+still unset (WARNING), select an existing option or type a new one --
+either way the resulting note's file opens directly so writing can
+start immediately. If it is already set, choose to update the linked
+note directly or change to a different option. Everywhere else, RET
+behaves normally.
 #+begin_src emacs-lisp
 (defun my/manifolding-atlas--current-property-key ()
   "Return the property KEY on the current line, or nil if not on one."
@@ -737,10 +740,130 @@ transcluded reference note. Everywhere else, RET behaves normally.
     (when (looking-at "^[ \t]*:\\([A-Za-z_]+\\):")
       (match-string-no-properties 1))))
 
+
+
+(defun my/manifolding-atlas--property-blueprint-file (property-type)
+  "Return the path to the blueprint file defining PROPERTY-TYPE's options."
+  (expand-file-name (format "%s.org" property-type)
+                     (expand-file-name "properties" (my/manifolding-atlas-blueprint-dir))))
+
+(defun my/manifolding-atlas--property-refs-as-candidates (property-type)
+  "Return the option strings defined as level-2 headings in the
+PROPERTY-TYPE blueprint file, excluding the WARNING sentinel."
+  (let ((file (my/manifolding-atlas--property-blueprint-file property-type)))
+    (when (file-exists-p file)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (goto-char (point-min))
+        (let (options)
+          (while (re-search-forward "^\\*\\* \\(.+\\)$" nil t)
+            (let ((title (string-trim (match-string-no-properties 1))))
+              (unless (string-equal title "WARNING")
+                (push title options))))
+          (nreverse options))))))
+
+(defvar-local my/manifolding-atlas--picker-callback nil)
+
+(defun my/manifolding-atlas--picker-select ()
+  (interactive)
+  (unless (org-at-heading-p)
+    (user-error "Point must be on an option"))
+  (let ((title (string-trim (org-get-heading t t t t)))
+        (cb my/manifolding-atlas--picker-callback))
+    (kill-buffer)
+    (when cb (funcall cb title))))
+
+(defvar my/manifolding-atlas--picker-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m (kbd "RET") #'my/manifolding-atlas--picker-select)
+    (define-key m (kbd "q") (lambda () (interactive) (kill-buffer)))
+    m))
+
+(defun my/manifolding-atlas--open-picker (property-type on-select)
+  "Open the PROPERTY-TYPE blueprint file in an org-capture buffer and
+immediately arm a key-selection jump restricted to level-2 (**)
+option headings. Pressing an option's letter selects it, closes this
+capture buffer, and calls ON-SELECT with its title -- one keypress,
+no separate mark/accept step."
+  (let* ((file (my/manifolding-atlas--property-blueprint-file property-type))
+         (org-capture-templates
+          `(("p" "Pick property option" plain (file ,file) ""
+             :unnarrowed t :empty-lines 1))))
+    (message "TRACE picker: BEFORE org-capture, current-buffer=%s" (current-buffer))
+    (org-capture nil "p")
+    (message "TRACE picker: AFTER org-capture, current-buffer=%s" (current-buffer))
+    (goto-char (point-min))
+    (let ((ks-all-windows nil))
+      (ks-jump "^\\*\\* .+$"
+               :beg (point-min)
+               :end (point-max)
+               :action
+               (lambda (pt)
+                 (goto-char pt)
+                 (org-back-to-heading t)
+                 (let ((title (string-trim (org-get-heading t t t t))))
+                   (message "TRACE picker: selected title=%s, current-buffer=%s BEFORE org-capture-kill" title (current-buffer))
+                   (org-capture-kill)
+                   (message "TRACE picker: current-buffer=%s AFTER org-capture-kill" (current-buffer))
+                   (funcall on-select title)))))))
+
+(defun my/manifolding-atlas--open-ref-file-capture (ref-id)
+  "Open REF-ID's file in a plain org-capture buffer for editing."
+  (let ((file (ignore-errors (org-id-find-id-file ref-id))))
+    (unless (and file (file-exists-p file))
+      (user-error "Could not find the reference file for %s" ref-id))
+    (message "TRACE ref-capture: BEFORE org-capture file=%s current-buffer=%s" file (current-buffer))
+    (let ((org-capture-templates
+           `(("n" "Edit ref" plain (file ,file) "" :unnarrowed t :empty-lines 1))))
+      (org-capture nil "n"))
+    (message "TRACE ref-capture: AFTER org-capture current-buffer=%s" (current-buffer))))
+
+(defun my/manifolding-atlas--property-choose-and-link (property-type key)
+  "Open the PROPERTY-TYPE blueprint file so the user can pick an
+option with a single keypress. On selection, create/reuse the ref
+note for that value and write its id-link as KEY's plain property
+VALUE inside the note's existing :PROPERTIES: drawer -- never as a
+separate transcluded block -- then open the ref note for editing."
+  (message "TRACE choose-link: START property-type=%s key=%s current-buffer=%s" property-type key (current-buffer))
+  (let ((marker (point-marker)))
+    (my/manifolding-atlas--open-picker
+     property-type
+     (lambda (final-title)
+       (message "TRACE choose-link: on-select fired final-title=%s current-buffer=%s marker-buffer=%s" final-title (current-buffer) (marker-buffer marker))
+       (let* ((link (my/manifolding-atlas--ensure-ref-note property-type final-title))
+              (ref-id (my/manifolding-atlas--id-from-link link)))
+         (unless ref-id
+           (user-error "Could not create a reference note for %s" final-title))
+         (with-current-buffer (marker-buffer marker)
+           (save-excursion
+             (goto-char marker)
+             (org-entry-put nil key link)
+             (save-buffer)))
+         (message "TRACE choose-link: about to open ref-file-capture ref-id=%s current-buffer=%s" ref-id (current-buffer))
+         (my/manifolding-atlas--open-ref-file-capture ref-id))))))
+
+(defun my/manifolding-atlas--property-pick-via-session (property-type key)
+  "Open the real declarative-prompt session for PROPERTY-TYPE/KEY on
+the note at point -- the same picker used at note creation time
+(letters jump+mark, C-l makes it live, C-e edits the file, RET
+advances). PROPERTY-TYPE doubles as the registry key-sym."
+  (when (zerop (hash-table-count my/manifolding-atlas-org-prompt--specs))
+    (my/manifolding-atlas-org-prompt--register-all))
+  (let* ((note (my/manifolding-atlas--note-at-point))
+         (spec (gethash property-type my/manifolding-atlas-org-prompt--specs)))
+    (unless note
+      (user-error "Not on a note (no :ID: on this heading)"))
+    (unless spec
+      (user-error "No declarative spec registered for %s" key))
+    (my/manifolding-atlas-org-prompt--session-begin
+     (list (list :spec spec :default nil))
+     note
+     nil)))
+
 (defun my/manifolding-atlas-property-make-live ()
-  "Prompt for a value and convert the property at point into a live,
-transcluded reference note, using the existing ensure-ref-note and
-refresh-property-transclude machinery."
+  "RET on a property: select/create its value and open the resulting
+note directly. If the property already has a live value, ask whether
+to update the existing note or change the selected option."
   (interactive)
   (let ((key (my/manifolding-atlas--current-property-key)))
     (unless key
@@ -748,22 +871,20 @@ refresh-property-transclude machinery."
     (when (member key '("ID"))
       (user-error "Cannot make the ID property live"))
     (let* ((property-type (intern (downcase (string-replace "_" "-" key))))
-           (current (or (org-entry-get nil key) ""))
-           (value (read-string
-                   (format "%s value: " (my/manifolding-atlas--property-display-name property-type))
-                   current))
-           (link (my/manifolding-atlas--ensure-ref-note property-type value))
-           (ref-id (my/manifolding-atlas--id-from-link link)))
-      (unless ref-id
-        (user-error "Could not create or find a reference note for %s" value))
-      (my/manifolding-atlas--refresh-property-transclude property-type value ref-id)
-      (message "%s is now live -> %s" key value))))
+           (raw (or (org-entry-get nil key) ""))
+           (existing-link (my/manifolding-atlas--ref-link-value raw))
+           (existing-id (car existing-link)))
+      (if existing-id
+          (if (y-or-n-p (format "%s is set -- update the note (y) or change the option (n)? " key))
+              (my/manifolding-atlas--open-ref-file existing-id)
+            (my/manifolding-atlas--property-choose-and-link property-type key))
+        (my/manifolding-atlas--property-choose-and-link property-type key)))))
 
 (defun my/manifolding-atlas-return-dispatch ()
   "RET dispatcher: make the property at point live if on one, else
 fall back to normal `org-return' behavior everywhere else."
   (interactive)
-  (if (org-in-property-drawer-p)
+  (if (my/manifolding-atlas--current-property-key)
       (my/manifolding-atlas-property-make-live)
     (call-interactively #'org-return)))
 

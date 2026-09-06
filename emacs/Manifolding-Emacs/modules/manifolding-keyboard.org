@@ -2514,6 +2514,7 @@ Own block: an error here must never abort the core rebuild above.
     ("Q"    . my/org-insert-code-block)
     ("L"    . org-latex-preview)
     ("X"    . my/org-insert-latex-block)
+    ("RET"  . my/manifolding-atlas-return-dispatch)
     ("V"    . manifolding-atlas-find)
     ("I"    . manifolding-atlas-insert)
     ("u"    . vundo)
